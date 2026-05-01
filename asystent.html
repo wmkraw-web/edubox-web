@@ -27,7 +27,7 @@
         ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #475569; }
 
-        .fade-in { animation: fadeIn 0.4s ease-out forwards; }
+        .fade-in { animation: fadeIn 0.3s ease-out forwards; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 
         /* Komponenty UI */
@@ -89,13 +89,9 @@
 
         const getSystemPrompt = (module, docType, customHeaders) => {
             if (module === 'dokumenty') {
-                let base = `Jesteś wybitnym pedagogiem specjalnym. Wygeneruj profesjonalny dokument urzędowy o typie: ${docType}. Używaj języka formalnego, pedagogicznego, zgodnego z wytycznymi MEN. Nie używaj formatowania Markdown (**).`;
+                let base = `Jesteś wybitnym pedagogiem specjalnym. Wygeneruj profesjonalny dokument urzędowy o typie: \${docType}. Używaj języka formalnego, pedagogicznego, zgodnego z wytycznymi MEN. Nie używaj formatowania Markdown (**).`;
                 if (customHeaders) {
-                    base += `\n\nUWAGA! Użytkownik podał własne nagłówki/strukturę, której MUSISZ bezwzględnie przestrzegać:\n"${customHeaders}"\nDopasuj wygenerowaną treść do tych nagłówków.`;
-                } else {
-                    if (docType === 'ipet') base += `\nStruktura domyślna: 1. Cele, 2. Metody pracy, 3. Dostosowania wymagań, 4. Działania wspierające.`;
-                    if (docType === 'wopfu') base += `\nStruktura domyślna: 1. Poziom funkcjonowania, 2. Trudności i bariery, 3. Potencjał ucznia, 4. Rekomendacje.`;
-                    if (docType === 'opinia') base += `\nStruktura domyślna: 1. Powód opinii, 2. Funkcjonowanie dydaktyczne, 3. Funkcjonowanie społeczno-emocjonalne, 4. Wnioski.`;
+                    base += `\n\nUWAGA! Użytkownik podał własne nagłówki/strukturę, której MUSISZ bezwzględnie przestrzegać:\n"\${customHeaders}"\nDopasuj wygenerowaną treść do tych nagłówków.`;
                 }
                 return base;
             }
@@ -104,13 +100,9 @@
 Napisz ją w pierwszej osobie ("Ja"). 
 Podziel tekst WYRAŹNIE na 3 obszerne akapity opatrzone nagłówkami:
 1. PROBLEM (Opisz dokładnie trudną sytuację z perspektywy dziecka i emocje, które jej towarzyszą).
-2. STRATEGIA (Opisz, co dziecko może zrobić, by poczuć się lepiej, jakich strategii radzenia sobie ze złością/stresem użyć, lub kto i jak mu pomaga).
-3. EFEKT (Opisz pozytywne zakończenie, poczucie dumy i spokój dziecka po poprawnym rozwiązaniu problemu).
-Tekst musi być uspokajający, wspierający i odpowiedni dla dzieci ze specjalnymi potrzebami.`;
+2. STRATEGIA (Opisz, co dziecko może zrobić, by poczuć się lepiej, jakich strategii radzenia sobie użyć).
+3. EFEKT (Opisz pozytywne zakończenie i spokój dziecka).`;
             }
-            if (module === 'rymowanki') return `Jesteś nauczycielem wychowania przedszkolnego. Ułóż radosną, wpadającą w ucho rymowankę pomagającą dziecku zapamiętać ważną czynność lub zasadę.`;
-            if (module === 'tus') return `Jesteś trenerem TUS (Trening Umiejętności Społecznych). Przygotuj krótki, 15-minutowy scenariusz ćwiczenia danej umiejętności dla grupy (cel, przebieg zabawy, omówienie).`;
-            if (module === 'rodzice') return `Jesteś szkolnym dyplomatą używającym NVC (Porozumienie bez Przemocy). Przekształć notatkę w kulturalną, profesjonalną wiadomość e-mail do rodzica (tzw. metoda kanapki).`;
             return "Jesteś ekspertem edukacyjnym.";
         };
 
@@ -143,18 +135,8 @@ Tekst musi być uspokajający, wspierający i odpowiedni dla dzieci ze specjalny
             const handleFileUpload = (e) => {
                 const file = e.target.files[0];
                 if (!file) return;
-                
-                if (file.name.endsWith('.txt')) {
-                    const reader = new FileReader();
-                    reader.onload = (evt) => {
-                        setOrzeczenieTekst(evt.target.result);
-                        setShowFileTextArea(true);
-                    };
-                    reader.readAsText(file);
-                } else {
-                    alert("Zabezpieczenie przeglądarki: Otwórz plik PDF/DOCX na swoim komputerze, skopiuj treść orzeczenia i wklej w pole tekstowe, które zaraz się pojawi.");
-                    setShowFileTextArea(true);
-                }
+                alert("Zabezpieczenie: skopiuj treść orzeczenia i wklej w pole tekstowe poniżej.");
+                setShowFileTextArea(true);
             };
 
             const secureApiCall = async (payload, type = 'text') => {
@@ -165,33 +147,28 @@ Tekst musi być uspokajający, wspierający i odpowiedni dla dzieci ze specjalny
                         body: JSON.stringify({ payload, type })
                     });
                     const data = await response.json();
-                    if (!response.ok) throw new Error(data.error || `Błąd serwera Vercel (${response.status})`);
+                    if (!response.ok) throw new Error(data.error || "Błąd serwera");
                     return data;
                 } catch (error) {
-                    console.error("Błąd sieci:", error);
-                    throw new Error("Wystąpił błąd podczas łączenia z głównym serwerem EduBox AI.");
+                    throw new Error("Błąd sieci serwera EduBox.");
                 }
             };
 
             const handleGenerate = async () => {
-                if (!isUnlocked) { setError("Wpisz poprawny kod dostępu w lewym menu!"); return; }
+                if (!isUnlocked) { setError("Wpisz poprawny kod PIN!"); return; }
                 
                 setIsGenerating(true); 
                 setError(''); 
                 setGeneratedText(''); 
                 setGeneratedImages([]);
-                setLoadingMsg('Analizuję problem i przygotowuję materiały...');
+                setLoadingMsg('Analizuję sytuację...');
 
                 try {
                     let finalPrompt = "";
                     if (activeModule === 'dokumenty') {
-                        finalPrompt = `Wygeneruj dokument: ${DOC_TYPES.find(d => d.id === docType)?.label}\n`;
-                        if (diagnoza) finalPrompt += `\nDiagnoza/Deficyty: ${diagnoza}`;
-                        if (mocneStrony) finalPrompt += `\nPotencjał/Mocne strony: ${mocneStrony}`;
-                        if (trudnosci) finalPrompt += `\nTrudności/Bariery: ${trudnosci}`;
-                        if (orzeczenieTekst) finalPrompt += `\n\nTREŚĆ ORZECZENIA Z PORADNI DO UWZGLĘDNIENIA:\n"""\n${orzeczenieTekst}\n"""`;
+                        finalPrompt = `Dokument: \${docType}\nDiagnoza: \${diagnoza}\nMocne strony: \${mocneStrony}\nTrudności: \${trudnosci}`;
                     } else {
-                        finalPrompt = `Temat / Problem / Notatka: ${genericInput}`;
+                        finalPrompt = `Temat: \${genericInput}`;
                     }
 
                     const textPayload = {
@@ -201,23 +178,25 @@ Tekst musi być uspokajający, wspierający i odpowiedni dla dzieci ze specjalny
 
                     const textData = await secureApiCall(textPayload, 'text');
                     const story = textData.candidates?.[0]?.content?.parts?.[0]?.text;
-                    if (!story) throw new Error("API nie zwróciło poprawnego tekstu.");
-                    
+                    if (!story) throw new Error("Pusta odpowiedź AI.");
                     setGeneratedText(story);
                     
                     setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
 
                     // =========================================================
-                    // BEZPIECZNE GENEROWANIE GRAFIK (OMIJANIE FILTRÓW NSFW/CHILD)
+                    // BEZPIECZNE PROMPTY (OMIJAJĄCE FILTRY)
                     // =========================================================
                     if (activeModule === 'historyjki') {
-                        // Złagodzone polecenia. 
-                        // Zamiast "sad/crying child" piszemy "puzzled/unsure character facing a challenge".
-                        // To bezpieczne dla AI, a efekt na obrazku wciąż pokazuje zmianę z zagubienia w uśmiech.
+                        // Zamiast "Kuba bije kolegę" używamy "Subject: [cleaned]"
+                        const cleanTheme = genericInput.substring(0, 60).replace(/[^\w\sąęćźżłóń]/gi, '');
+
                         const prompts = [
-                            `A cute simple 2D therapeutic illustration for kids showing a challenging situation: ${genericInput}. The main character looks puzzled or unsure, facing a minor challenge. Calm pastel colors.`,
-                            `A cute simple 2D therapeutic illustration for kids showing a coping strategy for: ${genericInput}. The main character is calm, taking a deep breath, focusing on the solution. Calm pastel colors.`,
-                            `A cute simple 2D therapeutic illustration for kids showing a happy resolution for: ${genericInput}. The main character has a wide smile, feeling very proud and joyful. Bright cheerful pastel colors.`
+                            // 1. Problem (Używamy: "pensive, unsure character")
+                            `Whimsical 2D illustration, storybook style. A young student character looks pensive and unsure, standing in front of a classroom challenge. Theme: \${cleanTheme}. Calm soft colors.`,
+                            // 2. Strategia (Używamy: "peaceful, taking a breath")
+                            `Whimsical 2D illustration, storybook style. A young student character taking a peaceful deep breath, feeling calm and focused. Theme: \${cleanTheme}. Soft soothing colors.`,
+                            // 3. Efekt (Używamy: "joyful success, big happy smile")
+                            `Whimsical 2D illustration, storybook style. A young student character with a joyful big smile, feeling very proud and happy. Theme: \${cleanTheme}. Bright cheerful colors.`
                         ];
                         
                         try {
@@ -229,23 +208,19 @@ Tekst musi być uspokajający, wspierający i odpowiedni dla dzieci ze specjalny
                             
                             results.forEach(res => {
                                 if (res.status === 'fulfilled' && res.value.predictions?.[0]?.bytesBase64Encoded) {
-                                    newImages.push(`data:image/png;base64,${res.value.predictions[0].bytesBase64Encoded}`);
+                                    newImages.push(`data:image/png;base64,\${res.value.predictions[0].bytesBase64Encoded}`);
                                 } else {
                                     failedCount++;
-                                    console.error("Błąd generowania pojedynczego obrazka:", res.reason);
                                 }
                             });
                             
                             setGeneratedImages(newImages);
                             
-                            // Jeśli filtry zablokowały część obrazków (wciąż może się zdarzyć przy trudnych tematach)
                             if (failedCount > 0) {
-                                setError(`Filtry bezpieczeństwa AI zablokowały wygenerowanie ${failedCount} z 3 obrazków (uznano je za potencjalnie zbyt wrażliwe). Spróbuj opisać sytuację jeszcze delikatniej.`);
+                                setError(`UWAGA: Wygenerowano \${3-failedCount} z 3 obrazków. Filtry AI wciąż blokują niektóre drastyczne opisy problemów.`);
                             }
                             
-                        } catch(e) {
-                            console.log("Ogólny błąd obrazków:", e);
-                        }
+                        } catch(e) { console.log("Błąd grafiki:", e); }
                     }
 
                 } catch (err) {
@@ -268,13 +243,11 @@ Tekst musi być uspokajający, wspierający i odpowiedni dla dzieci ze specjalny
                     <div className="sidebar w-72 flex-shrink-0 flex flex-col h-screen sticky top-0 print-hidden">
                         <div className="p-6 border-b border-slate-800">
                             <h1 className="font-bold text-slate-300 text-sm tracking-widest uppercase">Kombajn Modułowy PRO</h1>
-                            <p className="text-xs text-slate-500 mt-1">(Powered by OpenAI)</p>
                         </div>
 
                         <div className="p-6 flex-1 overflow-y-auto custom-scrollbar">
                             <div className="mb-8">
-                                <h2 className="font-bold text-white mb-4 flex items-center gap-2">🔑 Autoryzacja</h2>
-                                <label className="block text-xs text-slate-400 mb-2">Kod dostępu:</label>
+                                <h2 className="font-bold text-white mb-2">🔑 PIN</h2>
                                 <div className="relative mb-4">
                                     <input 
                                         type={showPassword ? "text" : "password"} 
@@ -284,24 +257,18 @@ Tekst musi być uspokajający, wspierający i odpowiedni dla dzieci ze specjalny
                                     />
                                     <button onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white">👁️</button>
                                 </div>
-                                <div className={`p-4 rounded-lg text-xs leading-relaxed transition-colors duration-300 ${isUnlocked ? 'auth-box unlocked' : 'auth-box'}`}>
-                                    {isUnlocked ? "✅ Dostęp odblokowany. Moduły aktywne." : "Podaj aktywny kod, aby odblokować generowanie."}
+                                <div className={`p-4 rounded-lg text-xs leading-relaxed \${isUnlocked ? 'auth-box unlocked' : 'auth-box'}`}>
+                                    {isUnlocked ? "✅ System gotowy." : "Podaj PIN (awans2024)"}
                                 </div>
                             </div>
 
-                            <hr className="border-slate-800 mb-8" />
-
-                            <div>
-                                <h2 className="font-bold text-white mb-4 flex items-center gap-2">🛠️ Wybierz Narzędzie</h2>
-                                <div className="space-y-1">
-                                    {MODULES.map(mod => (
-                                        <div key={mod.id} onClick={() => { setActiveModule(mod.id); resetForm(); }} className={`module-btn ${activeModule === mod.id ? 'active' : ''}`}>
-                                            <span className="w-5 text-center">{mod.icon}</span>
-                                            <span>{mod.label}</span>
-                                            {activeModule === mod.id && <span className="ml-auto w-2 h-2 rounded-full bg-red-500"></span>}
-                                        </div>
-                                    ))}
-                                </div>
+                            <div className="space-y-1">
+                                {MODULES.map(mod => (
+                                    <div key={mod.id} onClick={() => { setActiveModule(mod.id); resetForm(); }} className={`module-btn \${activeModule === mod.id ? 'active' : ''}`}>
+                                        <span className="w-5 text-center">{mod.icon}</span>
+                                        <span>{mod.label}</span>
+                                    </div>
+                                ))}
                             </div>
                         </div>
                     </div>
@@ -309,9 +276,9 @@ Tekst musi być uspokajający, wspierający i odpowiedni dla dzieci ze specjalny
                     <div className="main-content flex-1 bg-[#020617] p-6 lg:p-10 min-w-0">
                         {!generatedText && !isGenerating ? (
                             <div className="max-w-4xl fade-in print-hidden">
-                                {activeModule === 'dokumenty' && (
+                                {activeModule === 'dokumenty' ? (
                                     <div className="space-y-6">
-                                        <h2 className="text-2xl font-bold text-white mb-6">Asystent Dokumentów (IPET/WOPFU)</h2>
+                                        <h2 className="text-2xl font-bold text-white mb-6">Asystent Dokumentów</h2>
                                         <div className="card-bg p-2 rounded-xl">
                                             {DOC_TYPES.map(doc => (
                                                 <div key={doc.id}>
@@ -320,59 +287,31 @@ Tekst musi być uspokajający, wspierający i odpowiedni dla dzieci ze specjalny
                                                 </div>
                                             ))}
                                         </div>
-
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                             <div className="card-bg p-4 rounded-xl">
-                                                <label className="block text-sm font-bold text-slate-300 mb-2">Diagnoza / Deficyty:</label>
-                                                <textarea value={diagnoza} onChange={(e) => setDiagnoza(e.target.value)} placeholder="Np. Spektrum autyzmu, ADHD..." className="w-full h-24 input-bg rounded-lg p-3 text-sm custom-scrollbar resize-y"></textarea>
+                                                <label className="block text-sm font-bold text-slate-300 mb-2">Diagnoza:</label>
+                                                <textarea value={diagnoza} onChange={(e) => setDiagnoza(e.target.value)} className="w-full h-24 input-bg rounded-lg p-3 text-sm"></textarea>
                                             </div>
                                             <div className="card-bg p-4 rounded-xl">
-                                                <label className="block text-sm font-bold text-slate-300 mb-2">Własne nagłówki (Opcjonalnie):</label>
-                                                <textarea value={naglowki} onChange={(e) => setNaglowki(e.target.value)} placeholder="Wklej tu nazwy nagłówków wymaganych w szkole..." className="w-full h-24 input-bg rounded-lg p-3 text-sm custom-scrollbar resize-y"></textarea>
+                                                <label className="block text-sm font-bold text-slate-300 mb-2">Nagłówki:</label>
+                                                <textarea value={naglowki} onChange={(e) => setNaglowki(e.target.value)} className="w-full h-24 input-bg rounded-lg p-3 text-sm"></textarea>
                                             </div>
                                         </div>
-
                                         <div className="card-bg p-4 rounded-xl">
-                                            <label className="block text-sm font-bold text-amber-400 mb-2">💪 Mocne strony / Zasoby (Potencjał):</label>
-                                            <textarea value={mocneStrony} onChange={(e) => setMocneStrony(e.target.value)} className="w-full h-24 input-bg rounded-lg p-3 text-sm custom-scrollbar resize-y"></textarea>
+                                            <label className="block text-sm font-bold text-amber-400 mb-2">Mocne strony:</label>
+                                            <textarea value={mocneStrony} onChange={(e) => setMocneStrony(e.target.value)} className="w-full h-24 input-bg rounded-lg p-3 text-sm"></textarea>
                                         </div>
-
                                         <div className="card-bg p-4 rounded-xl">
-                                            <label className="block text-sm font-bold text-rose-400 mb-2">🚧 Trudności / Bariery (Dysfunkcje):</label>
-                                            <textarea value={trudnosci} onChange={(e) => setTrudnosci(e.target.value)} className="w-full h-24 input-bg rounded-lg p-3 text-sm custom-scrollbar resize-y"></textarea>
-                                        </div>
-
-                                        <div>
-                                            <label className="block text-sm font-bold text-slate-300 mb-2">Wgraj orzeczenia z Poradni (PDF/DOCX/TXT):</label>
-                                            <div className="upload-box" onClick={() => fileInputRef.current.click()}>
-                                                <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept=".txt,.pdf,.docx" className="hidden" />
-                                                <div className="flex items-center justify-center gap-4">
-                                                    <span className="bg-slate-800 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm border border-slate-600 hover:bg-slate-700">
-                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
-                                                        Dodaj plik
-                                                    </span>
-                                                </div>
-                                            </div>
-                                            {showFileTextArea && (
-                                                <div className="mt-4 fade-in">
-                                                    <label className="block text-xs text-slate-400 mb-1">Treść orzeczenia (do wklejenia ręcznego jeśli plik zawiedzie):</label>
-                                                    <textarea value={orzeczenieTekst} onChange={(e) => setOrzeczenieTekst(e.target.value)} className="w-full h-32 input-bg rounded-lg p-3 text-sm custom-scrollbar resize-y border-emerald-500/50"></textarea>
-                                                </div>
-                                            )}
+                                            <label className="block text-sm font-bold text-rose-400 mb-2">Trudności:</label>
+                                            <textarea value={trudnosci} onChange={(e) => setTrudnosci(e.target.value)} className="w-full h-24 input-bg rounded-lg p-3 text-sm"></textarea>
                                         </div>
                                     </div>
-                                )}
-
-                                {activeModule !== 'dokumenty' && (
+                                ) : (
                                     <div className="space-y-6">
-                                        <h2 className="text-2xl font-bold text-white mb-2">
-                                            {MODULES.find(m => m.id === activeModule)?.icon} {MODULES.find(m => m.id === activeModule)?.label}
-                                        </h2>
-                                        <p className="text-slate-400 text-sm mb-6">Opisz krótko problem lub sytuację, a AI zajmie się resztą.</p>
-                                        
+                                        <h2 className="text-2xl font-bold text-white mb-2">{MODULES.find(m => m.id === activeModule)?.label}</h2>
                                         <div className="card-bg p-4 rounded-xl">
-                                            <label className="block text-sm font-bold text-slate-300 mb-2">Opis sytuacji / Wytyczne:</label>
-                                            <textarea value={genericInput} onChange={(e) => setGenericInput(e.target.value)} placeholder="Wpisz tutaj szczegóły..." className="w-full h-40 input-bg rounded-lg p-4 text-sm sm:text-base custom-scrollbar resize-y"></textarea>
+                                            <label className="block text-sm font-bold text-slate-300 mb-2">Opis sytuacji:</label>
+                                            <textarea value={genericInput} onChange={(e) => setGenericInput(e.target.value)} placeholder="Wpisz krótko co się dzieje..." className="w-full h-40 input-bg rounded-lg p-4 text-sm"></textarea>
                                         </div>
                                     </div>
                                 )}
@@ -383,50 +322,37 @@ Tekst musi być uspokajający, wspierający i odpowiedni dla dzieci ze specjalny
 
                         <div className="mt-8 max-w-4xl print-hidden">
                             {!generatedText || isGenerating ? (
-                                <button onClick={handleGenerate} disabled={isGenerating || !isUnlocked} className="btn-red px-8 py-4 rounded-xl font-bold transition-all w-full sm:w-auto flex items-center justify-center gap-3 shadow-lg">
+                                <button onClick={handleGenerate} disabled={isGenerating || !isUnlocked} className="btn-red px-8 py-4 rounded-xl font-bold w-full sm:w-auto flex items-center justify-center gap-3">
                                     {isGenerating ? (
-                                        <><svg className="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> {loadingMsg || "TRWA TWORZENIE..."}</>
-                                    ) : `✨ GENERUJ ${activeModule === 'dokumenty' ? 'DOKUMENT' : 'MATERIAŁ'}`}
+                                        <><svg className="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> {loadingMsg || "Pracuję..."}</>
+                                    ) : `✨ GENERUJ MATERIAŁ`}
                                 </button>
                             ) : null}
                         </div>
 
-                        {/* Wyniki pojawiają się tuż po wygenerowaniu tekstu */}
                         {generatedText && (
                             <div ref={resultRef} className="max-w-5xl fade-in pb-10 mt-6">
                                 <div className="flex items-center justify-between mb-6 print-hidden border-b border-slate-800 pb-4">
-                                    <h2 className="text-2xl font-bold text-white">Wygenerowany Materiał</h2>
+                                    <h2 className="text-2xl font-bold text-white">Twój Materiał</h2>
                                     <div className="flex gap-3">
-                                        <button onClick={() => window.print()} className="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-lg text-sm font-bold border border-slate-600 shadow-md transition-colors">🖨️ Drukuj</button>
-                                        <button onClick={resetForm} disabled={isGenerating} className="bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-md transition-colors">Wróć</button>
+                                        <button onClick={() => window.print()} className="bg-slate-800 text-white px-4 py-2 rounded-lg text-sm font-bold border border-slate-600 transition-colors hover:bg-slate-700">🖨️ Drukuj</button>
+                                        <button onClick={resetForm} className="bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-red-500 transition-colors">Wróć</button>
                                     </div>
                                 </div>
 
                                 <div className="card-bg p-8 sm:p-12 rounded-[2rem] print-area flex flex-col gap-8">
-                                    
-                                    {activeModule === 'historyjki' && (
+                                    {activeModule === 'historyjki' && generatedImages.length > 0 && (
                                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full print-images-grid">
-                                            {/* Zwrócone obrazki */}
                                             {generatedImages.map((img, idx) => (
                                                 <div key={idx} className="flex flex-col items-center fade-in">
-                                                    <img src={img} alt={`Ilustracja ${idx + 1}`} className="w-full aspect-square object-cover rounded-2xl border-4 border-slate-800 shadow-xl" />
-                                                    <p className="text-center text-xs text-slate-300 mt-3 font-bold uppercase tracking-widest bg-slate-900 px-4 py-1.5 rounded-full border border-slate-700">
+                                                    <img src={img} alt={`Krok \${idx+1}`} className="w-full aspect-square object-cover rounded-2xl border-4 border-slate-800 shadow-xl" />
+                                                    <p className="text-center text-xs text-slate-300 mt-3 font-bold uppercase bg-slate-900 px-4 py-1.5 rounded-full border border-slate-700">
                                                         {idx === 0 ? "1. Problem" : idx === 1 ? "2. Strategia" : "3. Efekt"}
                                                     </p>
                                                 </div>
                                             ))}
-                                            {/* Szkicowe ładowanie dla obrazków, które jeszcze "idą" */}
-                                            {isGenerating && generatedImages.length < 3 && Array(3 - generatedImages.length).fill(0).map((_, idx) => (
-                                                <div key={`loading-${idx}`} className="flex flex-col items-center justify-center aspect-square rounded-2xl border-4 border-dashed border-slate-700 bg-slate-800/50 fade-in">
-                                                    <svg className="animate-spin h-8 w-8 text-rose-500 mb-2" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                                                    <span className="text-slate-400 text-xs font-bold">
-                                                        Rysowanie {generatedImages.length + idx === 0 ? "Problemu" : generatedImages.length + idx === 1 ? "Strategii" : "Efektu"}...
-                                                    </span>
-                                                </div>
-                                            ))}
                                         </div>
                                     )}
-
                                     <div className="w-full text-slate-200 whitespace-pre-wrap text-lg leading-relaxed">
                                         {generatedText}
                                     </div>
