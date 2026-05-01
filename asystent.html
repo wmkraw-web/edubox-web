@@ -27,7 +27,7 @@
         ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #475569; }
 
-        .fade-in { animation: fadeIn 0.3s ease-out forwards; }
+        .fade-in { animation: fadeIn 0.4s ease-out forwards; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 
         /* Komponenty UI */
@@ -71,7 +71,6 @@
         const { useState, useRef, useEffect } = React;
 
         const SECRET_PIN = "awans2024"; 
-        const BUY_COFFEE_LINK = "https://buycoffee.to/magiccolor";
 
         const DOC_TYPES = [
             { id: 'ipet', label: 'IPET (Indywidualny Program Edukacyjno-Terapeutyczny)' },
@@ -101,7 +100,6 @@
                 return base;
             }
             if (module === 'historyjki') {
-                // NOWY, ROZBUDOWANY PROMPT DLA HISTORYJEK
                 return `Jesteś pedagogiem specjalnym i terapeutą. Napisz rozbudowaną, empatyczną 'Historyjkę Społeczną' wg zasad Carol Gray. 
 Napisz ją w pierwszej osobie ("Ja"). 
 Podziel tekst WYRAŹNIE na 3 obszerne akapity opatrzone nagłówkami:
@@ -132,8 +130,9 @@ Tekst musi być uspokajający, wspierający i odpowiedni dla dzieci ze specjalny
             const [genericInput, setGenericInput] = useState('');
 
             const [generatedText, setGeneratedText] = useState('');
-            const [generatedImages, setGeneratedImages] = useState([]); // Zmienione na tablicę
+            const [generatedImages, setGeneratedImages] = useState([]); 
             const [isGenerating, setIsGenerating] = useState(false);
+            const [loadingMsg, setLoadingMsg] = useState(''); // Komunikaty ładowania
             const [error, setError] = useState('');
 
             const fileInputRef = useRef(null);
@@ -176,7 +175,12 @@ Tekst musi być uspokajający, wspierający i odpowiedni dla dzieci ze specjalny
 
             const handleGenerate = async () => {
                 if (!isUnlocked) { setError("Wpisz poprawny kod dostępu w lewym menu!"); return; }
-                setIsGenerating(true); setError(''); setGeneratedText(''); setGeneratedImages([]);
+                
+                setIsGenerating(true); 
+                setError(''); 
+                setGeneratedText(''); 
+                setGeneratedImages([]);
+                setLoadingMsg('Piszę tekst materiału...');
 
                 try {
                     let finalPrompt = "";
@@ -200,41 +204,43 @@ Tekst musi być uspokajający, wspierający i odpowiedni dla dzieci ze specjalny
                     if (!story) throw new Error("API nie zwróciło poprawnego tekstu.");
                     
                     setGeneratedText(story);
+                    
+                    // Przewijamy do dołu, by użytkownik mógł już czytać tekst, podczas gdy obrazki się generują!
+                    setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
 
                     // =========================================================
-                    // 3 GRAFIKI JEDNOCZEŚNIE DLA HISTORYJEK
+                    // KOLEJKOWANIE 3 GRAFIK (Zapobiega przeciążeniom i błędom)
                     // =========================================================
                     if (activeModule === 'historyjki') {
-                        try {
-                            // ZMIANA: Bardzo silne, wyraźne emocje na samym początku każdego promptu!
-                            const imgPromises = [
-                                secureApiCall({ instances: { prompt: `Facial expression: VERY SAD, CRYING, FRUSTRATED, ANXIOUS. A child experiencing a problem: ${genericInput}. Cute simple 2D therapeutic illustration for kids, calm colors.` } }, 'image'),
-                                secureApiCall({ instances: { prompt: `Facial expression: CALM, FOCUSED, TAKING A DEEP BREATH. A child using a coping strategy for: ${genericInput}. Cute simple 2D therapeutic illustration for kids, calm colors.` } }, 'image'),
-                                secureApiCall({ instances: { prompt: `Facial expression: VERY HAPPY, WIDE SMILE, PROUD, RELIEVED. A child who successfully resolved: ${genericInput}. Cute simple 2D therapeutic illustration for kids, calm colors.` } }, 'image')
-                            ];
-                            
-                            // Czekamy na wszystkie 3 obrazy naraz
-                            const results = await Promise.allSettled(imgPromises);
-                            const newImages = [];
-                            
-                            results.forEach(res => {
-                                if (res.status === 'fulfilled' && res.value.predictions?.[0]?.bytesBase64Encoded) {
-                                    newImages.push(`data:image/png;base64,${res.value.predictions[0].bytesBase64Encoded}`);
+                        const prompts = [
+                            `Facial expression: VERY SAD, CRYING, FRUSTRATED, ANXIOUS. A child experiencing a problem: ${genericInput}. Cute simple 2D therapeutic illustration for kids, calm colors.`,
+                            `Facial expression: CALM, FOCUSED, TAKING A DEEP BREATH. A child using a coping strategy for: ${genericInput}. Cute simple 2D therapeutic illustration for kids, calm colors.`,
+                            `Facial expression: VERY HAPPY, WIDE SMILE, PROUD, RELIEVED. A child who successfully resolved: ${genericInput}. Cute simple 2D therapeutic illustration for kids, calm colors.`
+                        ];
+                        
+                        const fetchedImages = [];
+                        
+                        for (let i = 0; i < prompts.length; i++) {
+                            setLoadingMsg(`Rysuję obrazek ${i + 1} z 3...`); // Zmieniamy napis na przycisku!
+                            try {
+                                const imgData = await secureApiCall({ instances: { prompt: prompts[i] } }, 'image');
+                                const base64Image = imgData.predictions?.[0]?.bytesBase64Encoded;
+                                if (base64Image) {
+                                    fetchedImages.push(`data:image/png;base64,${base64Image}`);
+                                    // Aktualizujemy stan od razu, by obrazek "wskoczył" na ekran!
+                                    setGeneratedImages([...fetchedImages]);
                                 }
-                            });
-                            
-                            setGeneratedImages(newImages);
-                        } catch(e) {
-                            console.log("Generowanie obrazków zignorowane:", e);
+                            } catch(e) {
+                                console.log(`Błąd obrazka ${i + 1}:`, e);
+                            }
                         }
                     }
-
-                    setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
 
                 } catch (err) {
                     setError('BŁĄD: ' + err.message);
                 } finally {
                     setIsGenerating(false);
+                    setLoadingMsg('');
                 }
             };
 
@@ -242,6 +248,7 @@ Tekst musi być uspokajający, wspierający i odpowiedni dla dzieci ze specjalny
                 setGeneratedText('');
                 setGeneratedImages([]);
                 setError('');
+                setLoadingMsg('');
             };
 
             return (
@@ -288,7 +295,7 @@ Tekst musi być uspokajający, wspierający i odpowiedni dla dzieci ze specjalny
                     </div>
 
                     <div className="main-content flex-1 bg-[#020617] p-6 lg:p-10 min-w-0">
-                        {!generatedText ? (
+                        {!generatedText && !isGenerating ? (
                             <div className="max-w-4xl fade-in print-hidden">
                                 {activeModule === 'dokumenty' && (
                                     <div className="space-y-6">
@@ -357,38 +364,53 @@ Tekst musi być uspokajający, wspierający i odpowiedni dla dzieci ze specjalny
                                         </div>
                                     </div>
                                 )}
-
-                                {error && <div className="mt-6 p-4 bg-red-900/40 border border-red-500/50 rounded-xl text-red-400 text-sm font-medium">{error}</div>}
-
-                                <div className="mt-8">
-                                    <button onClick={handleGenerate} disabled={isGenerating || !isUnlocked} className="btn-red px-8 py-4 rounded-xl font-bold transition-all w-full sm:w-auto">
-                                        {isGenerating ? "TRWA TWORZENIE (ok. 10s)..." : `✨ GENERUJ ${activeModule === 'dokumenty' ? 'DOKUMENT' : 'MATERIAŁ'}`}
-                                    </button>
-                                </div>
                             </div>
-                        ) : (
-                            <div ref={resultRef} className="max-w-5xl fade-in pb-10">
+                        ) : null}
+
+                        {/* Obszar błędów lub trwania generowania zawsze widoczny na dole gdy generuje */}
+                        {error && <div className="mt-6 max-w-4xl p-4 bg-red-900/40 border border-red-500/50 rounded-xl text-red-400 text-sm font-medium">{error}</div>}
+
+                        <div className="mt-8 max-w-4xl print-hidden">
+                            {!generatedText || isGenerating ? (
+                                <button onClick={handleGenerate} disabled={isGenerating || !isUnlocked} className="btn-red px-8 py-4 rounded-xl font-bold transition-all w-full sm:w-auto flex items-center justify-center gap-3 shadow-lg">
+                                    {isGenerating ? (
+                                        <><svg className="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> {loadingMsg || "TRWA TWORZENIE..."}</>
+                                    ) : `✨ GENERUJ ${activeModule === 'dokumenty' ? 'DOKUMENT' : 'MATERIAŁ'}`}
+                                </button>
+                            ) : null}
+                        </div>
+
+                        {/* Wyniki pojawiają się tuż po wygenerowaniu tekstu */}
+                        {generatedText && (
+                            <div ref={resultRef} className="max-w-5xl fade-in pb-10 mt-6">
                                 <div className="flex items-center justify-between mb-6 print-hidden border-b border-slate-800 pb-4">
                                     <h2 className="text-2xl font-bold text-white">Wygenerowany Materiał</h2>
                                     <div className="flex gap-3">
-                                        <button onClick={() => window.print()} className="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-lg text-sm font-bold border border-slate-600">🖨️ Drukuj</button>
-                                        <button onClick={resetForm} className="bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded-lg text-sm font-bold">Wróć</button>
+                                        <button onClick={() => window.print()} className="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-lg text-sm font-bold border border-slate-600 shadow-md transition-colors">🖨️ Drukuj</button>
+                                        <button onClick={resetForm} disabled={isGenerating} className="bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-md transition-colors">Wróć</button>
                                     </div>
                                 </div>
 
                                 <div className="card-bg p-8 sm:p-12 rounded-[2rem] print-area flex flex-col gap-8">
                                     
-                                    {/* 3 Obrazki dla historyjek ustawione w rzędzie */}
-                                    {generatedImages.length > 0 && (
+                                    {/* 3 Obrazki dla historyjek ustawione w rzędzie. Pokazują się na żywo! */}
+                                    {activeModule === 'historyjki' && generatedImages.length > 0 && (
                                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full print-images-grid">
                                             {generatedImages.map((img, idx) => (
-                                                <div key={idx} className="flex flex-col items-center">
+                                                <div key={idx} className="flex flex-col items-center fade-in">
                                                     <img src={img} alt={`Ilustracja ${idx + 1}`} className="w-full aspect-square object-cover rounded-2xl border-4 border-slate-800 shadow-xl" />
                                                     <p className="text-center text-xs text-slate-300 mt-3 font-bold uppercase tracking-widest bg-slate-900 px-4 py-1.5 rounded-full border border-slate-700">
                                                         {idx === 0 ? "1. Problem" : idx === 1 ? "2. Strategia" : "3. Efekt"}
                                                     </p>
                                                 </div>
                                             ))}
+                                            {/* Szkicowy podgląd ładowania kolejnych obrazków */}
+                                            {isGenerating && generatedImages.length < 3 && (
+                                                <div className="flex flex-col items-center justify-center aspect-square rounded-2xl border-4 border-dashed border-slate-700 bg-slate-800/50">
+                                                    <svg className="animate-spin h-8 w-8 text-rose-500 mb-2" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                                                    <span className="text-slate-400 text-xs font-bold">Rysowanie...</span>
+                                                </div>
+                                            )}
                                         </div>
                                     )}
 
