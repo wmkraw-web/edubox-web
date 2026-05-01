@@ -4,30 +4,55 @@ export default async function handler(req, res) {
   }
 
   const { payload, type } = req.body;
-  const geminiApiKey = process.env.GEMINI_API_KEY;
 
   if (type === 'text') {
-    if (!geminiApiKey) return res.status(500).json({ error: 'Błąd: Brak GEMINI_API_KEY w Vercel.' });
+    const openaiKey = process.env.OPENAI_API_KEY;
+    if (!openaiKey) return res.status(500).json({ error: 'Błąd: Brak klucza OPENAI_API_KEY w Vercel.' });
 
-    // WRACAMY DO KORZENI: Stary, niezawodny model gemini-pro (ten sam co w Streamlit)
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${geminiApiKey}`;
+    // Tłumaczymy format zapytania ze starego na profesjonalne OpenAI
+    let systemPrompt = "Jesteś ekspertem edukacyjnym.";
+    if (payload.systemInstruction?.parts?.[0]?.text) {
+        systemPrompt = payload.systemInstruction.parts[0].text;
+    }
+
+    let userPrompt = "";
+    if (payload.contents?.[0]?.parts?.[0]?.text) {
+        userPrompt = payload.contents[0].parts[0].text;
+    }
+
     try {
-      const response = await fetch(url, {
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${openaiKey}`
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini', // Błyskawiczny, niezawodny model dla profesjonalistów
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt }
+          ],
+          temperature: payload.generationConfig?.temperature || 0.4
+        })
       });
+
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error?.message || 'Błąd API Google');
-      
-      res.status(200).json(data);
+      if (!response.ok) throw new Error(data.error?.message || 'Błąd API OpenAI');
+
+      // Oszukujemy pliki HTML, że format odpowiedzi jest po staremu, by nic nie popsuć
+      res.status(200).json({
+        candidates: [{ content: { parts: [{ text: data.choices[0].message.content }] } }]
+      });
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
 
   } else if (type === 'image') {
     const stabilityApiKey = process.env.STABILITY_API_KEY;
-    if (!stabilityApiKey) return res.status(500).json({ error: 'Błąd: Brak STABILITY_API_KEY w Vercel.' });
+    const openaiKey = process.env.OPENAI_API_KEY;
+
+    if (!stabilityApiKey) return res.status(500).json({ error: 'Błąd: Brak klucza STABILITY_API_KEY w Vercel.' });
 
     let promptText = "Cute educational illustration";
     if (payload.instances && payload.instances.prompt) promptText = payload.instances.prompt;
@@ -35,20 +60,23 @@ export default async function handler(req, res) {
 
     try {
       let englishPrompt = promptText;
-      if (geminiApiKey) {
-         // Auto-tłumacz również na starym modelu gemini-pro
-         const translateUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${geminiApiKey}`;
-         const translateResponse = await fetch(translateUrl, {
+      if (openaiKey) {
+         // Auto-tłumacz również używa niezawodnego OpenAI
+         const translateResponse = await fetch('https://api.openai.com/v1/chat/completions', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${openaiKey}` },
             body: JSON.stringify({
-                contents: [{ parts: [{ text: `Translate to English. Return ONLY the translation:\n\n${promptText}` }] }],
-                generationConfig: { temperature: 0.1 }
+                model: 'gpt-4o-mini',
+                messages: [
+                    { role: "system", content: "Translate to English. Return ONLY the translation, no quotes." },
+                    { role: "user", content: promptText }
+                ],
+                temperature: 0.1
             })
          });
          const translateData = await translateResponse.json();
-         if (translateData.candidates?.[0]?.content?.parts?.[0]?.text) {
-             englishPrompt = translateData.candidates[0].content.parts[0].text.trim().replace(/^"|"$/g, '');
+         if (translateResponse.ok && translateData.choices?.[0]) {
+             englishPrompt = translateData.choices[0].message.content.trim();
          }
       }
 
