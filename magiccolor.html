@@ -90,24 +90,39 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useRef } = React;
+        const { useState, useRef, useEffect } = React;
 
         function App() {
             // =========================================================================
             // Kod PIN dla aplikacji (Zgodnie z Twoim życzeniem)
             const SECRET_PIN = "KAWA2024"; 
             const BUY_COFFEE_LINK = "https://buycoffee.to/magiccolor";
+            const FREE_TRIES_LIMIT = 3;
             // =========================================================================
 
+            // Stan autoryzacji i licznika darmowych prób
             const [isAuthenticated, setIsAuthenticated] = useState(false);
+            const [freeTries, setFreeTries] = useState(0);
+            const [showPaywall, setShowPaywall] = useState(false);
             const [passwordInput, setPasswordInput] = useState('');
             
+            // Stany generatora
             const [promptInput, setPromptInput] = useState('');
+            const [styleOption, setStyleOption] = useState('szkola'); // 'przedszkole', 'szkola', 'mandala'
             const [generatedImage, setGeneratedImage] = useState(null);
             const [isGenerating, setIsGenerating] = useState(false);
             const [error, setError] = useState('');
 
             const resultRef = useRef(null);
+
+            // Wczytywanie stanu darmowych prób i autoryzacji z localStorage
+            useEffect(() => {
+                const savedAuth = localStorage.getItem('magicColorAuth') === 'true';
+                if (savedAuth) setIsAuthenticated(true);
+
+                const savedTries = parseInt(localStorage.getItem('magicColorFreeTries') || '0');
+                setFreeTries(savedTries);
+            }, []);
 
             const fetchWithRetry = async (url, options, retries = 3, delay = 1000) => {
                 for (let i = 0; i < retries; i++) {
@@ -133,7 +148,7 @@
                     return await fetchWithRetry('/api/gemini', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ payload, type: 'image' }) // UWAGA: type='image' łączy z Imagen 4.0
+                        body: JSON.stringify({ payload, type: 'image' })
                     });
                 } else {
                     const apiKey = ""; // Podgląd Canvas wstrzykuje tu klucz testowy
@@ -147,6 +162,12 @@
             };
 
             const generateColoringPage = async () => {
+                // Sprawdzenie limitu darmowych prób
+                if (!isAuthenticated && freeTries >= FREE_TRIES_LIMIT) {
+                    setShowPaywall(true);
+                    return;
+                }
+
                 if (!promptInput.trim()) {
                     setError('Musisz wpisać, co chcesz narysować!');
                     return;
@@ -157,8 +178,18 @@
                 setGeneratedImage(null);
 
                 try {
-                    // Magiczny ukryty prompt, który zmusza AI do robienia czystej, czarno-białej kolorowanki
-                    const hiddenInstruction = `Black and white line art coloring page for kids, clean black outlines, no shading, no grayscale, pure white background, simple vector style. Subject: ${promptInput}`;
+                    // Modyfikator stylów na podstawie wyboru użytkownika
+                    let styleModifier = "";
+                    if (styleOption === 'przedszkole') {
+                        styleModifier = "Very simple and easy line art for toddlers, thick bold black outlines, minimal details, lots of white space, cartoon style";
+                    } else if (styleOption === 'szkola') {
+                        styleModifier = "Clean black outlines, standard children's coloring book page, clear subject, balanced details, vector line art";
+                    } else if (styleOption === 'mandala') {
+                        styleModifier = "Intricate adult coloring book style, complex geometric patterns, beautiful mandala design, highly detailed black line art";
+                    }
+
+                    // Magiczny ukryty prompt
+                    const hiddenInstruction = `${styleModifier}, pure white background, no shading, no grayscale, no colors. Subject: ${promptInput}`;
 
                     const payload = {
                         instances: { prompt: hiddenInstruction },
@@ -170,6 +201,14 @@
                     
                     if (base64Image) {
                         setGeneratedImage(`data:image/png;base64,${base64Image}`);
+                        
+                        // Zwiększenie licznika użyć jeśli użytkownik nie ma premium
+                        if (!isAuthenticated) {
+                            const newTries = freeTries + 1;
+                            setFreeTries(newTries);
+                            localStorage.setItem('magicColorFreeTries', newTries.toString());
+                        }
+
                         setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
                     } else {
                         throw new Error("Pusta odpowiedź API graficznego.");
@@ -179,19 +218,38 @@
                     console.error("Błąd grafiki:", err);
                     setError('Błąd połączenia. Upewnij się, że Twój klucz API jest wgrany do Zmiennych Środowiskowych Vercela.');
                     
-                    // Fallback dla demonstracji jeśli brak klucza lokalnie
+                    // Fallback dla demonstracji jeśli brak klucza
                     setTimeout(() => {
                         setGeneratedImage('https://images.unsplash.com/photo-1596461404969-9ae70f2830c1?q=80&w=400&auto=format&fit=crop'); // Placeholder
+                        
+                        if (!isAuthenticated) {
+                            const newTries = freeTries + 1;
+                            setFreeTries(newTries);
+                            localStorage.setItem('magicColorFreeTries', newTries.toString());
+                        }
+
                         setIsGenerating(false);
-                        setError('UWAGA: Pokazuję obrazek awaryjny (Tryb Demo).');
+                        setError('UWAGA: Pokazuję obrazek awaryjny (Tryb Demo). Limit mimo to został zmniejszony.');
                     }, 1500);
                 } finally {
                     setIsGenerating(false);
                 }
             };
 
-            // EKRAN LOGOWANIA PREMIUM
-            if (!isAuthenticated) {
+            const handleLogin = () => {
+                if (passwordInput === SECRET_PIN) {
+                    setIsAuthenticated(true);
+                    setShowPaywall(false);
+                    localStorage.setItem('magicColorAuth', 'true');
+                } else {
+                    alert('Nieprawidłowy kod PIN!');
+                }
+            };
+
+            // ==========================================
+            // EKRAN BLOKADY (PAYWALL) 
+            // ==========================================
+            if (showPaywall) {
                 return (
                     <div className="min-h-screen relative flex items-center justify-center p-4 print-hidden">
                         <div className="aura-blob aura-1"></div>
@@ -199,23 +257,29 @@
                         
                         <div className="glass-panel p-10 rounded-3xl max-w-md w-full text-center shadow-[0_0_50px_rgba(244,63,94,0.2)] border border-rose-500/30 fade-in relative z-10">
                             <div className="w-24 h-24 bg-gradient-to-br from-pink-500 to-amber-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
-                                <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"/></svg>
+                                <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
                             </div>
-                            <h2 className="text-4xl font-black text-white mb-2">Magic Color <span className="text-pink-400">AI</span></h2>
-                            <p className="text-slate-400 text-sm mb-8 font-medium">Narzędzie Premium. Podaj kod PIN, aby odblokować generator grafik.</p>
+                            <h2 className="text-3xl font-black text-white mb-2">Limit wyczerpany!</h2>
+                            <p className="text-slate-300 text-sm mb-8 font-medium">Wykorzystałeś swoje darmowe próby ({FREE_TRIES_LIMIT}/{FREE_TRIES_LIMIT}). Podaj kod PIN, aby uzyskać nielimitowany dostęp PRO.</p>
                             
                             <input 
                                 type="password" value={passwordInput} onChange={(e) => setPasswordInput(e.target.value)}
-                                onKeyPress={(e) => { if (e.key === 'Enter' && passwordInput === SECRET_PIN) setIsAuthenticated(true); }}
+                                onKeyPress={(e) => { if (e.key === 'Enter') handleLogin(); }}
                                 placeholder="Wpisz PIN..."
                                 className="w-full bg-slate-900 border border-slate-600 text-center text-white rounded-xl px-5 py-4 focus:ring-2 focus:ring-pink-500 outline-none mb-6 text-2xl tracking-[0.5em] font-bold uppercase"
                             />
                             
                             <button 
-                                onClick={() => { if (passwordInput === SECRET_PIN) setIsAuthenticated(true); else alert('Zły PIN!'); }}
-                                className="w-full bg-gradient-to-r from-pink-600 to-amber-500 hover:from-pink-500 hover:to-amber-400 text-white font-black py-4 rounded-xl transition-all transform hover:scale-105 btn-bounce text-lg shadow-lg mb-8"
+                                onClick={handleLogin}
+                                className="w-full bg-gradient-to-r from-pink-600 to-amber-500 hover:from-pink-500 hover:to-amber-400 text-white font-black py-4 rounded-xl transition-all transform hover:scale-105 btn-bounce text-lg shadow-lg mb-4"
                             >
                                 Odblokuj System
+                            </button>
+                            <button 
+                                onClick={() => setShowPaywall(false)}
+                                className="text-slate-400 hover:text-white text-sm font-bold mb-8"
+                            >
+                                Wróć do strony głównej
                             </button>
 
                             <div className="pt-6 border-t border-slate-700/50">
@@ -229,7 +293,9 @@
                 );
             }
 
-            // GŁÓWNY WIDOK
+            // ==========================================
+            // GŁÓWNY WIDOK APLIKACJI
+            // ==========================================
             return (
                 <div className="min-h-screen relative flex flex-col">
                     <div className="aura-blob aura-1 print-hidden"></div>
@@ -244,12 +310,27 @@
                                 </div>
                                 <span className="text-xl font-extrabold tracking-tight text-white hidden sm:block">MagicColor<span className="text-pink-400">AI</span></span>
                             </div>
-                            <div className="flex items-center gap-2">
-                                <div className="bg-emerald-500/20 text-emerald-400 text-xs font-bold px-3 py-1.5 rounded-full border border-emerald-500/50 flex items-center gap-2 hidden md:flex">
-                                    <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div> Połączono (Moduł Graficzny)
-                                </div>
+                            <div className="flex items-center gap-4">
+                                {!isAuthenticated ? (
+                                    <div className="bg-slate-800/80 border border-slate-600 px-3 py-1.5 rounded-full text-xs font-bold text-slate-300 flex items-center gap-2">
+                                        <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+                                        Darmowe próby: {FREE_TRIES_LIMIT - freeTries}
+                                    </div>
+                                ) : (
+                                    <div className="bg-emerald-500/20 border border-emerald-500/50 px-3 py-1.5 rounded-full text-xs font-bold text-emerald-400 flex items-center gap-2">
+                                        <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                                        Konto PRO Aktywne
+                                    </div>
+                                )}
+                                
+                                {!isAuthenticated && (
+                                    <button onClick={() => setShowPaywall(true)} className="text-pink-400 hover:text-pink-300 text-xs sm:text-sm font-bold transition-colors">
+                                        Zaloguj
+                                    </button>
+                                )}
+                                
                                 <a href="index.html" className="flex items-center gap-2 text-xs sm:text-sm font-bold text-slate-300 hover:text-white transition-colors bg-slate-800 hover:bg-slate-700 px-4 py-2.5 rounded-xl border border-slate-600">
-                                    Wyjdź (Zablokuj)
+                                    Wróć
                                 </a>
                             </div>
                         </div>
@@ -273,6 +354,35 @@
 
                             {/* Panel Sterowania */}
                             <div className="glass-panel p-6 sm:p-10 rounded-[2.5rem] fade-in border border-slate-700/50 print-hidden" style={{animationDelay: '0.1s'}}>
+                                
+                                {/* Wybór stylu kolorowanki */}
+                                <div className="mb-8">
+                                    <label className="block text-slate-300 font-bold mb-3 text-sm uppercase tracking-wider">Wybierz stopień trudności (Styl):</label>
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                        <button 
+                                            onClick={() => setStyleOption('przedszkole')}
+                                            className={`p-3 rounded-xl border-2 font-bold text-sm transition-all flex flex-col items-center justify-center gap-1 ${styleOption === 'przedszkole' ? 'bg-pink-600/20 border-pink-500 text-pink-400' : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:border-slate-500'}`}
+                                        >
+                                            <span className="text-2xl">🧸</span> Przedszkole
+                                            <span className="text-[10px] font-normal opacity-80">(Grube, proste linie)</span>
+                                        </button>
+                                        <button 
+                                            onClick={() => setStyleOption('szkola')}
+                                            className={`p-3 rounded-xl border-2 font-bold text-sm transition-all flex flex-col items-center justify-center gap-1 ${styleOption === 'szkola' ? 'bg-amber-600/20 border-amber-500 text-amber-400' : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:border-slate-500'}`}
+                                        >
+                                            <span className="text-2xl">🎒</span> Klasy 1-3
+                                            <span className="text-[10px] font-normal opacity-80">(Klasyczna kolorowanka)</span>
+                                        </button>
+                                        <button 
+                                            onClick={() => setStyleOption('mandala')}
+                                            className={`p-3 rounded-xl border-2 font-bold text-sm transition-all flex flex-col items-center justify-center gap-1 ${styleOption === 'mandala' ? 'bg-purple-600/20 border-purple-500 text-purple-400' : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:border-slate-500'}`}
+                                        >
+                                            <span className="text-2xl">✨</span> Mandala / Dorośli
+                                            <span className="text-[10px] font-normal opacity-80">(Zaawansowane wzory)</span>
+                                        </button>
+                                    </div>
+                                </div>
+
                                 <label className="block text-white font-bold mb-4 text-lg">Co mam dzisiaj narysować?</label>
                                 
                                 <div className="relative">
@@ -290,7 +400,7 @@
                                 {/* Podpowiedzi */}
                                 <div className="mt-6 flex flex-wrap gap-2">
                                     <span className="text-xs text-slate-500 font-bold uppercase mt-2 mr-2">Szybkie pomysły:</span>
-                                    {['Wesoły dinozaur jedzący pizzę', 'Zamek księżniczki na chmurze', 'Piesek jadący na deskorolce', 'Wóz strażacki'].map(idea => (
+                                    {['Wesoły dinozaur jedzący pizzę', 'Zamek księżniczki na chmurze', 'Piesek jadący na deskorolce', 'Geometryczna mandala w kształcie lwa'].map(idea => (
                                         <button key={idea} onClick={() => setPromptInput(idea)} className="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs px-3 py-2 rounded-lg border border-slate-700 transition-colors">
                                             {idea}
                                         </button>
@@ -308,7 +418,7 @@
                                     >
                                         {isGenerating ? (
                                             <><svg className="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> AI chwyta za pędzel...</>
-                                        ) : 'Wygeneruj Kolorowankę'}
+                                        ) : (!isAuthenticated && freeTries >= FREE_TRIES_LIMIT ? 'Odblokuj dostęp PRO' : 'Wygeneruj Kolorowankę')}
                                     </button>
                                 </div>
                             </div>
@@ -317,9 +427,9 @@
                             {generatedImage && (
                                 <div ref={resultRef} className="mt-12 fade-in print:mt-0 flex flex-col items-center">
                                     
-                                    <div className="flex items-center justify-between w-full mb-6 print-hidden">
-                                        <h3 className="text-xl font-bold text-white">Twoja Kolorowanka</h3>
-                                        <button onClick={() => window.print()} className="bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 transition-all btn-bounce shadow-[0_0_15px_rgba(16,185,129,0.3)]">
+                                    <div className="flex flex-col sm:flex-row items-center justify-between w-full mb-6 print-hidden gap-4">
+                                        <h3 className="text-xl font-bold text-white text-center sm:text-left">Twoja Kolorowanka ({styleOption === 'przedszkole' ? 'Grube linie' : styleOption === 'mandala' ? 'Mandala' : 'Standardowa'})</h3>
+                                        <button onClick={() => window.print()} className="bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 transition-all btn-bounce shadow-[0_0_15px_rgba(16,185,129,0.3)] w-full sm:w-auto justify-center">
                                             🖨️ Wydrukuj Dzieciom
                                         </button>
                                     </div>
