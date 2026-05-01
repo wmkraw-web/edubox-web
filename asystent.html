@@ -89,9 +89,9 @@
 
         const getSystemPrompt = (module, docType, customHeaders) => {
             if (module === 'dokumenty') {
-                let base = `Jesteś wybitnym pedagogiem specjalnym. Wygeneruj profesjonalny dokument urzędowy o typie: \${docType}. Używaj języka formalnego, pedagogicznego. Nie używaj gwiazdek **.`;
+                let base = `Jesteś wybitnym pedagogiem specjalnym. Wygeneruj profesjonalny dokument urzędowy o typie: ${docType}. Używaj języka formalnego, pedagogicznego. Nie używaj gwiazdek **.`;
                 if (customHeaders) {
-                    base += `\n\nUWAGA! Użyj tych nagłówków:\n"\${customHeaders}"`;
+                    base += `\n\nUWAGA! Użyj tych nagłówków:\n"${customHeaders}"`;
                 }
                 return base;
             }
@@ -125,19 +125,34 @@
 
             useEffect(() => { setIsUnlocked(authCode === SECRET_PIN); }, [authCode]);
 
-            const secureApiCall = async (payload, type = 'text') => {
-                try {
-                    const response = await fetch('/api/gemini', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ payload, type })
-                    });
-                    const data = await response.json();
-                    if (!response.ok) throw new Error(data.error || "Błąd serwera");
-                    return data;
-                } catch (error) {
-                    throw new Error("Błąd sieci. Sprawdź połączenie.");
+            // ==================================================================================
+            // BEZPIECZNY KONTROLER API - Zoptymalizowany dla środowiska podglądu z wykupionym pakietem
+            // ==================================================================================
+            const fetchWithRetry = async (url, options, retries = 5) => {
+                const delays = [1000, 2000, 4000, 8000, 16000];
+                for (let i = 0; i < retries; i++) {
+                    try {
+                        const response = await fetch(url, options);
+                        if (!response.ok) throw new Error(`Status API: ${response.status}`);
+                        return await response.json();
+                    } catch (e) {
+                        if (i === retries - 1) throw e;
+                        await new Promise(res => setTimeout(res, delays[i]));
+                    }
                 }
+            };
+
+            const secureApiCall = async (payload, type = 'text') => {
+                const apiKey = ""; // Środowisko ładuje klucz automatycznie w podglądzie
+                const url = type === 'text' 
+                    ? `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`
+                    : `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${apiKey}`;
+                
+                return await fetchWithRetry(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
             };
 
             const handleGenerate = async () => {
@@ -152,9 +167,9 @@
                 try {
                     let finalPrompt = "";
                     if (activeModule === 'dokumenty') {
-                        finalPrompt = `Dokument: \${docType}\nDiagnoza: \${diagnoza}\nMocne strony: \${mocneStrony}\nTrudności: \${trudnosci}`;
+                        finalPrompt = `Dokument: ${docType}\nDiagnoza: ${diagnoza}\nMocne strony: ${mocneStrony}\nTrudności: ${trudnosci}`;
                     } else {
-                        finalPrompt = `Temat: \${genericInput}`;
+                        finalPrompt = `Temat: ${genericInput}`;
                     }
 
                     const textData = await secureApiCall({
@@ -168,11 +183,7 @@
                     
                     setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
 
-                    // =========================================================
-                    // NOWE, "SUPER-BEZPIECZNE" PROMPTY DLA AI (BEZ SŁÓW-WYZWALACZY)
-                    // =========================================================
                     if (activeModule === 'historyjki') {
-                        // Używamy metafory "postać" i "zadanie", aby uniknąć filtrów "smutnego dziecka"
                         const prompts = [
                             `2D Flat vector illustration, storybook style. A charming friendly character looking pensive and thoughtful in a school environment. Soft pastel colors, innocent look.`,
                             `2D Flat vector illustration, storybook style. A charming friendly character taking a deep breath and feeling very calm and peaceful. School environment. Soft blue colors.`,
@@ -180,14 +191,14 @@
                         ];
                         
                         try {
-                            // Wysyłamy prośby o grafikę - teraz przejdą przez każdą cenzurę!
-                            const imgPromises = prompts.map(p => secureApiCall({ instances: { prompt: p } }, 'image'));
+                            // Żądania z parametrem instances + sampleCount zgodnie z wytycznymi
+                            const imgPromises = prompts.map(p => secureApiCall({ instances: { prompt: p }, parameters: { sampleCount: 1 } }, 'image'));
                             const results = await Promise.allSettled(imgPromises);
                             
                             const newImages = [];
                             results.forEach(res => {
                                 if (res.status === 'fulfilled' && res.value.predictions?.[0]?.bytesBase64Encoded) {
-                                    newImages.push(`data:image/png;base64,\${res.value.predictions[0].bytesBase64Encoded}`);
+                                    newImages.push(`data:image/png;base64,${res.value.predictions[0].bytesBase64Encoded}`);
                                 }
                             });
                             
@@ -228,13 +239,13 @@
                                     <input type={showPassword ? "text" : "password"} value={authCode} onChange={(e) => setAuthCode(e.target.value)} className="w-full input-bg rounded-lg px-3 py-2 text-sm pr-10" />
                                     <button onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">👁️</button>
                                 </div>
-                                <div className={`p-4 rounded-lg text-xs \${isUnlocked ? 'auth-box unlocked' : 'auth-box'}`}>
-                                    {isUnlocked ? "✅ Odblokowano" : "Podaj PIN awans2024"}
+                                <div className={`p-4 rounded-lg text-xs ${isUnlocked ? 'auth-box unlocked' : 'auth-box'}`}>
+                                    {isUnlocked ? "✅ Odblokowano" : "Podaj PIN np. KAWA2024"}
                                 </div>
                             </div>
                             <div className="space-y-1">
                                 {MODULES.map(mod => (
-                                    <div key={mod.id} onClick={() => { setActiveModule(mod.id); resetForm(); }} className={`module-btn \${activeModule === mod.id ? 'active' : ''}`}>
+                                    <div key={mod.id} onClick={() => { setActiveModule(mod.id); resetForm(); }} className={`module-btn ${activeModule === mod.id ? 'active' : ''}`}>
                                         <span className="w-5 text-center">{mod.icon}</span>
                                         <span>{mod.label}</span>
                                     </div>
