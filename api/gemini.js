@@ -9,11 +9,12 @@ export default async function handler(req, res) {
 
   if (type === 'text') {
     // ==========================================
-    // TRYB 1: GENEROWANIE TEKSTU (Google Gemini)
+    // TRYB 1: GENEROWANIE TEKSTU (Google Gemini 1.5 Flash - STABILNY)
     // ==========================================
     if (!geminiApiKey) return res.status(500).json({ error: 'Błąd serwera: Brak GEMINI_API_KEY.' });
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${geminiApiKey}`;
+    // ZMIANA: Używamy stabilnego i ogólnodostępnego modelu gemini-1.5-flash
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`;
     try {
       const response = await fetch(url, {
         method: 'POST',
@@ -31,7 +32,7 @@ export default async function handler(req, res) {
 
   } else if (type === 'image') {
     // ==========================================
-    // TRYB 2: GENEROWANIE OBRAZÓW (Stability AI z ulepszonym Auto-Tłumaczem)
+    // TRYB 2: GENEROWANIE OBRAZÓW (Stability AI z Auto-Tłumaczem)
     // ==========================================
     const stabilityApiKey = process.env.STABILITY_API_KEY;
     if (!stabilityApiKey) return res.status(500).json({ error: 'Błąd serwera: Brak STABILITY_API_KEY.' });
@@ -47,7 +48,8 @@ export default async function handler(req, res) {
       // --- BŁYSKAWICZNY AUTO-TŁUMACZ NA ANGIELSKI ---
       let englishPrompt = promptText;
       if (geminiApiKey) {
-         const translateUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${geminiApiKey}`;
+         // Tłumacz też używa teraz stabilnego gemini-1.5-flash
+         const translateUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`;
          const translateResponse = await fetch(translateUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -58,7 +60,6 @@ export default async function handler(req, res) {
          });
          const translateData = await translateResponse.json();
          if (translateData.candidates && translateData.candidates[0].content.parts[0].text) {
-             // Oczyszczamy z ewentualnych znaków nowej linii lub cudzysłowów
              englishPrompt = translateData.candidates[0].content.parts[0].text.trim().replace(/^"|"$/g, '');
          }
       }
@@ -71,7 +72,7 @@ export default async function handler(req, res) {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 8500); 
 
-      // Używamy modelu CORE (Najlepszy do rozumienia skomplikowanych poleceń)
+      // Używamy modelu CORE 
       const url = 'https://api.stability.ai/v2beta/stable-image/generate/core';
       const response = await fetch(url, {
         method: 'POST',
