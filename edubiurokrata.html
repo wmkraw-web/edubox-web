@@ -136,9 +136,6 @@ Wynik musi wyglądać jak profesjonalny formularz gotowy do druku i rozdania dzi
                 setCopyStatus('Skopiuj dokument');
 
                 try {
-                    const apiKey = ""; 
-                    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
-                    
                     const systemInstruction = PROMPTS[activeTab];
                     const finalPrompt = `Stwórz dokument na podstawie tych informacji:\n\n"""\n${inputText}\n"""`;
 
@@ -148,17 +145,27 @@ Wynik musi wyglądać jak profesjonalny formularz gotowy do druku i rozdania dzi
                         generationConfig: { temperature: 0.2 } 
                     };
 
-                    const response = await fetch(url, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
-
-                    if (!response.ok) {
-                        throw new Error(`Błąd API: ${response.status}`);
+                    let data;
+                    if (window.location.hostname.includes('vercel.app') || (window.location.hostname !== '' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1')) {
+                        const response = await fetch('/api/gemini', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ payload, type: 'text' })
+                        });
+                        if (!response.ok) throw new Error(`Błąd serwera API: ${response.status}`);
+                        data = await response.json();
+                    } else {
+                        const apiKey = ""; 
+                        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+                        const response = await fetch(url, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+                        if (!response.ok) throw new Error(`Błąd API: ${response.status}`);
+                        data = await response.json();
                     }
 
-                    const data = await response.json();
                     const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
                     
                     if (text) {
