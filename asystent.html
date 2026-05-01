@@ -208,17 +208,19 @@ Tekst musi być uspokajający, wspierający i odpowiedni dla dzieci ze specjalny
                     setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
 
                     // =========================================================
-                    // BŁYSKAWICZNE GENEROWANIE 3 GRAFIK NARAZ (Z BEZPIECZNYMI EMOCJAMI)
+                    // BEZPIECZNE GENEROWANIE GRAFIK (OMIJANIE FILTRÓW NSFW/CHILD)
                     // =========================================================
                     if (activeModule === 'historyjki') {
+                        // Złagodzone polecenia. 
+                        // Zamiast "sad/crying child" piszemy "puzzled/unsure character facing a challenge".
+                        // To bezpieczne dla AI, a efekt na obrazku wciąż pokazuje zmianę z zagubienia w uśmiech.
                         const prompts = [
-                            `Unhappy, worried, sad facial expression. A child experiencing a problem: ${genericInput}. Cute simple 2D therapeutic illustration for kids, calm colors.`,
-                            `Calm, focused, brave facial expression. A child using a coping strategy for: ${genericInput}. Cute simple 2D therapeutic illustration for kids, calm colors.`,
-                            `Very happy, wide smile, joyful facial expression. A child who successfully resolved: ${genericInput}. Cute simple 2D therapeutic illustration for kids, calm colors.`
+                            `A cute simple 2D therapeutic illustration for kids showing a challenging situation: ${genericInput}. The main character looks puzzled or unsure, facing a minor challenge. Calm pastel colors.`,
+                            `A cute simple 2D therapeutic illustration for kids showing a coping strategy for: ${genericInput}. The main character is calm, taking a deep breath, focusing on the solution. Calm pastel colors.`,
+                            `A cute simple 2D therapeutic illustration for kids showing a happy resolution for: ${genericInput}. The main character has a wide smile, feeling very proud and joyful. Bright cheerful pastel colors.`
                         ];
                         
                         try {
-                            // Odpalamy 3 zapytania JEDNOCZEŚNIE dla maksymalnej prędkości
                             const imgPromises = prompts.map(p => secureApiCall({ instances: { prompt: p } }, 'image'));
                             const results = await Promise.allSettled(imgPromises);
                             
@@ -236,9 +238,9 @@ Tekst musi być uspokajający, wspierający i odpowiedni dla dzieci ze specjalny
                             
                             setGeneratedImages(newImages);
                             
-                            // Jeśli wszystkie 3 zablokowała cenzura, informujemy użytkownika
-                            if (failedCount === 3) {
-                                setError("Filtry bezpieczeństwa AI zablokowały wygenerowanie obrazków (prawdopodobnie użyto słów uznanych za nieodpowiednie dla dzieci). Spróbuj opisać sytuację w nieco łagodniejszy sposób.");
+                            // Jeśli filtry zablokowały część obrazków (wciąż może się zdarzyć przy trudnych tematach)
+                            if (failedCount > 0) {
+                                setError(`Filtry bezpieczeństwa AI zablokowały wygenerowanie ${failedCount} z 3 obrazków (uznano je za potencjalnie zbyt wrażliwe). Spróbuj opisać sytuację jeszcze delikatniej.`);
                             }
                             
                         } catch(e) {
@@ -414,10 +416,12 @@ Tekst musi być uspokajający, wspierający i odpowiedni dla dzieci ze specjalny
                                                 </div>
                                             ))}
                                             {/* Szkicowe ładowanie dla obrazków, które jeszcze "idą" */}
-                                            {isGenerating && generatedImages.length === 0 && Array(3).fill(0).map((_, idx) => (
+                                            {isGenerating && generatedImages.length < 3 && Array(3 - generatedImages.length).fill(0).map((_, idx) => (
                                                 <div key={`loading-${idx}`} className="flex flex-col items-center justify-center aspect-square rounded-2xl border-4 border-dashed border-slate-700 bg-slate-800/50 fade-in">
                                                     <svg className="animate-spin h-8 w-8 text-rose-500 mb-2" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                                                    <span className="text-slate-400 text-xs font-bold">Rysowanie {idx===0?"Problemu":idx===1?"Strategii":"Efektu"}...</span>
+                                                    <span className="text-slate-400 text-xs font-bold">
+                                                        Rysowanie {generatedImages.length + idx === 0 ? "Problemu" : generatedImages.length + idx === 1 ? "Strategii" : "Efektu"}...
+                                                    </span>
                                                 </div>
                                             ))}
                                         </div>
