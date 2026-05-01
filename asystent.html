@@ -70,7 +70,7 @@
     <script type="text/babel">
         const { useState, useRef, useEffect } = React;
 
-        const SECRET_PIN = "KAWA2024"; 
+        const SECRET_PIN = "awans2024"; 
 
         const DOC_TYPES = [
             { id: 'ipet', label: 'IPET (Indywidualny Program Edukacyjno-Terapeutyczny)' },
@@ -132,7 +132,7 @@ Tekst musi być uspokajający, wspierający i odpowiedni dla dzieci ze specjalny
             const [generatedText, setGeneratedText] = useState('');
             const [generatedImages, setGeneratedImages] = useState([]); 
             const [isGenerating, setIsGenerating] = useState(false);
-            const [loadingMsg, setLoadingMsg] = useState(''); // Komunikaty ładowania
+            const [loadingMsg, setLoadingMsg] = useState(''); 
             const [error, setError] = useState('');
 
             const fileInputRef = useRef(null);
@@ -180,7 +180,7 @@ Tekst musi być uspokajający, wspierający i odpowiedni dla dzieci ze specjalny
                 setError(''); 
                 setGeneratedText(''); 
                 setGeneratedImages([]);
-                setLoadingMsg('Piszę tekst materiału...');
+                setLoadingMsg('Analizuję problem i przygotowuję materiały...');
 
                 try {
                     let finalPrompt = "";
@@ -205,34 +205,44 @@ Tekst musi być uspokajający, wspierający i odpowiedni dla dzieci ze specjalny
                     
                     setGeneratedText(story);
                     
-                    // Przewijamy do dołu, by użytkownik mógł już czytać tekst, podczas gdy obrazki się generują!
                     setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
 
                     // =========================================================
-                    // KOLEJKOWANIE 3 GRAFIK (Zapobiega przeciążeniom i błędom)
+                    // BŁYSKAWICZNE GENEROWANIE 3 GRAFIK NARAZ (Z BEZPIECZNYMI EMOCJAMI)
                     // =========================================================
                     if (activeModule === 'historyjki') {
                         const prompts = [
-                            `Facial expression: VERY SAD, CRYING, FRUSTRATED, ANXIOUS. A child experiencing a problem: ${genericInput}. Cute simple 2D therapeutic illustration for kids, calm colors.`,
-                            `Facial expression: CALM, FOCUSED, TAKING A DEEP BREATH. A child using a coping strategy for: ${genericInput}. Cute simple 2D therapeutic illustration for kids, calm colors.`,
-                            `Facial expression: VERY HAPPY, WIDE SMILE, PROUD, RELIEVED. A child who successfully resolved: ${genericInput}. Cute simple 2D therapeutic illustration for kids, calm colors.`
+                            `Unhappy, worried, sad facial expression. A child experiencing a problem: ${genericInput}. Cute simple 2D therapeutic illustration for kids, calm colors.`,
+                            `Calm, focused, brave facial expression. A child using a coping strategy for: ${genericInput}. Cute simple 2D therapeutic illustration for kids, calm colors.`,
+                            `Very happy, wide smile, joyful facial expression. A child who successfully resolved: ${genericInput}. Cute simple 2D therapeutic illustration for kids, calm colors.`
                         ];
                         
-                        const fetchedImages = [];
-                        
-                        for (let i = 0; i < prompts.length; i++) {
-                            setLoadingMsg(`Rysuję obrazek ${i + 1} z 3...`); // Zmieniamy napis na przycisku!
-                            try {
-                                const imgData = await secureApiCall({ instances: { prompt: prompts[i] } }, 'image');
-                                const base64Image = imgData.predictions?.[0]?.bytesBase64Encoded;
-                                if (base64Image) {
-                                    fetchedImages.push(`data:image/png;base64,${base64Image}`);
-                                    // Aktualizujemy stan od razu, by obrazek "wskoczył" na ekran!
-                                    setGeneratedImages([...fetchedImages]);
+                        try {
+                            // Odpalamy 3 zapytania JEDNOCZEŚNIE dla maksymalnej prędkości
+                            const imgPromises = prompts.map(p => secureApiCall({ instances: { prompt: p } }, 'image'));
+                            const results = await Promise.allSettled(imgPromises);
+                            
+                            const newImages = [];
+                            let failedCount = 0;
+                            
+                            results.forEach(res => {
+                                if (res.status === 'fulfilled' && res.value.predictions?.[0]?.bytesBase64Encoded) {
+                                    newImages.push(`data:image/png;base64,${res.value.predictions[0].bytesBase64Encoded}`);
+                                } else {
+                                    failedCount++;
+                                    console.error("Błąd generowania pojedynczego obrazka:", res.reason);
                                 }
-                            } catch(e) {
-                                console.log(`Błąd obrazka ${i + 1}:`, e);
+                            });
+                            
+                            setGeneratedImages(newImages);
+                            
+                            // Jeśli wszystkie 3 zablokowała cenzura, informujemy użytkownika
+                            if (failedCount === 3) {
+                                setError("Filtry bezpieczeństwa AI zablokowały wygenerowanie obrazków (prawdopodobnie użyto słów uznanych za nieodpowiednie dla dzieci). Spróbuj opisać sytuację w nieco łagodniejszy sposób.");
                             }
+                            
+                        } catch(e) {
+                            console.log("Ogólny błąd obrazków:", e);
                         }
                     }
 
@@ -367,7 +377,6 @@ Tekst musi być uspokajający, wspierający i odpowiedni dla dzieci ze specjalny
                             </div>
                         ) : null}
 
-                        {/* Obszar błędów lub trwania generowania zawsze widoczny na dole gdy generuje */}
                         {error && <div className="mt-6 max-w-4xl p-4 bg-red-900/40 border border-red-500/50 rounded-xl text-red-400 text-sm font-medium">{error}</div>}
 
                         <div className="mt-8 max-w-4xl print-hidden">
@@ -393,9 +402,9 @@ Tekst musi być uspokajający, wspierający i odpowiedni dla dzieci ze specjalny
 
                                 <div className="card-bg p-8 sm:p-12 rounded-[2rem] print-area flex flex-col gap-8">
                                     
-                                    {/* 3 Obrazki dla historyjek ustawione w rzędzie. Pokazują się na żywo! */}
-                                    {activeModule === 'historyjki' && generatedImages.length > 0 && (
+                                    {activeModule === 'historyjki' && (
                                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full print-images-grid">
+                                            {/* Zwrócone obrazki */}
                                             {generatedImages.map((img, idx) => (
                                                 <div key={idx} className="flex flex-col items-center fade-in">
                                                     <img src={img} alt={`Ilustracja ${idx + 1}`} className="w-full aspect-square object-cover rounded-2xl border-4 border-slate-800 shadow-xl" />
@@ -404,13 +413,13 @@ Tekst musi być uspokajający, wspierający i odpowiedni dla dzieci ze specjalny
                                                     </p>
                                                 </div>
                                             ))}
-                                            {/* Szkicowy podgląd ładowania kolejnych obrazków */}
-                                            {isGenerating && generatedImages.length < 3 && (
-                                                <div className="flex flex-col items-center justify-center aspect-square rounded-2xl border-4 border-dashed border-slate-700 bg-slate-800/50">
+                                            {/* Szkicowe ładowanie dla obrazków, które jeszcze "idą" */}
+                                            {isGenerating && generatedImages.length === 0 && Array(3).fill(0).map((_, idx) => (
+                                                <div key={`loading-${idx}`} className="flex flex-col items-center justify-center aspect-square rounded-2xl border-4 border-dashed border-slate-700 bg-slate-800/50 fade-in">
                                                     <svg className="animate-spin h-8 w-8 text-rose-500 mb-2" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                                                    <span className="text-slate-400 text-xs font-bold">Rysowanie...</span>
+                                                    <span className="text-slate-400 text-xs font-bold">Rysowanie {idx===0?"Problemu":idx===1?"Strategii":"Efektu"}...</span>
                                                 </div>
-                                            )}
+                                            ))}
                                         </div>
                                     )}
 
