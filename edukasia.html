@@ -81,7 +81,7 @@
 
         function App() {
             // =========================================================================
-            // TYLKO TO HASŁO ZMIENIASZ W PLIKU HTML (Klucz API jest bezpieczny na Vercelu)
+            // TYLKO TO HASŁO ZMIENIASZ W PLIKU HTML 
             const SECRET_PIN = "KAWA2024"; 
             // =========================================================================
 
@@ -121,18 +121,18 @@
             const [storyError, setStoryError] = useState('');
 
             // --- FUNKCJE POMOCNICZE ---
-            const fetchWithRetry = async (url, options, retries = 3, delay = 1000) => {
+            const fetchWithRetry = async (url, options, retries = 5) => {
+                const delays = [1000, 2000, 4000, 8000, 16000];
                 for (let i = 0; i < retries; i++) {
                     try {
                         const response = await fetch(url, options);
                         if (!response.ok) {
-                            const errData = await response.json().catch(() => ({}));
-                            throw new Error(errData.error || `Status API: ${response.status}`);
+                            throw new Error(`Status API: ${response.status}`);
                         }
                         return await response.json();
                     } catch (e) {
                         if (i === retries - 1) throw e;
-                        await new Promise(res => setTimeout(res, delay * Math.pow(2, i)));
+                        await new Promise(res => setTimeout(res, delays[i]));
                     }
                 }
             };
@@ -149,41 +149,22 @@
             };
 
             // ==================================================================================
-            // BEZPIECZNY KONTROLER API - Automatycznie wykrywa środowisko (Vercel vs Podgląd)
+            // BEZPIECZNY KONTROLER API - Zoptymalizowany dla tego środowiska i obrazów
             // ==================================================================================
             const secureApiCall = async (payload, endpointType) => {
-                let url;
-                let fetchOptions;
-
-                // Sprawdzamy czy strona działa u Ciebie na produkcji/hostingu
-                const isProduction = window.location.hostname.includes('vercel.app') || 
-                                     window.location.hostname !== '' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
-
-                if (isProduction) {
-                    // JESTEŚ NA VERCELU: Łączy się z bezpiecznym, ukrytym plikiem api/gemini.js
-                    url = '/api/gemini';
-                    fetchOptions = {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ payload, type: endpointType })
-                    };
-                } else {
-                    // JESTEŚ W PODGLĄDZIE (Lokalnie): Używa wstrzykiwanego klucza testowego środowiska
-                    const apiKey = ""; 
-                    url = endpointType === 'text' 
-                        ? `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`
-                        : `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${apiKey}`;
-                    fetchOptions = {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    };
-                }
-
-                return await fetchWithRetry(url, fetchOptions);
+                const apiKey = ""; // Puste pole - środowisko wykonawcze (Canvas) wstrzykuje klucz automatycznie!
+                const url = endpointType === 'text' 
+                    ? `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`
+                    : `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${apiKey}`;
+                
+                return await fetchWithRetry(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
             };
 
-            // --- AKCJE GŁÓWNE OPARTE O BEZPIECZNE POŁĄCZENIE ---
+            // --- AKCJE GŁÓWNE ---
             const generateSos = async () => {
                 if (!sosInput.trim()) { setSosError('Opisz krótko sytuację w klasie.'); return; }
                 
@@ -237,7 +218,7 @@
                     const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
                     if (text) { setSuccessText(text); setShowSuccessCard(true); } else throw new Error();
                 } catch (err) {
-                    alert("Błąd generowania. Serwer niedostępny lub brak poprawnego klucza w zmiennych środowiskowych Vercela.");
+                    alert("Błąd generowania. Serwer niedostępny.");
                 } finally {
                     setIsGeneratingSuccess(false);
                 }
@@ -255,7 +236,10 @@
                     const story = textData.candidates?.[0]?.content?.parts?.[0]?.text;
 
                     // 2. OBRAZEK
-                    const imgPayload = { instances: { prompt: `Cute 2D illustration for children book, a happy child resolving this problem: ${storyProblem}. Bright colors, therapeutic, calming.` }, parameters: { sampleCount: 1 } };
+                    const imgPayload = { 
+                        instances: { prompt: `Cute 2D illustration for children book, a happy child resolving this problem: ${storyProblem}. Bright colors, therapeutic, calming.` }, 
+                        parameters: { sampleCount: 1 } 
+                    };
                     const imgData = await secureApiCall(imgPayload, 'image');
                     const base64Image = imgData.predictions?.[0]?.bytesBase64Encoded;
                     
@@ -263,7 +247,7 @@
                         setGeneratedStory(story); setGeneratedImage(`data:image/png;base64,${base64Image}`);
                     } else throw new Error();
                 } catch (err) {
-                    setStoryError('Błąd połączenia z serwerem. Upewnij się, że poprawnie skonfigurowałeś zmienne Vercel.');
+                    setStoryError('Błąd połączenia z serwerem generowania obrazów.');
                 } finally {
                     setIsGeneratingStory(false);
                 }
@@ -291,8 +275,6 @@
                             >
                                 Odblokuj System
                             </button>
-
-                            {/* SEKCJA Z KAWĄ DODANA TUTAJ */}
                             <div className="mt-8 pt-6 border-t border-slate-700/50">
                                 <p className="text-slate-400 text-xs mb-3 font-medium">Nie masz dostępu? Zdobądź kod PIN wspierając projekt!</p>
                                 <a 
@@ -304,7 +286,6 @@
                                     <span className="text-lg">☕</span> Postaw kawę i odbierz kod
                                 </a>
                             </div>
-                            
                         </div>
                     </div>
                 );
