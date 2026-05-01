@@ -9,8 +9,8 @@ export default async function handler(req, res) {
   if (type === 'text') {
     if (!geminiApiKey) return res.status(500).json({ error: 'Błąd: Brak GEMINI_API_KEY w Vercel.' });
 
-    // Używamy NAJBARDZIEJ STABILNEGO modelu: gemini-1.5-flash
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`;
+    // WRACAMY DO KORZENI: Stary, niezawodny model gemini-pro (ten sam co w Streamlit)
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${geminiApiKey}`;
     try {
       const response = await fetch(url, {
         method: 'POST',
@@ -36,8 +36,8 @@ export default async function handler(req, res) {
     try {
       let englishPrompt = promptText;
       if (geminiApiKey) {
-         // Auto-tłumacz również na stabilnym modelu 1.5-flash
-         const translateUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`;
+         // Auto-tłumacz również na starym modelu gemini-pro
+         const translateUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${geminiApiKey}`;
          const translateResponse = await fetch(translateUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
