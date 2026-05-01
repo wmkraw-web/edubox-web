@@ -31,7 +31,7 @@ export default async function handler(req, res) {
 
   } else if (type === 'image') {
     // ==========================================
-    // TRYB 2: GENEROWANIE OBRAZÓW (Stability AI z Auto-Tłumaczem)
+    // TRYB 2: GENEROWANIE OBRAZÓW (Stability AI z ulepszonym Auto-Tłumaczem)
     // ==========================================
     const stabilityApiKey = process.env.STABILITY_API_KEY;
     if (!stabilityApiKey) return res.status(500).json({ error: 'Błąd serwera: Brak STABILITY_API_KEY.' });
@@ -44,8 +44,7 @@ export default async function handler(req, res) {
     }
 
     try {
-      // --- NOWOŚĆ: BŁYSKAWICZNY AUTO-TŁUMACZ NA ANGIELSKI ---
-      // Stability AI nie rozumie polskiego. Tłumaczymy polecenie za pomocą Gemini w 0.5s!
+      // --- BŁYSKAWICZNY AUTO-TŁUMACZ NA ANGIELSKI ---
       let englishPrompt = promptText;
       if (geminiApiKey) {
          const translateUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${geminiApiKey}`;
@@ -53,27 +52,27 @@ export default async function handler(req, res) {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                contents: [{ parts: [{ text: `Translate the following image generation prompt to English. Preserve all artistic instructions. ONLY return the English translation, nothing else:\n${promptText}` }] }],
+                contents: [{ parts: [{ text: `Translate the following image generation prompt to English. Return ONLY the translated English string, without any markdown formatting or quotes:\n\n${promptText}` }] }],
                 generationConfig: { temperature: 0.1 }
             })
          });
          const translateData = await translateResponse.json();
          if (translateData.candidates && translateData.candidates[0].content.parts[0].text) {
-             englishPrompt = translateData.candidates[0].content.parts[0].text.trim();
+             // Oczyszczamy z ewentualnych znaków nowej linii lub cudzysłowów
+             englishPrompt = translateData.candidates[0].content.parts[0].text.trim().replace(/^"|"$/g, '');
          }
       }
-      // --------------------------------------------------------
 
       const formData = new FormData();
       formData.append('prompt', englishPrompt);
-      formData.append('model', 'sd3-large');
       formData.append('output_format', 'jpeg');
 
-      // Bezpieczny timeout dopasowany do Vercela (max 10s łącznego działania funkcji)
+      // Bezpieczny timeout dopasowany do Vercela
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 7500); 
+      const timeoutId = setTimeout(() => controller.abort(), 8500); 
 
-      const url = 'https://api.stability.ai/v2beta/stable-image/generate/sd3';
+      // Używamy modelu CORE (Najlepszy do rozumienia skomplikowanych poleceń)
+      const url = 'https://api.stability.ai/v2beta/stable-image/generate/core';
       const response = await fetch(url, {
         method: 'POST',
         headers: {
