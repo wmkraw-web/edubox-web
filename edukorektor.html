@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="pl" translate="no" class="notranslate">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google" content="notranslate">
+    <title>EduKorektor AI - Ocenianie Kształtujące</title>
+    <!-- Biblioteki -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body { 
+            font-family: 'Plus Jakarta Sans', sans-serif; 
+            background-color: #020617; 
+            color: #f8fafc; 
+            scroll-behavior: smooth; 
+            overflow-x: hidden;
+        }
+        
+        .glass-panel { 
+            background: rgba(30, 41, 59, 0.4); 
+            backdrop-filter: blur(16px); 
+            -webkit-backdrop-filter: blur(16px); 
+            border: 1px solid rgba(255, 255, 255, 0.05); 
+        }
+        .glass-nav { 
+            background: rgba(2, 6, 23, 0.8); 
+            backdrop-filter: blur(20px); 
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05); 
+        }
+        
+        .text-gradient { 
+            background: linear-gradient(135deg, #a855f7 0%, #10b981 100%); 
+            -webkit-background-clip: text; 
+            -webkit-text-fill-color: transparent; 
+        }
+
+        .hero-glow {
+            position: absolute;
+            top: -20%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100vw;
+            height: 800px;
+            background: radial-gradient(circle, rgba(168, 85, 247, 0.15) 0%, rgba(2, 6, 23, 0) 70%);
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        .fade-in { animation: fadeIn 0.5s ease-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #0f172a; border-radius: 8px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #8b5cf6; border-radius: 8px; }
+        
+        .btn-bounce:active { transform: scale(0.95); }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useRef } = React;
+
+        const SYSTEM_PROMPT = `Jesteś ekspertem ds. edukacji i Oceniania Kształtującego (OK / NAZU). 
+Twoje zadanie: Przeanalizuj tekst/odpowiedź ucznia oraz (jeśli podano) kryteria nauczyciela. Następnie wygeneruj profesjonalną, wspierającą informację zwrotną dla ucznia.
+
+WYMOGI STYLU I STRUKTURY:
+1. Zacznij od przyjaznego przywitania (np. "Cześć, dziękuję za Twoją pracę!").
+2. 🟢 MOCNE STRONY: Wypunktuj co najmniej 2 konkretne rzeczy, które uczeń zrobił dobrze. Chwal za wysiłek i konkretne elementy.
+3. 🔴 DO POPRAWY: Wskaż delikatnie błędy (np. błędy ortograficzne, braki merytoryczne, brak rozwinięcia myśli). Używaj języka korzyści ("warto zwrócić uwagę na...").
+4. 💡 WSKAZÓWKA NA PRZYSZŁOŚĆ: Podaj 1-2 konkretne kroki, co uczeń ma zrobić, by następnym razem praca była lepsza (np. "przeczytaj tekst dwa razy na głos przed oddaniem").
+5. Utrzymuj język odpowiedni dla szkoły (kulturalny, ale bez nadmiernego, zimnego żargonu).
+6. Używaj emotikonów (🟢, 🔴, 💡), aby tekst był czytelny dla ucznia i gotowy do wklejenia do e-dziennika (Librus/Vulcan).`;
+
+        function App() {
+            const [studentText, setStudentText] = useState('');
+            const [teacherNotes, setTeacherNotes] = useState('');
+            const [generatedText, setGeneratedText] = useState('');
+            const [isGenerating, setIsGenerating] = useState(false);
+            const [error, setError] = useState('');
+            const [copyStatus, setCopyStatus] = useState('Skopiuj opinię');
+
+            const resultRef = useRef(null);
+
+            const generateFeedback = async () => {
+                if (!studentText.trim()) {
+                    setError('Proszę wkleić pracę ucznia do oceny.');
+                    return;
+                }
+
+                setIsGenerating(true);
+                setError('');
+                setGeneratedText('');
+                setCopyStatus('Skopiuj opinię');
+
+                try {
+                    const apiKey = ""; // Klucz dostarczany przez środowisko w runtime
+                    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+                    
+                    const finalPrompt = `Wygeneruj Ocenę Kształtującą.\n\nPRACA UCZNIA:\n"""\n${studentText}\n"""\n\nKRYTERIA/UWAGI NAUCZYCIELA (opcjonalnie):\n"""\n${teacherNotes || "Brak dodatkowych uwag. Oceń ogólnie poprawność i treść."}\n"""`;
+
+                    const payload = {
+                        contents: [{ parts: [{ text: finalPrompt }] }],
+                        systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+                        generationConfig: { temperature: 0.4 } 
+                    };
+
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`Błąd API: ${response.status}`);
+                    }
+
+                    const data = await response.json();
+                    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                    
+                    if (text) {
+                        setGeneratedText(text);
+                        setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
+                    } else {
+                        throw new Error("Pusta odpowiedź z API.");
+                    }
+
+                } catch (err) {
+                    console.error("Błąd generowania:", err);
+                    setError('Brak podłączenia do AI. Wyświetlam opinię pokazową (Demo).');
+                    
+                    setTimeout(() => {
+                        const demoText = `Cześć! Dziękuję za oddanie wypracowania o "Kamieniach na szaniec". Przeczytałem je z dużą uwagą.\n\n🟢 MOCNE STRONY:\n• Świetnie uchwyciłeś główny motyw przyjaźni między bohaterami. Widać, że znasz treść lektury.\n• Podoba mi się Twoje bogate słownictwo w drugim akapicie (użyłeś świetnych synonimów).\n\n🔴 DO POPRAWY:\n• Zwróć uwagę na ortografię. Pojawiły się błędy w pisowni wyrazów z "rz" i "ż" (np. "bohaterzy", "narząd").\n• Praca kończy się dość nagle. Zabrało krótkiego podsumowania Twoich rozważań.\n\n💡 WSKAZÓWKA NA PRZYSZŁOŚĆ:\nPrzed oddaniem kolejnej pracy spróbuj przeczytać tekst na głos – to pomoże Ci wyłapać ucięte zdania. Warto też mieć pod ręką słownik ortograficzny, gdy nie jesteś pewien pisowni trudniejszego słowa.\n\nDobra robota, trzymaj tak dalej!`;
+                        setGeneratedText(demoText);
+                        setIsGenerating(false);
+                    }, 1500);
+                } finally {
+                    setIsGenerating(false);
+                }
+            };
+
+            const copyToClipboard = () => {
+                if (!generatedText) return;
+                const textArea = document.createElement("textarea");
+                textArea.value = generatedText;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                textArea.remove();
+                setCopyStatus('Skopiowano! ✓');
+                setTimeout(() => setCopyStatus('Skopiuj opinię'), 3000);
+            };
+
+            return (
+                <div className="min-h-screen relative flex flex-col">
+                    <div className="hero-glow"></div>
+
+                    {/* NAWIGACJA */}
+                    <nav className="fixed top-0 w-full z-50 glass-nav">
+                        <div className="max-w-5xl mx-auto px-6 h-20 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 bg-gradient-to-br from-violet-500 to-emerald-500 rounded-xl flex items-center justify-center shadow-lg shadow-violet-500/20">
+                                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+                                </div>
+                                <span className="text-xl font-extrabold tracking-tight text-white">EduKorektor<span className="text-violet-400">AI</span></span>
+                            </div>
+                            <a href="index.html" className="flex items-center gap-2 text-sm font-bold text-slate-400 hover:text-white transition-colors bg-slate-800/50 hover:bg-slate-700 px-4 py-2 rounded-full border border-slate-700">
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+                                Wróć do EduBox
+                            </a>
+                        </div>
+                    </nav>
+
+                    <main className="flex-grow pt-32 pb-20 px-4 sm:px-6">
+                        <div className="max-w-5xl mx-auto">
+                            
+                            <div className="text-center mb-10 fade-in">
+                                <h1 className="text-4xl md:text-5xl font-black text-white mb-4 tracking-tight">
+                                    Gotowa informacja zwrotna w <span className="text-gradient">5 sekund.</span>
+                                </h1>
+                                <p className="text-slate-400 text-lg max-w-2xl mx-auto">
+                                    Wklej pracę ucznia, a sztuczna inteligencja wygeneruje profesjonalną Ocenę Kształtującą, podkreślając mocne strony i wskazując to, co wymaga poprawy.
+                                </p>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 fade-in" style={{animationDelay: '0.1s'}}>
+                                {/* Pole Pracy Ucznia */}
+                                <div className="glass-panel p-6 rounded-3xl border border-slate-700/50 flex flex-col">
+                                    <label className="text-white font-bold mb-3 flex items-center gap-2">
+                                        <svg className="w-5 h-5 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                                        Wklej tekst ucznia:
+                                    </label>
+                                    <textarea 
+                                        value={studentText}
+                                        onChange={(e) => setStudentText(e.target.value)}
+                                        placeholder="Np. Kamienie na szaniec to fajna ksiąszka. Bardzo podobał mi się Alek bo był odważny..."
+                                        className="w-full flex-grow min-h-[200px] bg-slate-900/50 border border-slate-700 text-slate-200 rounded-2xl p-4 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 custom-scrollbar resize-y text-sm sm:text-base leading-relaxed"
+                                    ></textarea>
+                                </div>
+
+                                {/* Pole Uwag Nauczyciela */}
+                                <div className="glass-panel p-6 rounded-3xl border border-slate-700/50 flex flex-col">
+                                    <label className="text-white font-bold mb-3 flex items-center gap-2">
+                                        <svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                        Twoje uwagi (opcjonalnie):
+                                    </label>
+                                    <textarea 
+                                        value={teacherNotes}
+                                        onChange={(e) => setTeacherNotes(e.target.value)}
+                                        placeholder="Np. Skup się na błędach ortograficznych. Pochwal za znajomość lektury. Musi popracować nad długością zdań."
+                                        className="w-full flex-grow min-h-[200px] bg-slate-900/50 border border-slate-700 text-slate-200 rounded-2xl p-4 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 custom-scrollbar resize-y text-sm sm:text-base leading-relaxed"
+                                    ></textarea>
+                                </div>
+                            </div>
+
+                            {error && (
+                                <div className="mt-4 p-4 bg-red-900/30 border border-red-500/50 rounded-xl text-red-400 text-sm text-center font-medium">
+                                    {error}
+                                </div>
+                            )}
+
+                            <div className="mt-8 flex justify-center fade-in" style={{animationDelay: '0.2s'}}>
+                                <button 
+                                    onClick={generateFeedback}
+                                    disabled={isGenerating || !studentText.trim()}
+                                    className={`px-10 py-5 rounded-2xl font-black text-white text-lg transition-all flex items-center gap-3 shadow-lg btn-bounce
+                                        ${isGenerating ? 'bg-slate-700 cursor-not-allowed' : 'bg-gradient-to-r from-violet-600 to-emerald-600 hover:shadow-violet-500/25'}`}
+                                >
+                                    {isGenerating ? (
+                                        <>
+                                            <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
+                                            Analizowanie Pracy...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                            Generuj Ocenę Kształtującą
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+
+                            {/* Wynik */}
+                            {generatedText && (
+                                <div ref={resultRef} className="mt-12 glass-panel p-8 sm:p-10 rounded-3xl fade-in border-violet-500/30 shadow-[0_0_40px_rgba(168,85,247,0.15)] relative overflow-hidden">
+                                    <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-violet-500 to-emerald-500"></div>
+                                    
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 gap-4">
+                                        <h3 className="text-2xl font-bold text-white flex items-center gap-3">
+                                            Gotowa Informacja Zwrotna (NAZU)
+                                        </h3>
+                                        <button 
+                                            onClick={copyToClipboard}
+                                            className="bg-violet-600 hover:bg-violet-500 text-white px-5 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 transition-all btn-bounce shadow-lg shadow-violet-500/20"
+                                        >
+                                            {copyStatus === 'Skopiowano! ✓' ? (
+                                                <svg className="w-4 h-4 text-emerald-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"/></svg>
+                                            ) : (
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
+                                            )}
+                                            {copyStatus}
+                                        </button>
+                                    </div>
+                                    
+                                    <div className="bg-[#0f172a] p-8 rounded-2xl border border-slate-700/50">
+                                        <p className="text-slate-200 whitespace-pre-wrap text-base sm:text-lg leading-relaxed font-medium">
+                                            {generatedText}
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
+
+                        </div>
+                    </main>
+
+                    <footer className="py-6 border-t border-slate-800 text-center text-sm font-bold text-slate-600 uppercase tracking-widest mt-auto">
+                        Część systemu EduBox AI
+                    </footer>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>

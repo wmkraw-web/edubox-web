@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="pl" translate="no" class="notranslate">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduOcena AI - Kreator Ocen Opisowych</title>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&family=Merriweather:ital,wght@0,400;0,700;1,400;1,700&display=swap');
+        
+        body { background-color: #020617; font-family: 'Plus Jakarta Sans', sans-serif; color: #f8fafc; overflow-x: hidden; }
+        .document-font { font-family: 'Merriweather', serif; }
+        
+        .glass-panel { background: rgba(30, 41, 59, 0.4); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.05); }
+        .glass-nav { background: rgba(2, 6, 23, 0.8); backdrop-filter: blur(20px); border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
+
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #0f172a; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+
+        input:focus, select:focus, textarea:focus { box-shadow: 0 0 15px rgba(139, 92, 246, 0.3); border-color: #8b5cf6 !important; }
+
+        @media print {
+            body { background: white; color: black; }
+            .print-hidden { display: none !important; }
+            #print-container { border: none !important; box-shadow: none !important; padding: 0 !important; margin: 0 !important; width: 100% !important; max-width: 100% !important; background: white !important; }
+            body, html { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+        }
+
+        @keyframes slide-up { 0% { opacity: 0; transform: translate(-50%, 20px); } 100% { opacity: 1; transform: translate(-50%, 0); } }
+        .animate-toast { animation: slide-up 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        @keyframes pop { 0% { transform: scale(0.9); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+        .bot-bubble { animation: pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+        @keyframes blink { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(0.1); } }
+        .bot-eye { animation: blink 4s infinite; transform-origin: center; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        const Icon = ({ name, size = 20, className = "" }) => {
+            const icons = {
+                FileBadge: <><path d="M12 22h6a2 2 0 0 0 2-2V7l-5-5H6a2 2 0 0 0-2 2v3"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M5 17a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M7 16.5 8 22l-3-1-3 1 1-5.5"/></>,
+                Sparkles: <path d="m12 3 1.912 5.813a2 2 0 0 0 1.275 1.275L21 12l-5.813 1.912a2 2 0 0 0-1.275 1.275L12 21l-1.912-5.813a2 2 0 0 0-1.275-1.275L3 12l5.813-1.912a2 2 0 0 0 1.275-1.275L12 3Z"/>,
+                Printer: <path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6z"/>,
+                Download: <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>,
+                Coffee: <path d="M18 8h1a4 4 0 0 1 0 8h-1M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8zM7 2v3M11 2v3M15 2v3"/>,
+                Lock: <><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></>,
+                AlertCircle: <><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></>,
+                User: <><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></>,
+                BookOpen: <><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></>,
+                Calculator: <><rect width="16" height="20" x="4" y="2" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="16" y1="14" x2="16" y2="18"/><path d="M16 10h.01"/><path d="M12 10h.01"/><path d="M8 10h.01"/><path d="M12 14h.01"/><path d="M8 14h.01"/><path d="M12 18h.01"/><path d="M8 18h.01"/></>,
+                Heart: <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>
+            };
+            return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>{icons[name] || null}</svg>;
+        };
+
+        const BotHelperAvatar = () => (
+            <svg viewBox="0 0 100 100" className="w-14 h-14 drop-shadow-md flex-shrink-0" xmlns="http://www.w3.org/2000/svg">
+                <path d="M50 30 V15" stroke="#a78bfa" strokeWidth="4" strokeLinecap="round"/>
+                <circle cx="50" cy="12" r="5" fill="#8b5cf6"/>
+                <rect x="25" y="30" width="50" height="40" rx="12" fill="#4c1d95"/>
+                <rect x="32" y="38" width="36" height="22" rx="6" fill="#ffffff"/>
+                <circle cx="40" cy="49" r="3.5" fill="#4c1d95" className="bot-eye"/>
+                <circle cx="60" cy="49" r="3.5" fill="#4c1d95" className="bot-eye"/>
+                <path d="M 45 56 Q 50 60 55 56" stroke="#4c1d95" strokeWidth="2.5" fill="none" strokeLinecap="round"/>
+            </svg>
+        );
+
+        function App() {
+            const [isPremium, setIsPremium] = useState(false);
+            const [accessCode, setAccessCode] = useState('');
+            const [isGenerating, setIsGenerating] = useState(false);
+            const [toastMessage, setToastMessage] = useState('');
+            const [botMessage, setBotMessage] = useState("Witaj! Maj i czerwiec to trudny czas. Wyklikaj oceny ucznia na suwakach, a ja zamienię je na piękny, dyplomatyczny tekst na świadectwo!");
+            
+            const [params, setParams] = useState({
+                studentName: '',
+                gender: 'Chłopiec',
+                classLevel: 'Klasa 1',
+                polish: 'Czyta płynnie i rozumie tekst',
+                math: 'Biegle liczy w pamięci',
+                social: 'Zgodnie współpracuje w grupie',
+                notes: ''
+            });
+
+            const [generatedData, setGeneratedData] = useState(null);
+
+            const showToast = (msg) => { setToastMessage(msg); setTimeout(() => setToastMessage(''), 4000); };
+
+            const handleVerifyCode = () => {
+                if (accessCode.toUpperCase() === 'KAWA2024') { 
+                    setIsPremium(true); setAccessCode(''); 
+                    showToast('Kod Premium aktywny! 🌟');
+                    setBotMessage("Premium odblokowane! AI wygeneruje teraz bardzo wyczerpujące i profesjonalne podsumowania.");
+                } else { showToast('Nieprawidłowy kod dostępu!'); }
+            };
+
+            const generateEvaluation = async () => {
+                if (!params.studentName.trim()) return showToast('Wpisz imię ucznia!');
+                
+                setIsGenerating(true);
+                setGeneratedData(null);
+                setBotMessage("Formułuję profesjonalną ocenę opisową. Będzie brzmiała dyplomatycznie, doceniając mocne strony i delikatnie wskazując obszary do pracy...");
+                
+                const grammarInstruction = params.gender === 'Chłopiec' 
+                    ? "Pisz wyłącznie w formie męskiej (uczeń, opanował, czyta, potrafi)."
+                    : "Pisz wyłącznie w formie żeńskiej (uczennica, opanowała, czyta, potrafi).";
+
+                const systemPrompt = `Jesteś wybitnym polskim nauczycielem edukacji wczesnoszkolnej. Twoim zadaniem jest napisanie oficjalnej Oceny Opisowej (rocznej/półrocznej) na świadectwo.
+ZASADY KRYTYCZNE:
+1. Ton musi być niezwykle profesjonalny, doceniający (wzmacniający), ale obiektywny. Używaj bogatego słownictwa pedagogicznego.
+2. ${grammarInstruction}
+3. Ułóż tekst w spójny esej z wyraźnymi akapitami. Brak formatowania markdown, użyj po prostu \n\n do oddzielenia akapitów.
+4. Zwróć WYŁĄCZNIE poprawny format JSON: { "title": "Ocena Opisowa", "content": "..." }`;
+
+                const userPrompt = `Imię: ${params.studentName}
+Etap: ${params.classLevel}
+Edukacja Polonistyczna: ${params.polish}
+Edukacja Matematyczna: ${params.math}
+Rozwój Społeczno-Emocjonalny: ${params.social}
+Dodatkowe uwagi od nauczyciela: ${params.notes || 'Brak dodatkowych uwag.'}
+
+Na podstawie tych parametrów wygeneruj pełną ocenę opisową, łącząc te elementy w logiczną całość.`;
+
+                try {
+                    const payload = { system: systemPrompt, prompt: userPrompt, temperature: 0.4, format: "json", model: "gpt-4o-mini" };
+                    const res = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                    const data = await res.json();
+                    if (!res.ok) throw new Error(data.details || data.message || "Błąd z serwera API");
+                    
+                    let cleanText = data.text;
+                    if (cleanText.includes('"reasoning_content"')) {
+                        const contentMarker = '"content":"';
+                        const startIdx = cleanText.indexOf(contentMarker);
+                        if (startIdx !== -1) {
+                            let extracted = cleanText.substring(startIdx + contentMarker.length);
+                            extracted = extracted.replace(/"\s*}\s*$/, '').replace(/"$/, ''); 
+                            cleanText = extracted.replace(/\\n/g, '\n').replace(/\\"/g, '"'); 
+                        }
+                    } else {
+                        try { const outerObj = JSON.parse(cleanText); if(outerObj.content) cleanText = outerObj.content; else if (outerObj.choices) cleanText = outerObj.choices[0].message.content; } catch(e){}
+                    }
+                    cleanText = cleanText.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+                    let jsonStr = cleanText.replace(/```json/gi, '').replace(/```/g, '').trim();
+                    if(jsonStr.indexOf('{') !== -1) jsonStr = jsonStr.substring(jsonStr.indexOf('{'), jsonStr.lastIndexOf('}') + 1);
+
+                    const parsedData = JSON.parse(jsonStr);
+                    setGeneratedData(parsedData);
+                    setBotMessage("Gotowe! Ocena jest sformułowana profesjonalnie. Możesz skopiować ją wprost do dziennika lub wydrukować!");
+                } catch (error) {
+                    console.error("Błąd AI:", error); showToast(`Błąd: ${error.message}`);
+                    setBotMessage("Ojej, serwer chwilowo odrzucił zapytanie. Kliknij 'Generuj' jeszcze raz!");
+                } finally { setIsGenerating(false); }
+            };
+
+            const exportToWord = () => {
+                if(!generatedData) return;
+                const content = document.getElementById('document-render-area').innerHTML;
+                const header = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>${generatedData.title}</title><style>body { font-family: 'Times New Roman', serif; font-size: 12pt; line-height: 1.5; color: #000; text-align: justify; } h1 { font-size: 16pt; text-align: center; text-transform: uppercase; margin-bottom: 20px; color: #1e293b; } p { margin-bottom: 10px; text-indent: 1.25cm; }</style></head><body>`;
+                const footer = `</body></html>`;
+                const blob = new Blob(['\ufeff', header + content + footer], { type: 'application/msword' });
+                const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = `Ocena_Opisowa_${params.studentName.replace(/\s+/g, '_')}.doc`; link.click();
+            };
+
+            return (
+                <div className="min-h-screen flex flex-col relative overflow-x-hidden">
+                    
+                    {toastMessage && (
+                        <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[200] bg-violet-600 text-white px-6 py-3 rounded-2xl shadow-[0_0_30px_rgba(139,92,246,0.4)] font-bold text-sm animate-toast flex items-center gap-3 border border-violet-400">
+                            <Icon name="AlertCircle" size={18} /> {toastMessage}
+                        </div>
+                    )}
+
+                    {isGenerating && (
+                        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-[100] flex flex-col items-center justify-center text-white">
+                            <div className="glass-panel p-10 rounded-3xl flex flex-col items-center space-y-6 max-w-sm border border-violet-500/20 shadow-[0_0_50px_rgba(139,92,246,0.2)]">
+                                <div className="w-16 h-16 border-4 border-slate-700 border-t-violet-500 rounded-full animate-spin"></div>
+                                <div className="text-center">
+                                    <h3 className="text-xl font-bold mb-2 text-white">Redaguję Ocenę...</h3>
+                                    <p className="text-xs text-slate-400 font-medium">Używam profesjonalnego języka pedagogicznego.</p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* GÓRNA NAWIGACJA */}
+                    <nav className="fixed top-0 w-full z-50 glass-nav py-4 px-6 print-hidden">
+                        <div className="max-w-7xl mx-auto flex justify-between items-center">
+                            <div className="flex items-center space-x-3 font-extrabold text-xl tracking-tight cursor-pointer" onClick={() => window.scrollTo(0,0)}>
+                                <div className="bg-gradient-to-br from-violet-500 to-indigo-600 p-2 rounded-xl text-white shadow-[0_0_15px_rgba(139,92,246,0.5)]">
+                                    <Icon name="FileBadge" size={22}/>
+                                </div>
+                                <span>Edu<span className="text-violet-400">Ocena</span> AI</span>
+                            </div>
+                            
+                            <div className="flex items-center space-x-4">
+                                {!isPremium && (
+                                    <div className="hidden md:flex items-center space-x-2 bg-slate-900 p-1.5 rounded-xl border border-slate-700">
+                                        <input value={accessCode} onChange={e => setAccessCode(e.target.value)} placeholder="Kod Premium..." className="p-2 bg-transparent text-sm w-32 outline-none font-medium text-white placeholder-slate-500"/>
+                                        <button onClick={handleVerifyCode} className="p-2 text-white rounded-lg bg-violet-600 hover:bg-violet-500 transition-colors shadow-md"><Icon name="Lock" size={16}/></button>
+                                    </div>
+                                )}
+                                <button onClick={() => window.open('https://buycoffee.to/magiccolor')} className="flex items-center space-x-2 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white px-5 py-2.5 rounded-xl font-bold transition-all active:scale-95 text-sm shadow-md">
+                                    <Icon name="Coffee" size={18} className="text-amber-400"/><span>Postaw Kawę</span>
+                                </button>
+                            </div>
+                        </div>
+                    </nav>
+
+                    {/* GŁÓWNY WIDOK APLIKACJI */}
+                    <div className="max-w-7xl mx-auto px-4 pt-32 pb-24 grid grid-cols-1 lg:grid-cols-12 gap-8 w-full print:block print:p-0 relative z-10">
+                        
+                        {/* PANEL LEWY - KONTROLKI */}
+                        <div className="lg:col-span-4 space-y-6 print-hidden">
+                            
+                            {/* Podstawowe Informacje */}
+                            <div className="glass-panel p-6 md:p-8 rounded-[2rem] space-y-5">
+                                <h2 className="font-bold flex items-center text-slate-300 text-sm uppercase tracking-widest border-b border-slate-700/50 pb-4">
+                                    <Icon name="User" className="mr-2 text-violet-400" size={18}/> Dane Ucznia
+                                </h2>
+                                
+                                <div>
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Imię ucznia (lub inicjał)</label>
+                                    <input type="text" value={params.studentName} onChange={e => setParams({...params, studentName: e.target.value})} placeholder="np. Kasia" className="w-full p-4 bg-slate-900 border border-slate-700 rounded-xl outline-none text-white text-sm font-bold focus:border-violet-500 transition-colors" />
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Płeć (Gramatyka)</label>
+                                        <select value={params.gender} onChange={e => setParams({...params, gender: e.target.value})} className="w-full p-4 bg-slate-900 border border-slate-700 rounded-xl outline-none text-white text-sm focus:border-violet-500 transition-colors appearance-none">
+                                            <option className="bg-slate-900">Dziewczynka</option>
+                                            <option className="bg-slate-900">Chłopiec</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Poziom Edukacji</label>
+                                        <select value={params.classLevel} onChange={e => setParams({...params, classLevel: e.target.value})} className="w-full p-4 bg-slate-900 border border-slate-700 rounded-xl outline-none text-white text-sm focus:border-violet-500 transition-colors appearance-none">
+                                            <option className="bg-slate-900">Przedszkole</option>
+                                            <option className="bg-slate-900">Klasa 1</option>
+                                            <option className="bg-slate-900">Klasa 2</option>
+                                            <option className="bg-slate-900">Klasa 3</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Poziom Umiejętności */}
+                            <div className="glass-panel p-6 md:p-8 rounded-[2rem] space-y-5">
+                                <h2 className="font-bold flex items-center text-slate-300 text-sm uppercase tracking-widest border-b border-slate-700/50 pb-4">
+                                    <Icon name="Sparkles" className="mr-2 text-indigo-400" size={18}/> Umiejętności
+                                </h2>
+                                
+                                <div>
+                                    <label className="text-[10px] font-bold text-blue-400 uppercase tracking-wider block mb-2 flex items-center gap-2"><Icon name="BookOpen" size={14}/> Edukacja Polonistyczna</label>
+                                    <select value={params.polish} onChange={e => setParams({...params, polish: e.target.value})} className="w-full p-3 bg-blue-900/10 border border-blue-500/30 rounded-xl outline-none text-white text-sm focus:border-blue-500 transition-colors appearance-none">
+                                        <option className="bg-slate-900">Czyta płynnie i ze zrozumieniem, pięknie pisze</option>
+                                        <option className="bg-slate-900">Czyta sylabami/głoskami, rozumie proste teksty</option>
+                                        <option className="bg-slate-900">Ma duże trudności z czytaniem i pisaniem</option>
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider block mb-2 flex items-center gap-2"><Icon name="Calculator" size={14}/> Edukacja Matematyczna</label>
+                                    <select value={params.math} onChange={e => setParams({...params, math: e.target.value})} className="w-full p-3 bg-emerald-900/10 border border-emerald-500/30 rounded-xl outline-none text-white text-sm focus:border-emerald-500 transition-colors appearance-none">
+                                        <option className="bg-slate-900">Biegle liczy w pamięci, logicznie myśli</option>
+                                        <option className="bg-slate-900">Liczy poprawnie na palcach/konkretach</option>
+                                        <option className="bg-slate-900">Myli działania, potrzebuje ciągłej pomocy</option>
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className="text-[10px] font-bold text-amber-400 uppercase tracking-wider block mb-2 flex items-center gap-2"><Icon name="Heart" size={14}/> Społeczno-Emocjonalna</label>
+                                    <select value={params.social} onChange={e => setParams({...params, social: e.target.value})} className="w-full p-3 bg-amber-900/10 border border-amber-500/30 rounded-xl outline-none text-white text-sm focus:border-amber-500 transition-colors appearance-none">
+                                        <option className="bg-slate-900">Uczynny, grzeczny, bardzo lubiany w grupie</option>
+                                        <option className="bg-slate-900">Nieśmiały, zamknięty w sobie, cichy</option>
+                                        <option className="bg-slate-900">Miewa wybuchy złości, wchodzi w konflikty</option>
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Dodatkowe uwagi (Sukcesy lub Trudności)</label>
+                                    <textarea value={params.notes} onChange={e => setParams({...params, notes: e.target.value})} placeholder="np. Pięknie maluje, brał udział w konkursie recytatorskim..." className="w-full p-4 bg-slate-900 border border-slate-700 rounded-xl outline-none text-white text-sm resize-none focus:border-violet-500 transition-colors custom-scrollbar placeholder-slate-600" rows="3"/>
+                                </div>
+
+                                {!isPremium ? (
+                                    <div className="p-6 rounded-xl border-2 border-dashed border-slate-700 flex flex-col items-center justify-center text-center gap-3 bg-slate-900/50">
+                                        <div className="p-3 bg-slate-800 rounded-full"><Icon name="Lock" size={24} className="text-slate-400"/></div>
+                                        <div><span className="text-sm font-bold text-slate-300 block mb-1">Funkcja zablokowana</span><span className="text-xs text-slate-500">Wpisz kod Premium na górnym pasku.</span></div>
+                                    </div>
+                                ) : (
+                                    <button onClick={generateEvaluation} disabled={isGenerating} className="w-full bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white py-4 rounded-xl font-black text-sm tracking-widest shadow-[0_0_20px_rgba(139,92,246,0.3)] flex justify-center items-center gap-2 transition-all active:scale-95 uppercase disabled:opacity-50">
+                                        <Icon name="Sparkles" size={20}/> Generuj Ocenę Opisową
+                                    </button>
+                                )}
+                            </div>
+
+                            {/* EduBot Pomocnik */}
+                            <div className="p-5 rounded-3xl shadow-lg border flex items-start gap-4 animate-[reveal_0.3s_ease-out] transition-colors bg-violet-900/20 border-violet-500/30">
+                                <BotHelperAvatar />
+                                <div className="flex-1 pt-1">
+                                    <h4 className="font-black text-xs uppercase tracking-widest mb-1.5 text-violet-400">EduBot Wychowawca</h4>
+                                    <p className="text-sm font-medium leading-relaxed text-slate-300 bot-bubble" key={botMessage}>{botMessage}</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* PANEL PRAWY - WYNIK (DOKUMENT BIAŁY) */}
+                        <div className="lg:col-span-8 flex justify-center items-start overflow-x-auto pb-10 print:block">
+                            
+                            {!generatedData ? (
+                                <div className="glass-panel w-full max-w-[210mm] min-h-[297mm] shadow-2xl p-8 rounded-[2rem] flex flex-col items-center justify-center text-center space-y-6 print-hidden border-2 border-dashed border-slate-700 opacity-60">
+                                    <div className="p-6 bg-slate-800/50 rounded-full border border-slate-700 shadow-inner">
+                                        <Icon name="FileBadge" size={64} className="text-violet-500" />
+                                    </div>
+                                    <div>
+                                        <h2 className="text-2xl font-bold mb-3 text-white">Miejsce na Ocenę Opisową</h2>
+                                        <p className="max-w-md mx-auto text-slate-400 leading-relaxed text-sm">Wybierz parametry po lewej stronie. Sztuczna inteligencja zbuduje wyczerpujące podsumowanie pracy ucznia w przyjaznym, pedagogicznym tonie.</p>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="w-full max-w-[210mm] animate-[reveal_0.5s_ease-out] print:max-w-full">
+                                    
+                                    {/* Toolbar Pobierania */}
+                                    <div className="flex justify-end gap-3 mb-6 print-hidden bg-slate-900/50 p-2 rounded-2xl border border-slate-800 backdrop-blur-md">
+                                        <button onClick={exportToWord} className="flex-1 sm:flex-none bg-violet-600 hover:bg-violet-500 text-white px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all text-sm shadow-[0_0_15px_rgba(139,92,246,0.3)] active:scale-95">
+                                            <Icon name="Download" size={18}/> Word (.docx)
+                                        </button>
+                                        <button onClick={() => window.print()} className="flex-1 sm:flex-none bg-slate-700 hover:bg-slate-600 text-white px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all text-sm active:scale-95">
+                                            <Icon name="Printer" size={18}/> Drukuj PDF
+                                        </button>
+                                    </div>
+
+                                    {/* Karta A4 (Zawsze jasna) */}
+                                    <div className="bg-white shadow-[0_20px_50px_rgba(0,0,0,0.5)] p-12 md:p-20 text-slate-900 document-font rounded-sm min-h-[297mm]" id="print-container">
+                                        
+                                        <div id="document-render-area">
+                                            {/* Nagłówek Dokumentu */}
+                                            <h1 className="text-xl md:text-2xl font-bold text-center uppercase mb-10 tracking-wide leading-tight text-slate-900 border-b-2 border-slate-200 pb-4">
+                                                {generatedData.title}
+                                            </h1>
+                                            
+                                            <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl mb-10 flex justify-between">
+                                                <div className="font-bold text-slate-800">Uczeń: <span className="font-normal text-slate-600">{params.studentName}</span></div>
+                                                <div className="font-bold text-slate-800">Etap: <span className="font-normal text-slate-600">{params.classLevel}</span></div>
+                                            </div>
+
+                                            {/* Treść Eseju Oceny */}
+                                            <div className="text-[11pt] md:text-[12pt] leading-loose text-justify text-slate-900 space-y-4">
+                                                {generatedData.content.split('\n\n').map((paragraph, i) => (
+                                                    <p key={i} style={{ textIndent: '1.5rem' }}>{paragraph}</p>
+                                                ))}
+                                            </div>
+                                            
+                                            {/* Stopka na podpisy */}
+                                            <div className="mt-32 flex justify-between px-4 print:px-0 text-slate-900">
+                                                <div className="border-t border-slate-400 w-48 text-center pt-2 text-xs uppercase tracking-widest text-slate-500">Miejscowość, data</div>
+                                                <div className="border-t border-slate-400 w-48 text-center pt-2 text-xs uppercase tracking-widest text-slate-500">Podpis Wychowawcy</div>
+                                            </div>
+                                        </div>
+
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>

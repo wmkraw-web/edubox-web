@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="pl" translate="no" class="notranslate">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduBoxPro Studio - Piosenki, Escape Roomy i TikToki na Lekcje</title>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&display=swap');
+        
+        body { background-color: #020617; font-family: 'Plus Jakarta Sans', sans-serif; color: #f8fafc; overflow-x: hidden; }
+        
+        .glass-panel { background: rgba(30, 41, 59, 0.4); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.05); }
+        .glass-nav { background: rgba(2, 6, 23, 0.8); backdrop-filter: blur(20px); border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
+        .text-gradient-fuchsia { background: linear-gradient(135deg, #d946ef 0%, #ec4899 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .text-gradient-amber { background: linear-gradient(135deg, #fbbf24 0%, #f97316 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .text-gradient-cyan { background: linear-gradient(135deg, #22d3ee 0%, #3b82f6 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #0f172a; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+
+        input:focus, select:focus, textarea:focus { box-shadow: 0 0 15px rgba(255, 255, 255, 0.1); }
+
+        @media print {
+            body { background: white; color: black; }
+            .print-hidden { display: none !important; }
+            #print-container { border: none !important; box-shadow: none !important; padding: 0 !important; margin: 0 !important; width: 100% !important; max-width: 100% !important; background: white !important; }
+            body, html { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+            .page-break { page-break-before: always; }
+            .page-break-inside-avoid { break-inside: avoid; page-break-inside: avoid; }
+        }
+        
+        @keyframes slide-up { 0% { opacity: 0; transform: translate(-50%, 20px); } 100% { opacity: 1; transform: translate(-50%, 0); } }
+        .animate-toast { animation: slide-up 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        
+        /* Animacje Bota */
+        @keyframes pop { 0% { transform: scale(0.9); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+        .bot-bubble { animation: pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+        @keyframes blink { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(0.1); } }
+        .bot-eye { animation: blink 4s infinite; transform-origin: center; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        const Icon = ({ name, size = 20, className = "" }) => {
+            const icons = {
+                Music: <><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></>,
+                Map: <><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/></>,
+                Video: <><rect width="18" height="18" x="3" y="3" rx="2"/><path d="m9 8 6 4-6 4Z"/></>,
+                Sparkles: <path d="m12 3 1.912 5.813a2 2 0 0 0 1.275 1.275L21 12l-5.813 1.912a2 2 0 0 0-1.275 1.275L12 21l-1.912-5.813a2 2 0 0 0-1.275-1.275L3 12l5.813-1.912a2 2 0 0 0 1.275-1.275L12 3Z"/>,
+                Printer: <path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6z"/>,
+                Copy: <><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></>,
+                Download: <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>,
+                Coffee: <path d="M18 8h1a4 4 0 0 1 0 8h-1M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8zM7 2v3M11 2v3M15 2v3"/>,
+                Lock: <><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></>,
+                Play: <path d="m5 3 14 9-14 9V3z"/>,
+                AlertCircle: <><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></>
+            };
+            return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>{icons[name]}</svg>;
+        };
+
+        // --- AVATAR BOTA ---
+        const BotHelperAvatar = ({ colorClass }) => (
+            <svg viewBox="0 0 100 100" className="w-14 h-14 drop-shadow-md flex-shrink-0" xmlns="http://www.w3.org/2000/svg">
+                <path d="M50 30 V15" stroke="#94a3b8" strokeWidth="4" strokeLinecap="round"/>
+                <circle cx="50" cy="12" r="5" fill="currentColor" className={colorClass}/>
+                <rect x="25" y="30" width="50" height="40" rx="12" fill="currentColor" className={colorClass}/>
+                <rect x="32" y="38" width="36" height="22" rx="6" fill="#ffffff"/>
+                <circle cx="40" cy="49" r="3.5" fill="currentColor" className={`bot-eye ${colorClass}`}/>
+                <circle cx="60" cy="49" r="3.5" fill="currentColor" className={`bot-eye ${colorClass}`}/>
+                <path d="M 45 56 Q 50 60 55 56" stroke="currentColor" strokeWidth="2.5" fill="none" strokeLinecap="round" className={colorClass}/>
+            </svg>
+        );
+
+        function App() {
+            const [isPremium, setIsPremium] = useState(false);
+            const [accessCode, setAccessCode] = useState('');
+            const [isGenerating, setIsGenerating] = useState(false);
+            const [copied, setCopied] = useState(false);
+            const [toastMessage, setToastMessage] = useState('');
+            
+            const [mode, setMode] = useState('song');
+            const [botMessage, setBotMessage] = useState('');
+            
+            const [params, setParams] = useState({
+                topic: '',
+                age: 'Klasy 1-3',
+                style: 'Wesoły Pop',
+                location: 'Sala Lekcyjna',
+                characters: '2 osoby'
+            });
+
+            const [generatedData, setGeneratedData] = useState(null);
+
+            // Dynamiczne podpowiedzi bota
+            useEffect(() => {
+                if (mode === 'song') setBotMessage("Napisz mi temat, a ułożę wiersz z idealnymi polskimi rymami. Skopiujesz go potem do Suno.com!");
+                else if (mode === 'escape') setBotMessage("Zagadki to świetna zabawa! Wybierz miejsce, w którym je ukryjemy, a ja zajmę się resztą.");
+                else if (mode === 'tiktok') setBotMessage("Dzieciaki uwielbiają scenki. Stworzę krótki, śmieszny scenariusz dialogowy idealny do odegrania w klasie!");
+            }, [mode]);
+
+            const showToast = (msg) => {
+                setToastMessage(msg);
+                setTimeout(() => setToastMessage(''), 4000);
+            };
+
+            const handleVerifyCode = () => {
+                if (accessCode.toUpperCase() === 'KAWA2024') { 
+                    setIsPremium(true); 
+                    setAccessCode(''); 
+                    showToast('Kod aktywny! Witamy w Premium 🌟');
+                    setBotMessage("Hura! Masz Premium! Odblokowałeś pełną moc generowania scenariuszy.");
+                } 
+                else {
+                    showToast('Nieprawidłowy kod dostępu!');
+                }
+            };
+
+            const THEMES = {
+                song: { color: 'fuchsia', gradient: 'from-fuchsia-600 to-pink-600', border: 'border-fuchsia-500/50', text: 'text-fuchsia-400', shadow: 'shadow-[0_0_20px_rgba(217,70,239,0.3)]', botColor: 'text-fuchsia-500', botBg: 'bg-fuchsia-900/40 border-fuchsia-500/30' },
+                escape: { color: 'amber', gradient: 'from-amber-500 to-orange-600', border: 'border-amber-500/50', text: 'text-amber-400', shadow: 'shadow-[0_0_20px_rgba(245,158,11,0.3)]', botColor: 'text-amber-500', botBg: 'bg-amber-900/40 border-amber-500/30' },
+                tiktok: { color: 'cyan', gradient: 'from-cyan-500 to-blue-600', border: 'border-cyan-500/50', text: 'text-cyan-400', shadow: 'shadow-[0_0_20px_rgba(6,182,212,0.3)]', botColor: 'text-cyan-500', botBg: 'bg-cyan-900/40 border-cyan-500/30' }
+            };
+
+            const currentTheme = THEMES[mode];
+
+            const generateContent = async () => {
+                if (!params.topic.trim()) {
+                    showToast('Wpisz najpierw temat lub zagadnienie!');
+                    return;
+                }
+                setIsGenerating(true);
+                setGeneratedData(null);
+                setCopied(false);
+                setBotMessage("Myślę... Proszę czekać, to zajmie kilka sekund.");
+                
+                let systemPrompt = "";
+                let userPrompt = "";
+                let aiTemperature = 0.5;
+                let useJsonMode = true;
+
+                if (mode === 'song') {
+                    useJsonMode = false;
+                    aiTemperature = 0.6; 
+                    systemPrompt = `Jesteś wybitnym autorem tekstów piosenek dla dzieci.
+Twoim zadaniem jest napisanie edukacyjnej, rytmicznej piosenki w 100% po polsku.
+
+ZASADY:
+1. Piosenka musi mieć idealne, proste rymy (AABB lub ABAB), np. woda/zgoda, krok/smok.
+2. Zwróć tylko i wyłącznie gotowy tekst według poniższego szablonu. Żadnych wstępów, monologów ani komentarzy.
+
+FORMAT ODPOWIEDZI (Skopiuj ten format dokładnie):
+TYTUŁ: [Wymyśl polski, wesoły tytuł piosenki]
+STYL: [Wpisz 4 angielskie tagi muzyczne, np. upbeat pop, happy, kids music]
+TEKST:
+[Zwrotka 1]
+(4 linijki rymowanego tekstu)
+
+[Refren]
+(4 linijki rymowanego tekstu)
+
+[Zwrotka 2]
+(4 linijki rymowanego tekstu)
+
+[Refren]
+(4 linijki rymowanego tekstu)`;
+                    userPrompt = `Napisz wesołą piosenkę dla dzieci. \nTemat: ${params.topic}. \nDla kogo: ${params.age}. \nGatunek muzyczny: ${params.style}.`;
+                } 
+                else if (mode === 'escape') {
+                    useJsonMode = true;
+                    aiTemperature = 0.4;
+                    systemPrompt = `Jesteś kreatywnym polskim nauczycielem tworzącym angażujące gry terenowe (Escape Roomy) w klasie. Odpowiadaj WYŁĄCZNIE w formacie JSON. Całość tekstu wewnątrz JSON musi być po POLSKU.
+CRITICAL RULE: You MUST use exactly these English keys: "title", "intro", "riddles", "final_code". Inside riddles array use: "number", "task", "answer", "hiding_spot". DO NOT translate these keys.
+{
+  "title": "Polski tytuł misji",
+  "intro": "Krótki, fabularny wstęp (list) po polsku do odczytania dzieciom",
+  "riddles": [
+    { "number": 1, "task": "Opis zagadki/łamigłówki po polsku", "answer": "Prawidłowa odpowiedź (np. cyfra)", "hiding_spot": "Gdzie w sali schować tę zagadkę po polsku" }
+  ],
+  "final_code": "Ostateczny kod/hasło składające się z odpowiedzi"
+}`;
+                    userPrompt = `Temat edukacyjny: ${params.topic}. Wiek uczestników: ${params.age}. Miejsce ukrywania wskazówek: ${params.location}. Ułóż 4 zagadki tematyczne po polsku, które dzieci muszą rozwiązać współpracując. Podaj sprytne, ale bezpieczne kryjówki.`;
+                }
+                else if (mode === 'tiktok') {
+                    useJsonMode = true;
+                    aiTemperature = 0.4;
+                    systemPrompt = `Jesteś polskim reżyserem form wideo (TikTok, Reels) tworzącym śmieszne scenariusze edukacyjne dla uczniów. Odpowiadaj WYŁĄCZNIE w formacie JSON. Całość scenariusza musi być po POLSKU.
+CRITICAL RULE: You MUST use exactly these English keys: "title", "characters", "hook", "script", "camera_tips". Inside script use: "actor", "action", "dialogue". DO NOT translate these keys.
+{
+  "title": "Chwytliwy polski tytuł",
+  "characters": ["Postać 1", "Postać 2"],
+  "hook": "Haczyk (Pierwsze 3 sekundy) po polsku",
+  "script": [
+    { "actor": "Kto mówi (po polsku)", "action": "Wskazówka reżyserska (po polsku)", "dialogue": "Dokładny tekst dialogu (po polsku)" }
+  ],
+  "camera_tips": "Krótka porada jak to nagrać (po polsku)"
+}`;
+                    userPrompt = `Temat wideo: ${params.topic}. Grupa docelowa: ${params.age}. Liczba aktorów: ${params.characters}. Stwórz krótki (30-40 sekund), dynamiczny i humorystyczny scenariusz scenki edukacyjnej w 100% po polsku.`;
+                }
+
+                try {
+                    const payload = { 
+                        system: systemPrompt,
+                        prompt: userPrompt,
+                        temperature: aiTemperature,
+                        format: useJsonMode ? "json" : "text",
+                        model: mode === 'song' ? 'gpt-4o' : 'gpt-4o-mini'
+                    };
+
+                    const res = await fetch('/api/chat', {
+                        method: 'POST', 
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    
+                    const data = await res.json();
+                    if (!res.ok) throw new Error(data.details || data.message || "Nieznany błąd z serwera");
+                    
+                    let text = data.text;
+                    let cleanText = text;
+                    
+                    if (cleanText.includes('"reasoning_content"')) {
+                        const contentMarker = '"content":"';
+                        const startIdx = cleanText.indexOf(contentMarker);
+                        if (startIdx !== -1) {
+                            let extracted = cleanText.substring(startIdx + contentMarker.length);
+                            extracted = extracted.replace(/"\s*}\s*$/, '').replace(/"$/, ''); 
+                            cleanText = extracted.replace(/\\n/g, '\n').replace(/\\"/g, '"'); 
+                        }
+                    } else {
+                        try {
+                            const outerObj = JSON.parse(text);
+                            if (outerObj.content) cleanText = outerObj.content;
+                            else if (outerObj.choices && outerObj.choices[0].message.content) cleanText = outerObj.choices[0].message.content;
+                        } catch(e) {}
+                    }
+                    
+                    cleanText = cleanText.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+
+                    if (mode === 'song') {
+                        let title = "Twoja Piosenka";
+                        let suno_prompt = "Upbeat children song";
+                        let lyrics = "Wystąpił błąd w pisaniu tekstu. Spróbuj ponownie.";
+
+                        const titleMatch = cleanText.match(/TYTU[ŁL]:\s*([^\n]+)/i);
+                        if (titleMatch) title = titleMatch[1].trim().replace(/["']/g, '');
+
+                        const styleMatch = cleanText.match(/(?:STYL|PROMPT):\s*([^\n]+)/i);
+                        if (styleMatch) suno_prompt = styleMatch[1].trim().replace(/["']/g, '');
+
+                        const textSplit = cleanText.split(/TEKST:\s*/i);
+                        if (textSplit.length > 1) {
+                            lyrics = textSplit[1].trim();
+                        } else {
+                            lyrics = cleanText.replace(/TYTU[ŁL]:[^\n]+\n/i, '').replace(/(STYL|PROMPT):[^\n]+\n/i, '').trim();
+                        }
+
+                        setGeneratedData({ title, suno_prompt, lyrics });
+                        setBotMessage("Gotowe! Rymy są wypolerowane na błysk.");
+                        setIsGenerating(false);
+                        return;
+                    }
+
+                    let jsonStr = cleanText.replace(/```json/gi, '').replace(/```/g, '').trim();
+                    const start = jsonStr.indexOf('{');
+                    const end = jsonStr.lastIndexOf('}');
+                    if(start !== -1 && end !== -1) {
+                        jsonStr = jsonStr.substring(start, end + 1);
+                    }
+                    
+                    const parsedData = JSON.parse(jsonStr);
+
+                    if (mode === 'escape') {
+                        parsedData.title = parsedData.title || parsedData.tytuł || "Twój Escape Room";
+                        parsedData.intro = parsedData.intro || parsedData.wstep || "Witajcie odkrywcy!";
+                        parsedData.final_code = parsedData.final_code || parsedData.kod || "1234";
+                        parsedData.riddles = parsedData.riddles || parsedData.zagadki || [];
+                    } else if (mode === 'tiktok') {
+                        parsedData.title = parsedData.title || parsedData.tytuł || "Twój Scenariusz";
+                        parsedData.characters = parsedData.characters || parsedData.obsada || [];
+                        parsedData.hook = parsedData.hook || parsedData.haczyk || "Uwaga!";
+                        parsedData.camera_tips = parsedData.camera_tips || parsedData.wskazowki || "Nagrywaj pionowo.";
+                        parsedData.script = parsedData.script || parsedData.skrypt || [];
+                    }
+                    
+                    setGeneratedData(parsedData);
+                    setBotMessage("Wszystko gotowe! Możesz teraz wydrukować swój plan lub pobrać do Worda.");
+                    
+                } catch (error) {
+                    console.error("Błąd AI:", error); 
+                    showToast(`Błąd: ${error.message}`);
+                    setBotMessage("Oj, serwer dostał zadyszki. Spróbuj kliknąć jeszcze raz!");
+                } finally { 
+                    setIsGenerating(false); 
+                }
+            };
+
+            const copyToClipboard = (text) => {
+                if(!text) return;
+                navigator.clipboard.writeText(text).then(() => {
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 2000);
+                });
+            };
+
+            const exportToWord = () => {
+                if(!generatedData) return;
+                const content = document.getElementById('document-render-area').innerHTML;
+                
+                const header = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+                <head><meta charset='utf-8'><title>${generatedData.title}</title>
+                <style>
+                    body { font-family: 'Arial', sans-serif; font-size: 12pt; line-height: 1.5; color: #000; }
+                    h1 { font-size: 20pt; text-align: center; text-transform: uppercase; margin-bottom: 20px; color: #1e293b; border-bottom: 2px solid #cbd5e1; padding-bottom: 10px;}
+                    h2 { font-size: 14pt; color: #334155; margin-top: 15px;}
+                    h3 { font-size: 12pt; color: #475569; }
+                    .box { background-color: #f8fafc; padding: 15px; border: 1px solid #e2e8f0; margin-bottom: 15px; border-radius: 5px; }
+                    .riddle-box { border: 1px solid #cbd5e1; padding: 10px; margin-bottom: 10px; }
+                    .code-box { font-size: 24pt; font-weight: bold; text-align: center; letter-spacing: 5px; margin: 20px 0; }
+                </style></head><body>`;
+                const footer = `</body></html>`;
+                
+                const blob = new Blob(['\ufeff', header + content + footer], { type: 'application/msword' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = `EduBox_${mode}_${Date.now()}.doc`;
+                link.click();
+            };
+
+            return (
+                <div className="min-h-screen flex flex-col relative overflow-x-hidden">
+                    
+                    {/* POWIADOMIENIE (TOAST) */}
+                    {toastMessage && (
+                        <div className={`fixed bottom-10 left-1/2 -translate-x-1/2 z-[200] bg-slate-800 text-white px-6 py-3 rounded-2xl shadow-2xl font-bold text-sm animate-toast flex items-center gap-3 border ${currentTheme.border}`}>
+                            <Icon name="AlertCircle" size={18} className={currentTheme.text} />
+                            {toastMessage}
+                        </div>
+                    )}
+
+                    {/* EKRAN ŁADOWANIA */}
+                    {isGenerating && (
+                        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-[100] flex flex-col items-center justify-center text-white">
+                            <div className={`glass-panel p-10 rounded-3xl flex flex-col items-center space-y-6 max-w-sm border ${currentTheme.border} ${currentTheme.shadow}`}>
+                                <div className={`w-16 h-16 border-4 border-slate-700 rounded-full animate-spin ${mode === 'song' ? 'border-t-fuchsia-500' : mode === 'escape' ? 'border-t-amber-500' : 'border-t-cyan-500'}`}></div>
+                                <div className="text-center">
+                                    <h3 className="text-xl font-bold mb-2 text-white">Tworzę magię...</h3>
+                                    <p className="text-xs text-slate-400 font-medium">To potrwa zaledwie kilka sekund.</p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* GÓRNA NAWIGACJA */}
+                    <nav className="fixed top-0 w-full z-50 glass-nav py-4 px-6 print-hidden">
+                        <div className="max-w-7xl mx-auto flex justify-between items-center">
+                            <div className="flex items-center space-x-3 font-extrabold text-xl tracking-tight cursor-pointer" onClick={() => window.scrollTo(0,0)}>
+                                <div className={`bg-gradient-to-br ${currentTheme.gradient} p-2 rounded-xl text-white shadow-lg`}>
+                                    <Icon name="Play" size={22}/>
+                                </div>
+                                <span>EduBox<span className={currentTheme.text}>Studio</span></span>
+                            </div>
+                            
+                            <div className="flex items-center space-x-4">
+                                {!isPremium && (
+                                    <div className="hidden md:flex items-center space-x-2 bg-slate-900 p-1.5 rounded-xl border border-slate-700">
+                                        <input value={accessCode} onChange={e => setAccessCode(e.target.value)} placeholder="Kod Premium..." className="p-2 bg-transparent text-sm w-32 outline-none font-medium text-white placeholder-slate-500"/>
+                                        <button onClick={handleVerifyCode} className={`p-2 text-white rounded-lg bg-slate-800 hover:bg-slate-700 transition-colors border border-slate-600`}><Icon name="Lock" size={16}/></button>
+                                    </div>
+                                )}
+                                <button onClick={() => window.open('https://buycoffee.to/magiccolor')} className="flex items-center space-x-2 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white px-5 py-2.5 rounded-xl font-bold transition-all active:scale-95 text-sm shadow-md">
+                                    <Icon name="Coffee" size={18} className="text-amber-400"/><span>Postaw Kawę</span>
+                                </button>
+                            </div>
+                        </div>
+                    </nav>
+
+                    {/* GŁÓWNY WIDOK APLIKACJI */}
+                    <div className="max-w-7xl mx-auto px-4 pt-32 pb-24 grid grid-cols-1 lg:grid-cols-12 gap-8 w-full print:block print:p-0 relative z-10">
+                        
+                        {/* PANEL LEWY - KONFIGURACJA */}
+                        <div className="lg:col-span-4 space-y-6 print-hidden">
+                            
+                            {/* Wybór Trybu */}
+                            <div className="glass-panel p-2 rounded-2xl flex gap-2">
+                                <button onClick={() => {setMode('song'); setGeneratedData(null);}} className={`flex-1 py-4 px-2 rounded-xl flex flex-col items-center justify-center font-bold text-[10px] uppercase tracking-widest transition-all duration-300 ${mode === 'song' ? 'bg-gradient-to-br from-fuchsia-600 to-pink-600 text-white shadow-[0_0_20px_rgba(217,70,239,0.3)] border border-fuchsia-500' : 'text-slate-400 hover:bg-slate-800'}`}>
+                                    <Icon name="Music" size={24} className={`mb-2 ${mode === 'song' ? 'text-white' : 'text-fuchsia-400'}`} /> Piosenki
+                                </button>
+                                <button onClick={() => {setMode('escape'); setGeneratedData(null);}} className={`flex-1 py-4 px-2 rounded-xl flex flex-col items-center justify-center font-bold text-[10px] uppercase tracking-widest transition-all duration-300 ${mode === 'escape' ? 'bg-gradient-to-br from-amber-500 to-orange-600 text-white shadow-[0_0_20px_rgba(245,158,11,0.3)] border border-amber-500' : 'text-slate-400 hover:bg-slate-800'}`}>
+                                    <Icon name="Map" size={24} className={`mb-2 ${mode === 'escape' ? 'text-white' : 'text-amber-400'}`} /> Escape Room
+                                </button>
+                                <button onClick={() => {setMode('tiktok'); setGeneratedData(null);}} className={`flex-1 py-4 px-2 rounded-xl flex flex-col items-center justify-center font-bold text-[10px] uppercase tracking-widest transition-all duration-300 ${mode === 'tiktok' ? 'bg-gradient-to-br from-cyan-500 to-blue-600 text-white shadow-[0_0_20px_rgba(6,182,212,0.3)] border border-cyan-500' : 'text-slate-400 hover:bg-slate-800'}`}>
+                                    <Icon name="Video" size={24} className={`mb-2 ${mode === 'tiktok' ? 'text-white' : 'text-cyan-400'}`} /> Teatrzyk
+                                </button>
+                            </div>
+
+                            {/* Formularz Danych */}
+                            <div className="glass-panel p-6 md:p-8 rounded-[2rem] space-y-6">
+                                <h2 className={`font-bold text-sm uppercase tracking-widest border-b border-slate-700/50 pb-4 ${currentTheme.text} flex items-center gap-2`}>
+                                    Szczegóły Scenariusza
+                                </h2>
+                                
+                                <div>
+                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">
+                                        {mode === 'song' ? 'O czym ma być piosenka?' : mode === 'escape' ? 'Temat Zagadek i Misji' : 'Temat lub Postać Historyczna'}
+                                    </label>
+                                    <textarea 
+                                        value={params.topic} 
+                                        onChange={e => setParams({...params, topic: e.target.value})} 
+                                        placeholder={mode === 'song' ? "np. Jak działa wulkan, Ułamki..." : mode === 'escape' ? "np. Starożytny Rzym, Ekologia..." : "np. Wywiad z Bolesławem Chrobrym..."} 
+                                        className={`w-full p-4 bg-slate-900 border border-slate-700 rounded-xl outline-none text-white text-sm font-medium resize-none focus:border-${currentTheme.color}-500 transition-colors placeholder-slate-600`}
+                                        rows="3"
+                                    />
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">Wiek / Klasa</label>
+                                        <select value={params.age} onChange={e => setParams({...params, age: e.target.value})} className={`w-full p-4 bg-slate-900 border border-slate-700 rounded-xl outline-none text-white text-sm font-medium focus:border-${currentTheme.color}-500 transition-colors appearance-none`}>
+                                            <option className="bg-slate-900">Przedszkole</option>
+                                            <option className="bg-slate-900">Klasy 1-3</option>
+                                            <option className="bg-slate-900">Klasy 4-6</option>
+                                            <option className="bg-slate-900">Klasy 7-8</option>
+                                        </select>
+                                    </div>
+
+                                    {mode === 'song' && (
+                                        <div>
+                                            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">Gatunek Muzyczny</label>
+                                            <select value={params.style} onChange={e => setParams({...params, style: e.target.value})} className={`w-full p-4 bg-slate-900 border border-slate-700 rounded-xl outline-none text-white text-sm font-medium focus:border-fuchsia-500 transition-colors appearance-none`}>
+                                                <option className="bg-slate-900">Wesoły Pop / Radiowy</option>
+                                                <option className="bg-slate-900">Kołysanka / Lullaby</option>
+                                                <option className="bg-slate-900">Energetyczny Rap</option>
+                                                <option className="bg-slate-900">Rock / Gitarowy</option>
+                                            </select>
+                                        </div>
+                                    )}
+                                    {mode === 'escape' && (
+                                        <div>
+                                            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">Gdzie chowamy?</label>
+                                            <select value={params.location} onChange={e => setParams({...params, location: e.target.value})} className={`w-full p-4 bg-slate-900 border border-slate-700 rounded-xl outline-none text-white text-sm font-medium focus:border-amber-500 transition-colors appearance-none`}>
+                                                <option className="bg-slate-900">Sala Lekcyjna</option>
+                                                <option className="bg-slate-900">Sala Gimnastyczna</option>
+                                                <option className="bg-slate-900">Boisko / Podwórko</option>
+                                            </select>
+                                        </div>
+                                    )}
+                                    {mode === 'tiktok' && (
+                                        <div>
+                                            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">Obsada</label>
+                                            <select value={params.characters} onChange={e => setParams({...params, characters: e.target.value})} className={`w-full p-4 bg-slate-900 border border-slate-700 rounded-xl outline-none text-white text-sm font-medium focus:border-cyan-500 transition-colors appearance-none`}>
+                                                <option className="bg-slate-900">Tylko Nauczyciel (Solo)</option>
+                                                <option className="bg-slate-900">2 osoby (Wywiad)</option>
+                                                <option className="bg-slate-900">Cała Klasa (Chór)</option>
+                                            </select>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {!isPremium ? (
+                                    <div className="p-6 rounded-xl border-2 border-dashed border-slate-700 flex flex-col items-center justify-center text-center gap-3 bg-slate-900/50">
+                                        <div className="p-3 bg-slate-800 rounded-full"><Icon name="Lock" size={24} className="text-slate-400"/></div>
+                                        <div>
+                                            <span className="text-sm font-bold text-slate-300 block mb-1">Funkcja zablokowana</span>
+                                            <span className="text-xs text-slate-500">Wpisz kod Premium na górnym pasku.</span>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <button onClick={generateContent} className={`w-full bg-gradient-to-r ${currentTheme.gradient} text-white py-4 rounded-xl font-black text-sm tracking-widest shadow-lg flex justify-center items-center gap-2 transition-all active:scale-95 uppercase`}>
+                                        <Icon name="Sparkles" size={20}/> Generuj z AI
+                                    </button>
+                                )}
+                            </div>
+
+                            {/* AGENT EDU-BOT (POMOCNIK) */}
+                            <div className={`p-5 rounded-3xl shadow-lg border flex items-start gap-4 animate-[reveal_0.3s_ease-out] transition-colors ${currentTheme.botBg}`}>
+                                <BotHelperAvatar colorClass={currentTheme.botColor} />
+                                <div className="flex-1 pt-1">
+                                    <h4 className={`font-black text-xs uppercase tracking-widest mb-1.5 ${currentTheme.botColor}`}>EduBot Studio</h4>
+                                    <p className="text-sm font-medium leading-relaxed text-slate-300 bot-bubble" key={botMessage}>{botMessage}</p>
+                                </div>
+                            </div>
+
+                            {mode === 'song' && (
+                                <div className="bg-slate-800/50 p-5 rounded-3xl border border-slate-700 flex items-center gap-4">
+                                    <div className="bg-slate-700 p-3 rounded-2xl"><Icon name="Music" size={24} className="text-fuchsia-400"/></div>
+                                    <div>
+                                        <p className="text-sm font-bold text-slate-200">Jak zrobić muzykę?</p>
+                                        <p className="text-[10px] text-slate-400 mt-1">Wklej tekst do generatora <strong>Suno.com</strong> w trybie "Custom Mode".</p>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* PANEL PRAWY - WYNIK (JASNY DOKUMENT) */}
+                        <div className="lg:col-span-8 flex justify-center items-start overflow-x-auto pb-10 print:block">
+                            
+                            {!generatedData ? (
+                                <div className="glass-panel w-full max-w-[210mm] min-h-[297mm] shadow-2xl p-8 rounded-[2rem] flex flex-col items-center justify-center text-center space-y-6 print-hidden border-2 border-dashed border-slate-700">
+                                    <div className="p-6 bg-slate-800/50 rounded-full border border-slate-700 shadow-inner opacity-50">
+                                        <Icon name={mode === 'song' ? 'Music' : mode === 'escape' ? 'Map' : 'Video'} size={64} className={currentTheme.text} />
+                                    </div>
+                                    <div>
+                                        <h2 className="text-2xl font-bold mb-3 text-white">Twoje Multimediowe Studio</h2>
+                                        <p className="max-w-md mx-auto text-slate-400 leading-relaxed text-sm">Wypełnij formularz, aby zamienić nudny temat w piosenkę, grę terenową z zagadkami lub śmieszny scenariusz wideo.</p>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="w-full max-w-[210mm] animate-[reveal_0.5s_ease-out] print:max-w-full">
+                                    
+                                    {/* Toolbar Pobierania */}
+                                    <div className="flex justify-end gap-3 mb-6 print-hidden bg-slate-900/50 p-2 rounded-2xl border border-slate-800 backdrop-blur-md">
+                                        {mode === 'song' ? (
+                                            <button onClick={() => copyToClipboard(generatedData.lyrics)} className="flex-1 sm:flex-none bg-fuchsia-600 hover:bg-fuchsia-500 text-white px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all text-sm shadow-[0_0_15px_rgba(217,70,239,0.3)] active:scale-95">
+                                                <Icon name={copied ? "Sparkles" : "Copy"} size={18}/> {copied ? "SKOPIOWANO!" : "KOPIUJ DO SUNO"}
+                                            </button>
+                                        ) : (
+                                            <>
+                                                <button onClick={exportToWord} className={`flex-1 sm:flex-none text-white px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all text-sm active:scale-95 ${mode === 'escape' ? 'bg-amber-600 hover:bg-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.3)]' : 'bg-cyan-600 hover:bg-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.3)]'}`}>
+                                                    <Icon name="Download" size={18}/> Word (.docx)
+                                                </button>
+                                                <button onClick={() => window.print()} className="flex-1 sm:flex-none bg-slate-700 hover:bg-slate-600 text-white px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all text-sm active:scale-95">
+                                                    <Icon name="Printer" size={18}/> Drukuj PDF
+                                                </button>
+                                            </>
+                                        )}
+                                    </div>
+
+                                    {/* KARTA WYNIKOWA (JASNA) */}
+                                    <div className="bg-white shadow-[0_20px_50px_rgba(0,0,0,0.5)] p-10 md:p-16 text-slate-900 rounded-[2rem] min-h-[297mm]" id="print-container">
+                                        <div id="document-render-area">
+                                            
+                                            {/* WIDOK: PIOSENKA */}
+                                            {mode === 'song' && (
+                                                <div className="space-y-8 font-sans">
+                                                    <div className="text-center">
+                                                        <div className="inline-flex items-center gap-2 bg-fuchsia-50 text-fuchsia-700 px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest mb-4 border border-fuchsia-200">
+                                                            <Icon name="Music" size={14}/> Edu-Piosenka
+                                                        </div>
+                                                        <h1 className="text-3xl md:text-5xl font-black text-slate-800 tracking-tight leading-tight">{generatedData.title}</h1>
+                                                    </div>
+
+                                                    <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 shadow-inner">
+                                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Prompt Muzyczny (Wklej w pole "Style of Music" na Suno.com):</p>
+                                                        <p className="font-mono text-sm text-fuchsia-700 font-bold">{generatedData.suno_prompt}</p>
+                                                    </div>
+
+                                                    <div className="p-8 rounded-3xl border border-slate-100">
+                                                        <pre className="font-sans text-slate-700 text-lg md:text-xl whitespace-pre-wrap leading-relaxed font-medium">{generatedData.lyrics}</pre>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* WIDOK: ESCAPE ROOM */}
+                                            {mode === 'escape' && (
+                                                <div className="space-y-8 font-sans">
+                                                    <div className="text-center border-b-4 border-amber-400 pb-8">
+                                                        <div className="inline-flex items-center gap-2 bg-amber-50 text-amber-700 px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest mb-4 border border-amber-200">
+                                                            <Icon name="Map" size={14}/> Klasowy Escape Room
+                                                        </div>
+                                                        <h1 className="text-3xl md:text-4xl font-black text-slate-800 tracking-tight leading-tight uppercase">{generatedData.title}</h1>
+                                                    </div>
+
+                                                    <div className="bg-amber-50 p-6 rounded-2xl border border-amber-200">
+                                                        <h2 className="text-sm font-black text-amber-800 uppercase tracking-widest mb-3">✉️ Wstęp Fabularny (Przeczytaj uczniom):</h2>
+                                                        <p className="text-amber-900 italic leading-relaxed text-lg">"{generatedData.intro}"</p>
+                                                    </div>
+
+                                                    <div className="space-y-6">
+                                                        <h2 className="text-xl font-black text-slate-800 uppercase border-b-2 border-slate-100 pb-2">Karty z Zagadkami</h2>
+                                                        {generatedData.riddles && generatedData.riddles.map((r, i) => (
+                                                            <div key={i} className="flex gap-4 p-5 rounded-2xl border border-slate-200 bg-white shadow-sm page-break-inside-avoid riddle-box">
+                                                                <div className="w-12 h-12 bg-amber-500 text-white rounded-full flex items-center justify-center font-black text-xl flex-shrink-0 shadow-md">{r.number || i+1}</div>
+                                                                <div className="flex-1">
+                                                                    <h3 className="font-bold text-slate-800 text-lg mb-2">{r.task}</h3>
+                                                                    <div className="grid grid-cols-2 gap-4 mt-4 bg-slate-50 p-3 rounded-xl text-sm border border-slate-100">
+                                                                        <div><span className="block text-[10px] uppercase font-black text-slate-400">Odpowiedź:</span> <span className="font-bold text-emerald-600">{r.answer}</span></div>
+                                                                        <div><span className="block text-[10px] uppercase font-black text-slate-400">Gdzie schować?</span> <span className="font-bold text-slate-700">{r.hiding_spot}</span></div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+
+                                                    <div className="bg-slate-800 text-white p-8 rounded-3xl text-center page-break-inside-avoid shadow-2xl code-box">
+                                                        <h2 className="text-sm font-black text-slate-400 uppercase tracking-widest mb-2" style={{letterSpacing: '2px', color: '#94a3b8', fontSize: '10pt', fontWeight: 'bold'}}>Hasło Finałowe (Do kłódki):</h2>
+                                                        <div className="text-5xl font-black tracking-[0.5em] text-amber-400" style={{fontSize: '32pt', letterSpacing: '10px', fontWeight: 'bold', color: '#f59e0b'}}>{generatedData.final_code}</div>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* WIDOK: TIKTOK/ROLEPLAY */}
+                                            {mode === 'tiktok' && (
+                                                <div className="space-y-8 font-sans">
+                                                    <div className="text-center border-b border-slate-200 pb-6">
+                                                        <div className="inline-flex items-center gap-2 bg-cyan-50 text-cyan-700 px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest mb-4 border border-cyan-200">
+                                                            <Icon name="Video" size={14}/> Scenariusz / Scenka
+                                                        </div>
+                                                        <h1 className="text-3xl md:text-4xl font-black text-slate-800 tracking-tight leading-tight">{generatedData.title}</h1>
+                                                    </div>
+
+                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                        <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 box">
+                                                            <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2" style={{fontSize: '10pt', color: '#64748b'}}>👥 Obsada:</h2>
+                                                            <p className="font-bold text-slate-700">{generatedData.characters && generatedData.characters.join(' oraz ')}</p>
+                                                        </div>
+                                                        <div className="bg-cyan-50 p-5 rounded-2xl border border-cyan-200 box" style={{backgroundColor: '#ecfeff', borderColor: '#a5f3fc'}}>
+                                                            <h2 className="text-[10px] font-black text-cyan-600 uppercase tracking-widest mb-2" style={{fontSize: '10pt', color: '#0891b2'}}>🎣 Hook (Początek wideo):</h2>
+                                                            <p className="font-bold text-cyan-900">"{generatedData.hook}"</p>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="bg-white border-2 border-slate-100 rounded-3xl overflow-hidden box">
+                                                        <div className="bg-slate-800 text-white py-3 px-6 text-sm font-black uppercase tracking-widest" style={{backgroundColor: '#1e293b', color: '#fff', padding: '10px', fontWeight: 'bold'}}>Skrypt Dialogowy</div>
+                                                        <div className="p-6 md:p-8 space-y-6">
+                                                            {generatedData.script && generatedData.script.map((line, i) => (
+                                                                <div key={i} className="flex flex-col sm:flex-row gap-2 sm:gap-4 page-break-inside-avoid" style={{marginBottom: '15px'}}>
+                                                                    <div className="sm:w-1/4 font-black text-cyan-600 text-right uppercase text-sm pt-1" style={{color: '#0891b2', fontWeight: 'bold'}}>{line.actor}:</div>
+                                                                    <div className="sm:w-3/4">
+                                                                        <div className="text-xs font-bold text-slate-400 italic mb-1" style={{fontSize: '10pt', color: '#64748b'}}>[{line.action}]</div>
+                                                                        <div className="text-lg text-slate-800 font-medium leading-relaxed">"{line.dialogue}"</div>
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="bg-slate-50 border-l-4 border-cyan-500 p-5 rounded-r-2xl page-break-inside-avoid box">
+                                                        <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2" style={{fontSize: '10pt', color: '#64748b'}}>🎥 Wskazówka Reżyserska:</h2>
+                                                        <p className="font-medium text-slate-700">{generatedData.camera_tips}</p>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>

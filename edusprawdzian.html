@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="pl" translate="no" class="notranslate">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google" content="notranslate">
+    <title>EduSprawdzian Maker AI - Generuj Testy i Klucze</title>
+    <!-- Biblioteki -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body { 
+            font-family: 'Plus Jakarta Sans', sans-serif; 
+            background-color: #020617; 
+            color: #f8fafc; 
+            scroll-behavior: smooth; 
+            overflow-x: hidden;
+        }
+        
+        .glass-panel { 
+            background: rgba(30, 41, 59, 0.4); 
+            backdrop-filter: blur(16px); 
+            -webkit-backdrop-filter: blur(16px); 
+            border: 1px solid rgba(255, 255, 255, 0.05); 
+        }
+        .glass-nav { 
+            background: rgba(2, 6, 23, 0.8); 
+            backdrop-filter: blur(20px); 
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05); 
+        }
+        
+        .text-gradient { 
+            background: linear-gradient(135deg, #22d3ee 0%, #3b82f6 100%); 
+            -webkit-background-clip: text; 
+            -webkit-text-fill-color: transparent; 
+        }
+
+        .hero-glow {
+            position: absolute;
+            top: -20%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100vw;
+            height: 800px;
+            background: radial-gradient(circle, rgba(34, 211, 238, 0.15) 0%, rgba(2, 6, 23, 0) 70%);
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        .fade-in { animation: fadeIn 0.5s ease-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #0f172a; border-radius: 8px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #06b6d4; border-radius: 8px; }
+        
+        .btn-bounce:active { transform: scale(0.95); }
+
+        /* Stylizacja wydruku */
+        @media print {
+            body { background-color: white; color: black; }
+            .print-hidden { display: none !important; }
+            .glass-panel { border: none; background: transparent; filter: none; padding: 0; }
+            .prose { max-width: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useRef } = React;
+
+        const BUY_COFFEE_LINK = "https://buycoffee.to/magiccolor";
+
+        const SYSTEM_PROMPT = `Jesteś wybitnym metodykiem edukacyjnym. Twoim zadaniem jest stworzenie profesjonalnego sprawdzianu na podstawie dostarczonego materiału.
+
+WYMAGANIA:
+1. Sprawdzian musi mieć różnorodne typy zadań (zamknięte ABCD, prawda/fałsz, zadania z luką, zadania otwarte).
+2. Sprawdzian musi być podzielony na Grupę A i Grupę B (podobny stopień trudności, ale zmienione pytania/kolejność odpowiedzi, aby zapobiec ściąganiu).
+3. Na końcu MUSI znajdować się dokładny Klucz Odpowiedzi dla obu grup wraz z sugerowaną punktacją.
+
+WYMAGANY FORMAT ZWROTU (użyj dokładnie tych znaczników jako separatorów):
+[GRUPA_A]
+(Tutaj treść sprawdzianu dla Grupy A, dodaj pole na Imię, Nazwisko, Klasę i Datę)
+
+[GRUPA_B]
+(Tutaj treść sprawdzianu dla Grupy B, dodaj pole na Imię, Nazwisko, Klasę i Datę)
+
+[KLUCZ]
+(Tutaj klucz odpowiedzi i punktacja)`;
+
+        function App() {
+            const [sourceText, setSourceText] = useState('');
+            const [classLevel, setClassLevel] = useState('Klasy 4-6');
+            const [questionCount, setQuestionCount] = useState('6 pytań (krótki)');
+            
+            const [isGenerating, setIsGenerating] = useState(false);
+            const [error, setError] = useState('');
+            
+            // Wyniki
+            const [resultA, setResultA] = useState('');
+            const [resultB, setResultB] = useState('');
+            const [resultKey, setResultKey] = useState('');
+            const [activeTab, setActiveTab] = useState('grupaA'); // 'grupaA', 'grupaB', 'klucz'
+
+            const resultRef = useRef(null);
+
+            const parseResponse = (fullText) => {
+                try {
+                    const partsA = fullText.split('[GRUPA_B]');
+                    const textA = partsA[0].replace('[GRUPA_A]', '').trim();
+                    const partsB = partsA[1].split('[KLUCZ]');
+                    const textB = partsB[0].trim();
+                    const textKey = partsB[1].trim();
+
+                    setResultA(textA);
+                    setResultB(textB);
+                    setResultKey(textKey);
+                    setActiveTab('grupaA');
+                } catch (e) {
+                    // Fallback jeśli AI nie zastosuje się idealnie do separatorów
+                    setResultA(fullText);
+                    setResultB("Błąd parsowania Grupy B. Zobacz wynik w zakładce Grupa A.");
+                    setResultKey("Błąd parsowania Klucza. Zobacz wynik w zakładce Grupa A.");
+                }
+            };
+
+            const generateTest = async () => {
+                if (!sourceText.trim()) {
+                    setError('Proszę wkleić tekst bazowy lub zagadnienia do sprawdzianu.');
+                    return;
+                }
+
+                setIsGenerating(true);
+                setError('');
+                setResultA('');
+                setResultB('');
+                setResultKey('');
+
+                try {
+                    const apiKey = ""; // Klawisz środowiskowy
+                    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+                    
+                    const finalPrompt = `Poziom: ${classLevel}\nDługość testu: ${questionCount}\n\nMATERIAŁ BAZOWY DO SPRAWDZIANU:\n"""\n${sourceText}\n"""`;
+
+                    const payload = {
+                        contents: [{ parts: [{ text: finalPrompt }] }],
+                        systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+                        generationConfig: { temperature: 0.3 } // Niższa temperatura dla logicznych pytań
+                    };
+
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`Błąd API: ${response.status}`);
+                    }
+
+                    const data = await response.json();
+                    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                    
+                    if (text) {
+                        parseResponse(text);
+                        setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+                    } else {
+                        throw new Error("Pusta odpowiedź z API.");
+                    }
+
+                } catch (err) {
+                    console.error("Błąd generowania:", err);
+                    setError('Brak połączenia z centralą AI. Wczytuję sprawdzian pokazowy.');
+                    
+                    setTimeout(() => {
+                        const demoText = `[GRUPA_A]
+Imię i nazwisko: ....................................... Klasa: ........ Data: ........
+Sprawdzian - Budowa Komórki (Grupa A)
+
+Zadanie 1. (1 pkt) Zaznacz prawidłową odpowiedź.
+Co jest centrum dowodzenia komórką zwierzęcą?
+A. Wakuola
+B. Jądro komórkowe
+C. Cytoplazma
+D. Błona komórkowa
+
+Zadanie 2. (2 pkt) Oceń prawdziwość zdań (P/F).
+1. Komórka roślinna posiada ścianę komórkową. (.....)
+2. Chloroplasty występują tylko w komórkach zwierzęcych. (.....)
+
+Zadanie 3. (3 pkt) Podaj główną funkcję mitochondrium.
+...........................................................................................
+
+[GRUPA_B]
+Imię i nazwisko: ....................................... Klasa: ........ Data: ........
+Sprawdzian - Budowa Komórki (Grupa B)
+
+Zadanie 1. (1 pkt) Zaznacz prawidłową odpowiedź.
+Który element komórki chroni ją przed czynnikami zewnętrznymi?
+A. Jądro komórkowe
+B. Chloroplast
+C. Błona komórkowa
+D. Wakuola
+
+Zadanie 2. (2 pkt) Oceń prawdziwość zdań (P/F).
+1. Mitochondria produkują energię dla komórki. (.....)
+2. Komórka zwierzęca posiada dużą, centralną wakuolę. (.....)
+
+Zadanie 3. (3 pkt) Podaj główną funkcję jądra komórkowego.
+...........................................................................................
+
+[KLUCZ]
+KLUCZ ODPOWIEDZI I PUNKTACJA
+
+Grupa A:
+Zad 1. B (1 pkt)
+Zad 2. 1-P, 2-F (2 pkt)
+Zad 3. Oddychanie komórkowe / produkcja energii. (3 pkt)
+Maksymalnie: 6 pkt.
+
+Grupa B:
+Zad 1. C (1 pkt)
+Zad 2. 1-P, 2-F (2 pkt)
+Zad 3. Przechowywanie materiału genetycznego (DNA) / sterowanie komórką. (3 pkt)
+Maksymalnie: 6 pkt.`;
+                        parseResponse(demoText);
+                        setIsGenerating(false);
+                    }, 1500);
+                } finally {
+                    setIsGenerating(false);
+                }
+            };
+
+            const printDocument = () => {
+                window.print();
+            };
+
+            return (
+                <div className="min-h-screen relative flex flex-col print:bg-white">
+                    <div className="hero-glow print-hidden"></div>
+
+                    {/* NAWIGACJA Z PRZYCISKIEM KAWY */}
+                    <nav className="fixed top-0 w-full z-50 glass-nav print-hidden">
+                        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-20 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 bg-gradient-to-br from-cyan-400 to-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-cyan-500/20">
+                                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
+                                </div>
+                                <span className="text-xl font-extrabold tracking-tight text-white hidden sm:block">EduSprawdzian<span className="text-cyan-400">Maker</span></span>
+                            </div>
+                            
+                            <div className="flex items-center gap-2 sm:gap-4">
+                                <a href={BUY_COFFEE_LINK} target="_blank" className="bg-amber-600 hover:bg-amber-500 text-white px-4 py-2 rounded-xl text-xs sm:text-sm font-bold shadow-[0_0_15px_rgba(217,119,6,0.4)] transition-all btn-bounce flex items-center gap-2 uppercase tracking-wide">
+                                    <span>☕</span> <span className="hidden sm:inline">Postaw Kawę</span>
+                                </a>
+
+                                <a href="index.html" className="flex items-center gap-2 text-xs sm:text-sm font-bold text-slate-400 hover:text-white transition-colors bg-slate-800/50 hover:bg-slate-700 px-3 sm:px-4 py-2 rounded-xl border border-slate-700">
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+                                    <span className="hidden sm:inline">Wróć</span>
+                                </a>
+                            </div>
+                        </div>
+                    </nav>
+
+                    <main className="flex-grow pt-32 pb-20 px-4 sm:px-6 print:pt-0 print:pb-0">
+                        <div className="max-w-5xl mx-auto">
+                            
+                            {/* Nagłówek */}
+                            <div className="text-center mb-10 fade-in print-hidden">
+                                <div className="inline-flex items-center gap-2 bg-cyan-900/30 border border-cyan-500/30 px-4 py-1.5 rounded-full text-[10px] font-black text-cyan-400 uppercase tracking-widest mb-4">
+                                    Narzędzie dla Nauczycieli
+                                </div>
+                                <h1 className="text-4xl md:text-5xl font-black text-white mb-4 tracking-tight">
+                                    Sprawdziany <span className="text-gradient">bez wysiłku.</span>
+                                </h1>
+                                <p className="text-slate-400 text-lg max-w-2xl mx-auto">
+                                    Wklej tekst z podręcznika lub notatkę, a AI wygeneruje w pełni profesjonalny test z podziałem na Grupę A, Grupę B oraz szczegółowy Klucz Odpowiedzi.
+                                </p>
+                            </div>
+
+                            {/* Panel Sterowania */}
+                            <div className="glass-panel p-6 sm:p-8 rounded-[2rem] fade-in border border-slate-700/50 print-hidden" style={{animationDelay: '0.1s'}}>
+                                
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
+                                    <div>
+                                        <label className="block text-white font-bold mb-3 text-sm uppercase tracking-wider">Grupa docelowa:</label>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            {['Klasy 1-3', 'Klasy 4-6', 'Klasy 7-8', 'Szkoła Średnia'].map(lvl => (
+                                                <button key={lvl} onClick={() => setClassLevel(lvl)} className={`py-2 px-3 rounded-xl text-sm font-bold border-2 transition-all ${classLevel === lvl ? 'bg-cyan-600/20 border-cyan-500 text-cyan-400' : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:border-slate-500'}`}>
+                                                    {lvl}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-white font-bold mb-3 text-sm uppercase tracking-wider">Wielkość sprawdzianu:</label>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            {['Kartkówka (3-4 pyt.)', '6 pytań (krótki)', '10 pytań (średni)', '15 pytań (duży)'].map(count => (
+                                                <button key={count} onClick={() => setQuestionCount(count)} className={`py-2 px-3 rounded-xl text-sm font-bold border-2 transition-all ${questionCount === count ? 'bg-blue-600/20 border-blue-500 text-blue-400' : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:border-slate-500'}`}>
+                                                    {count}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="block text-white font-bold mb-3 text-sm uppercase tracking-wider flex items-center gap-2">
+                                        <svg className="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                                        Wklej tekst bazowy, notatkę z lekcji lub temat:
+                                    </label>
+                                    <textarea 
+                                        value={sourceText}
+                                        onChange={(e) => setSourceText(e.target.value)}
+                                        placeholder="Skopiuj fragment podręcznika, wklej link do artykułu lub po prostu wpisz: 'Sprawdzian z ułamków zwykłych: dodawanie, odejmowanie i skracanie'."
+                                        className="w-full h-40 bg-slate-900/50 border border-slate-700 text-slate-200 rounded-2xl p-4 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 custom-scrollbar resize-y text-sm sm:text-base leading-relaxed"
+                                    ></textarea>
+                                </div>
+
+                                {error && <div className="mt-4 p-4 bg-red-900/30 border border-red-500/50 rounded-xl text-red-400 text-sm font-medium text-center">{error}</div>}
+
+                                <div className="mt-8 flex justify-center">
+                                    <button 
+                                        onClick={generateTest}
+                                        disabled={isGenerating || !sourceText.trim()}
+                                        className={`w-full sm:w-auto px-10 py-5 rounded-2xl font-black text-white text-lg transition-all flex items-center justify-center gap-3 shadow-[0_0_20px_rgba(34,211,238,0.2)] btn-bounce
+                                            ${isGenerating ? 'bg-slate-700 cursor-not-allowed' : 'bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500'}`}
+                                    >
+                                        {isGenerating ? (
+                                            <><svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Generowanie Sprawdzianu...</>
+                                        ) : 'Utwórz Sprawdzian z Kluczem'}
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Sekcja Wyników */}
+                            {resultA && (
+                                <div ref={resultRef} className="mt-12 fade-in print:mt-0">
+                                    {/* Zakładki do sterowania - Ukryte podczas druku */}
+                                    <div className="flex bg-slate-800/50 p-1 rounded-2xl mb-6 border border-slate-700 print-hidden max-w-md mx-auto">
+                                        <button onClick={() => setActiveTab('grupaA')} className={`flex-1 py-3 text-sm font-bold rounded-xl transition-all ${activeTab === 'grupaA' ? 'bg-cyan-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}>Grupa A</button>
+                                        <button onClick={() => setActiveTab('grupaB')} className={`flex-1 py-3 text-sm font-bold rounded-xl transition-all ${activeTab === 'grupaB' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}>Grupa B</button>
+                                        <button onClick={() => setActiveTab('klucz')} className={`flex-1 py-3 text-sm font-bold rounded-xl transition-all ${activeTab === 'klucz' ? 'bg-amber-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}>Klucz 🗝️</button>
+                                    </div>
+
+                                    <div className="glass-panel p-8 sm:p-12 rounded-[2.5rem] border border-cyan-500/30 shadow-[0_0_40px_rgba(34,211,238,0.15)] relative overflow-hidden bg-white print:shadow-none print:border-none print:p-0 print:rounded-none">
+                                        <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-cyan-400 to-blue-600 print-hidden"></div>
+                                        
+                                        <div className="flex justify-between items-center mb-8 print-hidden border-b border-slate-200 pb-4">
+                                            <h3 className="text-xl font-bold text-slate-800">
+                                                Podgląd do druku: {activeTab === 'grupaA' ? 'Grupa A' : activeTab === 'grupaB' ? 'Grupa B' : 'Klucz Odpowiedzi'}
+                                            </h3>
+                                            <button onClick={printDocument} className="bg-slate-900 hover:bg-slate-800 text-white px-5 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 transition-all btn-bounce shadow-md">
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+                                                Drukuj
+                                            </button>
+                                        </div>
+
+                                        {/* Wyświetlany tekst zależnie od zakładki */}
+                                        <div className="text-black font-serif text-base sm:text-lg leading-relaxed whitespace-pre-wrap print:text-sm">
+                                            {activeTab === 'grupaA' && resultA}
+                                            {activeTab === 'grupaB' && resultB}
+                                            {activeTab === 'klucz' && resultKey}
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="mt-8 text-center bg-slate-900/50 p-6 rounded-2xl border border-slate-800 print-hidden max-w-xl mx-auto">
+                                        <p className="text-slate-400 mb-3 font-medium">Za ten sprawdzian byś dzisiaj siedział do nocy!</p>
+                                        <a href={BUY_COFFEE_LINK} target="_blank" className="inline-flex items-center gap-2 text-cyan-400 hover:text-cyan-300 font-bold hover:underline">
+                                            Uratowałem Twój czas? Postaw twórcy systemu kawę ☕!
+                                        </a>
+                                    </div>
+                                </div>
+                            )}
+
+                        </div>
+                    </main>
+
+                    <footer className="py-6 border-t border-slate-800 text-center text-sm font-bold text-slate-600 uppercase tracking-widest mt-auto print-hidden">
+                        Część systemu EduBox AI
+                    </footer>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>

@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="pl" translate="no" class="notranslate">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduWizualizator PRO - Komunikacja AAC i Plany Dnia</title>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&family=Nunito:wght@700;800;900&display=swap');
+        
+        body { background-color: #020617; font-family: 'Plus Jakarta Sans', sans-serif; color: #f8fafc; overflow-x: hidden; }
+        
+        .glass-panel { background: rgba(30, 41, 59, 0.4); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.05); }
+        .glass-nav { background: rgba(2, 6, 23, 0.8); backdrop-filter: blur(20px); border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
+
+        /* Font do czytania przez dzieci - bardzo okrągły i czytelny */
+        .kids-font { font-family: 'Nunito', sans-serif; }
+
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #0f172a; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+
+        input:focus, select:focus, textarea:focus { box-shadow: 0 0 15px rgba(250, 204, 21, 0.3); border-color: #facc15 !important; }
+
+        @media print {
+            body { background: white; color: black; }
+            .print-hidden { display: none !important; }
+            #print-container { border: none !important; box-shadow: none !important; padding: 0 !important; margin: 0 !important; width: 100% !important; max-width: 100% !important; background: white !important; }
+            body, html { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+            .page-break { page-break-before: always; }
+            .page-break-inside-avoid { break-inside: avoid; page-break-inside: avoid; }
+            .cut-line { border: 2px dashed #94a3b8 !important; }
+        }
+        
+        @keyframes slide-up { 0% { opacity: 0; transform: translate(-50%, 20px); } 100% { opacity: 1; transform: translate(-50%, 0); } }
+        .animate-toast { animation: slide-up 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        
+        @keyframes pop { 0% { transform: scale(0.9); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+        .bot-bubble { animation: pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+        @keyframes blink { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(0.1); } }
+        .bot-eye { animation: blink 4s infinite; transform-origin: center; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        const Icon = ({ name, size = 20, className = "" }) => {
+            const icons = {
+                Image: <><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></>,
+                LayoutGrid: <><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></>,
+                ArrowRightLeft: <><path d="m16 3 4 4-4 4"/><path d="M20 7H4"/><path d="m8 21-4-4 4-4"/><path d="M4 17h16"/></>,
+                CheckSquare: <><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></>,
+                Star: <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>,
+                Printer: <path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6z"/>,
+                Sparkles: <path d="m12 3 1.912 5.813a2 2 0 0 0 1.275 1.275L21 12l-5.813 1.912a2 2 0 0 0-1.275 1.275L12 21l-1.912-5.813a2 2 0 0 0-1.275-1.275L3 12l5.813-1.912a2 2 0 0 0 1.275-1.275L12 3Z"/>,
+                Coffee: <path d="M18 8h1a4 4 0 0 1 0 8h-1M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8zM7 2v3M11 2v3M15 2v3"/>,
+                Lock: <><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></>,
+                AlertCircle: <><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></>,
+                Scissors: <><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></>,
+                HelpCircle: <><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></>
+            };
+            return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>{icons[name] || null}</svg>;
+        };
+
+        const BotHelperAvatar = () => (
+            <svg viewBox="0 0 100 100" className="w-14 h-14 drop-shadow-md flex-shrink-0" xmlns="http://www.w3.org/2000/svg">
+                <path d="M50 30 V15" stroke="#fcd34d" strokeWidth="4" strokeLinecap="round"/>
+                <circle cx="50" cy="12" r="5" fill="#f59e0b"/>
+                <rect x="25" y="30" width="50" height="40" rx="12" fill="#ca8a04"/>
+                <rect x="32" y="38" width="36" height="22" rx="6" fill="#ffffff"/>
+                <circle cx="40" cy="49" r="3.5" fill="#ca8a04" className="bot-eye"/>
+                <circle cx="60" cy="49" r="3.5" fill="#ca8a04" className="bot-eye"/>
+                <path d="M 45 56 Q 50 60 55 56" stroke="#ca8a04" strokeWidth="2.5" fill="none" strokeLinecap="round"/>
+            </svg>
+        );
+
+        function App() {
+            const [isPremium, setIsPremium] = useState(false);
+            const [accessCode, setAccessCode] = useState('');
+            const [isGenerating, setIsGenerating] = useState(false);
+            const [toastMessage, setToastMessage] = useState('');
+            const [showInstructions, setShowInstructions] = useState(false);
+            
+            const [activeTab, setActiveTab] = useState('steps');
+            const [botMessage, setBotMessage] = useState("Cześć! Dzieci w spektrum to wzrokowcy. Wybierz zakładkę, a ja zamienię Twoje słowa na gotowe do laminowania obrazki!");
+
+            const [params, setParams] = useState({
+                routine: '',
+                firstTask: '',
+                thenReward: '',
+                goodBehavior: '',
+                badBehavior: '',
+                tokenChildName: '',
+                tokenReward: '',
+                tokenTheme: '',
+                tokenCount: '5'
+            });
+
+            const [generatedData, setGeneratedData] = useState(null);
+
+            const showToast = (msg) => { setToastMessage(msg); setTimeout(() => setToastMessage(''), 4000); };
+
+            const handleVerifyCode = () => {
+                if (accessCode.toUpperCase() === 'KAWA2024') { 
+                    setIsPremium(true); setAccessCode(''); 
+                    showToast('Kod Premium aktywny! 🌟');
+                    setBotMessage("Hura! Masz Premium! Odblokowano nielimitowane plany dnia i super dokładne przypisywanie symboli przez AI.");
+                } else { showToast('Nieprawidłowy kod dostępu!'); }
+            };
+
+            useEffect(() => {
+                if(activeTab === 'steps') setBotMessage("Plan Aktywności: Wpisz czynność (np. 'Wizyta u fryzjera' albo 'Mycie zębów'), a ja rozbiję ją na proste kroki i dobiorę piktogramy!");
+                else if(activeTab === 'first_then') setBotMessage("Najpierw - Potem: Wpisz trudne zadanie i nagrodę. Wygeneruję wielką tablicę wizualną, która da dziecku poczucie przewidywalności.");
+                else if(activeTab === 'rules') setBotMessage("Zasady Sali: Wpisz zachowania pożądane i niepożądane. Zrobię karty 'Tak robimy' (zielone) i 'Tego nie robimy' (czerwone).");
+                else if(activeTab === 'tokens') setBotMessage("Tablice Żetonowe: Wpisz nagrodę i motyw (np. Kosmos, Dinozaury, Auta). Aplikacja wygeneruje piękną planszę z żetonami do wycięcia i przyczepiania na rzepy!");
+                setGeneratedData(null);
+            }, [activeTab]);
+
+            const generateContent = async () => {
+                setIsGenerating(true);
+                setGeneratedData(null);
+                
+                try {
+                    let sysPrompt = "";
+                    let usrPrompt = "";
+
+                    if (activeTab === 'steps') {
+                        if (!params.routine) throw new Error('Wpisz czynność, np. Mycie rąk!');
+                        setBotMessage("Analizuję czynność, dzielę na kroki dla dziecka ze spektrum i maluję symbole...");
+                        
+                        sysPrompt = `Jesteś ekspertem ds. komunikacji AAC i pedagogiem specjalnym pracującym z dziećmi z autyzmem.
+                        Twoim zadaniem jest podzielenie podanej czynności na 4 do 8 bardzo prostych, zrozumiałych kroków (tzw. analiza zadania).
+                        Do każdego kroku MUSISZ dopasować dokładnie JEDNO, najlepiej opisujące je emoji (będzie służyć jako piktogram).
+                        Format JSON: { "title": "Tytuł czynności", "steps": [ {"emoji": "💧", "text": "Odkręcam wodę"}, {"emoji": "🧼", "text": "Biorę mydło"} ] }`;
+                        usrPrompt = `Rozbij tę czynność na kroki: ${params.routine}`;
+                    
+                    } else if (activeTab === 'first_then') {
+                        if (!params.firstTask || !params.thenReward) throw new Error('Wpisz zadanie i nagrodę!');
+                        setBotMessage("Tworzę tablicę Najpierw-Potem. Najlepsze narzędzie na świecie do radzenia sobie z buntem!");
+
+                        sysPrompt = `Jesteś pedagogiem specjalnym. Dopasuj do podanego zadania i nagrody po jednym czytelnym Emoji (piktogramie). Zredaguj tekst na najprostszy z możliwych (np. "Jem obiad", "Idę na plac zabaw"). Format JSON: { "first": {"text": "...", "emoji": "..."}, "then": {"text": "...", "emoji": "..."} }`;
+                        usrPrompt = `Najpierw: ${params.firstTask}. Potem: ${params.thenReward}`;
+
+                    } else if (activeTab === 'rules') {
+                        if (!params.goodBehavior || !params.badBehavior) throw new Error('Uzupełnij oba pola zasad!');
+                        setBotMessage("Szykuję karty zasad Sali. Jasny przekaz wizualny to podstawa poczucia bezpieczeństwa.");
+
+                        sysPrompt = `Jesteś pedagogiem. Sformatuj podane zasady na bardzo krótkie hasła dla dzieci z autyzmem. Dobierz do każdego po jednym Emoji. Format JSON: { "good": {"text": "...", "emoji": "..."}, "bad": {"text": "...", "emoji": "..."} }`;
+                        usrPrompt = `Zachowanie pozytywne: ${params.goodBehavior}. Zachowanie negatywne: ${params.badBehavior}`;
+                    
+                    } else if (activeTab === 'tokens') {
+                        if (!params.tokenReward || !params.tokenTheme) throw new Error('Wpisz motyw żetonów i nagrodę!');
+                        setBotMessage("Projektuję tablicę motywacyjną. Dobieram ikonki żetonów i nagrody z bazy...");
+
+                        sysPrompt = `Jesteś pedagogiem specjalnym, tworzysz tablicę żetonową (token economy board). Dopasuj do podanej nagrody i motywu żetonów odpowiednie Emoji. Zredaguj nazwę nagrody krótko i zrozumiale dla dziecka. Format JSON: { "rewardText": "...", "rewardEmoji": "...", "tokenEmoji": "..." }`;
+                        usrPrompt = `Nagroda: ${params.tokenReward}. Motyw żetonów (czym interesuje się dziecko): ${params.tokenTheme}`;
+                    }
+
+                    const res = await fetch('/api/chat', { 
+                        method: 'POST', headers: { 'Content-Type': 'application/json' }, 
+                        body: JSON.stringify({ system: sysPrompt, prompt: usrPrompt, temperature: 0.3, format: "json", model: "gpt-4o-mini" }) 
+                    });
+                    
+                    const data = await res.json();
+                    if (!res.ok) throw new Error(data.error?.message || "Błąd serwera");
+
+                    let cleanText = data.text;
+                    if (cleanText.includes('"reasoning_content"')) {
+                        const startIdx = cleanText.indexOf('"content":"');
+                        if (startIdx !== -1) {
+                            let extracted = cleanText.substring(startIdx + 11).replace(/"\s*}\s*$/, '').replace(/"$/, ''); 
+                            cleanText = extracted.replace(/\\n/g, '\n').replace(/\\"/g, '"'); 
+                        }
+                    } else {
+                        try { const outerObj = JSON.parse(cleanText); if(outerObj.content) cleanText = outerObj.content; else if (outerObj.choices) cleanText = outerObj.choices[0].message.content; } catch(e){}
+                    }
+                    cleanText = cleanText.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+                    let jsonStr = cleanText.replace(/```json/gi, '').replace(/```/g, '').trim();
+                    if(jsonStr.indexOf('{') !== -1) jsonStr = jsonStr.substring(jsonStr.indexOf('{'), jsonStr.lastIndexOf('}') + 1);
+
+                    setGeneratedData({ type: activeTab, data: JSON.parse(jsonStr), localParams: { ...params } });
+                    setBotMessage("Gotowe! Obrazki są wielkie i wyraźne. Możesz je wydrukować, zalaminować i powiesić w sali!");
+
+                } catch (error) {
+                    console.error(error); showToast(`Błąd: ${error.message}`);
+                    setBotMessage("Ojej, coś poszło nie tak. Upewnij się, że poprawnie wypełniłeś pola.");
+                } finally { setIsGenerating(false); }
+            };
+
+            return (
+                <div className="min-h-screen flex flex-col relative overflow-x-hidden">
+                    {toastMessage && (
+                        <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[200] bg-yellow-500 text-yellow-950 px-6 py-3 rounded-2xl shadow-2xl font-bold text-sm animate-toast flex items-center gap-3 border border-yellow-400">
+                            <Icon name="AlertCircle" size={18} /> {toastMessage}
+                        </div>
+                    )}
+
+                    {isGenerating && (
+                        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-[100] flex flex-col items-center justify-center text-white">
+                            <div className="glass-panel p-10 rounded-3xl flex flex-col items-center space-y-6 max-w-sm border border-yellow-500/20 shadow-[0_0_50px_rgba(250,204,21,0.2)]">
+                                <div className="w-16 h-16 border-4 border-slate-700 border-t-yellow-500 rounded-full animate-spin"></div>
+                                <div className="text-center">
+                                    <h3 className="text-xl font-bold mb-2 text-white">Tworzenie Wizualizacji...</h3>
+                                    <p className="text-xs text-slate-400 font-medium">Dobieram czytelne piktogramy.</p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    <nav className="fixed top-0 w-full z-50 glass-nav py-4 px-6 print-hidden">
+                        <div className="max-w-7xl mx-auto flex justify-between items-center">
+                            <div className="flex items-center space-x-3 font-extrabold text-xl tracking-tight cursor-pointer" onClick={() => window.scrollTo(0,0)}>
+                                <div className="bg-gradient-to-br from-yellow-400 to-orange-500 p-2 rounded-xl text-yellow-950 shadow-[0_0_15px_rgba(250,204,21,0.5)]">
+                                    <Icon name="Image" size={22}/>
+                                </div>
+                                <span>Edu<span className="text-yellow-400">Wizualizator</span> PRO</span>
+                            </div>
+                            <div className="flex items-center space-x-4">
+                                <button onClick={() => setShowInstructions(true)} className="flex items-center space-x-2 text-yellow-400 hover:text-yellow-300 hover:bg-slate-800 px-4 py-2 rounded-xl font-bold transition-colors border border-transparent hover:border-slate-700">
+                                    <Icon name="HelpCircle" size={20} /> <span className="hidden sm:inline">Jak używać?</span>
+                                </button>
+                                {!isPremium && (
+                                    <div className="hidden md:flex items-center space-x-2 bg-slate-900 p-1.5 rounded-xl border border-slate-700">
+                                        <input value={accessCode} onChange={e => setAccessCode(e.target.value)} placeholder="Kod Premium..." className="p-2 bg-transparent text-sm w-32 outline-none font-medium text-white placeholder-slate-500"/>
+                                        <button onClick={handleVerifyCode} className="p-2 text-yellow-950 rounded-lg bg-yellow-500 hover:bg-yellow-400 transition-colors shadow-md"><Icon name="Lock" size={16}/></button>
+                                    </div>
+                                )}
+                                <button onClick={() => window.open('https://buycoffee.to/magiccolor')} className="flex items-center space-x-2 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white px-5 py-2.5 rounded-xl font-bold transition-all active:scale-95 text-sm shadow-md">
+                                    <Icon name="Coffee" size={18} className="text-amber-400"/><span>Postaw Kawę</span>
+                                </button>
+                            </div>
+                        </div>
+                    </nav>
+
+                    <div className="max-w-7xl mx-auto px-4 pt-32 pb-24 grid grid-cols-1 lg:grid-cols-12 gap-8 w-full print:block print:p-0 relative z-10">
+                        
+                        {/* LEWY PANEL (KONTROLKI) */}
+                        <div className="lg:col-span-4 space-y-6 print-hidden">
+                            <div className="glass-panel p-2 rounded-2xl grid grid-cols-2 gap-2">
+                                <button onClick={() => setActiveTab('steps')} className={`py-4 px-2 rounded-xl flex flex-col items-center justify-center font-bold text-[10px] uppercase tracking-widest transition-all duration-300 ${activeTab === 'steps' ? 'bg-yellow-500 text-yellow-950 shadow-lg border border-yellow-400' : 'text-slate-400 hover:bg-slate-800'}`}>
+                                    <Icon name="LayoutGrid" size={24} className="mb-2" /> Kroki / Rutyny
+                                </button>
+                                <button onClick={() => setActiveTab('first_then')} className={`py-4 px-2 rounded-xl flex flex-col items-center justify-center font-bold text-[10px] uppercase tracking-widest transition-all duration-300 ${activeTab === 'first_then' ? 'bg-orange-500 text-white shadow-lg border border-orange-400' : 'text-slate-400 hover:bg-slate-800'}`}>
+                                    <Icon name="ArrowRightLeft" size={24} className="mb-2" /> Najpierw/Potem
+                                </button>
+                                <button onClick={() => setActiveTab('rules')} className={`py-4 px-2 rounded-xl flex flex-col items-center justify-center font-bold text-[10px] uppercase tracking-widest transition-all duration-300 ${activeTab === 'rules' ? 'bg-emerald-600 text-white shadow-lg border border-emerald-500' : 'text-slate-400 hover:bg-slate-800'}`}>
+                                    <Icon name="CheckSquare" size={24} className="mb-2" /> Zasady
+                                </button>
+                                <button onClick={() => setActiveTab('tokens')} className={`py-4 px-2 rounded-xl flex flex-col items-center justify-center font-bold text-[10px] uppercase tracking-widest transition-all duration-300 ${activeTab === 'tokens' ? 'bg-sky-500 text-white shadow-lg border border-sky-400' : 'text-slate-400 hover:bg-slate-800'}`}>
+                                    <Icon name="Star" size={24} className="mb-2" /> Tablice Żetonowe
+                                </button>
+                            </div>
+
+                            <div className="glass-panel p-6 md:p-8 rounded-[2rem] space-y-5 relative overflow-hidden">
+                                {activeTab === 'steps' && (
+                                    <>
+                                        <h2 className="font-bold flex items-center text-yellow-400 text-sm uppercase tracking-widest border-b border-slate-700/50 pb-4"><Icon name="LayoutGrid" className="mr-2" size={18}/> Analiza Zadania (Kroki)</h2>
+                                        <div>
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase block mb-2">Jaka czynność sprawia problem?</label>
+                                            <textarea value={params.routine} onChange={e=>setParams({...params, routine: e.target.value})} placeholder="np. Mycie rąk, Wyjście na plac zabaw, Ubieranie butów..." className="w-full p-4 bg-slate-900 border border-slate-700 rounded-xl outline-none text-white text-sm focus:border-yellow-500 h-28 resize-none custom-scrollbar" />
+                                            <p className="text-[10px] text-slate-500 mt-2">AI automatycznie podzieli ją na małe, wizualne kroki.</p>
+                                        </div>
+                                    </>
+                                )}
+                                
+                                {activeTab === 'first_then' && (
+                                    <>
+                                        <h2 className="font-bold flex items-center text-orange-400 text-sm uppercase tracking-widest border-b border-slate-700/50 pb-4"><Icon name="ArrowRightLeft" className="mr-2" size={18}/> Tablica Motywacyjna</h2>
+                                        <div>
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase block mb-2">Najpierw (Co musi zrobić?)</label>
+                                            <input type="text" value={params.firstTask} onChange={e=>setParams({...params, firstTask: e.target.value})} placeholder="np. Zjeść zupę, Posprzątać klocki" className="w-full p-4 bg-slate-900 border border-slate-700 rounded-xl outline-none text-white text-sm focus:border-orange-500" />
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] font-bold text-orange-400 uppercase block mb-2">Potem (Nagroda / Co się wydarzy?)</label>
+                                            <input type="text" value={params.thenReward} onChange={e=>setParams({...params, thenReward: e.target.value})} placeholder="np. Plac zabaw, Oglądanie bajki" className="w-full p-4 bg-orange-900/10 border border-slate-700 rounded-xl outline-none text-white text-sm focus:border-orange-500" />
+                                        </div>
+                                    </>
+                                )}
+
+                                {activeTab === 'rules' && (
+                                    <>
+                                        <h2 className="font-bold flex items-center text-emerald-400 text-sm uppercase tracking-widest border-b border-slate-700/50 pb-4"><Icon name="CheckSquare" className="mr-2" size={18}/> Zasady (Kontrakt Sali)</h2>
+                                        <div>
+                                            <label className="text-[10px] font-bold text-emerald-400 uppercase block mb-2">Tak robimy (Oczekiwane)</label>
+                                            <input type="text" value={params.goodBehavior} onChange={e=>setParams({...params, goodBehavior: e.target.value})} placeholder="np. W sali mówimy cicho" className="w-full p-4 bg-emerald-900/10 border border-slate-700 rounded-xl outline-none text-white text-sm focus:border-emerald-500" />
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] font-bold text-red-400 uppercase block mb-2">Tego NIE robimy (Zakazane)</label>
+                                            <input type="text" value={params.badBehavior} onChange={e=>setParams({...params, badBehavior: e.target.value})} placeholder="np. Nie bijemy innych dzieci" className="w-full p-4 bg-red-900/10 border border-slate-700 rounded-xl outline-none text-white text-sm focus:border-red-500" />
+                                        </div>
+                                    </>
+                                )}
+
+                                {activeTab === 'tokens' && (
+                                    <>
+                                        <h2 className="font-bold flex items-center text-sky-400 text-sm uppercase tracking-widest border-b border-slate-700/50 pb-4"><Icon name="Star" className="mr-2" size={18}/> Tablice Żetonowe</h2>
+                                        <div>
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase block mb-2">Imię Dziecka</label>
+                                            <input type="text" value={params.tokenChildName} onChange={e=>setParams({...params, tokenChildName: e.target.value})} placeholder="np. Jaś" className="w-full p-4 bg-slate-900 border border-slate-700 rounded-xl outline-none text-white text-sm focus:border-sky-500" />
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase block mb-2">Motyw Żetonów (Zainteresowania)</label>
+                                            <input type="text" value={params.tokenTheme} onChange={e=>setParams({...params, tokenTheme: e.target.value})} placeholder="np. Koparki, dinozaury, pociągi, gwiazdki..." className="w-full p-4 bg-slate-900 border border-slate-700 rounded-xl outline-none text-white text-sm focus:border-sky-500" />
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase block mb-2">Na co pracuje? (Nagroda)</label>
+                                            <input type="text" value={params.tokenReward} onChange={e=>setParams({...params, tokenReward: e.target.value})} placeholder="np. Oglądanie bajki, żelki..." className="w-full p-4 bg-slate-900 border border-slate-700 rounded-xl outline-none text-white text-sm focus:border-sky-500" />
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] font-bold text-sky-400 uppercase block mb-2">Liczba Żetonów do zdobycia</label>
+                                            <select value={params.tokenCount} onChange={e=>setParams({...params, tokenCount: e.target.value})} className="w-full p-4 bg-sky-900/10 border border-slate-700 rounded-xl outline-none text-white text-sm focus:border-sky-500 appearance-none font-bold">
+                                                {[3, 4, 5, 6, 7, 8, 9, 10].map(n => <option key={n} value={n} className="bg-slate-900">{n} żetonów</option>)}
+                                            </select>
+                                        </div>
+                                    </>
+                                )}
+
+                                {!isPremium ? (
+                                    <div className="p-6 rounded-xl border-2 border-dashed border-slate-700 flex flex-col items-center justify-center text-center gap-3 bg-slate-900/50">
+                                        <div className="p-3 bg-slate-800 rounded-full"><Icon name="Lock" size={24} className="text-slate-400"/></div>
+                                        <div><span className="text-sm font-bold text-slate-300 block mb-1">Funkcja zablokowana</span><span className="text-xs text-slate-500">Wpisz kod Premium na górnym pasku.</span></div>
+                                    </div>
+                                ) : (
+                                    <button onClick={generateContent} disabled={isGenerating} className={`w-full text-white py-4 rounded-xl font-black text-sm tracking-widest shadow-lg flex justify-center items-center gap-2 transition-all active:scale-95 uppercase disabled:opacity-50 ${activeTab === 'steps' ? 'bg-yellow-500 text-yellow-950 hover:bg-yellow-400 shadow-yellow-500/20' : activeTab === 'first_then' ? 'bg-orange-500 hover:bg-orange-400 shadow-orange-500/20' : activeTab === 'rules' ? 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-500/20' : 'bg-sky-500 hover:bg-sky-400 shadow-sky-500/20'}`}>
+                                        <Icon name="Sparkles" size={20}/> Generuj Plansze
+                                    </button>
+                                )}
+                            </div>
+
+                            <div className="p-5 rounded-3xl shadow-lg border flex items-start gap-4 transition-colors bg-slate-800/50 border-slate-700">
+                                <BotHelperAvatar />
+                                <div className="flex-1 pt-1">
+                                    <h4 className="font-black text-xs uppercase tracking-widest mb-1.5 text-yellow-400">EduBot AAC</h4>
+                                    <p className="text-sm font-medium leading-relaxed text-slate-300 bot-bubble" key={botMessage}>{botMessage}</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* PRAWY PANEL (WYNIK DO DRUKU) */}
+                        <div className="lg:col-span-8 flex justify-center items-start overflow-x-auto pb-10 print:block">
+                            {!generatedData ? (
+                                <div className="glass-panel w-full max-w-[210mm] min-h-[297mm] shadow-2xl p-8 rounded-[2rem] flex flex-col items-center justify-center text-center space-y-6 print-hidden border-2 border-dashed border-slate-700 opacity-60">
+                                    <div className="p-6 bg-slate-800/50 rounded-full border border-slate-700 shadow-inner">
+                                        <Icon name={activeTab === 'steps' ? 'LayoutGrid' : activeTab === 'first_then' ? 'ArrowRightLeft' : activeTab === 'rules' ? 'CheckSquare' : 'Star'} size={64} className={activeTab === 'steps' ? 'text-yellow-500' : activeTab === 'first_then' ? 'text-orange-500' : activeTab === 'rules' ? 'text-emerald-500' : 'text-sky-500'} />
+                                    </div>
+                                    <div>
+                                        <h2 className="text-2xl font-bold mb-3 text-white">Tutaj pojawią się plansze wizualne</h2>
+                                        <p className="max-w-md mx-auto text-slate-400 leading-relaxed text-sm">Gotowe do wydrukowania i wycięcia wzdłuż linii przerywanych. Idealne do tworzenia zalaminowanych pomocy dla dzieci.</p>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="w-full max-w-[210mm] animate-[reveal_0.5s_ease-out] print:max-w-full">
+                                    <div className="flex justify-end gap-3 mb-6 print-hidden bg-slate-900/50 p-2 rounded-2xl border border-slate-800 backdrop-blur-md">
+                                        <button onClick={() => window.print()} className="w-full bg-yellow-500 hover:bg-yellow-400 text-yellow-950 px-6 py-4 rounded-xl font-black flex items-center justify-center gap-3 transition-all text-sm active:scale-95 uppercase tracking-widest">
+                                            <Icon name="Printer" size={20}/> Wydrukuj (Zapisz PDF)
+                                        </button>
+                                    </div>
+
+                                    {/* KARTKA A4 DO DRUKU */}
+                                    <div id="print-container" className="bg-white shadow-[0_20px_50px_rgba(0,0,0,0.5)] p-10 text-slate-900 rounded-sm min-h-[297mm] kids-font flex flex-col">
+                                        
+                                        <div className="print-hidden mb-6 flex items-center justify-center text-slate-400 text-xs font-bold uppercase tracking-widest gap-2">
+                                            <Icon name="Scissors" size={16} /> Wytnij wzdłuż szarych linii przerywanych
+                                        </div>
+
+                                        {generatedData.type === 'steps' && (
+                                            <div className="flex-1">
+                                                <h1 className="text-3xl font-black text-center mb-10 text-slate-800 uppercase tracking-widest border-b-4 border-slate-200 pb-4">{generatedData.data.title}</h1>
+                                                
+                                                <div className="flex flex-col gap-6">
+                                                    {generatedData.data.steps.map((step, i) => (
+                                                        <div key={i} className="cut-line border-2 border-dashed border-slate-300 p-4 rounded-xl flex items-center gap-8 bg-slate-50 page-break-inside-avoid relative">
+                                                            <div className="absolute top-2 left-2 w-6 h-6 bg-slate-200 text-slate-500 rounded-full flex items-center justify-center text-xs font-black">{i+1}</div>
+                                                            <div className="text-[5rem] w-32 h-32 flex items-center justify-center bg-white rounded-2xl shadow-sm border border-slate-100 flex-shrink-0">
+                                                                {step.emoji}
+                                                            </div>
+                                                            <div className="text-3xl font-black text-slate-800 leading-tight">
+                                                                {step.text.toUpperCase()}
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {generatedData.type === 'first_then' && (
+                                            <div className="flex-1 flex flex-col justify-center items-center h-full">
+                                                <div className="w-full border-4 border-slate-800 rounded-3xl p-8 bg-slate-50 flex flex-col md:flex-row shadow-sm page-break-inside-avoid cut-line border-dashed">
+                                                    
+                                                    {/* LEWA STRONA (NAJPIERW) */}
+                                                    <div className="flex-1 flex flex-col items-center border-b-4 md:border-b-0 md:border-r-4 border-slate-300 pb-8 md:pb-0 md:pr-8">
+                                                        <div className="bg-yellow-400 text-yellow-950 font-black text-2xl uppercase tracking-widest py-2 px-8 rounded-full mb-8 shadow-sm">
+                                                            1. Najpierw
+                                                        </div>
+                                                        <div className="text-[8rem] w-48 h-48 bg-white border-2 border-slate-200 rounded-3xl shadow-inner flex items-center justify-center mb-6">
+                                                            {generatedData.data.first.emoji}
+                                                        </div>
+                                                        <div className="text-3xl font-black text-center text-slate-800 uppercase h-20">
+                                                            {generatedData.data.first.text}
+                                                        </div>
+                                                    </div>
+
+                                                    {/* PRAWA STRONA (POTEM) */}
+                                                    <div className="flex-1 flex flex-col items-center pt-8 md:pt-0 md:pl-8">
+                                                        <div className="bg-emerald-500 text-white font-black text-2xl uppercase tracking-widest py-2 px-8 rounded-full mb-8 shadow-sm">
+                                                            2. Potem
+                                                        </div>
+                                                        <div className="text-[8rem] w-48 h-48 bg-white border-2 border-slate-200 rounded-3xl shadow-inner flex items-center justify-center mb-6">
+                                                            {generatedData.data.then.emoji}
+                                                        </div>
+                                                        <div className="text-3xl font-black text-center text-slate-800 uppercase h-20">
+                                                            {generatedData.data.then.text}
+                                                        </div>
+                                                    </div>
+
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {generatedData.type === 'rules' && (
+                                            <div className="flex-1 flex flex-col justify-center gap-10">
+                                                
+                                                {/* ZASADA: DOBRA */}
+                                                <div className="cut-line border-4 border-dashed border-slate-300 p-6 rounded-3xl flex flex-col items-center bg-emerald-50 page-break-inside-avoid relative">
+                                                    <div className="absolute top-4 left-4 w-16 h-16 bg-emerald-500 text-white rounded-full flex items-center justify-center text-3xl shadow-md border-4 border-white">✓</div>
+                                                    <div className="text-[8rem] mb-6 drop-shadow-sm">{generatedData.data.good.emoji}</div>
+                                                    <div className="text-4xl font-black text-emerald-900 text-center uppercase leading-tight bg-white px-8 py-4 rounded-2xl shadow-sm w-full border border-emerald-100">
+                                                        {generatedData.data.good.text}
+                                                    </div>
+                                                </div>
+
+                                                {/* ZASADA: ZŁA */}
+                                                <div className="cut-line border-4 border-dashed border-slate-300 p-6 rounded-3xl flex flex-col items-center bg-red-50 page-break-inside-avoid relative">
+                                                    <div className="absolute top-4 left-4 w-16 h-16 bg-red-500 text-white rounded-full flex items-center justify-center text-3xl shadow-md border-4 border-white">✕</div>
+                                                    <div className="text-[8rem] mb-6 drop-shadow-sm opacity-80">{generatedData.data.bad.emoji}</div>
+                                                    <div className="text-4xl font-black text-red-900 text-center uppercase leading-tight bg-white px-8 py-4 rounded-2xl shadow-sm w-full border border-red-100">
+                                                        {generatedData.data.bad.text}
+                                                    </div>
+                                                </div>
+
+                                            </div>
+                                        )}
+
+                                        {generatedData.type === 'tokens' && (
+                                            <div className="flex-1 flex flex-col h-full">
+                                                {/* Nagłówek i Nagroda */}
+                                                <div className="flex flex-col md:flex-row justify-between items-center mb-8 border-b-4 border-slate-200 pb-6 gap-6">
+                                                    <h1 className="text-3xl font-black text-slate-800 uppercase tracking-widest text-center md:text-left">
+                                                        Tablica: <span className="text-sky-600">{generatedData.localParams.tokenChildName}</span>
+                                                    </h1>
+                                                    
+                                                    {/* Pole na rzep (Nagroda) */}
+                                                    <div className="flex items-center gap-4 bg-amber-100 p-4 rounded-[2rem] border-4 border-amber-300 shadow-sm relative">
+                                                        <div className="absolute -top-3 left-6 bg-white px-2 text-amber-600 text-xs font-black uppercase tracking-widest rounded-full border-2 border-amber-300">Pracuję na:</div>
+                                                        <div className="w-16 h-16 bg-white rounded-full shadow-sm text-4xl border-4 border-dashed border-amber-300 flex items-center justify-center flex-shrink-0">
+                                                            {generatedData.data.rewardEmoji}
+                                                        </div>
+                                                        <span className="text-2xl font-black text-amber-900 uppercase pr-4">{generatedData.data.rewardText}</span>
+                                                    </div>
+                                                </div>
+
+                                                {/* Miejsca na żetony */}
+                                                <div className="bg-slate-100 border-4 border-slate-300 rounded-[2.5rem] p-8 mb-12 flex justify-center flex-wrap gap-6 shadow-inner">
+                                                    {Array.from({ length: parseInt(generatedData.localParams.tokenCount) }).map((_, i) => (
+                                                        <div key={i} className="w-24 h-24 rounded-full border-4 border-slate-300 bg-white shadow-inner flex items-center justify-center relative">
+                                                            <div className="w-4 h-4 rounded-full bg-slate-200 absolute"></div> {/* Oznaczenie na rzep */}
+                                                        </div>
+                                                    ))}
+                                                </div>
+
+                                                {/* Obszar do wycięcia - Żetony */}
+                                                <div className="mt-auto border-t-4 border-dashed border-slate-300 pt-10 relative">
+                                                    <div className="absolute -top-5 left-1/2 -translate-x-1/2 bg-white px-6 py-1 rounded-full text-slate-500 font-black text-sm uppercase tracking-widest border-2 border-dashed border-slate-300 flex items-center gap-2">
+                                                        <Icon name="Scissors" size={18} /> Wytnij żetony
+                                                    </div>
+                                                    <div className="flex flex-wrap justify-center gap-6">
+                                                        {Array.from({ length: parseInt(generatedData.localParams.tokenCount) }).map((_, i) => (
+                                                            <div key={i} className="cut-line w-24 h-24 rounded-full border-4 border-dashed border-sky-400 bg-sky-50 shadow-sm flex items-center justify-center text-[4rem] hover:scale-105 transition-transform">
+                                                                {generatedData.data.tokenEmoji}
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {showInstructions && (
+                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md print-hidden">
+                            <div className="glass-panel w-full max-w-3xl max-h-[90vh] rounded-[2rem] shadow-2xl overflow-hidden flex flex-col font-sans border border-slate-700">
+                                <div className="flex justify-between items-center p-6 border-b border-slate-700 bg-slate-900/80 flex-shrink-0">
+                                    <h2 className="text-xl font-black text-white flex items-center gap-3"><Icon name="HelpCircle" className="text-yellow-500"/> Instrukcja Obsługi: EduWizualizator</h2>
+                                    <button onClick={() => setShowInstructions(false)} className="p-2 hover:bg-slate-800 rounded-xl transition-colors text-slate-400 hover:text-white font-bold text-lg">✕</button>
+                                </div>
+
+                                <div className="p-6 md:p-8 overflow-y-auto space-y-8 text-sm text-slate-300 custom-scrollbar bg-slate-900/50">
+                                    <p className="text-base font-medium text-white">Witaj w <strong>EduWizualizatorze PRO!</strong> To narzędzie stworzone dla pedagogów specjalnych i wychowawców. Pomaga błyskawicznie tworzyć pomoce wizualne (AAC) dla dzieci w spektrum autyzmu, z afazją czy niepełnosprawnością.</p>
+
+                                    <div className="space-y-3 bg-slate-800/50 p-5 rounded-2xl border border-slate-700">
+                                        <h3 className="font-bold text-yellow-400 text-lg border-b border-slate-700 pb-2">Krok 1: Analiza Zadania (Kroki)</h3>
+                                        <p>Wpisz czynność (np. "Mycie rąk"), a sztuczna inteligencja automatycznie podzieli ją na proste polecenia i do każdego dopasuje czytelny piktogram (emoji). Idealne do stworzenia pionowego planu w łazience lub szatni!</p>
+                                    </div>
+
+                                    <div className="space-y-3 bg-slate-800/50 p-5 rounded-2xl border border-slate-700">
+                                        <h3 className="font-bold text-orange-400 text-lg border-b border-slate-700 pb-2">Krok 2: Tablica "Najpierw - Potem"</h3>
+                                        <p>To absolutny fundament pracy z oporem i buntem. Wpisz nielubiane zadanie (np. "Zupa") oraz motywator (np. "Plac zabaw"). Aplikacja wygeneruje wielką, wyraźną tablicę, która tłumaczy dziecku ciąg przyczynowo-skutkowy.</p>
+                                    </div>
+
+                                    <div className="space-y-3 bg-slate-800/50 p-5 rounded-2xl border border-slate-700">
+                                        <h3 className="font-bold text-emerald-400 text-lg border-b border-slate-700 pb-2">Krok 3: Zasady Sali</h3>
+                                        <p>Wpisz zasadę dobrą ("Mówimy cicho") i złą ("Nie krzyczymy"). Aplikacja wygeneruje karty z wielkim zielonym ptaszkiem (✓) i czerwonym krzyżykiem (✕).</p>
+                                    </div>
+
+                                    <div className="space-y-3 bg-slate-800/50 p-5 rounded-2xl border border-slate-700">
+                                        <h3 className="font-bold text-sky-400 text-lg border-b border-slate-700 pb-2">Krok 4: Tablice Żetonowe (NOWOŚĆ)</h3>
+                                        <p>Wpisz imię dziecka, czym się interesuje i nagrodę. AI stworzy personalizowaną planszę. Dziecko zdobywa żetony (np. z ulubionym dinozaurem) za dobre zachowanie, aż uzbiera pełną pulę na nagrodę!</p>
+                                    </div>
+
+                                    <div className="space-y-3 bg-yellow-900/20 p-6 rounded-2xl border border-yellow-500/30 mt-8">
+                                        <h3 className="font-black text-yellow-400 text-lg flex items-center gap-2"><Icon name="Printer" size={20}/> Wydruk i Laminowanie</h3>
+                                        <p className="text-yellow-200 font-medium">Kiedy plansze są gotowe, kliknij <strong>WYDRUKUJ</strong>.</p>
+                                        <ul className="list-disc pl-5 text-yellow-300 space-y-1">
+                                            <li>Wszystkie wygenerowane karty mają wbudowane <strong>szare przerywane linie</strong>.</li>
+                                            <li>Wydrukuj karty, wytnij wzdłuż linii, zalaminuj i przyklej do nich rzepy!</li>
+                                        </ul>
+                                    </div>
+
+                                    <div className="text-center pt-4">
+                                        <button onClick={() => setShowInstructions(false)} className="bg-yellow-500 hover:bg-yellow-400 text-yellow-950 px-10 py-4 rounded-xl font-black shadow-[0_0_20px_rgba(250,204,21,0.3)] transition-all active:scale-95 text-base tracking-wide w-full sm:w-auto uppercase">
+                                            Rozumiem, do dzieła!
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>

@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="pl" translate="no" class="notranslate">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduTerapia PRO - Historyjki Społeczne i TUS</title>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&family=Comic+Neue:wght@400;700&display=swap');
+        
+        body { background-color: #020617; font-family: 'Plus Jakarta Sans', sans-serif; color: #f8fafc; overflow-x: hidden; }
+        
+        .glass-panel { background: rgba(30, 41, 59, 0.4); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.05); }
+        .glass-nav { background: rgba(2, 6, 23, 0.8); backdrop-filter: blur(20px); border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
+        
+        .story-font { font-family: 'Comic Neue', cursive; font-size: 1.25rem; line-height: 1.8; color: #1e293b; }
+        .tus-font { font-family: 'Plus Jakarta Sans', sans-serif; color: #0f172a; }
+
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #0f172a; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+
+        input:focus, select:focus, textarea:focus { box-shadow: 0 0 15px rgba(236, 72, 153, 0.3); border-color: #ec4899 !important; }
+
+        @media print {
+            body { background: white; color: black; }
+            .print-hidden { display: none !important; }
+            #print-container { border: none !important; box-shadow: none !important; padding: 0 !important; margin: 0 !important; width: 100% !important; max-width: 100% !important; background: white !important; }
+            body, html { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+            .page-break-inside-avoid { break-inside: avoid; page-break-inside: avoid; }
+        }
+        
+        /* Renderowanie sformatowanego HTML przez AI */
+        .markdown-body h2 { font-size: 1.25rem; font-weight: bold; color: #be185d; border-bottom: 2px solid #fce7f3; padding-bottom: 0.5rem; margin-top: 1.5rem; margin-bottom: 1rem; text-transform: uppercase; }
+        .markdown-body h3 { font-size: 1.1rem; font-weight: bold; color: #334155; margin-top: 1rem; margin-bottom: 0.5rem; }
+        .markdown-body p { margin-bottom: 1rem; line-height: 1.6; }
+        .markdown-body strong { color: #000; }
+        .markdown-body ul { list-style-type: disc; padding-left: 2rem; margin-bottom: 1rem; }
+        .markdown-body li { margin-bottom: 0.5rem; }
+
+        @keyframes slide-up { 0% { opacity: 0; transform: translate(-50%, 20px); } 100% { opacity: 1; transform: translate(-50%, 0); } }
+        .animate-toast { animation: slide-up 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        @keyframes pop { 0% { transform: scale(0.9); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+        .bot-bubble { animation: pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+        @keyframes blink { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(0.1); } }
+        .bot-eye { animation: blink 4s infinite; transform-origin: center; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        const Icon = ({ name, size = 20, className = "" }) => {
+            const icons = {
+                HeartHandshake: <><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/><path d="M12 5 9.04 7.96a2.17 2.17 0 0 0 0 3.08v0c.82.82 2.13.85 3 .07l2.07-1.9a2.82 2.82 0 0 1 3.79 0l2.96 2.66"/><path d="m18 15-2-2"/><path d="m15 18-2-2"/></>,
+                BookOpen: <><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></>,
+                Users: <><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></>,
+                Puzzle: <><path d="M19.439 7.85c-.049.322.059.648.289.878l1.568 1.568c.47.47.706 1.087.706 1.704s-.235 1.233-.706 1.704l-1.611 1.611a.98.98 0 0 1-.837.276c-.47-.07-.952.151-1.251.583l-1.121 1.616c-.378.544-.452 1.253-.197 1.86l.666 1.58a1.77 1.77 0 0 1-.223 1.95c-.47.47-1.087.706-1.704.706s-1.233-.235-1.704-.706l-1.568-1.568a1.026 1.026 0 0 0-.878-.289c-.322.049-.648-.059-.878-.289l-1.568-1.568c-.47-.47-.706-1.087-.706-1.704s.235-1.233.706-1.704l1.611-1.611a.98.98 0 0 1 .837-.276c.47.07.952-.151 1.251-.583l1.121-1.616c.378-.544.452-1.253.197-1.86l-.666-1.58a1.77 1.77 0 0 1 .223-1.95c.47-.47 1.087-.706 1.704-.706s1.233.235 1.704.706l1.568 1.568c.23.23.556.338.878.289Z"/></>,
+                Printer: <path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6z"/>,
+                Download: <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>,
+                Sparkles: <path d="m12 3 1.912 5.813a2 2 0 0 0 1.275 1.275L21 12l-5.813 1.912a2 2 0 0 0-1.275 1.275L12 21l-1.912-5.813a2 2 0 0 0-1.275-1.275L3 12l5.813-1.912a2 2 0 0 0 1.275-1.275L12 3Z"/>,
+                Lock: <><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></>,
+                AlertCircle: <><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></>,
+                Coffee: <path d="M18 8h1a4 4 0 0 1 0 8h-1M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8zM7 2v3M11 2v3M15 2v3"/>
+            };
+            return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>{icons[name] || null}</svg>;
+        };
+
+        const BotHelperAvatar = () => (
+            <svg viewBox="0 0 100 100" className="w-14 h-14 drop-shadow-md flex-shrink-0" xmlns="http://www.w3.org/2000/svg">
+                <path d="M50 30 V15" stroke="#f472b6" strokeWidth="4" strokeLinecap="round"/>
+                <circle cx="50" cy="12" r="5" fill="#ec4899"/>
+                <rect x="25" y="30" width="50" height="40" rx="12" fill="#be185d"/>
+                <rect x="32" y="38" width="36" height="22" rx="6" fill="#ffffff"/>
+                <circle cx="40" cy="49" r="3.5" fill="#be185d" className="bot-eye"/>
+                <circle cx="60" cy="49" r="3.5" fill="#be185d" className="bot-eye"/>
+                <path d="M 45 56 Q 50 60 55 56" stroke="#be185d" strokeWidth="2.5" fill="none" strokeLinecap="round"/>
+            </svg>
+        );
+
+        function App() {
+            const [isPremium, setIsPremium] = useState(false);
+            const [accessCode, setAccessCode] = useState('');
+            const [isGenerating, setIsGenerating] = useState(false);
+            const [toastMessage, setToastMessage] = useState('');
+            const [botMessage, setBotMessage] = useState("Cześć! Dzieci ze spektrum autyzmu i niepełnosprawnościami potrzebują jasnych obrazów i prostych słów. Stworzę dla Ciebie idealną pomoc terapeutyczną.");
+            
+            const [activeTab, setActiveTab] = useState('story');
+            
+            const [params, setParams] = useState({
+                childName: '',
+                childAge: '4 lata',
+                gender: 'chłopiec',
+                trigger: '',
+                solution: '',
+                tusGoal: '',
+                tusGroup: 'Spektrum autyzmu',
+                sensoryType: 'Wyciszenie (Propriocepcja)'
+            });
+
+            const [generatedData, setGeneratedData] = useState(null);
+
+            useEffect(() => {
+                if(activeTab === 'story') setBotMessage("Historyjka Społeczna z obrazkiem: Opisz mi, czego uczeń się boi lub z czym ma problem, a ja napiszę prostą bajkę terapeutyczną i narysuję do niej uspokajający obrazek!");
+                else if(activeTab === 'tus') setBotMessage("Trening TUS: Wpisz główny problem grupy (np. agresja przy przegrywaniu), a ułożę szczegółowy, 30-minutowy plan zajęć.");
+                else if(activeTab === 'sensory') setBotMessage("Zabawy Sensoryczne: Wybierz, czego potrzebuje dziecko, a wymyślę kreatywne ćwiczenia z użyciem ryżu, wody czy koca.");
+                setGeneratedData(null);
+            }, [activeTab]);
+
+            const showToast = (msg) => { setToastMessage(msg); setTimeout(() => setToastMessage(''), 4000); };
+
+            const handleVerifyCode = () => {
+                if (accessCode.toUpperCase() === 'KAWA2024') { 
+                    setIsPremium(true); setAccessCode(''); 
+                    showToast('Kod Premium aktywny! 🌟');
+                    setBotMessage("Hura! Masz Premium! Odblokowałem moduł generowania ilustracji 3D (Pixar) do Historyjek Społecznych.");
+                } else { showToast('Nieprawidłowy kod dostępu!'); }
+            };
+
+            const generateContent = async () => {
+                setIsGenerating(true);
+                setGeneratedData(null);
+                
+                try {
+                    if (activeTab === 'story') {
+                        if (!params.childName || !params.trigger) throw new Error('Wpisz imię i opisz sytuację trudną!');
+                        setBotMessage("Piszę historyjkę i zamawiam ilustrację u malarza 3D. To potrwa kilkanaście sekund...");
+                        
+                        // 1. Generowanie tekstu historyjki
+                        const sysPrompt = `Jesteś pedagogiem specjalnym. Napisz krótką Historyjkę Społeczną (Social Story) dla dziecka (${params.childAge}, ${params.gender}). 
+                        ZASADY:
+                        1. Bardzo prosty język, krótkie zdania. Zero metafor i ironii.
+                        2. Struktura: Wstęp (kim jest dziecko), Sytuacja trudna, Emocje (normalizacja), Rozwiązanie (co dziecko ma zrobić), Zakończenie (sukces).
+                        3. Zwróć tylko sformatowany tekst w HTML (<p>, <strong>).`;
+                        
+                        const usrPrompt = `Imię: ${params.childName}\nTrudność (zapalnik): ${params.trigger}\nPożądane zachowanie (rozwiązanie): ${params.solution}`;
+
+                        const textRes = await fetch('/api/chat', { 
+                            method: 'POST', headers: { 'Content-Type': 'application/json' }, 
+                            body: JSON.stringify({ system: sysPrompt, prompt: usrPrompt, temperature: 0.5, format: "text", model: "gpt-4o-mini" }) 
+                        });
+                        const textData = await textRes.json();
+                        let storyText = textData.text.replace(/```html/gi, '').replace(/```/g, '').trim();
+
+                        // 2. Generowanie Obrazka AI (Fal.ai Flux)
+                        let imageUrl = null;
+                        const englishGender = params.gender === 'chłopiec' ? 'boy' : 'girl';
+                        
+                        // Tłumaczenie promptu przez AI, aby był idealny dla Fluxa
+                        const transRes = await fetch('/api/chat', { 
+                            method: 'POST', headers: { 'Content-Type': 'application/json' }, 
+                            body: JSON.stringify({ system: "Przetłumacz i opisz krótko tę sytuację jako prompt dla generatora obrazków po angielsku. Skup się wizualiach.", prompt: params.solution || params.trigger, temperature: 0.3 }) 
+                        });
+                        const transData = await transRes.json();
+                        const enScenario = transData.text;
+
+                        const imgPrompt = `A beautiful, highly detailed 3D Pixar style children's book illustration of a ${params.childAge} old ${englishGender}. The child is: ${enScenario}. The child looks very calm, safe, and happy. Cozy, warm, cheerful classroom or home environment. Single unified scene, NO TEXT, NO LETTERS, perfect human anatomy, masterpiece.`;
+                        
+                        const imgRes = await fetch('/api/generate', {
+                            method: 'POST', headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ prompt: imgPrompt })
+                        });
+                        if (imgRes.ok) {
+                            const imgData = await imgRes.json();
+                            imageUrl = imgData.imageUrl;
+                        }
+
+                        setGeneratedData({ type: 'story', title: `Historyjka dla: ${params.childName}`, content: storyText, image: imageUrl });
+                        setBotMessage("Gotowe! Mamy przepiękną, spersonalizowaną historyjkę z obrazkiem. Dzieciakom to bardzo pomoże!");
+                    
+                    } else if (activeTab === 'tus') {
+                        if (!params.tusGoal) throw new Error('Wpisz cel lub problem grupy!');
+                        setBotMessage("Przygotowuję pełny scenariusz Treningu Umiejętności Społecznych...");
+
+                        const sysPrompt = `Jesteś certyfikowanym trenerem TUS (Trening Umiejętności Społecznych). Skonstruuj SZCZEGÓŁOWY i praktyczny scenariusz na 30-45 minut.
+                        Dopasuj zabawy do profilu grupy. Odpowiadaj w formacie JSON:
+                        { "title": "Tytuł zajęć", "content": "Skrypt w HTML (używaj <h2>, <p>, <ul>, <strong>)" }`;
+                        
+                        const usrPrompt = `Wiek/Profil: ${params.childAge}, ${params.tusGroup}\nProblem do przepracowania: ${params.tusGoal}\nNapisz: 1. Powitanie, 2. Psychoedukację, 3. Scenkę ról, 4. Relaksację.`;
+
+                        const res = await fetch('/api/chat', { 
+                            method: 'POST', headers: { 'Content-Type': 'application/json' }, 
+                            body: JSON.stringify({ system: sysPrompt, prompt: usrPrompt, temperature: 0.5, format: "json", model: "gpt-4o-mini" }) 
+                        });
+                        const data = await res.json();
+                        const parsed = JSON.parse(data.text.replace(/```json/gi, '').replace(/```/g, '').trim());
+                        
+                        setGeneratedData({ type: 'tus', title: parsed.title, content: parsed.content });
+                        setBotMessage("Scenariusz TUS gotowy! Konkretne kroki, proste polecenia. Drukuj i wchodź na salę.");
+
+                    } else if (activeTab === 'sensory') {
+                        setBotMessage("Szukam najciekawszych zabaw z użyciem tanich materiałów...");
+
+                        const sysPrompt = `Jesteś terapeutą Integracji Sensorycznej (SI). Wygeneruj 3 kreatywne, tanie w przygotowaniu zabawy sensoryczne celujące w wybrany obszar.
+                        Odpowiadaj w formacie JSON:
+                        { "title": "Zabawy Sensoryczne", "content": "Zabawy w formacie HTML (<h2>Nazwa zabawy</h2><p><strong>Potrzebne:</strong> ...</p><p><strong>Opis:</strong> ...</p>)" }`;
+                        
+                        const usrPrompt = `Cel stymulacji: ${params.sensoryType}\nWiek: ${params.childAge}\nZabawy mają być bezpieczne, łatwe do zrobienia w przedszkolu ze zwykłych przedmiotów.`;
+
+                        const res = await fetch('/api/chat', { 
+                            method: 'POST', headers: { 'Content-Type': 'application/json' }, 
+                            body: JSON.stringify({ system: sysPrompt, prompt: usrPrompt, temperature: 0.6, format: "json", model: "gpt-4o-mini" }) 
+                        });
+                        const data = await res.json();
+                        const parsed = JSON.parse(data.text.replace(/```json/gi, '').replace(/```/g, '').trim());
+                        
+                        setGeneratedData({ type: 'sensory', title: parsed.title, content: parsed.content });
+                        setBotMessage("Znalazłem świetne zabawy! Pamiętaj, żeby przy zabawach brudzących uprzedzić dzieci z nadwrażliwością dotykową.");
+                    }
+
+                } catch (error) {
+                    console.error(error); showToast(`Błąd: ${error.message}`);
+                    setBotMessage("Ojej, coś przerwało połączenie. Spróbujmy jeszcze raz!");
+                } finally { setIsGenerating(false); }
+            };
+
+            const exportToWord = () => {
+                if(!generatedData) return;
+                const content = document.getElementById('document-render-area').innerHTML;
+                const header = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>${generatedData.title}</title><style>body { font-family: 'Arial', sans-serif; font-size: 14pt; line-height: 1.6; color: #000; } h1 { font-size: 20pt; text-align: center; color: #be185d; } h2 { font-size: 16pt; color: #9d174d; border-bottom: 1px solid #fce7f3; padding-bottom: 5px; margin-top: 20px;} p { margin-bottom: 15px; } img { max-width: 100%; height: auto; border-radius: 10px; margin-bottom: 20px; }</style></head><body>`;
+                const footer = `</body></html>`;
+                const blob = new Blob(['\ufeff', header + content + footer], { type: 'application/msword' });
+                const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = `EduTerapia_${Date.now()}.doc`; link.click();
+            };
+
+            return (
+                <div className="min-h-screen flex flex-col relative overflow-x-hidden bg-slate-950">
+                    
+                    {toastMessage && (
+                        <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[200] bg-pink-600 text-white px-6 py-3 rounded-2xl shadow-[0_0_30px_rgba(236,72,153,0.4)] font-bold text-sm animate-toast flex items-center gap-3 border border-pink-400">
+                            <Icon name="AlertCircle" size={18} /> {toastMessage}
+                        </div>
+                    )}
+
+                    {isGenerating && (
+                        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-[100] flex flex-col items-center justify-center text-white">
+                            <div className="glass-panel p-10 rounded-3xl flex flex-col items-center space-y-6 max-w-sm border border-pink-500/20 shadow-[0_0_50px_rgba(236,72,153,0.2)]">
+                                <div className="w-16 h-16 border-4 border-slate-700 border-t-pink-500 rounded-full animate-spin"></div>
+                                <div className="text-center">
+                                    <h3 className="text-xl font-bold mb-2 text-white">Tworzenie Materiału...</h3>
+                                    <p className="text-xs text-slate-400 font-medium">To potrwa kilkanaście sekund.</p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    <nav className="fixed top-0 w-full z-50 glass-nav py-4 px-6 print-hidden">
+                        <div className="max-w-7xl mx-auto flex justify-between items-center">
+                            <div className="flex items-center space-x-3 font-extrabold text-xl tracking-tight cursor-pointer" onClick={() => window.scrollTo(0,0)}>
+                                <div className="bg-gradient-to-br from-pink-500 to-rose-600 p-2 rounded-xl text-white shadow-[0_0_15px_rgba(236,72,153,0.5)]">
+                                    <Icon name="HeartHandshake" size={22}/>
+                                </div>
+                                <span>Edu<span className="text-pink-500">Terapia</span> PRO</span>
+                            </div>
+                            <div className="flex items-center space-x-4">
+                                {!isPremium && (
+                                    <div className="hidden md:flex items-center space-x-2 bg-slate-900 p-1.5 rounded-xl border border-slate-700">
+                                        <input value={accessCode} onChange={e => setAccessCode(e.target.value)} placeholder="Kod Premium..." className="p-2 bg-transparent text-sm w-32 outline-none font-medium text-white placeholder-slate-500"/>
+                                        <button onClick={handleVerifyCode} className="p-2 text-white rounded-lg bg-pink-600 hover:bg-pink-500 transition-colors shadow-md"><Icon name="Lock" size={16}/></button>
+                                    </div>
+                                )}
+                                <button onClick={() => window.open('https://buycoffee.to/magiccolor')} className="flex items-center space-x-2 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white px-5 py-2.5 rounded-xl font-bold transition-all active:scale-95 text-sm shadow-md">
+                                    <Icon name="Coffee" size={18} className="text-amber-400"/><span>Postaw Kawę</span>
+                                </button>
+                            </div>
+                        </div>
+                    </nav>
+
+                    <div className="max-w-7xl mx-auto px-4 pt-32 pb-24 grid grid-cols-1 lg:grid-cols-12 gap-8 w-full print:block print:p-0 relative z-10">
+                        
+                        <div className="lg:col-span-4 space-y-6 print-hidden">
+                            
+                            <div className="glass-panel p-2 rounded-2xl flex gap-2 flex-wrap sm:flex-nowrap">
+                                <button onClick={() => setActiveTab('story')} className={`flex-1 py-4 px-2 rounded-xl flex flex-col items-center justify-center font-bold text-[10px] uppercase tracking-widest transition-all duration-300 ${activeTab === 'story' ? 'bg-pink-600 text-white shadow-lg border border-pink-500' : 'text-slate-400 hover:bg-slate-800'}`}>
+                                    <Icon name="BookOpen" size={24} className="mb-2" /> Historyjki
+                                </button>
+                                <button onClick={() => setActiveTab('tus')} className={`flex-1 py-4 px-2 rounded-xl flex flex-col items-center justify-center font-bold text-[10px] uppercase tracking-widest transition-all duration-300 ${activeTab === 'tus' ? 'bg-rose-600 text-white shadow-lg border border-rose-500' : 'text-slate-400 hover:bg-slate-800'}`}>
+                                    <Icon name="Users" size={24} className="mb-2" /> Scenariusze TUS
+                                </button>
+                                <button onClick={() => setActiveTab('sensory')} className={`flex-1 py-4 px-2 rounded-xl flex flex-col items-center justify-center font-bold text-[10px] uppercase tracking-widest transition-all duration-300 ${activeTab === 'sensory' ? 'bg-fuchsia-600 text-white shadow-lg border border-fuchsia-500' : 'text-slate-400 hover:bg-slate-800'}`}>
+                                    <Icon name="Puzzle" size={24} className="mb-2" /> Sensoryka
+                                </button>
+                            </div>
+
+                            <div className="glass-panel p-6 md:p-8 rounded-[2rem] space-y-5">
+                                {activeTab === 'story' && (
+                                    <>
+                                        <h2 className="font-bold flex items-center text-pink-400 text-sm uppercase tracking-widest border-b border-slate-700/50 pb-4"><Icon name="BookOpen" className="mr-2" size={18}/> Kreator Historyjek Społecznych</h2>
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div><label className="text-[10px] font-bold text-slate-400 uppercase block mb-2">Imię dziecka</label><input type="text" value={params.childName} onChange={e=>setParams({...params, childName: e.target.value})} placeholder="np. Jaś" className="w-full p-4 bg-slate-900 border border-slate-700 rounded-xl outline-none text-white text-sm focus:border-pink-500" /></div>
+                                            <div><label className="text-[10px] font-bold text-slate-400 uppercase block mb-2">Wiek i Płeć</label>
+                                                <div className="flex gap-2">
+                                                    <input type="text" value={params.childAge} onChange={e=>setParams({...params, childAge: e.target.value})} className="w-1/2 p-4 bg-slate-900 border border-slate-700 rounded-xl outline-none text-white text-sm focus:border-pink-500" />
+                                                    <select value={params.gender} onChange={e=>setParams({...params, gender: e.target.value})} className="w-1/2 p-4 bg-slate-900 border border-slate-700 rounded-xl outline-none text-white text-sm focus:border-pink-500 appearance-none"><option>chłopiec</option><option>dziewczynka</option></select>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div><label className="text-[10px] font-bold text-slate-400 uppercase block mb-2">Zapalnik (Czego się boi / Co wywołuje złość?)</label><textarea value={params.trigger} onChange={e=>setParams({...params, trigger: e.target.value})} placeholder="np. Bardzo głośny dźwięk dzwonka szkolnego..." className="w-full p-4 bg-slate-900 border border-slate-700 rounded-xl outline-none text-white text-sm focus:border-pink-500 h-20 resize-none custom-scrollbar" /></div>
+                                        <div><label className="text-[10px] font-bold text-pink-400 uppercase block mb-2">Rozwiązanie (Pożądane zachowanie)</label><textarea value={params.solution} onChange={e=>setParams({...params, solution: e.target.value})} placeholder="np. Zakłada słuchawki wyciszające i liczy do dziesięciu..." className="w-full p-4 bg-pink-900/10 border border-slate-700 rounded-xl outline-none text-white text-sm focus:border-pink-500 h-24 resize-none custom-scrollbar" /></div>
+                                    </>
+                                )}
+                                
+                                {activeTab === 'tus' && (
+                                    <>
+                                        <h2 className="font-bold flex items-center text-rose-400 text-sm uppercase tracking-widest border-b border-slate-700/50 pb-4"><Icon name="Users" className="mr-2" size={18}/> Scenariusz TUS</h2>
+                                        <div>
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase block mb-2">Profil grupy / Funkcjonowanie</label>
+                                            <input type="text" value={params.tusGroup} onChange={e=>setParams({...params, tusGroup: e.target.value})} placeholder="np. Spektrum autyzmu, przedszkolaki, brak mowy..." className="w-full p-4 bg-slate-900 border border-slate-700 rounded-xl outline-none text-white text-sm focus:border-rose-500" />
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] font-bold text-rose-400 uppercase block mb-2">Cel zajęć (Problem do rozwiązania)</label>
+                                            <textarea value={params.tusGoal} onChange={e=>setParams({...params, tusGoal: e.target.value})} placeholder="np. Nauka spokojnego czekania na swoją kolej podczas zabawy zjeżdżalnią..." className="w-full p-4 bg-rose-900/10 border border-slate-700 rounded-xl outline-none text-white text-sm focus:border-rose-500 h-28 resize-none custom-scrollbar" />
+                                        </div>
+                                    </>
+                                )}
+
+                                {activeTab === 'sensory' && (
+                                    <>
+                                        <h2 className="font-bold flex items-center text-fuchsia-400 text-sm uppercase tracking-widest border-b border-slate-700/50 pb-4"><Icon name="Puzzle" className="mr-2" size={18}/> Zabawy Sensoryczne</h2>
+                                        <div>
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase block mb-2">Wiek dziecka</label>
+                                            <input type="text" value={params.childAge} onChange={e=>setParams({...params, childAge: e.target.value})} className="w-full p-4 bg-slate-900 border border-slate-700 rounded-xl outline-none text-white text-sm focus:border-fuchsia-500" />
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] font-bold text-fuchsia-400 uppercase block mb-2">Cel stymulacji</label>
+                                            <select value={params.sensoryType} onChange={e=>setParams({...params, sensoryType: e.target.value})} className="w-full p-4 bg-fuchsia-900/10 border border-slate-700 rounded-xl outline-none text-white text-sm focus:border-fuchsia-500 appearance-none font-bold">
+                                                <option className="bg-slate-900">Wyciszenie (Układ proprioceptywny / czucie głębokie)</option>
+                                                <option className="bg-slate-900">Pobudzenie (Układ przedsionkowy / ruch)</option>
+                                                <option className="bg-slate-900">Oswajanie dotyku (Nadwrażliwość dotykowa)</option>
+                                                <option className="bg-slate-900">Trening węchu i smaku</option>
+                                            </select>
+                                        </div>
+                                    </>
+                                )}
+
+                                {!isPremium && activeTab === 'story' ? (
+                                    <div className="p-6 rounded-xl border-2 border-dashed border-slate-700 flex flex-col items-center justify-center text-center gap-3 bg-slate-900/50">
+                                        <div className="p-3 bg-slate-800 rounded-full"><Icon name="Lock" size={24} className="text-slate-400"/></div>
+                                        <div><span className="text-sm font-bold text-slate-300 block mb-1">Rysowanie AI zablokowane</span><span className="text-xs text-slate-500">Wpisz kod Premium, by generować obrazki.</span></div>
+                                    </div>
+                                ) : (
+                                    <button onClick={generateContent} disabled={isGenerating} className={`w-full text-white py-4 rounded-xl font-black text-sm tracking-widest shadow-lg flex justify-center items-center gap-2 transition-all active:scale-95 uppercase disabled:opacity-50 ${activeTab === 'story' ? 'bg-pink-600 hover:bg-pink-500 shadow-pink-500/20' : activeTab === 'tus' ? 'bg-rose-600 hover:bg-rose-500 shadow-rose-500/20' : 'bg-fuchsia-600 hover:bg-fuchsia-500 shadow-fuchsia-500/20'}`}>
+                                        <Icon name="Sparkles" size={20}/> Generuj Materiał
+                                    </button>
+                                )}
+                            </div>
+
+                            <div className="p-5 rounded-3xl shadow-lg border flex items-start gap-4 transition-colors bg-slate-800/50 border-slate-700">
+                                <BotHelperAvatar />
+                                <div className="flex-1 pt-1">
+                                    <h4 className="font-black text-xs uppercase tracking-widest mb-1.5 text-pink-400">EduBot Terapeuta</h4>
+                                    <p className="text-sm font-medium leading-relaxed text-slate-300 bot-bubble" key={botMessage}>{botMessage}</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* PANEL PRAWY - WYNIK (BIAŁY A4) */}
+                        <div className="lg:col-span-8 flex justify-center items-start overflow-x-auto pb-10 print:block">
+                            {!generatedData ? (
+                                <div className="glass-panel w-full max-w-[210mm] min-h-[297mm] shadow-2xl p-8 rounded-[2rem] flex flex-col items-center justify-center text-center space-y-6 print-hidden border-2 border-dashed border-slate-700 opacity-60">
+                                    <div className="p-6 bg-slate-800/50 rounded-full border border-slate-700 shadow-inner"><Icon name="HeartHandshake" size={64} className="text-pink-500" /></div>
+                                    <div>
+                                        <h2 className="text-2xl font-bold mb-3 text-white">Miejsce na materiały terapeutyczne</h2>
+                                        <p className="max-w-md mx-auto text-slate-400 leading-relaxed text-sm">Wypełnij dane po lewej stronie. Aplikacja stworzy dla Ciebie spersonalizowane materiały, idealnie dostosowane do potrzeb dzieci z Twojej grupy.</p>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="w-full max-w-[210mm] animate-[reveal_0.5s_ease-out] print:max-w-full">
+                                    <div className="flex justify-end gap-3 mb-6 print-hidden bg-slate-900/50 p-2 rounded-2xl border border-slate-800 backdrop-blur-md">
+                                        <button onClick={exportToWord} className="flex-1 sm:flex-none bg-pink-600 hover:bg-pink-500 text-white px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all text-sm shadow-[0_0_15px_rgba(236,72,153,0.3)] active:scale-95"><Icon name="Download" size={18}/> Word (.docx)</button>
+                                        <button onClick={() => window.print()} className="flex-1 sm:flex-none bg-slate-700 hover:bg-slate-600 text-white px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all text-sm active:scale-95"><Icon name="Printer" size={18}/> Drukuj PDF</button>
+                                    </div>
+
+                                    <div id="print-container" className="bg-white shadow-[0_20px_50px_rgba(0,0,0,0.5)] p-10 md:p-16 rounded-sm min-h-[297mm]">
+                                        <div id="document-render-area" className={generatedData.type === 'story' ? 'story-font' : 'tus-font'}>
+                                            <h1 className="text-2xl md:text-3xl font-black text-center uppercase mb-8 text-pink-700">{generatedData.title}</h1>
+                                            
+                                            {/* ZDJĘCIE AI DO HISTORYJKI */}
+                                            {generatedData.type === 'story' && generatedData.image && (
+                                                <div className="w-full mb-8 flex justify-center">
+                                                    <img src={generatedData.image} className="w-full max-w-md rounded-2xl shadow-lg border-4 border-pink-100 object-cover aspect-square" alt="Ilustracja AI" />
+                                                </div>
+                                            )}
+
+                                            <div className="text-base markdown-body text-slate-800" dangerouslySetInnerHTML={{ __html: generatedData.content }} />
+                                            
+                                            {generatedData.type === 'story' && (
+                                                <div className="mt-16 text-center text-sm font-bold text-slate-400 print-hidden border-t border-slate-200 pt-4">
+                                                    Wskazówka: Czytaj tę historyjkę dziecku regularnie, w spokojnych momentach (nie w trakcie napadu złości), aby utrwalić pożądane zachowanie.
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>

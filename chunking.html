@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="pl" translate="no" class="notranslate">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduChunk AI - Asystent Skupienia (ADHD/Dysleksja)</title>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&family=Comic+Neue:wght@400;700&display=swap');
+        
+        body { background-color: #020617; font-family: 'Plus Jakarta Sans', sans-serif; color: #f8fafc; overflow-x: hidden; }
+        
+        .glass-panel { background: rgba(30, 41, 59, 0.4); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.05); }
+        .glass-nav { background: rgba(2, 6, 23, 0.8); backdrop-filter: blur(20px); border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
+        .text-gradient { background: linear-gradient(135deg, #2dd4bf 0%, #3b82f6 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+
+        /* Domyślny font dla materiałów (Lexend) */
+        .chunk-content { font-family: 'Lexend', sans-serif; }
+        
+        /* Tryb Dysleksji */
+        .dyslexia-mode {
+            font-family: 'Comic Neue', 'Comic Sans MS', cursive !important;
+            letter-spacing: 0.1em !important;
+            word-spacing: 0.2em !important;
+            line-height: 2 !important;
+            background-color: #fffbeb !important; /* Ciepłe, żółtawe tło redukujące stres wzrokowy */
+            color: #1e293b !important;
+        }
+        .dyslexia-text { color: #1e293b !important; }
+        
+        @media print {
+            body { background: white; color: black; }
+            .print-hidden { display: none !important; }
+            #print-container { border: none !important; box-shadow: none !important; padding: 0 !important; margin: 0 !important; width: 100% !important; max-width: 100% !important; }
+            .chunk-card { break-inside: avoid; page-break-inside: avoid; border: 2px solid #e2e8f0 !important; background-color: #f8fafc !important; }
+            .dyslexia-mode .chunk-card { background-color: #ffffff !important; border: 2px solid #fde68a !important; }
+            body, html { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+        }
+
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #0f172a; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+
+        input:focus, select:focus, textarea:focus { box-shadow: 0 0 15px rgba(45, 212, 191, 0.3); border-color: #2dd4bf !important; }
+
+        @keyframes slide-up { 0% { opacity: 0; transform: translate(-50%, 20px); } 100% { opacity: 1; transform: translate(-50%, 0); } }
+        .animate-toast { animation: slide-up 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        
+        /* Animacje Bota */
+        @keyframes pop { 0% { transform: scale(0.9); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+        .bot-bubble { animation: pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+        @keyframes blink { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(0.1); } }
+        .bot-eye { animation: blink 4s infinite; transform-origin: center; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        const Icon = ({ name, size = 20, className = "" }) => {
+            const icons = {
+                Brain: <><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 1.98-3A2.5 2.5 0 0 1 9.5 2Z"/><path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-1.98-3A2.5 2.5 0 0 0 14.5 2Z"/></>,
+                SplitSquare: <><rect width="8" height="18" x="3" y="3" rx="2" ry="2"/><rect width="8" height="18" x="13" y="3" rx="2" ry="2"/></>,
+                Sparkles: <path d="m12 3 1.912 5.813a2 2 0 0 0 1.275 1.275L21 12l-5.813 1.912a2 2 0 0 0-1.275 1.275L12 21l-1.912-5.813a2 2 0 0 0-1.275-1.275L3 12l5.813-1.912a2 2 0 0 0 1.275-1.275L12 3Z"/>,
+                Printer: <path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6z"/>,
+                Download: <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>,
+                Coffee: <path d="M18 8h1a4 4 0 0 1 0 8h-1M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8zM7 2v3M11 2v3M15 2v3"/>,
+                Lock: <><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></>,
+                Eye: <><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></>,
+                BookOpen: <><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></>,
+                AlertCircle: <><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></>
+            };
+            return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>{icons[name]}</svg>;
+        };
+
+        // --- AVATAR BOTA ---
+        const BotHelperAvatar = () => (
+            <svg viewBox="0 0 100 100" className="w-14 h-14 drop-shadow-md flex-shrink-0" xmlns="http://www.w3.org/2000/svg">
+                <path d="M50 30 V15" stroke="#94a3b8" strokeWidth="4" strokeLinecap="round"/>
+                <circle cx="50" cy="12" r="5" fill="#2dd4bf" />
+                <rect x="25" y="30" width="50" height="40" rx="12" fill="#0f766e" />
+                <rect x="32" y="38" width="36" height="22" rx="6" fill="#ffffff"/>
+                <circle cx="40" cy="49" r="3.5" fill="#0f766e" className="bot-eye" />
+                <circle cx="60" cy="49" r="3.5" fill="#0f766e" className="bot-eye" />
+                <path d="M 45 56 Q 50 60 55 56" stroke="#0f766e" strokeWidth="2.5" fill="none" strokeLinecap="round" />
+            </svg>
+        );
+
+        function App() {
+            const [isPremium, setIsPremium] = useState(false);
+            const [accessCode, setAccessCode] = useState('');
+            const [isGenerating, setIsGenerating] = useState(false);
+            const [toastMessage, setToastMessage] = useState('');
+            const [botMessage, setBotMessage] = useState("Cześć! Wklej tutaj długi, zawiły tekst z podręcznika, a ja podzielę go na przyjazne i czytelne 'fiszki' dla dzieci z dysleksją lub ADHD.");
+            
+            const [sourceText, setSourceText] = useState('');
+            const [dyslexiaMode, setDyslexiaMode] = useState(false);
+            
+            const [params, setParams] = useState({
+                age: 'Klasy 4-8 Szkoły Podstawowej',
+                chunkSize: 'Bardzo krótkie (max 3 zdania)',
+                highlightKeywords: true,
+                includeQuiz: true
+            });
+
+            const [chunkedData, setChunkedData] = useState(null);
+
+            const showToast = (msg) => {
+                setToastMessage(msg);
+                setTimeout(() => setToastMessage(''), 4000);
+            };
+
+            const handleVerifyCode = () => {
+                if (accessCode.toUpperCase() === 'KAWA2024') { 
+                    setIsPremium(true); 
+                    setAccessCode(''); 
+                    showToast('Kod aktywny! Witamy w Premium 🌟');
+                    setBotMessage("Hura! Masz Premium! Uruchomiłem prywatne serwery, teksty będą ładować się błyskawicznie.");
+                } 
+                else {
+                    showToast('Nieprawidłowy kod dostępu!');
+                }
+            };
+
+            const toggleDyslexiaMode = () => {
+                setDyslexiaMode(!dyslexiaMode);
+                if (!dyslexiaMode) {
+                    setBotMessage("Włączyłeś tryb przyjazny dla dysleksji! Tekst będzie miał większe odstępy, ciepłe tło i specjalną czcionkę redukującą stres wzrokowy.");
+                } else {
+                    setBotMessage("Wróciłeś do standardowego, czytelnego formatu mikro-lekcji.");
+                }
+            };
+
+            const fillSampleText = () => {
+                setSourceText("Fotosynteza to złożony proces biochemiczny, w którym rośliny, glony i niektóre bakterie przekształcają energię świetlną w energię chemiczną. Proces ten zachodzi głównie w liściach, w specjalnych strukturach zwanych chloroplastami, które zawierają zielony barwnik - chlorofil. Zasadniczo, rośliny pobierają dwutlenek węgla z powietrza oraz wodę z gleby, a następnie przy udziale światła słonecznego przekształcają te substancje w glukozę, która jest ich pożywieniem. Produktem ubocznym tego procesu jest tlen, który jest uwalniany do atmosfery i jest niezbędny do życia niemal wszystkich organizmów na Ziemi.");
+                setBotMessage("Świetny przykład! Ten naukowy bełkot za chwilę zamieni się w piękną i prostą notatkę. Kliknij 'Zmień w mikro-lekcję'.");
+            };
+
+            const generateChunks = async () => {
+                if (!sourceText.trim()) {
+                    showToast('Wklej tekst, który chcesz uprościć!');
+                    return;
+                }
+                if (sourceText.length < 50) {
+                    showToast('Tekst jest za krótki. Wklej co najmniej jeden pełny akapit.');
+                    return;
+                }
+                
+                setIsGenerating(true);
+                setChunkedData(null);
+                setBotMessage("Siekam tekst na kawałki i wybieram najważniejsze informacje... To zajmie dosłownie chwilę!");
+                
+                const systemPrompt = `Jesteś ekspertem ds. neuroinkluzywności i pedagogiki specjalnej. Twoim zadaniem jest zastosowanie metody "chunkingu" (podziału na mikro-lekcje) na podanym tekście z podręcznika. Optymalizujesz tekst dla ucznia z ADHD lub dysleksją.
+                Odpowiadaj WYŁĄCZNIE w formacie JSON.
+                Struktura JSON:
+                {
+                  "title": "Chwytliwy, bardzo prosty tytuł materiału",
+                  "chunks": [
+                    { 
+                      "icon": "Tylko JEDNO emoji (np. ☀️)", 
+                      "heading": "Krótki nagłówek/pytanie (np. Skąd roślina bierze jedzenie?)", 
+                      "content": "Uproszczony tekst oryginału. Używaj krótkich, prostych zdań (podmiot, orzeczenie, dopełnienie).", 
+                      "keywords_to_bold": ["słowo1", "słowo2"] 
+                    }
+                  ],
+                  "summary": "Podsumowanie całej lekcji w DOKŁADNIE jednym, prostym zdaniu.",
+                  "quiz": ["Proste pytanie sprawdzające 1", "Proste pytanie sprawdzające 2"]
+                }
+                ZASADY: 
+                - NIE zmieniaj faktów. 
+                - Dziel długie zdania wielokrotnie złożone na krótkie.
+                - Wybierz 2-3 najważniejsze pojęcia z każdego chunka do tablicy 'keywords_to_bold'.`;
+
+                const userPrompt = `Tekst źródłowy: "${sourceText}". \nWiek ucznia: ${params.age}. \nRozmiar porcji: ${params.chunkSize}. \nProszę o przetworzenie tekstu zgodnie z zasadami chunkingu.`;
+
+                try {
+                    // Łączymy się z prywatnym Vercel API (Niezawodność i Szybkość)
+                    const payload = { 
+                        system: systemPrompt,
+                        prompt: userPrompt,
+                        temperature: 0.3,
+                        format: "json",
+                        model: "gpt-4o-mini"
+                    };
+
+                    const res = await fetch('/api/chat', {
+                        method: 'POST', 
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    
+                    const data = await res.json();
+                    if (!res.ok) throw new Error(data.details || data.message || "Błąd z serwera AI");
+                    
+                    let text = data.text;
+                    let cleanText = text;
+                    
+                    // Usuwanie ukrytych myśli (Reasoning Leak Protection)
+                    if (cleanText.includes('"reasoning_content"')) {
+                        const contentMarker = '"content":"';
+                        const startIdx = cleanText.indexOf(contentMarker);
+                        if (startIdx !== -1) {
+                            let extracted = cleanText.substring(startIdx + contentMarker.length);
+                            extracted = extracted.replace(/"\s*}\s*$/, '').replace(/"$/, ''); 
+                            cleanText = extracted.replace(/\\n/g, '\n').replace(/\\"/g, '"'); 
+                        }
+                    } else {
+                        try {
+                            const outerObj = JSON.parse(text);
+                            if (outerObj.content) cleanText = outerObj.content;
+                            else if (outerObj.choices && outerObj.choices[0].message.content) cleanText = outerObj.choices[0].message.content;
+                        } catch(e) {}
+                    }
+                    
+                    cleanText = cleanText.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+
+                    let jsonStr = cleanText.replace(/```json/gi, '').replace(/```/g, '').trim();
+                    const start = jsonStr.indexOf('{');
+                    const end = jsonStr.lastIndexOf('}');
+                    if(start !== -1 && end !== -1) {
+                        jsonStr = jsonStr.substring(start, end + 1);
+                    }
+                    
+                    const parsedData = JSON.parse(jsonStr);
+                    setChunkedData(parsedData);
+                    setBotMessage("Gotowe! Rozbiłem ten tekst na proste kawałki. Zobacz podgląd po prawej stronie, dyrekcja będzie dumna!");
+                    
+                } catch (error) {
+                    console.error("Błąd AI:", error); 
+                    showToast(`Błąd: ${error.message}`);
+                    setBotMessage("Serwer jest obciążony. Odczekaj chwilę i spróbuj jeszcze raz.");
+                } finally { 
+                    setIsGenerating(false); 
+                }
+            };
+
+            const exportToWord = () => {
+                if(!chunkedData) return;
+                
+                const header = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>Mikro-Lekcja: ${chunkedData.title}</title><style>body {font-family: Arial, sans-serif; font-size: 14pt; line-height: 1.5; color: #1e293b;} h1 {font-size: 22pt; color: #0f766e; text-align: center; text-transform: uppercase; margin-bottom: 30px;} h2 {font-size: 16pt; color: #14b8a6; border-bottom: 2px solid #ccfbf1; padding-bottom: 5px; margin-top: 20px;} .chunk { border: 1px solid #cbd5e1; padding: 20px; margin-bottom: 20px; border-radius: 10px; background-color: #f8fafc;} b {color: #000; font-weight: bold;} .summary { background-color: #ecfdf5; padding: 20px; border-left: 6px solid #10b981; margin-top: 30px; } .quiz { background-color: #fef2f2; padding: 20px; border-left: 6px solid #ef4444; margin-top: 20px; } ul { padding-left: 25px; } li { margin-bottom: 10px; }</style></head><body>`;
+                const footer = `</body></html>`;
+                
+                let wordHtml = `<h1>${chunkedData.title}</h1>`;
+                chunkedData.chunks.forEach(chunk => {
+                    let contentText = chunk.content;
+                    if(params.highlightKeywords) {
+                        chunk.keywords_to_bold.forEach(kw => {
+                            const regex = new RegExp(`\\b${kw}\\b`, 'gi');
+                            contentText = contentText.replace(regex, `<b>$&</b>`);
+                        });
+                    }
+                    wordHtml += `<div class="chunk"><h2>${chunk.icon} ${chunk.heading}</h2><p>${contentText}</p></div>`;
+                });
+                
+                wordHtml += `<div class="summary"><h2>Podsumowanie w pigułce</h2><p>${chunkedData.summary}</p></div>`;
+                if(params.includeQuiz && chunkedData.quiz) {
+                    wordHtml += `<div class="quiz"><h2>Sprawdź się!</h2><ul>`;
+                    chunkedData.quiz.forEach(q => wordHtml += `<li>${q}</li>`);
+                    wordHtml += `</ul></div>`;
+                }
+
+                const blob = new Blob(['\ufeff', header + wordHtml + footer], { type: 'application/msword' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = `MikroLekcja_${chunkedData.title.replace(/\s+/g, '_')}.doc`;
+                link.click();
+            };
+
+            const renderContentWithHighlights = (text, keywords) => {
+                if (!params.highlightKeywords || !keywords || keywords.length === 0) return text;
+                let resultText = text;
+                [...keywords].sort((a,b) => b.length - a.length).forEach(kw => {
+                    const regex = new RegExp(`\\b(${kw})\\b`, 'gi');
+                    resultText = resultText.replace(regex, '<strong>$1</strong>');
+                });
+                return <span dangerouslySetInnerHTML={{ __html: resultText }} />;
+            };
+
+            return (
+                <div className="min-h-screen flex flex-col relative overflow-x-hidden">
+                    
+                    {/* POWIADOMIENIA TOAST */}
+                    {toastMessage && (
+                        <div className={`fixed bottom-10 left-1/2 -translate-x-1/2 z-[200] bg-teal-600 text-white px-6 py-3 rounded-2xl shadow-[0_0_30px_rgba(45,212,191,0.4)] font-bold text-sm animate-toast flex items-center gap-3 border border-teal-400`}>
+                            <Icon name="AlertCircle" size={18} className="text-white" />
+                            {toastMessage}
+                        </div>
+                    )}
+
+                    {/* EKRAN ŁADOWANIA */}
+                    {isGenerating && (
+                        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-[100] flex flex-col items-center justify-center text-white">
+                            <div className={`glass-panel p-10 rounded-3xl flex flex-col items-center space-y-6 max-w-sm border border-teal-500/20 shadow-[0_0_50px_rgba(45,212,191,0.2)]`}>
+                                <div className={`w-16 h-16 border-4 border-slate-700 rounded-full animate-spin border-t-teal-500`}></div>
+                                <div className="text-center">
+                                    <h3 className="text-xl font-bold mb-2 text-white">Upraszczam tekst...</h3>
+                                    <p className="text-xs text-slate-400 font-medium">To potrwa zaledwie kilka sekund.</p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* GÓRNA NAWIGACJA */}
+                    <nav className="fixed top-0 w-full z-50 glass-nav py-4 px-6 print-hidden">
+                        <div className="max-w-7xl mx-auto flex justify-between items-center">
+                            <div className="flex items-center space-x-3 font-extrabold text-xl tracking-tight cursor-pointer" onClick={() => window.scrollTo(0,0)}>
+                                <div className={`bg-gradient-to-br from-teal-500 to-indigo-600 p-2 rounded-xl text-white shadow-lg`}>
+                                    <Icon name="Brain" size={22}/>
+                                </div>
+                                <span>Edu<span className="text-teal-400">Chunk</span> AI</span>
+                            </div>
+                            
+                            <div className="flex items-center space-x-4">
+                                {!isPremium && (
+                                    <div className="hidden md:flex items-center space-x-2 bg-slate-900 p-1.5 rounded-xl border border-slate-700">
+                                        <input value={accessCode} onChange={e => setAccessCode(e.target.value)} placeholder="Kod Premium..." className="p-2 bg-transparent text-sm w-32 outline-none font-medium text-white placeholder-slate-500"/>
+                                        <button onClick={handleVerifyCode} className="p-2 text-white rounded-lg bg-teal-600 hover:bg-teal-500 transition-colors shadow-md"><Icon name="Lock" size={16}/></button>
+                                    </div>
+                                )}
+                                <button onClick={() => window.open('https://buycoffee.to/magiccolor')} className="flex items-center space-x-2 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white px-5 py-2.5 rounded-xl font-bold transition-all active:scale-95 text-sm shadow-md">
+                                    <Icon name="Coffee" size={18} className="text-amber-400"/><span>Postaw Kawę</span>
+                                </button>
+                            </div>
+                        </div>
+                    </nav>
+
+                    {/* GŁÓWNY WIDOK APLIKACJI */}
+                    <div className="max-w-7xl mx-auto px-4 pt-32 pb-24 grid grid-cols-1 lg:grid-cols-12 gap-8 w-full print:block print:p-0 relative z-10">
+                        
+                        {/* PANEL LEWY - KONFIGURACJA */}
+                        <div className="lg:col-span-4 space-y-6 print-hidden">
+                            
+                            <div className="glass-panel p-6 md:p-8 rounded-[2rem] space-y-6">
+                                <div className="flex justify-between items-center border-b border-slate-700/50 pb-4">
+                                    <h2 className={`font-bold text-sm uppercase tracking-widest text-teal-400 flex items-center gap-2`}>
+                                        <Icon name="BookOpen" size={18} /> Tekst Źródłowy
+                                    </h2>
+                                    <button onClick={fillSampleText} className="text-[10px] bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-300 px-3 py-1.5 rounded-lg font-bold transition-colors">
+                                        Wklej Przykładowy
+                                    </button>
+                                </div>
+                                
+                                <div>
+                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">Ściana tekstu (Podręcznik / Wikipedia)</label>
+                                    <textarea 
+                                        value={sourceText} 
+                                        onChange={e => setSourceText(e.target.value)} 
+                                        onFocus={() => setBotMessage("Świetnie! Wklej tutaj ścianę tekstu. Ja wyciągnę z niej to, co najważniejsze i ułożę w piękne akapity.")}
+                                        placeholder="Wklej tutaj długi, trudny tekst do przetworzenia..." 
+                                        className={`w-full p-4 bg-slate-900 border border-slate-700 rounded-xl outline-none text-white text-sm font-medium resize-none focus:border-teal-500 transition-colors placeholder-slate-600 h-48 custom-scrollbar`}
+                                    />
+                                    <div className="text-right mt-1 text-[10px] font-bold text-slate-500">{sourceText.length} znaków</div>
+                                </div>
+                            </div>
+
+                            <div className="glass-panel p-6 md:p-8 rounded-[2rem] space-y-6">
+                                <h2 className={`font-bold text-sm uppercase tracking-widest border-b border-slate-700/50 pb-4 text-indigo-400 flex items-center gap-2`}>
+                                    <Icon name="SplitSquare" size={18} /> Ustawienia Redukcji
+                                </h2>
+
+                                <div className="space-y-5">
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">Poziom edukacyjny</label>
+                                        <select value={params.age} onChange={e => setParams({...params, age: e.target.value})} className={`w-full p-4 bg-slate-900 border border-slate-700 rounded-xl outline-none text-white text-sm font-medium focus:border-indigo-500 transition-colors appearance-none`}>
+                                            <option className="bg-slate-900">Edukacja Wczesnoszkolna (1-3)</option>
+                                            <option className="bg-slate-900">Klasy 4-8 Szkoły Podstawowej</option>
+                                            <option className="bg-slate-900">Szkoła Ponadpodstawowa</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">Wielkość porcji (Chunk Size)</label>
+                                        <select value={params.chunkSize} onChange={e => setParams({...params, chunkSize: e.target.value})} className={`w-full p-4 bg-slate-900 border border-slate-700 rounded-xl outline-none text-white text-sm font-medium focus:border-indigo-500 transition-colors appearance-none`}>
+                                            <option className="bg-slate-900">Bardzo krótkie (max 3 zdania / Fiszki)</option>
+                                            <option className="bg-slate-900">Średnie (Podział na małe akapity)</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <div className="pt-2 space-y-3">
+                                        <label className="flex items-center gap-3 p-4 bg-slate-900/50 border border-slate-700 rounded-xl hover:bg-slate-800 cursor-pointer transition-colors">
+                                            <input type="checkbox" checked={params.highlightKeywords} onChange={e => setParams({...params, highlightKeywords: e.target.checked})} className="w-5 h-5 text-teal-600 rounded border-slate-600 focus:ring-teal-500 bg-slate-800" />
+                                            <div className="flex flex-col">
+                                                <span className="text-sm font-bold text-slate-200">Pogrubiaj słowa kluczowe</span>
+                                                <span className="text-[10px] text-slate-500">Wizualne kotwice ułatwiające skanowanie tekstu.</span>
+                                            </div>
+                                        </label>
+                                        <label className="flex items-center gap-3 p-4 bg-slate-900/50 border border-slate-700 rounded-xl hover:bg-slate-800 cursor-pointer transition-colors">
+                                            <input type="checkbox" checked={params.includeQuiz} onChange={e => setParams({...params, includeQuiz: e.target.checked})} className="w-5 h-5 text-teal-600 rounded border-slate-600 focus:ring-teal-500 bg-slate-800" />
+                                            <div className="flex flex-col">
+                                                <span className="text-sm font-bold text-slate-200">Dodaj quiz sprawdzający</span>
+                                                <span className="text-[10px] text-slate-500">Pytania wspomagające zapamiętywanie.</span>
+                                            </div>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                {!isPremium ? (
+                                    <div className="p-6 rounded-xl border-2 border-dashed border-slate-700 flex flex-col items-center justify-center text-center gap-3 bg-slate-900/50">
+                                        <div className="p-3 bg-slate-800 rounded-full"><Icon name="Lock" size={24} className="text-slate-400"/></div>
+                                        <div>
+                                            <span className="text-sm font-bold text-slate-300 block mb-1">Funkcja zablokowana</span>
+                                            <span className="text-xs text-slate-500">Wpisz kod Premium na górnym pasku.</span>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <button onClick={generateChunks} disabled={isGenerating} className={`w-full bg-gradient-to-r from-teal-500 to-indigo-600 text-white py-4 rounded-xl font-black text-sm tracking-widest shadow-[0_0_20px_rgba(45,212,191,0.3)] flex justify-center items-center gap-2 transition-all active:scale-95 uppercase disabled:opacity-50`}>
+                                        <Icon name="Sparkles" size={20}/> Zmień w Mikro-lekcję
+                                    </button>
+                                )}
+                            </div>
+
+                            {/* AGENT EDU-BOT (POMOCNIK) */}
+                            <div className={`p-5 rounded-3xl shadow-lg border flex items-start gap-4 animate-[reveal_0.3s_ease-out] transition-colors bg-teal-900/20 border-teal-500/30`}>
+                                <BotHelperAvatar />
+                                <div className="flex-1 pt-1">
+                                    <h4 className={`font-black text-xs uppercase tracking-widest mb-1.5 text-teal-400`}>EduBot Skupienie</h4>
+                                    <p className="text-sm font-medium leading-relaxed text-slate-300 bot-bubble" key={botMessage}>{botMessage}</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* PANEL PRAWY - WYNIK (JASNY DOKUMENT LUB TRYB DYSLEKSJI) */}
+                        <div className="lg:col-span-8 flex justify-center items-start overflow-x-auto pb-10 print:block">
+                            
+                            <div className={`w-full max-w-[210mm] min-h-[297mm] p-8 md:p-14 shadow-2xl rounded-[2rem] transition-colors duration-500 ${dyslexiaMode ? 'dyslexia-mode border-2 border-amber-200' : 'bg-white text-slate-900 chunk-content'}`} id="print-container">
+                                
+                                {/* Opcje Podglądu */}
+                                <div className="flex flex-col sm:flex-row justify-between items-center mb-8 pb-6 border-b-2 border-slate-200/50 print-hidden gap-4">
+                                    <div className={`flex items-center gap-4 p-3 rounded-2xl border ${dyslexiaMode ? 'bg-amber-100/50 border-amber-300' : 'bg-slate-100 border-slate-200'}`}>
+                                        <div className={`pl-2 pr-1 text-xs font-bold uppercase tracking-widest flex items-center gap-2 ${dyslexiaMode ? 'text-amber-800' : 'text-slate-600'}`}>
+                                            <Icon name="Eye" size={16} /> Tryb Dysleksji
+                                        </div>
+                                        <label className="relative inline-flex items-center cursor-pointer mr-2">
+                                            <input type="checkbox" className="sr-only peer" checked={dyslexiaMode} onChange={toggleDyslexiaMode} />
+                                            <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
+                                        </label>
+                                    </div>
+                                    
+                                    <div className="flex gap-2 w-full sm:w-auto bg-slate-900/50 p-2 rounded-2xl backdrop-blur-md">
+                                        <button onClick={exportToWord} disabled={!chunkedData} className="flex-1 sm:flex-none bg-teal-600 hover:bg-teal-500 text-white border-none px-6 py-3 rounded-xl font-bold flex justify-center items-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm shadow-[0_0_15px_rgba(45,212,191,0.3)] active:scale-95">
+                                            <Icon name="Download" size={18}/> Word (.docx)
+                                        </button>
+                                        <button onClick={() => window.print()} disabled={!chunkedData} className="flex-1 sm:flex-none bg-slate-700 hover:bg-slate-600 text-white px-6 py-3 rounded-xl font-bold flex justify-center items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm active:scale-95">
+                                            <Icon name="Printer" size={18}/> Drukuj PDF
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {!chunkedData ? (
+                                    <div className={`h-full flex flex-col items-center justify-center text-center space-y-6 pt-24 print-hidden ${dyslexiaMode ? 'opacity-50' : 'opacity-30'}`}>
+                                        <Icon name="SplitSquare" size={80} className={dyslexiaMode ? 'text-amber-500' : 'text-slate-400'} />
+                                        <div>
+                                            <h2 className="text-2xl font-bold mb-2">Tutaj pojawi się Twój przejrzysty materiał</h2>
+                                            <p className={`max-w-md mx-auto font-medium ${dyslexiaMode ? 'text-amber-900' : 'text-slate-600'}`}>Wklej tekst podręcznikowy w panelu po lewej stronie, a AI podzieli go na łatwe do przyswojenia "fiszki" edukacyjne.</p>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-8 animate-[reveal_0.5s_ease-out]">
+                                        <h1 className={`text-3xl md:text-4xl font-extrabold mb-8 tracking-tight text-center ${dyslexiaMode ? 'dyslexia-text' : 'text-teal-900'}`}>
+                                            {chunkedData.title}
+                                        </h1>
+
+                                        <div className="space-y-6">
+                                            {chunkedData.chunks.map((chunk, idx) => (
+                                                <div key={idx} className={`chunk-card p-6 md:p-8 rounded-2xl shadow-sm transition-all ${dyslexiaMode ? 'bg-white border-2 border-amber-300' : 'bg-slate-50 border border-slate-200 hover:border-teal-300 hover:shadow-md'}`}>
+                                                    <div className="flex items-start gap-4">
+                                                        <div className={`text-3xl md:text-4xl flex-shrink-0 p-3 rounded-2xl ${dyslexiaMode ? 'bg-amber-100' : 'bg-teal-100'}`}>
+                                                            {chunk.icon}
+                                                        </div>
+                                                        <div className="flex-1 pt-1">
+                                                            <h2 className={`text-lg md:text-xl font-bold mb-3 ${dyslexiaMode ? 'dyslexia-text' : 'text-slate-800'}`}>
+                                                                {chunk.heading}
+                                                            </h2>
+                                                            <p className={`text-base md:text-lg leading-relaxed ${dyslexiaMode ? 'dyslexia-text' : 'text-slate-700'}`}>
+                                                                {renderContentWithHighlights(chunk.content, chunk.keywords_to_bold)}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-10 print:block print:space-y-6">
+                                            <div className={`p-6 rounded-2xl ${dyslexiaMode ? 'bg-amber-50 border-2 border-amber-300' : 'bg-emerald-50 border border-emerald-200'}`}>
+                                                <h3 className={`text-sm font-black uppercase tracking-widest mb-3 flex items-center gap-2 ${dyslexiaMode ? 'dyslexia-text' : 'text-emerald-800'}`}>
+                                                    <Icon name="Sparkles" size={18}/> Podsumowanie
+                                                </h3>
+                                                <p className={`font-medium leading-relaxed ${dyslexiaMode ? 'dyslexia-text' : 'text-emerald-900'}`}>
+                                                    {chunkedData.summary}
+                                                </p>
+                                            </div>
+
+                                            {params.includeQuiz && chunkedData.quiz && (
+                                                <div className={`p-6 rounded-2xl ${dyslexiaMode ? 'bg-rose-50 border-2 border-rose-300' : 'bg-rose-50 border border-rose-200'}`}>
+                                                    <h3 className={`text-sm font-black uppercase tracking-widest mb-3 flex items-center gap-2 ${dyslexiaMode ? 'dyslexia-text' : 'text-rose-800'}`}>
+                                                        <Icon name="Brain" size={18}/> Sprawdź się!
+                                                    </h3>
+                                                    <ul className="space-y-3">
+                                                        {chunkedData.quiz.map((q, i) => (
+                                                            <li key={i} className={`flex gap-3 leading-relaxed font-medium ${dyslexiaMode ? 'dyslexia-text' : 'text-rose-900'}`}>
+                                                                <span className="font-black text-rose-500">{i+1}.</span> {q}
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>

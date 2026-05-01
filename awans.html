@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="pl" translate="no" class="notranslate">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kreator Awansu AI - EduBox Premium</title>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Merriweather:ital,wght@0,400;0,700;1,400&display=swap');
+        
+        body { background-color: #020617; font-family: 'Plus Jakarta Sans', sans-serif; color: #f8fafc; overflow-x: hidden; }
+        .document-font { font-family: 'Merriweather', serif; }
+        
+        .glass-panel { background: rgba(30, 41, 59, 0.4); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.05); }
+        .glass-nav { background: rgba(2, 6, 23, 0.8); backdrop-filter: blur(20px); border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
+        
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #0f172a; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+
+        input:focus, select:focus, textarea:focus { box-shadow: 0 0 15px rgba(59, 130, 246, 0.3); border-color: #3b82f6 !important; }
+
+        @media print {
+            body { background: white; color: black; }
+            .print-hidden { display: none !important; }
+            #print-container { border: none !important; box-shadow: none !important; padding: 0 !important; margin: 0 !important; width: 100% !important; max-width: 100% !important; background: white !important; }
+            body, html { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+        }
+        
+        @keyframes slide-up { 0% { opacity: 0; transform: translate(-50%, 20px); } 100% { opacity: 1; transform: translate(-50%, 0); } }
+        .animate-toast { animation: slide-up 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        
+        @keyframes pop { 0% { transform: scale(0.9); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+        .bot-bubble { animation: pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+        @keyframes blink { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(0.1); } }
+        .bot-eye { animation: blink 4s infinite; transform-origin: center; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        const Icon = ({ name, size = 20, className = "" }) => {
+            const icons = {
+                Briefcase: <><rect width="20" height="14" x="2" y="7" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></>,
+                FileSignature: <><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><path d="M8 18h8"/><path d="M8 14h8"/><path d="M8 10h2"/></>,
+                Sparkles: <path d="m12 3 1.912 5.813a2 2 0 0 0 1.275 1.275L21 12l-5.813 1.912a2 2 0 0 0-1.275 1.275L12 21l-1.912-5.813a2 2 0 0 0-1.275-1.275L3 12l5.813-1.912a2 2 0 0 0 1.275-1.275L12 3Z"/>,
+                Printer: <path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6z"/>,
+                Download: <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>,
+                Coffee: <path d="M18 8h1a4 4 0 0 1 0 8h-1M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8zM7 2v3M11 2v3M15 2v3"/>,
+                Lock: <><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></>,
+                AlertCircle: <><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></>,
+                UserCheck: <><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><polyline points="16 11 18 13 22 9"/></>
+            };
+            return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>{icons[name]}</svg>;
+        };
+
+        const BotHelperAvatar = () => (
+            <svg viewBox="0 0 100 100" className="w-14 h-14 drop-shadow-md flex-shrink-0" xmlns="http://www.w3.org/2000/svg">
+                <path d="M50 30 V15" stroke="#94a3b8" strokeWidth="4" strokeLinecap="round"/>
+                <circle cx="50" cy="12" r="5" fill="#3b82f6"/>
+                <rect x="25" y="30" width="50" height="40" rx="12" fill="#1e40af"/>
+                <rect x="32" y="38" width="36" height="22" rx="6" fill="#ffffff"/>
+                <circle cx="40" cy="49" r="3.5" fill="#1e40af" className="bot-eye"/>
+                <circle cx="60" cy="49" r="3.5" fill="#1e40af" className="bot-eye"/>
+                <path d="M 45 56 Q 50 60 55 56" stroke="#1e40af" strokeWidth="2.5" fill="none" strokeLinecap="round"/>
+            </svg>
+        );
+
+        function App() {
+            const [isPremium, setIsPremium] = useState(false);
+            const [accessCode, setAccessCode] = useState('');
+            const [isGenerating, setIsGenerating] = useState(false);
+            const [toastMessage, setToastMessage] = useState('');
+            const [botMessage, setBotMessage] = useState("Cześć! Wrzuć mi w formularz swoje chaotyczne notatki. Użyję profesjonalnego żargonu prawnego i pedagogicznego, by zamienić je w elegancki dokument!");
+            
+            const [mode, setMode] = useState('opiekun'); 
+            
+            const [params, setParams] = useState({
+                teacherName: '',
+                role: 'Nauczyciel edukacji wczesnoszkolnej',
+                customRole: '',
+                level: 'Nauczyciel początkujący (na mianowanego)',
+                achievements: '',
+                formatType: 'epic' // Nowa opcja!
+            });
+
+            const [generatedData, setGeneratedData] = useState(null);
+
+            const ROLES = [
+                "Nauczyciel wychowania przedszkolnego",
+                "Nauczyciel edukacji wczesnoszkolnej",
+                "Nauczyciel przedmiotu (szkoła podstawowa/średnia)",
+                "Pedagog szkolny / specjalny",
+                "Psycholog szkolny",
+                "Logopeda",
+                "Fizjoterapeuta / Rehabilitant",
+                "Inne (wpisz własne)"
+            ];
+
+            const showToast = (msg) => { setToastMessage(msg); setTimeout(() => setToastMessage(''), 4000); };
+
+            const handleVerifyCode = () => {
+                if (accessCode.toUpperCase() === 'KAWA2024') { 
+                    setIsPremium(true); setAccessCode(''); 
+                    showToast('Kod aktywny! Witamy w Premium 🌟');
+                    setBotMessage("Premium odblokowane! Możesz teraz wygenerować epicko rozbudowane dokumenty.");
+                } else { showToast('Nieprawidłowy kod dostępu!'); }
+            };
+
+            useEffect(() => {
+                if(mode === 'opiekun') setBotMessage("Tryb Dyrektora/Opiekuna. Dokument zostanie zredagowany w 3-ciej osobie jako formalna 'Ocena Dorobku Zawodowego'.");
+                else setBotMessage("Tryb Nauczyciela. Dokument zostanie zredagowany w 1-szej osobie jako Twoje osobiste 'Sprawozdanie z realizacji planu'.");
+            }, [mode]);
+
+            const generateDocument = async () => {
+                const finalRole = params.role === "Inne (wpisz własne)" ? params.customRole : params.role;
+                if (!finalRole.trim() || !params.achievements.trim()) return showToast('Wypełnij stanowisko i działania/sukcesy!');
+                
+                setIsGenerating(true);
+                setGeneratedData(null);
+                setBotMessage("Analizuję Twoje notatki i dopasowuję odpowiednie paragrafy z Karty Nauczyciela. Chwileczkę...");
+                
+                let lengthInstruction = params.formatType === 'epic' 
+                    ? "Wymagam BARDZO ROZBUDOWANEGO i wyczerpującego dokumentu ('lany tekst'). Rozbuduj każdy podany punkt, używaj wyrafinowanego języka urzędowego, dodaj profesjonalne wnioski i podsumowania. Dokument musi wyglądać na profesjonalnie przygotowany esej."
+                    : "Wymagam ZWIĘZŁEGO dokumentu. Używaj punktatorów i krótkich, konkretnych zdań. Tylko same fakty i profesjonalne podsumowanie.";
+
+                let systemPrompt = "";
+                let userPrompt = "";
+
+                if (mode === 'opiekun') {
+                    systemPrompt = `Jesteś doświadczonym dyrektorem szkoły oraz ekspertem prawa oświatowego w Polsce. 
+ZASADY KRYTYCZNE:
+1. Pisz w 3 osobie liczby pojedynczej o nauczycielu. Ton wybitnie profesjonalny, urzędowy.
+2. ${lengthInstruction}
+3. Dopasuj słownictwo do specyfiki zawodu: ${finalRole}.
+4. Zwróć WYŁĄCZNIE format JSON: { "title": "...", "legal_basis": "...", "document_body": "Używaj tu znaczników <br> oraz <b> do formatowania. Bez formatowania markdown." }`;
+                    userPrompt = `Imię: ${params.teacherName || '[Imię]'}\nStanowisko: ${finalRole}\nStopień: ${params.level}\nDziałania: ${params.achievements}\nNapisz pełną opinię dyrektora/opiekuna.`;
+                } 
+                else if (mode === 'nauczyciel') {
+                    systemPrompt = `Jesteś ekspertem prawa oświatowego piszącym "Sprawozdanie z realizacji planu rozwoju zawodowego" dla nauczyciela.
+ZASADY KRYTYCZNE:
+1. Pisz w 1 osobie liczby pojedynczej ("Zrealizowałem/am"). Ton refleksyjny i urzędowy.
+2. ${lengthInstruction}
+3. Dopasuj działania do stanowiska: ${finalRole}.
+4. Zwróć WYŁĄCZNIE format JSON: { "title": "...", "legal_basis": "...", "document_body": "Używaj tu znaczników <br>, <b>, <ul>, <li> do formatowania. Bez formatowania markdown." }`;
+                    userPrompt = `Imię: ${params.teacherName || '[Imię]'}\nStanowisko: ${finalRole}\nStopień: ${params.level}\nMoje zrealizowane działania: ${params.achievements}\nPrzekształć te notatki w moje urzędowe sprawozdanie.`;
+                }
+
+                try {
+                    const payload = { system: systemPrompt, prompt: userPrompt, temperature: 0.4, format: "json", model: "gpt-4o-mini" };
+                    const res = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                    const data = await res.json();
+                    if (!res.ok) throw new Error(data.details || data.message || "Błąd z serwera");
+                    
+                    let cleanText = data.text;
+                    if (cleanText.includes('"reasoning_content"')) {
+                        const startIdx = cleanText.indexOf('"content":"');
+                        if (startIdx !== -1) {
+                            let extracted = cleanText.substring(startIdx + 11).replace(/"\s*}\s*$/, '').replace(/"$/, ''); 
+                            cleanText = extracted.replace(/\\n/g, '\n').replace(/\\"/g, '"'); 
+                        }
+                    } else {
+                        try { const outerObj = JSON.parse(cleanText); if(outerObj.content) cleanText = outerObj.content; else if (outerObj.choices) cleanText = outerObj.choices[0].message.content; } catch(e){}
+                    }
+                    cleanText = cleanText.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+                    let jsonStr = cleanText.replace(/```json/gi, '').replace(/```/g, '').trim();
+                    if(jsonStr.indexOf('{') !== -1) jsonStr = jsonStr.substring(jsonStr.indexOf('{'), jsonStr.lastIndexOf('}') + 1);
+                    
+                    const parsedData = JSON.parse(jsonStr);
+                    setGeneratedData(parsedData);
+                    setBotMessage("Gotowe! Przejrzyj wygenerowany dokument po prawej stronie. Możesz go wydrukować lub pobrać do edycji w Wordzie.");
+                } catch (error) {
+                    console.error("Błąd AI:", error); showToast(`Błąd: ${error.message}`); setBotMessage("Coś poszło nie tak z połączeniem. Spróbuj ponownie!");
+                } finally { setIsGenerating(false); }
+            };
+
+            const exportToWord = () => {
+                if(!generatedData) return;
+                const content = document.getElementById('document-render-area').innerHTML;
+                const header = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>${generatedData.title}</title><style>body { font-family: 'Times New Roman', serif; font-size: 12pt; line-height: 1.5; color: #000; text-align: justify; } h1 { font-size: 16pt; text-align: center; text-transform: uppercase; margin-bottom: 20px; } .legal { font-size: 10pt; font-style: italic; text-align: center; margin-bottom: 30px; } ul { padding-left: 20px; } li { margin-bottom: 5px; }</style></head><body>`;
+                const footer = `</body></html>`;
+                const blob = new Blob(['\ufeff', header + content + footer], { type: 'application/msword' });
+                const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = `Awans_${mode}_${Date.now()}.doc`; link.click();
+            };
+
+            return (
+                <div className="min-h-screen flex flex-col relative overflow-x-hidden">
+                    {toastMessage && <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[200] bg-blue-600 text-white px-6 py-3 rounded-2xl shadow-[0_0_30px_rgba(37,99,235,0.4)] font-bold text-sm animate-toast flex items-center gap-3 border border-blue-500"><Icon name="AlertCircle" size={18} />{toastMessage}</div>}
+
+                    {isGenerating && (
+                        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-[100] flex flex-col items-center justify-center text-white">
+                            <div className="glass-panel p-10 rounded-3xl flex flex-col items-center space-y-6 max-w-sm border border-blue-500/20">
+                                <div className="w-16 h-16 border-4 border-slate-700 border-t-blue-500 rounded-full animate-spin"></div>
+                                <div className="text-center"><h3 className="text-xl font-bold mb-2 text-white">Analizuję przepisy MEN...</h3><p className="text-xs text-slate-400 font-medium">Pisanie urzędowego dokumentu (ok. 15 sek).</p></div>
+                            </div>
+                        </div>
+                    )}
+
+                    <nav className="fixed top-0 w-full z-50 glass-nav py-4 px-6 print-hidden">
+                        <div className="max-w-7xl mx-auto flex justify-between items-center">
+                            <div className="flex items-center space-x-3 font-extrabold text-xl tracking-tight cursor-pointer" onClick={() => window.scrollTo(0,0)}>
+                                <div className="bg-gradient-to-br from-blue-600 to-indigo-600 p-2 rounded-xl text-white shadow-[0_0_15px_rgba(37,99,235,0.5)]"><Icon name="Briefcase" size={22}/></div>
+                                <span>Kreator<span className="text-blue-500">Awansu</span></span>
+                            </div>
+                            <div className="flex items-center space-x-4">
+                                {!isPremium && (
+                                    <div className="hidden md:flex items-center space-x-2 bg-slate-900 p-1.5 rounded-xl border border-slate-700">
+                                        <input value={accessCode} onChange={e => setAccessCode(e.target.value)} placeholder="Kod Premium..." className="p-2 bg-transparent text-sm w-32 outline-none font-medium text-white placeholder-slate-500"/>
+                                        <button onClick={handleVerifyCode} className="p-2 text-white rounded-lg bg-blue-600 hover:bg-blue-500 transition-colors shadow-md"><Icon name="Lock" size={16}/></button>
+                                    </div>
+                                )}
+                                <button onClick={() => window.open('https://buycoffee.to/magiccolor')} className="flex items-center space-x-2 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white px-5 py-2.5 rounded-xl font-bold transition-all active:scale-95 text-sm shadow-md">
+                                    <Icon name="Coffee" size={18} className="text-amber-400"/><span>Postaw Kawę</span>
+                                </button>
+                            </div>
+                        </div>
+                    </nav>
+
+                    <div className="max-w-7xl mx-auto px-4 pt-32 pb-24 grid grid-cols-1 lg:grid-cols-12 gap-8 w-full print:block print:p-0 relative z-10">
+                        <div className="lg:col-span-4 space-y-6 print-hidden">
+                            <div className="glass-panel p-2 rounded-2xl flex gap-2">
+                                <button onClick={() => {setMode('opiekun'); setGeneratedData(null);}} className={`flex-1 py-4 px-2 rounded-xl flex flex-col items-center justify-center font-bold text-[10px] uppercase tracking-widest transition-all duration-300 ${mode === 'opiekun' ? 'bg-blue-600 text-white shadow-[0_0_20px_rgba(37,99,235,0.3)] border border-blue-500' : 'text-slate-400 hover:bg-slate-800'}`}>
+                                    <Icon name="FileSignature" size={24} className="mb-2 text-blue-300" /> Piszę Opinię <span className="text-[8px] font-normal opacity-70 mt-1">(Dyrektor)</span>
+                                </button>
+                                <button onClick={() => {setMode('nauczyciel'); setGeneratedData(null);}} className={`flex-1 py-4 px-2 rounded-xl flex flex-col items-center justify-center font-bold text-[10px] uppercase tracking-widest transition-all duration-300 ${mode === 'nauczyciel' ? 'bg-indigo-600 text-white shadow-[0_0_20px_rgba(79,70,229,0.3)] border border-indigo-500' : 'text-slate-400 hover:bg-slate-800'}`}>
+                                    <Icon name="UserCheck" size={24} className="mb-2 text-indigo-300" /> Sprawozdanie <span className="text-[8px] font-normal opacity-70 mt-1">(Nauczyciel)</span>
+                                </button>
+                            </div>
+
+                            <div className="glass-panel p-6 md:p-8 rounded-[2rem] space-y-6">
+                                <h2 className="font-bold text-sm uppercase tracking-widest border-b border-slate-700/50 pb-4 text-slate-300 flex items-center gap-2"><Icon name="Briefcase" size={18} className="text-blue-500" /> Formularz Awansu</h2>
+                                
+                                <div>
+                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">Stanowisko / Specjalizacja</label>
+                                    <select value={params.role} onChange={e => setParams({...params, role: e.target.value})} className="w-full p-4 bg-slate-900 border border-slate-700 rounded-xl outline-none text-white text-sm font-medium focus:border-blue-500 mb-3 transition-colors appearance-none">
+                                        {ROLES.map(r => <option key={r} value={r} className="bg-slate-900">{r}</option>)}
+                                    </select>
+                                    {params.role === "Inne (wpisz własne)" && <input type="text" value={params.customRole} onChange={e => setParams({...params, customRole: e.target.value})} placeholder="np. Nauczyciel bibliotekarz..." className="w-full p-4 bg-slate-800 border border-blue-500/50 rounded-xl outline-none text-white text-sm focus:border-blue-500 transition-colors" />}
+                                </div>
+
+                                <div>
+                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">Cel Awansu</label>
+                                    <select value={params.level} onChange={e => setParams({...params, level: e.target.value})} className="w-full p-4 bg-slate-900 border border-slate-700 rounded-xl outline-none text-white text-sm font-medium focus:border-blue-500 transition-colors appearance-none">
+                                        <option value="Nauczyciel początkujący (na mianowanego)" className="bg-slate-900">Na nauczyciela mianowanego</option>
+                                        <option value="Nauczyciel mianowany (na dyplomowanego)" className="bg-slate-900">Na nauczyciela dyplomowanego</option>
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">Działania (Luźne notatki)</label>
+                                    <textarea value={params.achievements} onChange={e => setParams({...params, achievements: e.target.value})} placeholder="np. kółko szachowe, gazetki, pomoc w poradni, kursy..." className="w-full p-4 bg-slate-900 border border-slate-700 rounded-xl outline-none text-white font-medium text-sm resize-none focus:border-blue-500 transition-colors custom-scrollbar placeholder-slate-600" rows="5"/>
+                                </div>
+
+                                <div className="bg-blue-900/20 p-4 rounded-xl border border-blue-500/30">
+                                    <label className="text-[10px] font-black text-blue-400 uppercase tracking-widest block mb-3">Długość dokumentu</label>
+                                    <div className="flex flex-col gap-2">
+                                        <label className="flex items-center gap-3 cursor-pointer group">
+                                            <input type="radio" name="format" value="epic" checked={params.formatType === 'epic'} onChange={() => setParams({...params, formatType: 'epic'})} className="w-4 h-4 text-blue-600 bg-slate-900 border-slate-600 focus:ring-blue-500" />
+                                            <span className="text-sm font-bold text-slate-300 group-hover:text-white transition-colors">Epicko rozbudowany (Lany tekst)</span>
+                                        </label>
+                                        <label className="flex items-center gap-3 cursor-pointer group">
+                                            <input type="radio" name="format" value="short" checked={params.formatType === 'short'} onChange={() => setParams({...params, formatType: 'short'})} className="w-4 h-4 text-blue-600 bg-slate-900 border-slate-600 focus:ring-blue-500" />
+                                            <span className="text-sm font-bold text-slate-300 group-hover:text-white transition-colors">Zwięzły (Krótkie punkty)</span>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                {!isPremium ? (
+                                    <div className="p-6 rounded-xl border-2 border-dashed border-slate-700 flex flex-col items-center justify-center text-center gap-3 bg-slate-900/50">
+                                        <div className="p-3 bg-slate-800 rounded-full"><Icon name="Lock" size={24} className="text-slate-400"/></div>
+                                        <div><span className="text-sm font-bold text-slate-300 block mb-1">Funkcja zablokowana</span><span className="text-xs text-slate-500">Wpisz kod Premium na górnym pasku.</span></div>
+                                    </div>
+                                ) : (
+                                    <button onClick={generateDocument} className="w-full bg-blue-600 hover:bg-blue-500 text-white py-4 rounded-xl font-black text-sm tracking-widest shadow-[0_0_20px_rgba(37,99,235,0.3)] flex justify-center items-center gap-2 transition-all active:scale-95 uppercase">
+                                        <Icon name="Sparkles" size={20}/> Zredaguj Dokument
+                                    </button>
+                                )}
+                            </div>
+
+                            <div className="p-5 rounded-3xl shadow-lg border flex items-start gap-4 animate-[reveal_0.3s_ease-out] transition-colors bg-blue-900/20 border-blue-500/30">
+                                <BotHelperAvatar />
+                                <div className="flex-1 pt-1">
+                                    <h4 className="font-black text-xs uppercase tracking-widest mb-1.5 text-blue-400">EduBot Urzędnik</h4>
+                                    <p className="text-sm font-medium leading-relaxed text-slate-300 bot-bubble" key={botMessage}>{botMessage}</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="lg:col-span-8 flex justify-center items-start overflow-x-auto pb-10 print:block">
+                            {!generatedData ? (
+                                <div className="glass-panel w-full max-w-[210mm] min-h-[297mm] shadow-2xl p-8 rounded-[2rem] flex flex-col items-center justify-center text-center space-y-6 print-hidden border-2 border-dashed border-slate-700">
+                                    <div className="p-6 bg-slate-800/50 rounded-full border border-slate-700 shadow-inner"><Icon name="FileSignature" size={64} className="text-slate-500" /></div>
+                                    <div>
+                                        <h2 className="text-2xl font-bold mb-3 text-white">Twój dokument pojawi się tutaj</h2>
+                                        <p className="max-w-md mx-auto text-slate-400 leading-relaxed text-sm">Wypełnij formularz po lewej stronie, a zredaguję z Twoich luźnych notatek poprawny dokument urzędowy.</p>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="w-full max-w-[210mm] animate-[reveal_0.5s_ease-out] print:max-w-full">
+                                    <div className="flex justify-end gap-3 mb-6 print-hidden bg-slate-900/50 p-2 rounded-2xl border border-slate-800 backdrop-blur-md">
+                                        <button onClick={exportToWord} className="flex-1 sm:flex-none bg-blue-600 hover:bg-blue-500 text-white px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all text-sm shadow-[0_0_15px_rgba(37,99,235,0.3)] active:scale-95"><Icon name="Download" size={18}/> Word (.docx)</button>
+                                        <button onClick={() => window.print()} className="flex-1 sm:flex-none bg-slate-700 hover:bg-slate-600 text-white px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all text-sm active:scale-95"><Icon name="Printer" size={18}/> Drukuj PDF</button>
+                                    </div>
+                                    <div className="bg-white shadow-[0_20px_50px_rgba(0,0,0,0.5)] p-12 md:p-20 text-slate-900 document-font text-justify rounded-sm min-h-[297mm]" id="print-container">
+                                        <div id="document-render-area">
+                                            <h1 className="text-xl font-bold text-center uppercase mb-6 tracking-wide leading-tight text-black">{generatedData.title}</h1>
+                                            {generatedData.legal_basis && <p className="text-sm italic text-center mb-10 text-slate-700 px-8">{generatedData.legal_basis}</p>}
+                                            <div className="text-base leading-relaxed space-y-4 text-black" dangerouslySetInnerHTML={{ __html: generatedData.document_body }} />
+                                            <div className="mt-24 flex justify-between px-8 print:px-0 text-black">
+                                                <div className="border-t border-slate-400 w-48 text-center pt-2 text-sm">Miejscowość, data</div>
+                                                <div className="border-t border-slate-400 w-48 text-center pt-2 text-sm">Podpis i pieczęć</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+        const root = ReactDOM.createRoot(document.getElementById('root')); root.render(<App />);
+    </script>
+</body>
+</html>
