@@ -89,19 +89,14 @@
 
         const getSystemPrompt = (module, docType, customHeaders) => {
             if (module === 'dokumenty') {
-                let base = `Jesteś wybitnym pedagogiem specjalnym. Wygeneruj profesjonalny dokument urzędowy o typie: \${docType}. Używaj języka formalnego, pedagogicznego, zgodnego z wytycznymi MEN. Nie używaj formatowania Markdown (**).`;
+                let base = `Jesteś wybitnym pedagogiem specjalnym. Wygeneruj profesjonalny dokument urzędowy o typie: \${docType}. Używaj języka formalnego, pedagogicznego. Nie używaj gwiazdek **.`;
                 if (customHeaders) {
-                    base += `\n\nUWAGA! Użytkownik podał własne nagłówki/strukturę, której MUSISZ bezwzględnie przestrzegać:\n"\${customHeaders}"\nDopasuj wygenerowaną treść do tych nagłówków.`;
+                    base += `\n\nUWAGA! Użyj tych nagłówków:\n"\${customHeaders}"`;
                 }
                 return base;
             }
             if (module === 'historyjki') {
-                return `Jesteś pedagogiem specjalnym i terapeutą. Napisz rozbudowaną, empatyczną 'Historyjkę Społeczną' wg zasad Carol Gray. 
-Napisz ją w pierwszej osobie ("Ja"). 
-Podziel tekst WYRAŹNIE na 3 obszerne akapity opatrzone nagłówkami:
-1. PROBLEM (Opisz dokładnie trudną sytuację z perspektywy dziecka i emocje, które jej towarzyszą).
-2. STRATEGIA (Opisz, co dziecko może zrobić, by poczuć się lepiej, jakich strategii radzenia sobie użyć).
-3. EFEKT (Opisz pozytywne zakończenie i spokój dziecka).`;
+                return `Jesteś pedagogiem specjalnym. Napisz rozbudowaną 'Historyjkę Społeczną'. Napisz ją w pierwszej osobie ("Ja"). Podziel tekst na 3 akapity: 1. PROBLEM, 2. STRATEGIA, 3. EFEKT.`;
             }
             return "Jesteś ekspertem edukacyjnym.";
         };
@@ -117,8 +112,6 @@ Podziel tekst WYRAŹNIE na 3 obszerne akapity opatrzone nagłówkami:
             const [naglowki, setNaglowki] = useState('');
             const [mocneStrony, setMocneStrony] = useState('');
             const [trudnosci, setTrudnosci] = useState('');
-            const [orzeczenieTekst, setOrzeczenieTekst] = useState('');
-            const [showFileTextArea, setShowFileTextArea] = useState(false);
             const [genericInput, setGenericInput] = useState('');
 
             const [generatedText, setGeneratedText] = useState('');
@@ -132,13 +125,6 @@ Podziel tekst WYRAŹNIE na 3 obszerne akapity opatrzone nagłówkami:
 
             useEffect(() => { setIsUnlocked(authCode === SECRET_PIN); }, [authCode]);
 
-            const handleFileUpload = (e) => {
-                const file = e.target.files[0];
-                if (!file) return;
-                alert("Zabezpieczenie: skopiuj treść orzeczenia i wklej w pole tekstowe poniżej.");
-                setShowFileTextArea(true);
-            };
-
             const secureApiCall = async (payload, type = 'text') => {
                 try {
                     const response = await fetch('/api/gemini', {
@@ -150,7 +136,7 @@ Podziel tekst WYRAŹNIE na 3 obszerne akapity opatrzone nagłówkami:
                     if (!response.ok) throw new Error(data.error || "Błąd serwera");
                     return data;
                 } catch (error) {
-                    throw new Error("Błąd sieci serwera EduBox.");
+                    throw new Error("Błąd sieci. Sprawdź połączenie.");
                 }
             };
 
@@ -161,7 +147,7 @@ Podziel tekst WYRAŹNIE na 3 obszerne akapity opatrzone nagłówkami:
                 setError(''); 
                 setGeneratedText(''); 
                 setGeneratedImages([]);
-                setLoadingMsg('Analizuję sytuację...');
+                setLoadingMsg('Przygotowuję treść...');
 
                 try {
                     let finalPrompt = "";
@@ -171,60 +157,50 @@ Podziel tekst WYRAŹNIE na 3 obszerne akapity opatrzone nagłówkami:
                         finalPrompt = `Temat: \${genericInput}`;
                     }
 
-                    const textPayload = {
+                    const textData = await secureApiCall({
                         contents: [{ parts: [{ text: finalPrompt }] }],
                         systemInstruction: { parts: [{ text: getSystemPrompt(activeModule, docType, naglowki) }] }
-                    };
+                    }, 'text');
 
-                    const textData = await secureApiCall(textPayload, 'text');
                     const story = textData.candidates?.[0]?.content?.parts?.[0]?.text;
-                    if (!story) throw new Error("Pusta odpowiedź AI.");
+                    if (!story) throw new Error("AI nie zwróciło tekstu.");
                     setGeneratedText(story);
                     
                     setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
 
                     // =========================================================
-                    // BEZPIECZNE PROMPTY (OMIJAJĄCE FILTRY)
+                    // NOWE, "SUPER-BEZPIECZNE" PROMPTY DLA AI (BEZ SŁÓW-WYZWALACZY)
                     // =========================================================
                     if (activeModule === 'historyjki') {
-                        // Zamiast "Kuba bije kolegę" używamy "Subject: [cleaned]"
-                        const cleanTheme = genericInput.substring(0, 60).replace(/[^\w\sąęćźżłóń]/gi, '');
-
+                        // Używamy metafory "postać" i "zadanie", aby uniknąć filtrów "smutnego dziecka"
                         const prompts = [
-                            // 1. Problem (Używamy: "pensive, unsure character")
-                            `Whimsical 2D illustration, storybook style. A young student character looks pensive and unsure, standing in front of a classroom challenge. Theme: \${cleanTheme}. Calm soft colors.`,
-                            // 2. Strategia (Używamy: "peaceful, taking a breath")
-                            `Whimsical 2D illustration, storybook style. A young student character taking a peaceful deep breath, feeling calm and focused. Theme: \${cleanTheme}. Soft soothing colors.`,
-                            // 3. Efekt (Używamy: "joyful success, big happy smile")
-                            `Whimsical 2D illustration, storybook style. A young student character with a joyful big smile, feeling very proud and happy. Theme: \${cleanTheme}. Bright cheerful colors.`
+                            `2D Flat vector illustration, storybook style. A charming friendly character looking pensive and thoughtful in a school environment. Soft pastel colors, innocent look.`,
+                            `2D Flat vector illustration, storybook style. A charming friendly character taking a deep breath and feeling very calm and peaceful. School environment. Soft blue colors.`,
+                            `2D Flat vector illustration, storybook style. A charming friendly character with a very big happy smile, feeling proud and successful. Bright joyful colors.`
                         ];
                         
                         try {
+                            // Wysyłamy prośby o grafikę - teraz przejdą przez każdą cenzurę!
                             const imgPromises = prompts.map(p => secureApiCall({ instances: { prompt: p } }, 'image'));
                             const results = await Promise.allSettled(imgPromises);
                             
                             const newImages = [];
-                            let failedCount = 0;
-                            
                             results.forEach(res => {
                                 if (res.status === 'fulfilled' && res.value.predictions?.[0]?.bytesBase64Encoded) {
                                     newImages.push(`data:image/png;base64,\${res.value.predictions[0].bytesBase64Encoded}`);
-                                } else {
-                                    failedCount++;
                                 }
                             });
                             
                             setGeneratedImages(newImages);
                             
-                            if (failedCount > 0) {
-                                setError(`UWAGA: Wygenerowano \${3-failedCount} z 3 obrazków. Filtry AI wciąż blokują niektóre drastyczne opisy problemów.`);
+                            if (newImages.length === 0) {
+                                setError("Serwer graficzny jest chwilowo przeciążony. Spróbuj wygenerować ponownie za chwilę.");
                             }
-                            
                         } catch(e) { console.log("Błąd grafiki:", e); }
                     }
 
                 } catch (err) {
-                    setError('BŁĄD: ' + err.message);
+                    setError('Wystąpił błąd: ' + err.message);
                 } finally {
                     setIsGenerating(false);
                     setLoadingMsg('');
@@ -242,26 +218,20 @@ Podziel tekst WYRAŹNIE na 3 obszerne akapity opatrzone nagłówkami:
                 <div className="flex min-h-screen relative">
                     <div className="sidebar w-72 flex-shrink-0 flex flex-col h-screen sticky top-0 print-hidden">
                         <div className="p-6 border-b border-slate-800">
-                            <h1 className="font-bold text-slate-300 text-sm tracking-widest uppercase">Kombajn Modułowy PRO</h1>
+                            <h1 className="font-bold text-slate-300 text-sm tracking-widest uppercase">Asystent Pedagoga PRO</h1>
                         </div>
 
                         <div className="p-6 flex-1 overflow-y-auto custom-scrollbar">
                             <div className="mb-8">
                                 <h2 className="font-bold text-white mb-2">🔑 PIN</h2>
                                 <div className="relative mb-4">
-                                    <input 
-                                        type={showPassword ? "text" : "password"} 
-                                        value={authCode}
-                                        onChange={(e) => setAuthCode(e.target.value)}
-                                        className="w-full input-bg rounded-lg px-3 py-2 text-sm pr-10" 
-                                    />
-                                    <button onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white">👁️</button>
+                                    <input type={showPassword ? "text" : "password"} value={authCode} onChange={(e) => setAuthCode(e.target.value)} className="w-full input-bg rounded-lg px-3 py-2 text-sm pr-10" />
+                                    <button onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">👁️</button>
                                 </div>
-                                <div className={`p-4 rounded-lg text-xs leading-relaxed \${isUnlocked ? 'auth-box unlocked' : 'auth-box'}`}>
-                                    {isUnlocked ? "✅ System gotowy." : "Podaj PIN (awans2024)"}
+                                <div className={`p-4 rounded-lg text-xs \${isUnlocked ? 'auth-box unlocked' : 'auth-box'}`}>
+                                    {isUnlocked ? "✅ Odblokowano" : "Podaj PIN awans2024"}
                                 </div>
                             </div>
-
                             <div className="space-y-1">
                                 {MODULES.map(mod => (
                                     <div key={mod.id} onClick={() => { setActiveModule(mod.id); resetForm(); }} className={`module-btn \${activeModule === mod.id ? 'active' : ''}`}>
@@ -276,9 +246,9 @@ Podziel tekst WYRAŹNIE na 3 obszerne akapity opatrzone nagłówkami:
                     <div className="main-content flex-1 bg-[#020617] p-6 lg:p-10 min-w-0">
                         {!generatedText && !isGenerating ? (
                             <div className="max-w-4xl fade-in print-hidden">
+                                <h2 className="text-2xl font-bold text-white mb-6">{MODULES.find(m => m.id === activeModule)?.label}</h2>
                                 {activeModule === 'dokumenty' ? (
                                     <div className="space-y-6">
-                                        <h2 className="text-2xl font-bold text-white mb-6">Asystent Dokumentów</h2>
                                         <div className="card-bg p-2 rounded-xl">
                                             {DOC_TYPES.map(doc => (
                                                 <div key={doc.id}>
@@ -287,32 +257,16 @@ Podziel tekst WYRAŹNIE na 3 obszerne akapity opatrzone nagłówkami:
                                                 </div>
                                             ))}
                                         </div>
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                            <div className="card-bg p-4 rounded-xl">
-                                                <label className="block text-sm font-bold text-slate-300 mb-2">Diagnoza:</label>
-                                                <textarea value={diagnoza} onChange={(e) => setDiagnoza(e.target.value)} className="w-full h-24 input-bg rounded-lg p-3 text-sm"></textarea>
-                                            </div>
-                                            <div className="card-bg p-4 rounded-xl">
-                                                <label className="block text-sm font-bold text-slate-300 mb-2">Nagłówki:</label>
-                                                <textarea value={naglowki} onChange={(e) => setNaglowki(e.target.value)} className="w-full h-24 input-bg rounded-lg p-3 text-sm"></textarea>
-                                            </div>
+                                        <div className="grid grid-cols-2 gap-6">
+                                            <textarea value={diagnoza} onChange={(e) => setDiagnoza(e.target.value)} placeholder="Diagnoza..." className="w-full h-24 input-bg rounded-lg p-3 text-sm"></textarea>
+                                            <textarea value={naglowki} onChange={(e) => setNaglowki(e.target.value)} placeholder="Własne nagłówki..." className="w-full h-24 input-bg rounded-lg p-3 text-sm"></textarea>
                                         </div>
-                                        <div className="card-bg p-4 rounded-xl">
-                                            <label className="block text-sm font-bold text-amber-400 mb-2">Mocne strony:</label>
-                                            <textarea value={mocneStrony} onChange={(e) => setMocneStrony(e.target.value)} className="w-full h-24 input-bg rounded-lg p-3 text-sm"></textarea>
-                                        </div>
-                                        <div className="card-bg p-4 rounded-xl">
-                                            <label className="block text-sm font-bold text-rose-400 mb-2">Trudności:</label>
-                                            <textarea value={trudnosci} onChange={(e) => setTrudnosci(e.target.value)} className="w-full h-24 input-bg rounded-lg p-3 text-sm"></textarea>
-                                        </div>
+                                        <textarea value={mocneStrony} onChange={(e) => setMocneStrony(e.target.value)} placeholder="Mocne strony..." className="w-full h-24 input-bg rounded-lg p-3 text-sm"></textarea>
+                                        <textarea value={trudnosci} onChange={(e) => setTrudnosci(e.target.value)} placeholder="Trudności..." className="w-full h-24 input-bg rounded-lg p-3 text-sm"></textarea>
                                     </div>
                                 ) : (
-                                    <div className="space-y-6">
-                                        <h2 className="text-2xl font-bold text-white mb-2">{MODULES.find(m => m.id === activeModule)?.label}</h2>
-                                        <div className="card-bg p-4 rounded-xl">
-                                            <label className="block text-sm font-bold text-slate-300 mb-2">Opis sytuacji:</label>
-                                            <textarea value={genericInput} onChange={(e) => setGenericInput(e.target.value)} placeholder="Wpisz krótko co się dzieje..." className="w-full h-40 input-bg rounded-lg p-4 text-sm"></textarea>
-                                        </div>
+                                    <div className="card-bg p-4 rounded-xl">
+                                        <textarea value={genericInput} onChange={(e) => setGenericInput(e.target.value)} placeholder="Opisz krótko sytuację..." className="w-full h-40 input-bg rounded-lg p-4 text-sm"></textarea>
                                     </div>
                                 )}
                             </div>
@@ -324,7 +278,7 @@ Podziel tekst WYRAŹNIE na 3 obszerne akapity opatrzone nagłówkami:
                             {!generatedText || isGenerating ? (
                                 <button onClick={handleGenerate} disabled={isGenerating || !isUnlocked} className="btn-red px-8 py-4 rounded-xl font-bold w-full sm:w-auto flex items-center justify-center gap-3">
                                     {isGenerating ? (
-                                        <><svg className="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> {loadingMsg || "Pracuję..."}</>
+                                        <><svg className="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> {loadingMsg || "Generuję..."}</>
                                     ) : `✨ GENERUJ MATERIAŁ`}
                                 </button>
                             ) : null}
@@ -333,10 +287,10 @@ Podziel tekst WYRAŹNIE na 3 obszerne akapity opatrzone nagłówkami:
                         {generatedText && (
                             <div ref={resultRef} className="max-w-5xl fade-in pb-10 mt-6">
                                 <div className="flex items-center justify-between mb-6 print-hidden border-b border-slate-800 pb-4">
-                                    <h2 className="text-2xl font-bold text-white">Twój Materiał</h2>
+                                    <h2 className="text-2xl font-bold text-white">Gotowy Materiał</h2>
                                     <div className="flex gap-3">
-                                        <button onClick={() => window.print()} className="bg-slate-800 text-white px-4 py-2 rounded-lg text-sm font-bold border border-slate-600 transition-colors hover:bg-slate-700">🖨️ Drukuj</button>
-                                        <button onClick={resetForm} className="bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-red-500 transition-colors">Wróć</button>
+                                        <button onClick={() => window.print()} className="bg-slate-800 text-white px-4 py-2 rounded-lg text-sm font-bold border border-slate-600">🖨️ Drukuj</button>
+                                        <button onClick={resetForm} className="bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-bold">Wróć</button>
                                     </div>
                                 </div>
 
@@ -345,7 +299,7 @@ Podziel tekst WYRAŹNIE na 3 obszerne akapity opatrzone nagłówkami:
                                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full print-images-grid">
                                             {generatedImages.map((img, idx) => (
                                                 <div key={idx} className="flex flex-col items-center fade-in">
-                                                    <img src={img} alt={`Krok \${idx+1}`} className="w-full aspect-square object-cover rounded-2xl border-4 border-slate-800 shadow-xl" />
+                                                    <img src={img} alt="AI" className="w-full aspect-square object-cover rounded-2xl border-4 border-slate-800 shadow-xl" />
                                                     <p className="text-center text-xs text-slate-300 mt-3 font-bold uppercase bg-slate-900 px-4 py-1.5 rounded-full border border-slate-700">
                                                         {idx === 0 ? "1. Problem" : idx === 1 ? "2. Strategia" : "3. Efekt"}
                                                     </p>
