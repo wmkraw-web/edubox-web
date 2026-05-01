@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="pl" translate="no" class="notranslate">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google" content="notranslate">
+    <title>Asystent Pedagoga - Kombajn Modułowy v5.0</title>
+    <!-- Biblioteki -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background-color: #020617; 
+            color: #f8fafc; 
+            overflow-x: hidden;
+            margin: 0;
+            padding: 0;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+        .fade-in { animation: fadeIn 0.3s ease-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Komponenty UI ze screena */
+        .sidebar { background-color: #0f172a; border-right: 1px solid #1e293b; }
+        .card-bg { background-color: #0b1120; border: 1px solid #1e293b; }
+        .input-bg { background-color: #1e293b; border: 1px solid #334155; color: #f8fafc; }
+        .input-bg:focus { border-color: #ef4444; outline: none; }
+        
+        .btn-red { background: linear-gradient(135deg, #e11d48 0%, #be123c 100%); color: white; }
+        .btn-red:hover { background: linear-gradient(135deg, #f43f5e 0%, #e11d48 100%); }
+        .btn-red:disabled { background: #475569; cursor: not-allowed; color: #94a3b8; }
+
+        .auth-box { background-color: #27272a; border: 1px solid #3f3f46; color: #d4d4d8; }
+        .auth-box.unlocked { background-color: rgba(22, 101, 52, 0.2); border-color: #166534; color: #86efac; }
+
+        .module-btn { display: flex; items-center; gap: 0.75rem; padding: 0.75rem 1rem; border-radius: 0.5rem; transition: all 0.2s; color: #cbd5e1; font-weight: 500; font-size: 0.875rem; cursor: pointer; }
+        .module-btn:hover { background-color: #1e293b; color: #f8fafc; }
+        .module-btn.active { background-color: #1e293b; color: #f8fafc; border-left: 3px solid #ef4444; }
+
+        .doc-radio { display: none; }
+        .doc-label { display: block; padding: 0.75rem 1rem; background-color: #0b1120; border: 1px solid #1e293b; border-radius: 0.5rem; cursor: pointer; font-size: 0.875rem; transition: all 0.2s; margin-bottom: 0.5rem; }
+        .doc-radio:checked + .doc-label { background-color: rgba(225, 29, 72, 0.1); border-color: #e11d48; color: #fff; font-weight: 600; }
+        
+        .upload-box { border: 2px dashed #334155; border-radius: 0.75rem; padding: 1.5rem; text-align: center; cursor: pointer; transition: all 0.2s; background: #0f172a; }
+        .upload-box:hover { border-color: #ef4444; background: rgba(225, 29, 72, 0.05); }
+
+        @media print {
+            body { background-color: white !important; color: black !important; }
+            .print-hidden, .sidebar { display: none !important; }
+            .main-content { margin-left: 0 !important; width: 100% !important; padding: 0 !important; }
+            .card-bg { border: none !important; box-shadow: none !important; background: transparent !important; }
+            .print-area { font-family: 'Times New Roman', serif; font-size: 12pt; line-height: 1.5; color: black !important; white-space: pre-wrap; }
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useRef, useEffect } = React;
+
+        // ==========================================
+        // KONFIGURACJA 
+        // ==========================================
+        const GLOBAL_API_KEY = ""; // Zostaw puste dla Vercela
+        const SECRET_PIN = "awans2024"; // Twój kod autoryzacji
+        const BUY_COFFEE_LINK = "https://buycoffee.to/magiccolor";
+
+        const DOC_TYPES = [
+            { id: 'ipet', label: 'IPET (Indywidualny Program Edukacyjno-Terapeutyczny)' },
+            { id: 'wopfu', label: 'WOPFU (Wielospecjalistyczna Ocena Poziomu Funkcjonowania Ucznia)' },
+            { id: 'opinia', label: 'Opinia o uczniu do Poradni (PPP)' },
+            { id: 'notatka', label: 'Arkusz Obserwacji / Notatka służbowa' },
+            { id: 'inny', label: 'Indywidualny Plan Wsparcia (Inny)' }
+        ];
+
+        const MODULES = [
+            { id: 'dokumenty', label: 'Asystent Dokumentów (IPET/WOPFU)', icon: '📄' },
+            { id: 'historyjki', label: 'Historyjki Społeczne (+ Grafiki AI)', icon: '🧩' },
+            { id: 'rymowanki', label: 'Rymowanki Przedszkolne', icon: '🎈' },
+            { id: 'tus', label: 'Kreator TUS', icon: '🫂' },
+            { id: 'rodzice', label: 'Komunikacja z Rodzicem', icon: '🤝' }
+        ];
+
+        // --- SYSTEMY PROMPTÓW ---
+        const getSystemPrompt = (module, docType, customHeaders) => {
+            if (module === 'dokumenty') {
+                let base = `Jesteś wybitnym pedagogiem specjalnym. Wygeneruj profesjonalny dokument urzędowy o typie: ${docType}. 
+Używaj języka formalnego, pedagogicznego, zgodnego z wytycznymi MEN. Nie używaj znaków **.`;
+                if (customHeaders) {
+                    base += `\n\nUWAGA! Użytkownik podał własne nagłówki/strukturę, której MUSISZ bezwzględnie przestrzegać:\n"${customHeaders}"\nDopasuj wygenerowaną treść do tych nagłówków.`;
+                } else {
+                    if (docType === 'ipet') base += `\nStruktura domyślna: 1. Cele, 2. Metody pracy, 3. Dostosowania wymagań, 4. Działania wspierające.`;
+                    if (docType === 'wopfu') base += `\nStruktura domyślna: 1. Poziom funkcjonowania, 2. Trudności i bariery, 3. Potencjał ucznia, 4. Rekomendacje.`;
+                    if (docType === 'opinia') base += `\nStruktura domyślna: 1. Powód opinii, 2. Funkcjonowanie dydaktyczne, 3. Funkcjonowanie społeczno-emocjonalne, 4. Wnioski.`;
+                }
+                return base;
+            }
+            if (module === 'historyjki') return `Jesteś terapeutą behawioralnym. Napisz 'Historyjkę Społeczną' wg zasad Carol Gray. Krótkie zdania, pierwsza osoba ("Ja"), uspokajający ton, podanie rozwiązania trudnej sytuacji. Max 5-6 zdań.`;
+            if (module === 'rymowanki') return `Jesteś nauczycielem wychowania przedszkolnego. Ułóż radosną, wpadającą w ucho rymowankę pomagającą dziecku zapamiętać ważną czynność lub zasadę.`;
+            if (module === 'tus') return `Jesteś trenerem TUS (Trening Umiejętności Społecznych). Przygotuj krótki, 15-minutowy scenariusz ćwiczenia danej umiejętności dla grupy (cel, przebieg zabawy, omówienie).`;
+            if (module === 'rodzice') return `Jesteś szkolnym dyplomatą używającym NVC (Porozumienie bez Przemocy). Przekształć notatkę w kulturalną, profesjonalną wiadomość e-mail do rodzica (tzw. metoda kanapki).`;
+            return "Jesteś asystentem AI.";
+        };
+
+        function App() {
+            const [activeModule, setActiveModule] = useState('dokumenty');
+            const [authCode, setAuthCode] = useState('');
+            const [isUnlocked, setIsUnlocked] = useState(false);
+            const [showPassword, setShowPassword] = useState(false);
+
+            const [docType, setDocType] = useState('ipet');
+            const [diagnoza, setDiagnoza] = useState('');
+            const [naglowki, setNaglowki] = useState('');
+            const [mocneStrony, setMocneStrony] = useState('');
+            const [trudnosci, setTrudnosci] = useState('');
+            const [orzeczenieTekst, setOrzeczenieTekst] = useState('');
+            const [showFileTextArea, setShowFileTextArea] = useState(false);
+            const [genericInput, setGenericInput] = useState('');
+
+            const [generatedText, setGeneratedText] = useState('');
+            const [generatedImage, setGeneratedImage] = useState('');
+            const [isGenerating, setIsGenerating] = useState(false);
+            const [error, setError] = useState('');
+
+            const fileInputRef = useRef(null);
+            const resultRef = useRef(null);
+
+            const checkAuth = () => {
+                if (authCode === SECRET_PIN) {
+                    setIsUnlocked(true);
+                } else {
+                    setIsUnlocked(false);
+                }
+            };
+
+            useEffect(() => { checkAuth(); }, [authCode]);
+
+            const fetchWithRetry = async (url, options, retries = 3, delay = 1000) => {
+                for (let i = 0; i < retries; i++) {
+                    try {
+                        const response = await fetch(url, options);
+                        if (!response.ok) {
+                            const errData = await response.json().catch(() => ({}));
+                            throw new Error(errData.error || `Status: ${response.status}`);
+                        }
+                        return await response.json();
+                    } catch (e) {
+                        if (i === retries - 1) throw e;
+                        await new Promise(res => setTimeout(res, delay * Math.pow(2, i)));
+                    }
+                }
+            };
+
+            const secureApiCall = async (payload, type = 'text') => {
+                const isProduction = window.location.hostname.includes('vercel.app') || 
+                                     (window.location.hostname !== '' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1');
+
+                if (isProduction) {
+                    return await fetchWithRetry('/api/gemini', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ payload, type })
+                    });
+                } else {
+                    const apiKey = ""; 
+                    const url = type === 'text' 
+                        ? `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`
+                        : `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${apiKey}`;
+                    return await fetchWithRetry(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                }
+            };
+
+            const handleFileUpload = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                
+                if (file.name.endsWith('.txt')) {
+                    const reader = new FileReader();
+                    reader.onload = (evt) => {
+                        setOrzeczenieTekst(evt.target.result);
+                        setShowFileTextArea(true);
+                    };
+                    reader.readAsText(file);
+                } else {
+                    alert("Wersja w przeglądarce zabezpiecza Twoje dane. Otwórz plik PDF/DOCX na swoim komputerze, skopiuj treść orzeczenia i wklej w pole tekstowe, które właśnie się pojawiło.");
+                    setShowFileTextArea(true);
+                }
+            };
+
+            const handleGenerate = async () => {
+                if (!isUnlocked) {
+                    setError("Wpisz poprawny kod dostępu w lewym menu!");
+                    return;
+                }
+
+                setIsGenerating(true);
+                setError('');
+                setGeneratedText('');
+                setGeneratedImage('');
+
+                try {
+                    let finalPrompt = "";
+                    
+                    if (activeModule === 'dokumenty') {
+                        finalPrompt = `Wygeneruj dokument: ${DOC_TYPES.find(d => d.id === docType)?.label}\n`;
+                        if (diagnoza) finalPrompt += `\nDiagnoza/Deficyty: ${diagnoza}`;
+                        if (mocneStrony) finalPrompt += `\nPotencjał/Mocne strony: ${mocneStrony}`;
+                        if (trudnosci) finalPrompt += `\nTrudności/Bariery: ${trudnosci}`;
+                        if (orzeczenieTekst) finalPrompt += `\n\nTREŚĆ ORZECZENIA Z PORADNI DO UWZGLĘDNIENIA:\n"""\n${orzeczenieTekst}\n"""`;
+                    } else {
+                        finalPrompt = `Temat / Problem / Notatka: ${genericInput}`;
+                    }
+
+                    const textPayload = {
+                        contents: [{ parts: [{ text: finalPrompt }] }],
+                        systemInstruction: { parts: [{ text: getSystemPrompt(activeModule, docType, naglowki) }] },
+                        generationConfig: { temperature: activeModule === 'dokumenty' ? 0.2 : 0.6 }
+                    };
+
+                    const textData = await secureApiCall(textPayload, 'text');
+                    const story = textData.candidates?.[0]?.content?.parts?.[0]?.text;
+                    if (!story) throw new Error("Pusta odpowiedź API Tekstowego.");
+                    setGeneratedText(story);
+
+                    // Jeśli moduł Historyjki -> generujemy też obrazek (POPRAWIONY PROMPT)
+                    if (activeModule === 'historyjki') {
+                        try {
+                            // ZMIANA: Temat (genericInput) ląduje na samym początku polecenia, aby AI wzięło go za priorytet!
+                            const imgPayload = {
+                                instances: { prompt: `A situation where: ${genericInput}. Cute simple 2D therapeutic illustration for kids, showing a positive resolution, calm colors.` },
+                                parameters: { sampleCount: 1 }
+                            };
+                            const imgData = await secureApiCall(imgPayload, 'image');
+                            const base64Image = imgData.predictions?.[0]?.bytesBase64Encoded;
+                            if (base64Image) setGeneratedImage(`data:image/png;base64,${base64Image}`);
+                        } catch(e) {
+                            console.log("Błąd generowania obrazka:", e);
+                        }
+                    }
+
+                    setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
+
+                } catch (err) {
+                    setError('Błąd połączenia z serwerem AI. Spróbuj ponownie. (' + err.message + ')');
+                } finally {
+                    setIsGenerating(false);
+                }
+            };
+
+            const resetForm = () => {
+                setGeneratedText('');
+                setGeneratedImage('');
+                setError('');
+            };
+
+            return (
+                <div className="flex min-h-screen relative">
+                    <div className="sidebar w-72 flex-shrink-0 flex flex-col h-screen sticky top-0 print-hidden">
+                        
+                        <div className="p-6 border-b border-slate-800">
+                            <h1 className="font-bold text-slate-300 text-sm tracking-widest uppercase">Kombajn Modułowy v5.0</h1>
+                            <p className="text-xs text-slate-500 mt-1">(Dark Premium)</p>
+                        </div>
+
+                        <div className="p-6 flex-1 overflow-y-auto custom-scrollbar">
+                            <div className="mb-8">
+                                <h2 className="font-bold text-white mb-4 flex items-center gap-2">🔑 Autoryzacja</h2>
+                                <label className="block text-xs text-slate-400 mb-2">Kod dostępu:</label>
+                                <div className="relative mb-4">
+                                    <input 
+                                        type={showPassword ? "text" : "password"} 
+                                        value={authCode}
+                                        onChange={(e) => setAuthCode(e.target.value)}
+                                        className="w-full input-bg rounded-lg px-3 py-2 text-sm pr-10" 
+                                    />
+                                    <button 
+                                        onClick={() => setShowPassword(!showPassword)}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                                    >
+                                        👁️
+                                    </button>
+                                </div>
+                                <div className={`p-4 rounded-lg text-xs leading-relaxed transition-colors duration-300 ${isUnlocked ? 'auth-box unlocked' : 'auth-box'}`}>
+                                    {isUnlocked ? "✅ Dostęp odblokowany. Generowanie dokumentów aktywne." : "Podaj aktywny kod aby odblokować generowanie zdjęć i profesjonalne dokumenty urzędowe."}
+                                </div>
+                            </div>
+
+                            <hr className="border-slate-800 mb-8" />
+
+                            <div>
+                                <h2 className="font-bold text-white mb-4 flex items-center gap-2">🛠️ Wybierz Narzędzie</h2>
+                                <label className="block text-xs text-slate-400 mb-2">Menu Główne:</label>
+                                <div className="space-y-1">
+                                    {MODULES.map(mod => (
+                                        <div 
+                                            key={mod.id}
+                                            onClick={() => { setActiveModule(mod.id); resetForm(); }}
+                                            className={`module-btn ${activeModule === mod.id ? 'active' : ''}`}
+                                        >
+                                            <span className="w-5 text-center">{mod.icon}</span>
+                                            <span>{mod.label}</span>
+                                            {activeModule === mod.id && <span className="ml-auto w-2 h-2 rounded-full bg-red-500"></span>}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="p-6 border-t border-slate-800 text-center">
+                            <a href={BUY_COFFEE_LINK} target="_blank" className="text-xs text-slate-400 hover:text-white hover:underline flex justify-center items-center gap-2">
+                                ☕ Wesprzyj EduBox
+                            </a>
+                        </div>
+                    </div>
+
+                    <div className="main-content flex-1 bg-[#020617] p-6 lg:p-10 min-w-0">
+                        
+                        {!generatedText ? (
+                            <div className="max-w-4xl fade-in print-hidden">
+                                
+                                {activeModule === 'dokumenty' && (
+                                    <div className="space-y-6">
+                                        <h2 className="text-2xl font-bold text-white mb-6">Asystent Dokumentów (IPET/WOPFU)</h2>
+                                        
+                                        <div className="card-bg p-2 rounded-xl">
+                                            {DOC_TYPES.map(doc => (
+                                                <div key={doc.id}>
+                                                    <input 
+                                                        type="radio" id={doc.id} name="doctype" value={doc.id}
+                                                        checked={docType === doc.id} onChange={() => setDocType(doc.id)}
+                                                        className="doc-radio"
+                                                    />
+                                                    <label htmlFor={doc.id} className="doc-label">{doc.label}</label>
+                                                </div>
+                                            ))}
+                                        </div>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                            <div className="card-bg p-4 rounded-xl">
+                                                <label className="block text-sm font-bold text-slate-300 mb-2">Diagnoza / Deficyty:</label>
+                                                <textarea 
+                                                    value={diagnoza} onChange={(e) => setDiagnoza(e.target.value)}
+                                                    placeholder="Np. Spektrum autyzmu, ADHD, trudności z koncentracją..."
+                                                    className="w-full h-24 input-bg rounded-lg p-3 text-sm custom-scrollbar resize-y"
+                                                ></textarea>
+                                            </div>
+                                            <div className="card-bg p-4 rounded-xl">
+                                                <label className="block text-sm font-bold text-slate-300 mb-2">Własne nagłówki (Opcjonalnie):</label>
+                                                <textarea 
+                                                    value={naglowki} onChange={(e) => setNaglowki(e.target.value)}
+                                                    placeholder="Wklej tu nazwy nagłówków wymaganych w Twojej szkole (np. 1. Cele, 2. Metody...). AI się do tego dostosuje!"
+                                                    className="w-full h-24 input-bg rounded-lg p-3 text-sm custom-scrollbar resize-y"
+                                                ></textarea>
+                                            </div>
+                                        </div>
+
+                                        <div className="card-bg p-4 rounded-xl">
+                                            <label className="block text-sm font-bold text-amber-400 mb-2">💪 Mocne strony / Zasoby (Potencjał):</label>
+                                            <textarea 
+                                                value={mocneStrony} onChange={(e) => setMocneStrony(e.target.value)}
+                                                placeholder="Zainteresowania, dobre cechy, to co wychodzi mu najlepiej..."
+                                                className="w-full h-24 input-bg rounded-lg p-3 text-sm custom-scrollbar resize-y"
+                                            ></textarea>
+                                        </div>
+
+                                        <div className="card-bg p-4 rounded-xl">
+                                            <label className="block text-sm font-bold text-rose-400 mb-2">🚧 Trudności / Bariery (Dysfunkcje):</label>
+                                            <textarea 
+                                                value={trudnosci} onChange={(e) => setTrudnosci(e.target.value)}
+                                                placeholder="Co sprawia największy problem na lekcjach lub przerwach..."
+                                                className="w-full h-24 input-bg rounded-lg p-3 text-sm custom-scrollbar resize-y"
+                                            ></textarea>
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-sm font-bold text-slate-300 mb-2">Wgraj orzeczenia z Poradni (Opcjonalnie PDF/DOCX/TXT):</label>
+                                            <div className="upload-box" onClick={() => fileInputRef.current.click()}>
+                                                <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept=".txt,.pdf,.docx" className="hidden" />
+                                                <div className="flex items-center justify-center gap-4">
+                                                    <span className="bg-slate-800 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm border border-slate-600 hover:bg-slate-700 transition-colors">
+                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+                                                        Upload
+                                                    </span>
+                                                    <span className="text-sm text-slate-500">Maks. 2MB • PDF, DOCX, TXT</span>
+                                                </div>
+                                            </div>
+                                            {showFileTextArea && (
+                                                <div className="mt-4 fade-in">
+                                                    <label className="block text-xs text-slate-400 mb-1">Treść orzeczenia (Wklej tekst ze schowka, jeśli to PDF):</label>
+                                                    <textarea 
+                                                        value={orzeczenieTekst} onChange={(e) => setOrzeczenieTekst(e.target.value)}
+                                                        className="w-full h-32 input-bg rounded-lg p-3 text-sm custom-scrollbar resize-y border-emerald-500/50"
+                                                    ></textarea>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {activeModule !== 'dokumenty' && (
+                                    <div className="space-y-6">
+                                        <h2 className="text-2xl font-bold text-white mb-2">
+                                            {MODULES.find(m => m.id === activeModule)?.icon} {MODULES.find(m => m.id === activeModule)?.label}
+                                        </h2>
+                                        <p className="text-slate-400 text-sm mb-6">Opisz krótko problem, sytuację lub cel. AI wygeneruje dedykowany materiał.</p>
+                                        
+                                        <div className="card-bg p-4 rounded-xl">
+                                            <label className="block text-sm font-bold text-slate-300 mb-2">Opis sytuacji / Wytyczne:</label>
+                                            <textarea 
+                                                value={genericInput} onChange={(e) => setGenericInput(e.target.value)}
+                                                placeholder="Wpisz tutaj szczegóły..."
+                                                className="w-full h-40 input-bg rounded-lg p-4 text-sm sm:text-base custom-scrollbar resize-y"
+                                            ></textarea>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {error && <div className="mt-6 p-4 bg-red-900/40 border border-red-500/50 rounded-xl text-red-400 text-sm font-medium">{error}</div>}
+
+                                <div className="mt-8">
+                                    <button 
+                                        onClick={handleGenerate}
+                                        disabled={isGenerating || (!isUnlocked)}
+                                        className="btn-red px-8 py-4 rounded-xl font-bold transition-all flex items-center gap-2 w-full sm:w-auto justify-center"
+                                    >
+                                        {isGenerating ? (
+                                            <><svg className="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Przetwarzanie AI...</>
+                                        ) : (
+                                            <>✨ GENERUJ {activeModule === 'dokumenty' ? 'DOKUMENT URZĘDOWY' : 'MATERIAŁ'}</>
+                                        )}
+                                    </button>
+                                </div>
+                            </div>
+                        ) : (
+                            <div ref={resultRef} className="max-w-4xl fade-in pb-10">
+                                <div className="flex items-center justify-between mb-6 print-hidden border-b border-slate-800 pb-4">
+                                    <h2 className="text-2xl font-bold text-white">Twój Dokument</h2>
+                                    <div className="flex gap-3">
+                                        <button onClick={() => window.print()} className="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-lg text-sm font-bold border border-slate-600">🖨️ Drukuj</button>
+                                        <button onClick={resetForm} className="bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded-lg text-sm font-bold">Wróć do edycji</button>
+                                    </div>
+                                </div>
+
+                                <div className={`card-bg p-8 sm:p-12 rounded-[2rem] print-area ${generatedImage ? 'flex flex-col md:flex-row gap-8' : ''}`}>
+                                    
+                                    {generatedImage && (
+                                        <div className="w-full md:w-1/3 flex-shrink-0 print-hidden">
+                                            <img src={generatedImage} alt="Ilustracja AI" className="w-full rounded-2xl border-4 border-slate-800 shadow-2xl" />
+                                            <p className="text-center text-xs text-slate-500 mt-2">Grafika wygenerowana przez AI</p>
+                                        </div>
+                                    )}
+
+                                    <div className={`w-full ${generatedImage ? 'md:w-2/3' : ''} text-slate-200`}>
+                                        {generatedText}
+                                    </div>
+
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
