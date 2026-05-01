@@ -101,9 +101,6 @@ Pisz bezpośrednio do nauczyciela. Zadbaj, żeby treści były w 100% dostosowan
                 setGeneratedText('');
 
                 try {
-                    const apiKey = ""; // Twój klucz będzie wstrzyknięty w runtime
-                    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
-                    
                     const finalPrompt = `Wygeneruj lekcję na zastępstwo.\nGrupa wiekowa: ${ageGroup}\nTyp aktywności: ${activityType}`;
 
                     const payload = {
@@ -112,17 +109,27 @@ Pisz bezpośrednio do nauczyciela. Zadbaj, żeby treści były w 100% dostosowan
                         generationConfig: { temperature: 0.7 } // Nieco wyższa temperatura dla kreatywności
                     };
 
-                    const response = await fetch(url, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
-
-                    if (!response.ok) {
-                        throw new Error(`Błąd API: ${response.status}`);
+                    let data;
+                    if (window.location.hostname.includes('vercel.app') || (window.location.hostname !== '' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1')) {
+                        const response = await fetch('/api/gemini', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ payload, type: 'text' })
+                        });
+                        if (!response.ok) throw new Error(`Błąd serwera API: ${response.status}`);
+                        data = await response.json();
+                    } else {
+                        const apiKey = ""; 
+                        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+                        const response = await fetch(url, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+                        if (!response.ok) throw new Error(`Błąd API: ${response.status}`);
+                        data = await response.json();
                     }
 
-                    const data = await response.json();
                     const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
                     
                     if (text) {
