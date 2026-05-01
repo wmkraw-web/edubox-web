@@ -60,6 +60,7 @@
             .main-content { margin-left: 0 !important; width: 100% !important; padding: 0 !important; }
             .card-bg { border: none !important; box-shadow: none !important; background: transparent !important; }
             .print-area { font-family: 'Times New Roman', serif; font-size: 12pt; line-height: 1.5; color: black !important; white-space: pre-wrap; }
+            .print-images-grid { display: grid !important; grid-template-columns: repeat(3, 1fr) !important; gap: 1rem !important; margin-bottom: 2rem !important; }
         }
     </style>
 </head>
@@ -69,29 +70,24 @@
     <script type="text/babel">
         const { useState, useRef, useEffect } = React;
 
-        // ==========================================
-        // KONFIGURACJA 
-        // ==========================================
-        const SECRET_PIN = "KAWA2024"; 
+        const SECRET_PIN = "awans2024"; 
         const BUY_COFFEE_LINK = "https://buycoffee.to/magiccolor";
 
         const DOC_TYPES = [
             { id: 'ipet', label: 'IPET (Indywidualny Program Edukacyjno-Terapeutyczny)' },
             { id: 'wopfu', label: 'WOPFU (Wielospecjalistyczna Ocena Poziomu Funkcjonowania Ucznia)' },
             { id: 'opinia', label: 'Opinia o uczniu do Poradni (PPP)' },
-            { id: 'notatka', label: 'Arkusz Obserwacji / Notatka służbowa' },
-            { id: 'inny', label: 'Indywidualny Plan Wsparcia (Inny)' }
+            { id: 'notatka', label: 'Arkusz Obserwacji / Notatka służbowa' }
         ];
 
         const MODULES = [
             { id: 'dokumenty', label: 'Asystent Dokumentów (IPET/WOPFU)', icon: '📄' },
-            { id: 'historyjki', label: 'Historyjki Społeczne (+ Grafiki AI)', icon: '🧩' },
+            { id: 'historyjki', label: 'Historyjki Społeczne (3-etapowe)', icon: '🧩' },
             { id: 'rymowanki', label: 'Rymowanki Przedszkolne', icon: '🎈' },
             { id: 'tus', label: 'Kreator TUS', icon: '🫂' },
             { id: 'rodzice', label: 'Komunikacja z Rodzicem', icon: '🤝' }
         ];
 
-        // --- SYSTEMY PROMPTÓW OPARTE O NOWY SERWER ---
         const getSystemPrompt = (module, docType, customHeaders) => {
             if (module === 'dokumenty') {
                 let base = `Jesteś wybitnym pedagogiem specjalnym. Wygeneruj profesjonalny dokument urzędowy o typie: ${docType}. Używaj języka formalnego, pedagogicznego, zgodnego z wytycznymi MEN. Nie używaj formatowania Markdown (**).`;
@@ -104,7 +100,16 @@
                 }
                 return base;
             }
-            if (module === 'historyjki') return `Jesteś terapeutą behawioralnym. Napisz 'Historyjkę Społeczną' wg zasad Carol Gray. Krótkie zdania, pierwsza osoba ("Ja"), uspokajający ton, podanie rozwiązania trudnej sytuacji. Max 5-6 zdań.`;
+            if (module === 'historyjki') {
+                // NOWY, ROZBUDOWANY PROMPT DLA HISTORYJEK
+                return `Jesteś pedagogiem specjalnym i terapeutą. Napisz rozbudowaną, empatyczną 'Historyjkę Społeczną' wg zasad Carol Gray. 
+Napisz ją w pierwszej osobie ("Ja"). 
+Podziel tekst WYRAŹNIE na 3 obszerne akapity opatrzone nagłówkami:
+1. PROBLEM (Opisz dokładnie trudną sytuację z perspektywy dziecka i emocje, które jej towarzyszą).
+2. STRATEGIA (Opisz, co dziecko może zrobić, by poczuć się lepiej, jakich strategii radzenia sobie ze złością/stresem użyć, lub kto i jak mu pomaga).
+3. EFEKT (Opisz pozytywne zakończenie, poczucie dumy i spokój dziecka po poprawnym rozwiązaniu problemu).
+Tekst musi być uspokajający, wspierający i odpowiedni dla dzieci ze specjalnymi potrzebami.`;
+            }
             if (module === 'rymowanki') return `Jesteś nauczycielem wychowania przedszkolnego. Ułóż radosną, wpadającą w ucho rymowankę pomagającą dziecku zapamiętać ważną czynność lub zasadę.`;
             if (module === 'tus') return `Jesteś trenerem TUS (Trening Umiejętności Społecznych). Przygotuj krótki, 15-minutowy scenariusz ćwiczenia danej umiejętności dla grupy (cel, przebieg zabawy, omówienie).`;
             if (module === 'rodzice') return `Jesteś szkolnym dyplomatą używającym NVC (Porozumienie bez Przemocy). Przekształć notatkę w kulturalną, profesjonalną wiadomość e-mail do rodzica (tzw. metoda kanapki).`;
@@ -127,7 +132,7 @@
             const [genericInput, setGenericInput] = useState('');
 
             const [generatedText, setGeneratedText] = useState('');
-            const [generatedImage, setGeneratedImage] = useState('');
+            const [generatedImages, setGeneratedImages] = useState([]); // Zmienione na tablicę
             const [isGenerating, setIsGenerating] = useState(false);
             const [error, setError] = useState('');
 
@@ -153,9 +158,6 @@
                 }
             };
 
-            // =======================================================================
-            // JEDYNE I BEZPIECZNE POŁĄCZENIE Z TWOIM SERWEREM (OpenAI + Stability)
-            // =======================================================================
             const secureApiCall = async (payload, type = 'text') => {
                 try {
                     const response = await fetch('/api/gemini', {
@@ -163,12 +165,8 @@
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ payload, type })
                     });
-                    
                     const data = await response.json();
-                    
-                    if (!response.ok) {
-                        throw new Error(data.error || `Błąd serwera Vercel (${response.status})`);
-                    }
+                    if (!response.ok) throw new Error(data.error || `Błąd serwera Vercel (${response.status})`);
                     return data;
                 } catch (error) {
                     console.error("Błąd sieci:", error);
@@ -178,7 +176,7 @@
 
             const handleGenerate = async () => {
                 if (!isUnlocked) { setError("Wpisz poprawny kod dostępu w lewym menu!"); return; }
-                setIsGenerating(true); setError(''); setGeneratedText(''); setGeneratedImage('');
+                setIsGenerating(true); setError(''); setGeneratedText(''); setGeneratedImages([]);
 
                 try {
                     let finalPrompt = "";
@@ -192,7 +190,6 @@
                         finalPrompt = `Temat / Problem / Notatka: ${genericInput}`;
                     }
 
-                    // Struktura payloadu utrzymana w zgodności z nowym api/gemini.js
                     const textPayload = {
                         contents: [{ parts: [{ text: finalPrompt }] }],
                         systemInstruction: { parts: [{ text: getSystemPrompt(activeModule, docType, naglowki) }] }
@@ -204,19 +201,30 @@
                     
                     setGeneratedText(story);
 
-                    // Jeśli moduł to Historyjki, wygeneruj też terapeutyczną grafikę AI
+                    // =========================================================
+                    // 3 GRAFIKI JEDNOCZEŚNIE DLA HISTORYJEK
+                    // =========================================================
                     if (activeModule === 'historyjki') {
                         try {
-                            const imgPayload = {
-                                instances: { prompt: `A situation where: ${genericInput}. Cute simple 2D therapeutic illustration for kids, showing a positive resolution, calm colors.` }
-                            };
-                            const imgData = await secureApiCall(imgPayload, 'image');
-                            const base64Image = imgData.predictions?.[0]?.bytesBase64Encoded;
-                            if (base64Image) {
-                                setGeneratedImage(`data:image/png;base64,${base64Image}`);
-                            }
+                            const imgPromises = [
+                                secureApiCall({ instances: { prompt: `Part 1: The Problem. A child experiencing this issue: ${genericInput}. Showing the initial difficulty or frustration. Cute simple 2D therapeutic illustration for kids, calm colors.` } }, 'image'),
+                                secureApiCall({ instances: { prompt: `Part 2: The Strategy/Help. A child dealing with this issue: ${genericInput}. Using a coping strategy, taking a deep breath, or getting help from adult. Cute simple 2D therapeutic illustration for kids, calm colors.` } }, 'image'),
+                                secureApiCall({ instances: { prompt: `Part 3: The Effect/Resolution. A child who resolved this issue: ${genericInput}. Happy, calm, and proud positive resolution. Cute simple 2D therapeutic illustration for kids, calm colors.` } }, 'image')
+                            ];
+                            
+                            // Czekamy na wszystkie 3 obrazy naraz
+                            const results = await Promise.allSettled(imgPromises);
+                            const newImages = [];
+                            
+                            results.forEach(res => {
+                                if (res.status === 'fulfilled' && res.value.predictions?.[0]?.bytesBase64Encoded) {
+                                    newImages.push(`data:image/png;base64,${res.value.predictions[0].bytesBase64Encoded}`);
+                                }
+                            });
+                            
+                            setGeneratedImages(newImages);
                         } catch(e) {
-                            console.log("Generowanie obrazka zignorowane:", e);
+                            console.log("Generowanie obrazków zignorowane:", e);
                         }
                     }
 
@@ -231,7 +239,7 @@
 
             const resetForm = () => {
                 setGeneratedText('');
-                setGeneratedImage('');
+                setGeneratedImages([]);
                 setError('');
             };
 
@@ -353,12 +361,12 @@
 
                                 <div className="mt-8">
                                     <button onClick={handleGenerate} disabled={isGenerating || !isUnlocked} className="btn-red px-8 py-4 rounded-xl font-bold transition-all w-full sm:w-auto">
-                                        {isGenerating ? "TRWA TWORZENIE..." : `✨ GENERUJ ${activeModule === 'dokumenty' ? 'DOKUMENT' : 'MATERIAŁ'}`}
+                                        {isGenerating ? "TRWA TWORZENIE (ok. 10s)..." : `✨ GENERUJ ${activeModule === 'dokumenty' ? 'DOKUMENT' : 'MATERIAŁ'}`}
                                     </button>
                                 </div>
                             </div>
                         ) : (
-                            <div ref={resultRef} className="max-w-4xl fade-in pb-10">
+                            <div ref={resultRef} className="max-w-5xl fade-in pb-10">
                                 <div className="flex items-center justify-between mb-6 print-hidden border-b border-slate-800 pb-4">
                                     <h2 className="text-2xl font-bold text-white">Wygenerowany Materiał</h2>
                                     <div className="flex gap-3">
@@ -367,14 +375,23 @@
                                     </div>
                                 </div>
 
-                                <div className={`card-bg p-8 sm:p-12 rounded-[2rem] print-area ${generatedImage ? 'flex flex-col md:flex-row gap-8' : ''}`}>
-                                    {generatedImage && (
-                                        <div className="w-full md:w-1/3 flex-shrink-0 print-hidden">
-                                            <img src={generatedImage} alt="Ilustracja AI" className="w-full rounded-2xl border-4 border-slate-800 shadow-2xl" />
-                                            <p className="text-center text-xs text-slate-500 mt-2">Grafika wygenerowana przez AI</p>
+                                <div className="card-bg p-8 sm:p-12 rounded-[2rem] print-area flex flex-col gap-8">
+                                    
+                                    {/* 3 Obrazki dla historyjek ustawione w rzędzie */}
+                                    {generatedImages.length > 0 && (
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full print-images-grid">
+                                            {generatedImages.map((img, idx) => (
+                                                <div key={idx} className="flex flex-col items-center">
+                                                    <img src={img} alt={`Ilustracja ${idx + 1}`} className="w-full aspect-square object-cover rounded-2xl border-4 border-slate-800 shadow-xl" />
+                                                    <p className="text-center text-xs text-slate-300 mt-3 font-bold uppercase tracking-widest bg-slate-900 px-4 py-1.5 rounded-full border border-slate-700">
+                                                        {idx === 0 ? "1. Problem" : idx === 1 ? "2. Strategia" : "3. Efekt"}
+                                                    </p>
+                                                </div>
+                                            ))}
                                         </div>
                                     )}
-                                    <div className={`w-full ${generatedImage ? 'md:w-2/3' : ''} text-slate-200 whitespace-pre-wrap`}>
+
+                                    <div className="w-full text-slate-200 whitespace-pre-wrap text-lg leading-relaxed">
                                         {generatedText}
                                     </div>
                                 </div>
