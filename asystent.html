@@ -165,7 +165,7 @@
             }, [authCode]);
 
             // ==================================================================================
-            // KONTROLER API ZOPTYMALIZOWANY DLA ŚRODOWISKA CANVAS (GEMINI)
+            // KONTROLER API ZOPTYMALIZOWANY DLA ŚRODOWISKA CANVAS (GEMINI) ORAZ VERCEL
             // ==================================================================================
             const fetchWithRetry = async (url, options, retries = 5) => {
                 const delays = [1000, 2000, 4000, 8000, 16000];
@@ -185,18 +185,61 @@
             };
 
             const secureApiCall = async (payload, type = 'text') => {
-                // W ŚRODOWISKU CANVAS UŻYWAMY BEZPOŚREDNICH ADRESÓW GOOGLE API
-                // Klucz jest automatycznie wstrzykiwany przez środowisko
+                // Magiczny klucz wstrzykiwany przez środowisko Canvas podczas kliknięcia Preview
                 const apiKey = ""; 
-                const url = type === 'text' 
-                    ? `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`
-                    : `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${apiKey}`;
-                
-                return await fetchWithRetry(url, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
+
+                if (apiKey) {
+                    // JESTEŚMY W CANVAS (Darmowe testy z wstrzykniętym kluczem)
+                    const url = type === 'text' 
+                        ? `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`
+                        : `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${apiKey}`;
+                    
+                    return await fetchWithRetry(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                } else {
+                    // JESTEŚMY NA VERCELU LUB LOKALNIE (Używamy Twoich endpointów z Vercela)
+                    if (type === 'text') {
+                        const sysText = payload.systemInstruction?.parts[0]?.text || "";
+                        const usrText = payload.contents[0]?.parts[0]?.text || "";
+
+                        const response = await fetch('/api/chat', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                system: sysText,
+                                prompt: usrText,
+                                temperature: payload.generationConfig?.temperature || 0.5,
+                                format: "text",
+                                model: "gpt-4o-mini"
+                            })
+                        });
+
+                        if (!response.ok) {
+                            const errText = await response.text();
+                            throw new Error(`Błąd Vercel API: ${errText}`);
+                        }
+                        const data = await response.json();
+                        // Pakujemy to w format taki jak z Gemini, żeby reszta kodu nie wybuchła
+                        return { candidates: [{ content: { parts: [{ text: data.text }] } }] };
+                    } else {
+                        // Generowanie obrazu przez Twoje /api/generate
+                        const imgPrompt = payload.instances?.prompt || payload.instances[0]?.prompt;
+                        const response = await fetch('/api/generate', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ prompt: imgPrompt })
+                        });
+
+                        if (!response.ok) {
+                            throw new Error(`Błąd Vercel Image API: ${response.status}`);
+                        }
+                        const data = await response.json();
+                        return { isVercelUrl: true, url: data.imageUrl };
+                    }
+                }
             };
 
             const handleFileUpload = async (e) => {
@@ -258,7 +301,7 @@
                     
                     setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
 
-                    // 2. GENEROWANIE OBRAZÓW (Sekwencyjne z użyciem Imagen 4.0)
+                    // 2. GENEROWANIE OBRAZÓW (Sekwencyjne)
                     if (activeModule === 'historyjki') {
                         const prompts = [
                             `2D Flat vector illustration, storybook style. A charming friendly character looking pensive and thoughtful in a school environment. Soft pastel colors, innocent look. NO TEXT.`,
@@ -272,20 +315,21 @@
                             for (let i = 0; i < prompts.length; i++) {
                                 setLoadingMsg(`Maluję obrazek ${i + 1} z 3...`);
                                 
-                                // Payload zgodny z Imagen 4.0
                                 const res = await secureApiCall({ 
                                     instances: { prompt: prompts[i] }, 
                                     parameters: { sampleCount: 1 } 
                                 }, 'image');
                                 
-                                if (res.predictions && res.predictions[0] && res.predictions[0].bytesBase64Encoded) {
+                                if (res.isVercelUrl) {
+                                    newImages.push(res.url);
+                                } else if (res.predictions && res.predictions[0] && res.predictions[0].bytesBase64Encoded) {
                                     newImages.push(`data:image/png;base64,${res.predictions[0].bytesBase64Encoded}`);
                                 }
                             }
                             
                             setGeneratedImages(newImages);
                             if (newImages.length === 0) {
-                                setError("Serwer graficzny nie zwrócił obrazków. Upewnij się, że używasz środowiska Canvas.");
+                                setError("Serwer graficzny nie zwrócił obrazków. Spróbuj wygenerować ponownie za chwilę.");
                             }
                         } catch(e) { 
                             console.error("Błąd grafiki:", e); 
@@ -294,7 +338,7 @@
                     }
 
                 } catch (err) {
-                    setError('Wystąpił błąd: ' + err.message + ' (Pamiętaj, by użyć przycisku Podgląd w oknie czatu!)');
+                    setError('Wystąpił błąd: ' + err.message);
                 } finally {
                     setIsGenerating(false);
                     setLoadingMsg('');
