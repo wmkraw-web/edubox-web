@@ -129,61 +129,58 @@
             };
 
             // ==================================================================================
-            // PANCERNY KONTROLER API - Automatycznie przełącza Vercel / Podgląd
+            // BEZPIECZNY KONTROLER API - ŻADNYCH KLUCZY W KODZIE!
             // ==================================================================================
-            const secureApiCall = async (systemText, userText, temperature, format, endpointType, imgPrompt) => {
-                // 1. Zabezpieczenie przed odpaleniem prosto z dysku
-                if (window.location.protocol === 'file:') {
-                    throw new Error("Plik otwarty z dysku komputera! Przeglądarka zablokowała połączenie. Aby funkcja AI zadziałała, wgraj plik na Vercel lub użyj przycisku 'Podgląd' (Preview) u góry ekranu.");
-                }
+            const secureApiCall = async (payload, endpointType) => {
+                // Ta zmienna będzie wstrzyknięta przez środowisko Canvas, ale na Twoim Vercelu pozostanie PUSTA.
+                const previewApiKey = ""; 
 
-                // Klucz z Canvas
-                const canvasKey = ""; 
+                if (previewApiKey) {
+                    // TRYB TESTOWY W CANVAS (Darmowy test w tym czacie z wstrzykniętym kluczem)
+                    const url = endpointType === 'text' 
+                        ? `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${previewApiKey}`
+                        : `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${previewApiKey}`;
+                    
+                    const fetchWithRetry = async (url, options, retries = 5) => {
+                        const delays = [1000, 2000, 4000, 8000, 16000];
+                        for (let i = 0; i < retries; i++) {
+                            try {
+                                const response = await fetch(url, options);
+                                if (!response.ok) throw new Error(await response.text());
+                                return await response.json();
+                            } catch (e) {
+                                if (i === retries - 1) throw e;
+                                await new Promise(res => setTimeout(res, delays[i]));
+                            }
+                        }
+                    };
 
-                if (canvasKey) {
-                    // TRYB PODGLĄDU CANVAS (używa Gemini)
-                    if (endpointType === 'text') {
-                        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${canvasKey}`;
-                        const payload = {
-                            contents: [{ parts: [{ text: `System: ${systemText}\n\nUżytkownik: ${userText}` }] }],
-                            generationConfig: { temperature: temperature }
-                        };
-                        const res = await fetch(url, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload)});
-                        if (!res.ok) throw new Error("Błąd serwera Canvas (Google API)");
-                        const data = await res.json();
-                        return { text: data.candidates[0].content.parts[0].text };
-                    } else {
-                        const url = `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${canvasKey}`;
-                        const payload = { instances: [{ prompt: imgPrompt }], parameters: { sampleCount: 1 } };
-                        const res = await fetch(url, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload)});
-                        if (!res.ok) throw new Error("Błąd serwera Canvas (Grafika)");
-                        const data = await res.json();
-                        return { imageUrl: `data:image/png;base64,${data.predictions[0].bytesBase64Encoded}` };
-                    }
+                    return await fetchWithRetry(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
                 } else {
-                    // TRYB VERCEL (Łączy się z Twoimi istniejącymi plikami api/chat.js i api/generate.js)
-                    if (endpointType === 'text') {
-                        const res = await fetch('/api/chat', {
+                    // TRYB PRODUKCYJNY LUB LOKALNY
+                    if (window.location.protocol === 'file:') {
+                        throw new Error("Odpaliłeś plik z dysku komputera! 🛑 Przeglądarka zablokowała połączenie z siecią w celu ochrony Twoich danych. Wgraj plik na swój Vercel i otwórz przez link, lub kliknij przycisk 'Podgląd' (Preview) w oknie czatu.");
+                    }
+
+                    // JESTEŚMY NA VERCELU (Łączymy się ze "Strażnikiem Klucza" /api/gemini)
+                    try {
+                        const response = await fetch('/api/gemini', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ system: systemText, prompt: userText, temperature, format, model: "gpt-4o-mini" })
+                            body: JSON.stringify({ payload: payload, type: endpointType })
                         });
-                        if (!res.ok) {
-                            const err = await res.json().catch(()=>({}));
-                            throw new Error(err.message || `Błąd Vercel /api/chat (${res.status})`);
+                        
+                        if (!response.ok) {
+                            const errData = await response.json().catch(() => ({}));
+                            throw new Error(`Błąd Vercela: ${errData.error || response.statusText}. Upewnij się, że masz plik api/gemini.js na Vercelu.`);
                         }
-                        return await res.json();
-                    } else {
-                        const res = await fetch('/api/generate', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ prompt: imgPrompt })
-                        });
-                        if (!res.ok) {
-                            const err = await res.json().catch(()=>({}));
-                            throw new Error(err.message || `Błąd Vercel /api/generate (${res.status})`);
-                        }
-                        return await res.json();
+                        return await response.json();
+                    } catch (err) {
+                        throw new Error(`${err.message}`);
                     }
                 }
             };
@@ -195,22 +192,32 @@
                 setIsGeneratingSos(true); setSosError(''); setSosResult(''); setSosSources([]);
 
                 try {
-                    const data = await secureApiCall(
-                        PROMPTS[`sos_${sosMode}`],
-                        `Rozwiąż problem: ${sosInput}`,
-                        0.5,
-                        "text",
-                        'text',
-                        null
-                    );
+                    const payload = {
+                        contents: [{ parts: [{ text: `Rozwiąż problem: ${sosInput}` }] }],
+                        systemInstruction: { parts: [{ text: PROMPTS[`sos_${sosMode}`] }] },
+                        generationConfig: { temperature: 0.5 }
+                    };
+                    if (useWebSearch) payload.tools = [{ google_search: {} }];
+
+                    const data = await secureApiCall(payload, 'text');
+                    let text = data.candidates?.[0]?.content?.parts?.[0]?.text;
                     
-                    if (data.text) {
-                        let text = data.text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+                    if (text) {
+                        text = text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
                         setSosResult(text);
+                        if (useWebSearch && data.candidates[0].groundingMetadata?.groundingAttributions) {
+                            const extractedSources = [];
+                            const seenUris = new Set();
+                            data.candidates[0].groundingMetadata.groundingAttributions.forEach(attr => {
+                                if (attr.web && attr.web.uri && !seenUris.has(attr.web.uri)) {
+                                    seenUris.add(attr.web.uri);
+                                    extractedSources.push({ title: attr.web.title || attr.web.uri, uri: attr.web.uri });
+                                }
+                            });
+                            setSosSources(extractedSources);
+                        }
                         setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
-                    } else {
-                        throw new Error("Pusta odpowiedź z API.");
-                    }
+                    } else throw new Error("Pusta odpowiedź z API.");
                 } catch (err) {
                     setSosError('Błąd połączenia: ' + err.message);
                 } finally {
@@ -223,17 +230,16 @@
                 
                 setIsGeneratingSuccess(true); setShowSuccessCard(false); setSuccessText('');
                 try {
-                    const data = await secureApiCall(
-                        "Jesteś pełnym ciepła wychowawcą przedszkolnym.",
-                        `Dziecko o imieniu ${successName} osiągnęło sukces: ${successAction}. Napisz bardzo radosną, krótką (max 3 zdania) pochwałę/dyplomik dla rodziców. Zacznij od 'Wielkie brawa!'. Dodaj urocze emotikony.`,
-                        0.7,
-                        "text",
-                        'text',
-                        null
-                    );
+                    const payload = {
+                        contents: [{ parts: [{ text: `Dziecko o imieniu ${successName} osiągnęło sukces: ${successAction}. Napisz bardzo radosną, krótką (max 3 zdania) pochwałę/dyplomik dla rodziców. Zacznij od 'Wielkie brawa!'. Dodaj urocze emotikony.` }] }],
+                        systemInstruction: { parts: [{ text: "Jesteś pełnym ciepła wychowawcą przedszkolnym." }] },
+                        generationConfig: { temperature: 0.7 }
+                    };
                     
-                    if (data.text) { 
-                        let text = data.text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+                    const data = await secureApiCall(payload, 'text');
+                    let text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                    if (text) { 
+                        text = text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
                         setSuccessText(text); 
                         setShowSuccessCard(true); 
                     } else throw new Error();
@@ -250,27 +256,28 @@
                 setIsGeneratingStory(true); setStoryError(''); setGeneratedStory(''); setGeneratedImage('');
 
                 try {
-                    const textData = await secureApiCall(
-                        "Jesteś empatycznym pedagogiem. Piszesz terapeutyczne teksty dla dzieci.",
-                        `Napisz radosną, uspokajającą rymowankę (max 4 zdania) dla dziecka ze spektrum autyzmu. Dziecko: ${storyProblem}. Zakończ pochwałą.`,
-                        0.7,
-                        "text",
-                        'text',
-                        null
-                    );
-                    let story = textData.text;
+                    const textPayload = { 
+                        contents: [{ parts: [{ text: `Napisz radosną, uspokajającą rymowankę (max 4 zdania) dla dziecka ze spektrum autyzmu. Dziecko: ${storyProblem}. Zakończ pochwałą.` }] }], 
+                        generationConfig: { temperature: 0.7 } 
+                    };
+                    const textData = await secureApiCall(textPayload, 'text');
+                    let story = textData.candidates?.[0]?.content?.parts?.[0]?.text;
                     if (story) story = story.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
 
-                    const imgData = await secureApiCall(
-                        null, null, null, null, 'image',
-                        `Cute 2D illustration for children book, a happy child resolving this problem: ${storyProblem}. Bright colors, therapeutic, calming. NO TEXT.`
-                    );
+                    const imgPayload = { 
+                        instances: { prompt: `Cute 2D illustration for children book, a happy child resolving this problem: ${storyProblem}. Bright colors, therapeutic, calming. NO TEXT.` }, 
+                        parameters: { sampleCount: 1 } 
+                    };
+                    const imgData = await secureApiCall(imgPayload, 'image');
                     
-                    if (imgData.imageUrl) {
+                    // Ponieważ api/gemini.js po prostu odsyła to samo co bezpośrednie Google API,
+                    // struktura obiektu jest w obu przypadkach (Canvas i Vercel) taka sama:
+                    if (imgData.predictions && imgData.predictions[0] && imgData.predictions[0].bytesBase64Encoded) {
+                        const base64Image = imgData.predictions[0].bytesBase64Encoded;
                         setGeneratedStory(story); 
-                        setGeneratedImage(imgData.imageUrl);
+                        setGeneratedImage(`data:image/png;base64,${base64Image}`);
                     } else {
-                        throw new Error("Brak obrazka w odpowiedzi.");
+                        throw new Error("Brak obrazka w odpowiedzi. Zła struktura odpowiedzi z API.");
                     }
                 } catch (err) {
                     setStoryError('Błąd połączenia: ' + err.message);
