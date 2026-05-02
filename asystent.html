@@ -165,7 +165,7 @@
             }, [authCode]);
 
             // ==================================================================================
-            // KONTROLER API ZOPTYMALIZOWANY DLA ŚRODOWISKA CANVAS (GEMINI) ORAZ VERCEL
+            // KONTROLER API ZOPTYMALIZOWANY DLA ŚRODOWISKA CANVAS ORAZ VERCEL
             // ==================================================================================
             const fetchWithRetry = async (url, options, retries = 5) => {
                 const delays = [1000, 2000, 4000, 8000, 16000];
@@ -185,30 +185,18 @@
             };
 
             const secureApiCall = async (payload, type = 'text') => {
-                // Magiczny klucz wstrzykiwany przez środowisko Canvas podczas kliknięcia Preview
-                const apiKey = ""; 
+                // Sprawdzamy czy działamy na Vercelu (środowisko produkcyjne)
+                const isVercel = window.location.hostname.includes('vercel.app');
+                // Sprawdzamy czy plik odpalono podwójnym kliknięciem z dysku (lokalnie)
+                const isLocal = window.location.protocol === 'file:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 
-                if (apiKey) {
-                    // JESTEŚMY W CANVAS (Darmowe testy z wstrzykniętym kluczem)
-                    const url = type === 'text' 
-                        ? `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`
-                        : `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${apiKey}`;
-                    
-                    return await fetchWithRetry(url, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
-                } else {
-                    // JESTEŚMY NA VERCELU LUB LOKALNIE 
-                    const isLocal = window.location.protocol === 'file:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-                    
-                    if (isLocal) {
-                        // Zapobieganie błędom 'Failed to parse URL from /api/chat' przy otwieraniu z pulpitu
-                        throw new Error("Uruchamiasz plik prosto z dysku (lokalnie)! 🛑 AI nie ma tu dostępu do serwera. Aby przetestować, kliknij przycisk 'Podgląd' (Preview) w prawym górnym rogu okna czatu!");
-                    }
+                // Zabezpieczenie przed klikaniem z pulpitu - API tutaj nie zadziała
+                if (isLocal) {
+                    throw new Error("Uruchamiasz plik prosto z dysku (lokalnie)! 🛑 Aby przetestować aplikację z AI, kliknij przycisk 'Podgląd' (Preview) w prawym górnym rogu w oknie czatu.");
+                }
 
-                    // Logika dla Vercela
+                if (isVercel) {
+                    // JESTEŚMY NA VERCELU (Komunikacja przez Twoje endopointy backendowe)
                     if (type === 'text') {
                         const sysText = payload.systemInstruction?.parts[0]?.text || "";
                         const usrText = payload.contents[0]?.parts[0]?.text || "";
@@ -245,6 +233,18 @@
                         const data = await response.json();
                         return { isVercelUrl: true, url: data.imageUrl };
                     }
+                } else {
+                    // JESTEŚMY W OKNIE PODGLĄDU CANVAS (Magiczny klucz wstrzykiwany przez środowisko)
+                    const apiKey = ""; 
+                    const url = type === 'text' 
+                        ? `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`
+                        : `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${apiKey}`;
+                    
+                    return await fetchWithRetry(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
                 }
             };
 
@@ -300,14 +300,14 @@
                     }, 'text');
 
                     const story = textData.candidates?.[0]?.content?.parts?.[0]?.text;
-                    if (!story) throw new Error("AI nie zwróciło tekstu.");
+                    if (!story) throw new Error("AI nie zwróciło tekstu. Spróbuj wygenerować jeszcze raz.");
                     
                     let cleanText = story.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
                     setGeneratedText(cleanText);
                     
                     setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
 
-                    // 2. GENEROWANIE OBRAZÓW (Sekwencyjne z użyciem Imagen 4.0)
+                    // 2. GENEROWANIE OBRAZÓW (Sekwencyjne)
                     if (activeModule === 'historyjki') {
                         const prompts = [
                             `2D Flat vector illustration, storybook style. A charming friendly character looking pensive and thoughtful in a school environment. Soft pastel colors, innocent look. NO TEXT.`,
@@ -335,7 +335,7 @@
                             
                             setGeneratedImages(newImages);
                             if (newImages.length === 0) {
-                                setError("Serwer graficzny nie zwrócił obrazków.");
+                                setError("Serwer graficzny nie zwrócił obrazków. Odczekaj chwilę i spróbuj ponownie.");
                             }
                         } catch(e) { 
                             console.error("Błąd grafiki:", e); 
@@ -508,7 +508,7 @@
                                         </div>
                                     )}
                                     <div className="w-full text-slate-200 whitespace-pre-wrap text-lg leading-relaxed font-serif">
-                                        {generatedText}
+                                        <div dangerouslySetInnerHTML={{ __html: generatedText.replace(/\n/g, '<br/>') }} />
                                     </div>
                                 </div>
                             </div>
