@@ -120,10 +120,11 @@
             const [loadingMsg, setLoadingMsg] = useState(''); 
             const [error, setError] = useState('');
 
-            const fileInputRef = useRef(null);
             const resultRef = useRef(null);
 
-            useEffect(() => { setIsUnlocked(authCode === SECRET_PIN); }, [authCode]);
+            useEffect(() => { 
+                setIsUnlocked(authCode.toUpperCase() === SECRET_PIN); 
+            }, [authCode]);
 
             // ==================================================================================
             // BEZPIECZNY KONTROLER API - Zoptymalizowany dla środowiska podglądu z wykupionym pakietem
@@ -133,7 +134,10 @@
                 for (let i = 0; i < retries; i++) {
                     try {
                         const response = await fetch(url, options);
-                        if (!response.ok) throw new Error(`Status API: ${response.status}`);
+                        if (!response.ok) {
+                            const errText = await response.text();
+                            throw new Error(`Status API: ${response.status} - ${errText}`);
+                        }
                         return await response.json();
                     } catch (e) {
                         if (i === retries - 1) throw e;
@@ -156,13 +160,13 @@
             };
 
             const handleGenerate = async () => {
-                if (!isUnlocked) { setError("Wpisz poprawny kod PIN!"); return; }
+                if (!isUnlocked) { setError("Wpisz poprawny kod aktywacyjny!"); return; }
                 
                 setIsGenerating(true); 
                 setError(''); 
                 setGeneratedText(''); 
                 setGeneratedImages([]);
-                setLoadingMsg('Przygotowuję treść...');
+                setLoadingMsg('Przygotowuję treść dokumentu...');
 
                 try {
                     let finalPrompt = "";
@@ -172,6 +176,7 @@
                         finalPrompt = `Temat: ${genericInput}`;
                     }
 
+                    // GENEROWANIE TEKSTU
                     const textData = await secureApiCall({
                         contents: [{ parts: [{ text: finalPrompt }] }],
                         systemInstruction: { parts: [{ text: getSystemPrompt(activeModule, docType, naglowki) }] }
@@ -183,6 +188,7 @@
                     
                     setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
 
+                    // GENEROWANIE OBRAZÓW (Sekwencyjne - zapobiega błędom 403 API)
                     if (activeModule === 'historyjki') {
                         const prompts = [
                             `2D Flat vector illustration, storybook style. A charming friendly character looking pensive and thoughtful in a school environment. Soft pastel colors, innocent look.`,
@@ -191,23 +197,30 @@
                         ];
                         
                         try {
-                            // Żądania z parametrem instances + sampleCount zgodnie z wytycznymi
-                            const imgPromises = prompts.map(p => secureApiCall({ instances: { prompt: p }, parameters: { sampleCount: 1 } }, 'image'));
-                            const results = await Promise.allSettled(imgPromises);
-                            
                             const newImages = [];
-                            results.forEach(res => {
-                                if (res.status === 'fulfilled' && res.value.predictions?.[0]?.bytesBase64Encoded) {
-                                    newImages.push(`data:image/png;base64,${res.value.predictions[0].bytesBase64Encoded}`);
+                            
+                            // Pobieramy obrazy jeden po drugim, dając serwerowi odetchnąć
+                            for (let i = 0; i < prompts.length; i++) {
+                                setLoadingMsg(`Maluję obrazek ${i + 1} z 3...`);
+                                const res = await secureApiCall({ 
+                                    instances: { prompt: prompts[i] }, 
+                                    parameters: { sampleCount: 1 } 
+                                }, 'image');
+                                
+                                if (res && res.predictions && res.predictions[0] && res.predictions[0].bytesBase64Encoded) {
+                                    newImages.push(`data:image/png;base64,${res.predictions[0].bytesBase64Encoded}`);
                                 }
-                            });
+                            }
                             
                             setGeneratedImages(newImages);
                             
                             if (newImages.length === 0) {
-                                setError("Serwer graficzny jest chwilowo przeciążony. Spróbuj wygenerować ponownie za chwilę.");
+                                setError("Serwer graficzny odrzucił zapytanie. Spróbuj wygenerować ponownie za chwilę.");
                             }
-                        } catch(e) { console.log("Błąd grafiki:", e); }
+                        } catch(e) { 
+                            console.error("Błąd grafiki:", e); 
+                            setError(`Błąd podczas generowania obrazków: ${e.message}`);
+                        }
                     }
 
                 } catch (err) {
@@ -233,16 +246,29 @@
                         </div>
 
                         <div className="p-6 flex-1 overflow-y-auto custom-scrollbar">
+                            {/* POPRAWIONA SEKCJA Z KODEM I KAWĄ */}
                             <div className="mb-8">
-                                <h2 className="font-bold text-white mb-2">🔑 PIN</h2>
+                                <h2 className="font-bold text-white mb-2">🔑 Kod Dostępu</h2>
                                 <div className="relative mb-4">
-                                    <input type={showPassword ? "text" : "password"} value={authCode} onChange={(e) => setAuthCode(e.target.value)} className="w-full input-bg rounded-lg px-3 py-2 text-sm pr-10" />
+                                    <input 
+                                        type={showPassword ? "text" : "password"} 
+                                        value={authCode} 
+                                        onChange={(e) => setAuthCode(e.target.value)} 
+                                        placeholder="Wpisz kod..." 
+                                        className="w-full input-bg rounded-lg px-3 py-2 text-sm pr-10" 
+                                    />
                                     <button onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">👁️</button>
                                 </div>
                                 <div className={`p-4 rounded-lg text-xs ${isUnlocked ? 'auth-box unlocked' : 'auth-box'}`}>
-                                    {isUnlocked ? "✅ Odblokowano" : "Podaj PIN np. KAWA2024"}
+                                    {isUnlocked ? "✅ Kod poprawny - Odblokowano" : "Wpisz aktywny kod Premium, aby odblokować system."}
                                 </div>
+                                {!isUnlocked && (
+                                    <a href="https://buycoffee.to/magiccolor" target="_blank" rel="noreferrer" className="mt-3 flex items-center justify-center gap-2 w-full bg-amber-600 hover:bg-amber-500 text-white font-bold py-2 rounded-lg transition-colors text-xs">
+                                        ☕ Postaw Kawę po kod
+                                    </a>
+                                )}
                             </div>
+                            
                             <div className="space-y-1">
                                 {MODULES.map(mod => (
                                     <div key={mod.id} onClick={() => { setActiveModule(mod.id); resetForm(); }} className={`module-btn ${activeModule === mod.id ? 'active' : ''}`}>
