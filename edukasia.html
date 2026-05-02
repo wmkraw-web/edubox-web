@@ -84,7 +84,7 @@
 
             const [isAuthenticated, setIsAuthenticated] = useState(false);
             const [passwordInput, setPasswordInput] = useState('');
-            const [activeTab, setActiveTab] = useState('story'); 
+            const [activeTab, setActiveTab] = useState('sos'); 
             const resultRef = useRef(null);
 
             // Stany
@@ -129,14 +129,13 @@
             };
 
             // ==================================================================================
-            // BEZPIECZNY KONTROLER API - Z NAPRAWIONYM KLUCZEM CANVAS
+            // BEZPIECZNY KONTROLER API - TARCZA PRZED LOKALNYMI BŁĘDAMI
             // ==================================================================================
             const secureApiCall = async (payload, endpointType) => {
-                // Ta zmienna musi nazywać się DOKŁADNIE apiKey, by Canvas ją wstrzyknął
                 const apiKey = ""; 
 
                 if (apiKey) {
-                    // TRYB TESTOWY W CANVAS (Z wstrzykniętym kluczem!)
+                    // TRYB TESTOWY W CANVAS (Z wstrzykniętym kluczem)
                     const url = endpointType === 'text' 
                         ? `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`
                         : `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${apiKey}`;
@@ -161,11 +160,17 @@
                         body: JSON.stringify(payload)
                     });
                 } else {
-                    // TRYB PRODUKCYJNY LUB LOKALNY
-                    if (window.location.protocol === 'file:') {
-                        throw new Error("Odpaliłeś plik z dysku komputera! 🛑 Przeglądarka zablokowała połączenie z siecią w celu ochrony Twoich danych. Wgraj plik na swój Vercel i otwórz przez link, lub kliknij przycisk 'Podgląd' (Preview) w oknie czatu.");
+                    // Weryfikacja czy użytkownik nie otwiera pliku z dziwnego środowiska lokalnego
+                    const isLocal = window.location.protocol === 'file:' || 
+                                    window.location.hostname === 'localhost' || 
+                                    window.location.hostname === '127.0.0.1' || 
+                                    !window.location.hostname;
+
+                    if (isLocal) {
+                        throw new Error("Uruchomiłeś plik z dysku lub lokalnego podglądu (np. Live Server)! 🛑 Przeglądarka zablokowała połączenie. Wgraj plik na swój Vercel i otwórz przez link, lub kliknij przycisk 'Podgląd' (Preview) w oknie czatu.");
                     }
 
+                    // Jesteśmy bezpieczni na Vercelu (Łączymy się ze "Strażnikiem Klucza" /api/gemini)
                     try {
                         const response = await fetch('/api/gemini', {
                             method: 'POST',
@@ -224,7 +229,7 @@
                         setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
                     } else throw new Error("Pusta odpowiedź z API.");
                 } catch (err) {
-                    setSosError('Błąd połączenia: ' + err.message);
+                    setSosError('Błąd: ' + err.message);
                 } finally {
                     setIsGeneratingSos(false);
                 }
@@ -249,7 +254,7 @@
                         setShowSuccessCard(true); 
                     } else throw new Error();
                 } catch (err) {
-                    alert("Błąd generowania. Serwer niedostępny: " + err.message);
+                    alert("Błąd generowania. Spróbuj ponownie: " + err.message);
                 } finally {
                     setIsGeneratingSuccess(false);
                 }
@@ -297,10 +302,10 @@
                         setGeneratedStory(story); 
                         setGeneratedImage(imgData.url);
                     } else {
-                        throw new Error("Brak obrazka w odpowiedzi. Sprawdź, czy Twój klucz API obsługuje model graficzny.");
+                        throw new Error("Brak obrazka w odpowiedzi.");
                     }
                 } catch (err) {
-                    setStoryError('Błąd połączenia: ' + err.message);
+                    setStoryError('Błąd: ' + err.message);
                 } finally {
                     setIsGeneratingStory(false);
                 }
