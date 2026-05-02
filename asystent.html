@@ -28,6 +28,7 @@
             padding: 0;
         }
 
+        /* Scrollbar */
         ::-webkit-scrollbar { width: 8px; }
         ::-webkit-scrollbar-track { background: #0f172a; }
         ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
@@ -36,6 +37,7 @@
         .fade-in { animation: fadeIn 0.3s ease-out forwards; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 
+        /* Komponenty UI */
         .sidebar { background-color: #0f172a; border-right: 1px solid #1e293b; }
         .card-bg { background-color: #0b1120; border: 1px solid #1e293b; }
         .input-bg { background-color: #1e293b; border: 1px solid #334155; color: #f8fafc; transition: all 0.2s; }
@@ -111,7 +113,7 @@
                 return base;
             }
             if (module === 'historyjki') {
-                return `Jesteś pedagogiem specjalnym. Napisz rozbudowaną 'Historyjkę Społeczną'. Napisz ją w pierwszej osobie ("Ja"). Podziel tekst na 3 akapity: 1. PROBLEM, 2. STRATEGIA, 3. EFEKT. Zwróć tylko sformatowany tekst.`;
+                return `Jesteś pedagogiem specjalnym. Napisz rozbudowaną 'Historyjkę Społeczną'. Napisz ją w pierwszej osobie ("Ja"). Podziel tekst na 3 akapity: 1. PROBLEM, 2. STRATEGIA, 3. EFEKT. Zwróć tylko sformatowany tekst w HTML.`;
             }
             return "Jesteś ekspertem edukacyjnym.";
         };
@@ -166,40 +168,45 @@
                 setIsUnlocked(authCode.toUpperCase() === SECRET_PIN); 
             }, [authCode]);
 
-            const fetchWithRetry = async (url, options, retries = 3) => {
-                for (let i = 0; i < retries; i++) {
-                    try {
-                        const response = await fetch(url, options);
-                        if (!response.ok) {
-                            const errText = await response.text();
-                            throw new Error(`Błąd HTTP ${response.status}: ${errText}`);
-                        }
-                        return await response.json();
-                    } catch (e) {
-                        if (i === retries - 1) throw e;
-                        await new Promise(res => setTimeout(res, 2000 * Math.pow(2, i)));
-                    }
-                }
-            };
-
+            // ==================================================================================
+            // BEZPIECZNY KONTROLER API - ŻADNYCH KLUCZY W KODZIE FRONTENDU
+            // ==================================================================================
             const secureApiCall = async (payload, type = 'text') => {
-                const apiKey = ""; // Klucz z Canvas
+                // Ta zmienna będzie wstrzyknięta przez środowisko Canvas, ale w internecie pozostanie PUSTA.
+                const previewApiKey = ""; 
 
-                if (apiKey) {
+                if (previewApiKey) {
+                    // TRYB TESTOWY W CANVAAS (Darmowy test w tym czacie)
                     const url = type === 'text' 
-                        ? `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`
-                        : `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${apiKey}`;
+                        ? `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${previewApiKey}`
+                        : `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${previewApiKey}`;
                     
+                    const fetchWithRetry = async (url, options, retries = 5) => {
+                        const delays = [1000, 2000, 4000, 8000, 16000];
+                        for (let i = 0; i < retries; i++) {
+                            try {
+                                const response = await fetch(url, options);
+                                if (!response.ok) throw new Error(await response.text());
+                                return await response.json();
+                            } catch (e) {
+                                if (i === retries - 1) throw e;
+                                await new Promise(res => setTimeout(res, delays[i]));
+                            }
+                        }
+                    };
+
                     return await fetchWithRetry(url, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(payload)
                     });
                 } else {
-                    const isLocal = window.location.protocol === 'file:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-                    if (isLocal) throw new Error("Uruchamiasz plik prosto z dysku (lokalnie)! 🛑 Użyj przycisku 'Podgląd' (Preview) lub wrzuć plik na serwer Vercel.");
+                    // TRYB PRODUKCYJNY LUB LOKALNY
+                    if (window.location.protocol === 'file:') {
+                        throw new Error("Odpaliłeś plik prosto z dysku (lokalnie)! 🛑 Aby chronić Twój klucz API, zablokowałem połączenie. Wgraj kod na swojego GitHuba (Vercela) i otwórz przez link w internecie, lub testuj przez przycisk 'Podgląd' (Preview) w czacie!");
+                    }
 
-                    // Inteligentny Fallback dla Vercela
+                    // JESTEŚMY NA VERCELU (Łączymy się ze "Strażnikiem Klucza" czyli /api/gemini)
                     try {
                         const response = await fetch('/api/gemini', {
                             method: 'POST',
@@ -208,37 +215,13 @@
                         });
 
                         if (!response.ok) {
-                            // Jeśli plik /api/gemini nie istnieje, zróbmy Fallback do starszych endpointów
-                            if (response.status === 404) {
-                                if (type === 'text') {
-                                    const sysText = payload.systemInstruction?.parts[0]?.text || "";
-                                    const usrText = payload.contents[0]?.parts[0]?.text || "";
-                                    const fbRes = await fetch('/api/chat', {
-                                        method: 'POST',
-                                        headers: { 'Content-Type': 'application/json' },
-                                        body: JSON.stringify({ system: sysText, prompt: usrText, temperature: payload.generationConfig?.temperature || 0.4, format: "text", model: "gpt-4o-mini" })
-                                    });
-                                    if(!fbRes.ok) throw new Error("Błąd Vercel /api/chat");
-                                    const fbData = await fbRes.json();
-                                    return { candidates: [{ content: { parts: [{ text: fbData.text }] } }] };
-                                } else {
-                                    const imgPrompt = payload.instances?.prompt || payload.instances[0]?.prompt;
-                                    const fbRes = await fetch('/api/generate', {
-                                        method: 'POST',
-                                        headers: { 'Content-Type': 'application/json' },
-                                        body: JSON.stringify({ prompt: imgPrompt })
-                                    });
-                                    if(!fbRes.ok) throw new Error("Błąd Vercel /api/generate");
-                                    const fbData = await fbRes.json();
-                                    return { isVercelUrl: true, url: fbData.imageUrl };
-                                }
-                            }
                             const errData = await response.json().catch(() => ({}));
-                            throw new Error(`Błąd Vercel API: ${errData.error || response.statusText}`);
+                            throw new Error(`Błąd Vercela: ${errData.error || response.statusText}. Sprawdź, czy masz klucz GEMINI_API_KEY w ustawieniach (Settings -> Environment Variables) swojego Vercela.`);
                         }
+                        
                         return await response.json();
-                    } catch (e) {
-                        throw new Error("Błąd sieciowy z serwerem: " + e.message);
+                    } catch (err) {
+                        throw new Error(`${err.message}`);
                     }
                 }
             };
@@ -272,7 +255,7 @@
             };
 
             const handleGenerate = async () => {
-                if (!isUnlocked) { setError("Wpisz poprawny kod aktywacyjny!"); return; }
+                if (!isUnlocked) { setError("Wpisz poprawny kod aktywacyjny (np. KAWA2024) w panelu po lewej stronie!"); return; }
                 
                 setIsGenerating(true); 
                 setError(''); 
@@ -288,6 +271,7 @@
                         finalPrompt = `Temat: ${genericInput}`;
                     }
 
+                    // 1. GENEROWANIE TEKSTU
                     const textData = await secureApiCall({
                         contents: [{ parts: [{ text: finalPrompt }] }],
                         systemInstruction: { parts: [{ text: getSystemPrompt(activeModule, docType, naglowki, formatLength) }] },
@@ -302,7 +286,7 @@
                     
                     setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
 
-                    // Obrazy (sekwencyjnie)
+                    // 2. GENEROWANIE OBRAZÓW (Sekwencyjnie - chroni przed banem za spamowanie API)
                     if (activeModule === 'historyjki') {
                         const prompts = [
                             `2D Flat vector illustration, storybook style. A charming friendly character looking pensive and thoughtful in a school environment. Soft pastel colors, innocent look. NO TEXT.`,
@@ -312,20 +296,24 @@
                         
                         try {
                             const newImages = [];
+                            
                             for (let i = 0; i < prompts.length; i++) {
                                 setLoadingMsg(`Maluję obrazek ${i + 1} z 3...`);
+                                
                                 const res = await secureApiCall({ 
-                                    instances: { prompt: prompts[i] }, 
+                                    instances: [{ prompt: prompts[i] }], 
                                     parameters: { sampleCount: 1 } 
                                 }, 'image');
                                 
-                                if (res.isVercelUrl) {
-                                    newImages.push(res.url);
-                                } else if (res.predictions && res.predictions[0] && res.predictions[0].bytesBase64Encoded) {
+                                if (res.predictions && res.predictions[0] && res.predictions[0].bytesBase64Encoded) {
                                     newImages.push(`data:image/png;base64,${res.predictions[0].bytesBase64Encoded}`);
                                 }
                             }
+                            
                             setGeneratedImages(newImages);
+                            if (newImages.length === 0) {
+                                setError("Serwer graficzny nie zwrócił obrazków. Odczekaj chwilę i spróbuj ponownie.");
+                            }
                         } catch(e) { 
                             console.error("Błąd grafiki:", e); 
                             setError(`Zignorowano błąd obrazków: ${e.message}`);
@@ -355,8 +343,10 @@
                         </div>
 
                         <div className="p-6 flex-1 overflow-y-auto custom-scrollbar">
+                            
                             <div className="mb-8">
                                 <h2 className="font-bold text-white mb-3 flex items-center gap-2"><span>🛡️</span> Wersja PRO</h2>
+                                
                                 {!isUnlocked ? (
                                     <div className="space-y-4">
                                         <div className="relative">
@@ -409,6 +399,7 @@
                                             ))}
                                         </div>
                                         
+                                        {/* WGRYWANIE PLIKÓW PDF */}
                                         <div className="mt-4">
                                             <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">Własne pliki do analizy (PDF, TXT)</label>
                                             <div className="upload-box relative">
@@ -416,7 +407,7 @@
                                                 <div className="flex flex-col items-center gap-2 text-slate-400">
                                                     <span className="text-2xl">📂</span>
                                                     <span className="text-sm font-bold text-white">Kliknij lub upuść pliki opinii/orzeczeń tutaj</span>
-                                                    <span className="text-xs">Sztuczna Inteligencja przeczyta je i uwzględni w dokumencie!</span>
+                                                    <span className="text-xs">Sztuczna Inteligencja przeczyta je i uwzględni w Twoim dokumencie!</span>
                                                 </div>
                                             </div>
                                             {uploadedFilesText && <div className="mt-3 p-3 bg-emerald-900/30 border border-emerald-500/50 rounded-xl text-xs text-emerald-400 font-bold">✅ Pliki wczytane pomyślnie! AI przeanalizuje je przy generowaniu.</div>}
