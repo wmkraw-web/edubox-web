@@ -33,15 +33,15 @@
         /* Komponenty UI */
         .sidebar { background-color: #0f172a; border-right: 1px solid #1e293b; }
         .card-bg { background-color: #0b1120; border: 1px solid #1e293b; }
-        .input-bg { background-color: #1e293b; border: 1px solid #334155; color: #f8fafc; }
-        .input-bg:focus { border-color: #ef4444; outline: none; }
+        .input-bg { background-color: #1e293b; border: 1px solid #334155; color: #f8fafc; transition: all 0.2s; }
+        .input-bg:focus { border-color: #ef4444; outline: none; box-shadow: 0 0 10px rgba(239, 68, 68, 0.2); }
         
-        .btn-red { background: linear-gradient(135deg, #e11d48 0%, #be123c 100%); color: white; }
-        .btn-red:hover { background: linear-gradient(135deg, #f43f5e 0%, #e11d48 100%); }
-        .btn-red:disabled { background: #475569; cursor: not-allowed; color: #94a3b8; }
+        .btn-red { background: linear-gradient(135deg, #e11d48 0%, #be123c 100%); color: white; transition: all 0.3s; }
+        .btn-red:hover { background: linear-gradient(135deg, #f43f5e 0%, #e11d48 100%); transform: translateY(-2px); box-shadow: 0 5px 15px rgba(225, 29, 72, 0.4); }
+        .btn-red:active { transform: translateY(0); }
+        .btn-red:disabled { background: #475569; cursor: not-allowed; color: #94a3b8; transform: none; box-shadow: none; }
 
-        .auth-box { background-color: #27272a; border: 1px solid #3f3f46; color: #d4d4d8; }
-        .auth-box.unlocked { background-color: rgba(22, 101, 52, 0.2); border-color: #166534; color: #86efac; }
+        .btn-bounce:active { transform: scale(0.95); }
 
         .module-btn { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 1rem; border-radius: 0.5rem; transition: all 0.2s; color: #cbd5e1; font-weight: 500; font-size: 0.875rem; cursor: pointer; }
         .module-btn:hover { background-color: #1e293b; color: #f8fafc; }
@@ -50,9 +50,6 @@
         .doc-radio { display: none; }
         .doc-label { display: block; padding: 0.75rem 1rem; background-color: #0b1120; border: 1px solid #1e293b; border-radius: 0.5rem; cursor: pointer; font-size: 0.875rem; transition: all 0.2s; margin-bottom: 0.5rem; }
         .doc-radio:checked + .doc-label { background-color: rgba(225, 29, 72, 0.1); border-color: #e11d48; color: #fff; font-weight: 600; }
-        
-        .upload-box { border: 2px dashed #334155; border-radius: 0.75rem; padding: 1.5rem; text-align: center; cursor: pointer; transition: all 0.2s; background: #0f172a; }
-        .upload-box:hover { border-color: #ef4444; background: rgba(225, 29, 72, 0.05); }
 
         @media print {
             body { background-color: white !important; color: black !important; }
@@ -96,7 +93,7 @@
                 return base;
             }
             if (module === 'historyjki') {
-                return `Jesteś pedagogiem specjalnym. Napisz rozbudowaną 'Historyjkę Społeczną'. Napisz ją w pierwszej osobie ("Ja"). Podziel tekst na 3 akapity: 1. PROBLEM, 2. STRATEGIA, 3. EFEKT.`;
+                return `Jesteś pedagogiem specjalnym. Napisz rozbudowaną 'Historyjkę Społeczną'. Napisz ją w pierwszej osobie ("Ja"). Podziel tekst na 3 akapity: 1. PROBLEM, 2. STRATEGIA, 3. EFEKT. Zwróć tylko sformatowany tekst w HTML.`;
             }
             return "Jesteś ekspertem edukacyjnym.";
         };
@@ -127,10 +124,10 @@
             }, [authCode]);
 
             // ==================================================================================
-            // BEZPIECZNY KONTROLER API - Zoptymalizowany dla środowiska podglądu z wykupionym pakietem
+            // HYBRYDOWY KONTROLER API - Automatycznie przełącza tryby Canvas / Vercel
             // ==================================================================================
-            const fetchWithRetry = async (url, options, retries = 5) => {
-                const delays = [1000, 2000, 4000, 8000, 16000];
+            const fetchWithRetry = async (url, options, retries = 3) => {
+                const delays = [1000, 2000, 4000];
                 for (let i = 0; i < retries; i++) {
                     try {
                         const response = await fetch(url, options);
@@ -147,16 +144,62 @@
             };
 
             const secureApiCall = async (payload, type = 'text') => {
-                const apiKey = ""; // Środowisko ładuje klucz automatycznie w podglądzie
-                const url = type === 'text' 
-                    ? `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`
-                    : `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${apiKey}`;
-                
-                return await fetchWithRetry(url, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
+                // Wykrywanie środowiska: jeśli w adresie mamy vercel lub to nie jest localhost -> Jesteśmy w sieci
+                const isExternalHost = window.location.hostname.includes('vercel.app') || 
+                                       (window.location.hostname !== '' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1');
+
+                if (isExternalHost) {
+                    // TRYB PRODUKCYJNY VERCEL (Używamy Twoich bezpiecznych endpointów)
+                    if (type === 'text') {
+                        const sysText = payload.systemInstruction?.parts[0]?.text || "";
+                        const usrText = payload.contents[0]?.parts[0]?.text || "";
+                        
+                        const response = await fetch('/api/chat', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                system: sysText,
+                                prompt: usrText,
+                                temperature: payload.generationConfig?.temperature || 0.5,
+                                format: "text",
+                                model: "gpt-4o-mini"
+                            })
+                        });
+                        
+                        if (!response.ok) {
+                            const errText = await response.text();
+                            throw new Error(`Błąd Vercel API: ${errText}`);
+                        }
+                        const data = await response.json();
+                        // Pakujemy w strukturę kompatybilną z kodem docelowym
+                        return { candidates: [{ content: { parts: [{ text: data.text }] } }] };
+                    } else {
+                        // Zapytanie obrazkowe (Idzie do API Vercela np. /api/generate obsługujące model Flux)
+                        const imgPrompt = payload.instances?.prompt || payload.instances[0]?.prompt;
+                        const response = await fetch('/api/generate', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ prompt: imgPrompt })
+                        });
+                        
+                        if (!response.ok) throw new Error(`Błąd API Obrazków: ${response.status}`);
+                        const data = await response.json();
+                        // Informujemy aplikację, że zwracamy gotowy link URL a nie Base64
+                        return { isVercelUrl: true, url: data.imageUrl };
+                    }
+                } else {
+                    // TRYB CANVAS (Podgląd lokalny środowiska wstrzykującego darmowy klucz Gemini)
+                    const apiKey = ""; 
+                    const url = type === 'text' 
+                        ? `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`
+                        : `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${apiKey}`;
+                    
+                    return await fetchWithRetry(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                }
             };
 
             const handleGenerate = async () => {
@@ -176,30 +219,33 @@
                         finalPrompt = `Temat: ${genericInput}`;
                     }
 
-                    // GENEROWANIE TEKSTU
+                    // 1. GENEROWANIE TEKSTU
                     const textData = await secureApiCall({
                         contents: [{ parts: [{ text: finalPrompt }] }],
                         systemInstruction: { parts: [{ text: getSystemPrompt(activeModule, docType, naglowki) }] }
                     }, 'text');
 
                     const story = textData.candidates?.[0]?.content?.parts?.[0]?.text;
-                    if (!story) throw new Error("AI nie zwróciło tekstu.");
-                    setGeneratedText(story);
+                    if (!story) throw new Error("AI nie zwróciło tekstu. Spróbuj ponownie.");
+                    
+                    // Oczyszczanie ewentualnego tagu z myśleniem (Reasoning)
+                    let cleanText = story;
+                    cleanText = cleanText.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+                    setGeneratedText(cleanText);
                     
                     setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
 
-                    // GENEROWANIE OBRAZÓW (Sekwencyjne - zapobiega błędom 403 API)
+                    // 2. GENEROWANIE OBRAZÓW (Sekwencyjne)
                     if (activeModule === 'historyjki') {
                         const prompts = [
-                            `2D Flat vector illustration, storybook style. A charming friendly character looking pensive and thoughtful in a school environment. Soft pastel colors, innocent look.`,
-                            `2D Flat vector illustration, storybook style. A charming friendly character taking a deep breath and feeling very calm and peaceful. School environment. Soft blue colors.`,
-                            `2D Flat vector illustration, storybook style. A charming friendly character with a very big happy smile, feeling proud and successful. Bright joyful colors.`
+                            `2D Flat vector illustration, storybook style. A charming friendly character looking pensive and thoughtful in a school environment. Soft pastel colors, innocent look. NO TEXT.`,
+                            `2D Flat vector illustration, storybook style. A charming friendly character taking a deep breath and feeling very calm and peaceful. School environment. Soft blue colors. NO TEXT.`,
+                            `2D Flat vector illustration, storybook style. A charming friendly character with a very big happy smile, feeling proud and successful. Bright joyful colors. NO TEXT.`
                         ];
                         
                         try {
                             const newImages = [];
                             
-                            // Pobieramy obrazy jeden po drugim, dając serwerowi odetchnąć
                             for (let i = 0; i < prompts.length; i++) {
                                 setLoadingMsg(`Maluję obrazek ${i + 1} z 3...`);
                                 const res = await secureApiCall({ 
@@ -207,15 +253,16 @@
                                     parameters: { sampleCount: 1 } 
                                 }, 'image');
                                 
-                                if (res && res.predictions && res.predictions[0] && res.predictions[0].bytesBase64Encoded) {
-                                    newImages.push(`data:image/png;base64,${res.predictions[0].bytesBase64Encoded}`);
+                                if (res.isVercelUrl) {
+                                    newImages.push(res.url); // Jeśli na Vercelu, dostajemy link do obrazka
+                                } else if (res.predictions && res.predictions[0] && res.predictions[0].bytesBase64Encoded) {
+                                    newImages.push(`data:image/png;base64,${res.predictions[0].bytesBase64Encoded}`); // Z Canvasa
                                 }
                             }
                             
                             setGeneratedImages(newImages);
-                            
                             if (newImages.length === 0) {
-                                setError("Serwer graficzny odrzucił zapytanie. Spróbuj wygenerować ponownie za chwilę.");
+                                setError("Serwer graficzny odrzucił zapytanie. Brak obrazków.");
                             }
                         } catch(e) { 
                             console.error("Błąd grafiki:", e); 
@@ -240,39 +287,51 @@
 
             return (
                 <div className="flex min-h-screen relative">
-                    <div className="sidebar w-72 flex-shrink-0 flex flex-col h-screen sticky top-0 print-hidden">
+                    <div className="sidebar w-72 flex-shrink-0 flex flex-col h-screen sticky top-0 print-hidden z-20">
                         <div className="p-6 border-b border-slate-800">
                             <h1 className="font-bold text-slate-300 text-sm tracking-widest uppercase">Asystent Pedagoga PRO</h1>
                         </div>
 
                         <div className="p-6 flex-1 overflow-y-auto custom-scrollbar">
-                            {/* POPRAWIONA SEKCJA Z KODEM I KAWĄ */}
+                            
+                            {/* POPRAWIONA SEKCJA WERSJI PRO (Elegancka zachęta) */}
                             <div className="mb-8">
-                                <h2 className="font-bold text-white mb-2">🔑 Kod Dostępu</h2>
-                                <div className="relative mb-4">
-                                    <input 
-                                        type={showPassword ? "text" : "password"} 
-                                        value={authCode} 
-                                        onChange={(e) => setAuthCode(e.target.value)} 
-                                        placeholder="Wpisz kod..." 
-                                        className="w-full input-bg rounded-lg px-3 py-2 text-sm pr-10" 
-                                    />
-                                    <button onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">👁️</button>
-                                </div>
-                                <div className={`p-4 rounded-lg text-xs ${isUnlocked ? 'auth-box unlocked' : 'auth-box'}`}>
-                                    {isUnlocked ? "✅ Kod poprawny - Odblokowano" : "Wpisz aktywny kod Premium, aby odblokować system."}
-                                </div>
-                                {!isUnlocked && (
-                                    <a href="https://buycoffee.to/magiccolor" target="_blank" rel="noreferrer" className="mt-3 flex items-center justify-center gap-2 w-full bg-amber-600 hover:bg-amber-500 text-white font-bold py-2 rounded-lg transition-colors text-xs">
-                                        ☕ Postaw Kawę po kod
-                                    </a>
+                                <h2 className="font-bold text-white mb-3 flex items-center gap-2"><span>🛡️</span> Wersja PRO</h2>
+                                
+                                {!isUnlocked ? (
+                                    <div className="space-y-4">
+                                        <a href="https://buycoffee.to/magiccolor" target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white font-bold py-3.5 rounded-xl transition-all text-sm shadow-[0_0_15px_rgba(245,158,11,0.3)] btn-bounce">
+                                            ☕ Postaw Kawę po Kod
+                                        </a>
+                                        
+                                        <div className="relative">
+                                            <input 
+                                                type={showPassword ? "text" : "password"} 
+                                                value={authCode} 
+                                                onChange={(e) => setAuthCode(e.target.value)} 
+                                                placeholder="Masz kod? Wpisz go..." 
+                                                className="w-full bg-[#1e293b] border border-[#334155] focus:border-amber-500 text-white rounded-xl px-4 py-3 text-sm pr-10 outline-none transition-colors" 
+                                            />
+                                            <button onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white">
+                                                {showPassword ? "🙈" : "👁️"}
+                                            </button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 p-4 rounded-xl flex items-center gap-4 shadow-inner">
+                                        <div className="bg-emerald-500/20 p-2 rounded-lg"><span className="text-xl">✅</span></div>
+                                        <div>
+                                            <div className="uppercase tracking-widest text-[10px] opacity-80 font-bold">Status Premium</div>
+                                            <div className="text-sm font-bold text-white">System Odblokowany</div>
+                                        </div>
+                                    </div>
                                 )}
                             </div>
                             
                             <div className="space-y-1">
                                 {MODULES.map(mod => (
                                     <div key={mod.id} onClick={() => { setActiveModule(mod.id); resetForm(); }} className={`module-btn ${activeModule === mod.id ? 'active' : ''}`}>
-                                        <span className="w-5 text-center">{mod.icon}</span>
+                                        <span className="w-6 text-center text-lg">{mod.icon}</span>
                                         <span>{mod.label}</span>
                                     </div>
                                 ))}
@@ -280,42 +339,59 @@
                         </div>
                     </div>
 
-                    <div className="main-content flex-1 bg-[#020617] p-6 lg:p-10 min-w-0">
+                    <div className="main-content flex-1 bg-[#020617] p-6 lg:p-10 min-w-0 z-10 relative">
                         {!generatedText && !isGenerating ? (
                             <div className="max-w-4xl fade-in print-hidden">
-                                <h2 className="text-2xl font-bold text-white mb-6">{MODULES.find(m => m.id === activeModule)?.label}</h2>
+                                <h2 className="text-3xl font-black text-white mb-8 border-b border-slate-800 pb-4">{MODULES.find(m => m.id === activeModule)?.label}</h2>
                                 {activeModule === 'dokumenty' ? (
                                     <div className="space-y-6">
-                                        <div className="card-bg p-2 rounded-xl">
+                                        <div className="card-bg p-3 rounded-2xl flex flex-wrap gap-2">
                                             {DOC_TYPES.map(doc => (
-                                                <div key={doc.id}>
+                                                <div key={doc.id} className="flex-1 min-w-[200px]">
                                                     <input type="radio" id={doc.id} checked={docType === doc.id} onChange={() => setDocType(doc.id)} className="doc-radio" />
-                                                    <label htmlFor={doc.id} className="doc-label">{doc.label}</label>
+                                                    <label htmlFor={doc.id} className="doc-label text-center h-full flex items-center justify-center">{doc.label}</label>
                                                 </div>
                                             ))}
                                         </div>
-                                        <div className="grid grid-cols-2 gap-6">
-                                            <textarea value={diagnoza} onChange={(e) => setDiagnoza(e.target.value)} placeholder="Diagnoza..." className="w-full h-24 input-bg rounded-lg p-3 text-sm"></textarea>
-                                            <textarea value={naglowki} onChange={(e) => setNaglowki(e.target.value)} placeholder="Własne nagłówki..." className="w-full h-24 input-bg rounded-lg p-3 text-sm"></textarea>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                            <div>
+                                                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">Główna Diagnoza</label>
+                                                <textarea value={diagnoza} onChange={(e) => setDiagnoza(e.target.value)} placeholder="Np. Spektrum autyzmu, Afazja, Trudności adaptacyjne..." className="w-full h-28 input-bg rounded-xl p-4 text-sm resize-none"></textarea>
+                                            </div>
+                                            <div>
+                                                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">Szablon Placówki (Opcjonalnie)</label>
+                                                <textarea value={naglowki} onChange={(e) => setNaglowki(e.target.value)} placeholder="Np. Wklej tutaj nagłówki wymagane w Twojej szkole..." className="w-full h-28 input-bg rounded-xl p-4 text-sm resize-none"></textarea>
+                                            </div>
                                         </div>
-                                        <textarea value={mocneStrony} onChange={(e) => setMocneStrony(e.target.value)} placeholder="Mocne strony..." className="w-full h-24 input-bg rounded-lg p-3 text-sm"></textarea>
-                                        <textarea value={trudnosci} onChange={(e) => setTrudnosci(e.target.value)} placeholder="Trudności..." className="w-full h-24 input-bg rounded-lg p-3 text-sm"></textarea>
+                                        <div>
+                                            <label className="text-xs font-bold text-emerald-400 uppercase tracking-wider block mb-2">Mocne Strony ucznia</label>
+                                            <textarea value={mocneStrony} onChange={(e) => setMocneStrony(e.target.value)} placeholder="Co uczeń potrafi, w czym jest dobry..." className="w-full h-24 input-bg rounded-xl p-4 text-sm resize-none border-emerald-900/30 focus:border-emerald-500"></textarea>
+                                        </div>
+                                        <div>
+                                            <label className="text-xs font-bold text-rose-400 uppercase tracking-wider block mb-2">Trudności do pokonania</label>
+                                            <textarea value={trudnosci} onChange={(e) => setTrudnosci(e.target.value)} placeholder="Z czym ma problemy, co sprawia trudność na zajęciach..." className="w-full h-24 input-bg rounded-xl p-4 text-sm resize-none border-rose-900/30 focus:border-rose-500"></textarea>
+                                        </div>
                                     </div>
                                 ) : (
-                                    <div className="card-bg p-4 rounded-xl">
-                                        <textarea value={genericInput} onChange={(e) => setGenericInput(e.target.value)} placeholder="Opisz krótko sytuację..." className="w-full h-40 input-bg rounded-lg p-4 text-sm"></textarea>
+                                    <div className="space-y-4">
+                                        <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">Opisz temat lub problem</label>
+                                        <textarea value={genericInput} onChange={(e) => setGenericInput(e.target.value)} placeholder="Opisz krótko sytuację, z którą pracujemy..." className="w-full h-48 input-bg rounded-2xl p-5 text-base resize-none"></textarea>
                                     </div>
                                 )}
                             </div>
                         ) : null}
 
-                        {error && <div className="mt-6 max-w-4xl p-4 bg-red-900/40 border border-red-500/50 rounded-xl text-red-400 text-sm font-medium">{error}</div>}
+                        {error && (
+                            <div className="mt-6 max-w-4xl p-5 bg-red-900/20 border border-red-500/30 rounded-2xl text-red-400 text-sm font-medium flex items-center gap-3">
+                                <span className="text-xl">⚠️</span> {error}
+                            </div>
+                        )}
 
                         <div className="mt-8 max-w-4xl print-hidden">
                             {!generatedText || isGenerating ? (
-                                <button onClick={handleGenerate} disabled={isGenerating || !isUnlocked} className="btn-red px-8 py-4 rounded-xl font-bold w-full sm:w-auto flex items-center justify-center gap-3">
+                                <button onClick={handleGenerate} disabled={isGenerating || !isUnlocked} className="btn-red px-10 py-5 rounded-2xl font-black text-lg w-full sm:w-auto flex items-center justify-center gap-3 shadow-lg btn-bounce">
                                     {isGenerating ? (
-                                        <><svg className="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> {loadingMsg || "Generuję..."}</>
+                                        <><svg className="animate-spin h-6 w-6 text-white" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> {loadingMsg || "Generuję..."}</>
                                     ) : `✨ GENERUJ MATERIAŁ`}
                                 </button>
                             ) : null}
@@ -323,29 +399,33 @@
 
                         {generatedText && (
                             <div ref={resultRef} className="max-w-5xl fade-in pb-10 mt-6">
-                                <div className="flex items-center justify-between mb-6 print-hidden border-b border-slate-800 pb-4">
-                                    <h2 className="text-2xl font-bold text-white">Gotowy Materiał</h2>
-                                    <div className="flex gap-3">
-                                        <button onClick={() => window.print()} className="bg-slate-800 text-white px-4 py-2 rounded-lg text-sm font-bold border border-slate-600">🖨️ Drukuj</button>
-                                        <button onClick={resetForm} className="bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-bold">Wróć</button>
+                                <div className="flex flex-col sm:flex-row items-center justify-between mb-8 print-hidden border-b border-slate-800 pb-6 gap-4">
+                                    <h2 className="text-3xl font-black text-white">Gotowy Materiał</h2>
+                                    <div className="flex gap-3 w-full sm:w-auto">
+                                        <button onClick={() => window.print()} className="flex-1 sm:flex-none bg-slate-800 hover:bg-slate-700 text-white px-6 py-3 rounded-xl text-sm font-bold border border-slate-600 transition-colors flex items-center justify-center gap-2">
+                                            <span>🖨️</span> Drukuj
+                                        </button>
+                                        <button onClick={resetForm} className="flex-1 sm:flex-none btn-red px-6 py-3 rounded-xl text-sm font-bold shadow-md">
+                                            Wróć
+                                        </button>
                                     </div>
                                 </div>
 
-                                <div className="card-bg p-8 sm:p-12 rounded-[2rem] print-area flex flex-col gap-8">
+                                <div className="card-bg p-8 sm:p-14 rounded-[2rem] print-area flex flex-col gap-8 shadow-2xl">
                                     {activeModule === 'historyjki' && generatedImages.length > 0 && (
-                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full print-images-grid">
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 w-full print-images-grid mb-6">
                                             {generatedImages.map((img, idx) => (
-                                                <div key={idx} className="flex flex-col items-center fade-in">
-                                                    <img src={img} alt="AI" className="w-full aspect-square object-cover rounded-2xl border-4 border-slate-800 shadow-xl" />
-                                                    <p className="text-center text-xs text-slate-300 mt-3 font-bold uppercase bg-slate-900 px-4 py-1.5 rounded-full border border-slate-700">
+                                                <div key={idx} className="flex flex-col items-center fade-in bg-slate-900/30 p-4 rounded-3xl border border-slate-800">
+                                                    <img src={img} alt="Ilustracja AI" className="w-full aspect-square object-cover rounded-2xl border border-slate-700 shadow-md" />
+                                                    <p className="text-center text-xs text-white mt-4 font-black uppercase tracking-widest bg-blue-600 px-5 py-2 rounded-full shadow-lg">
                                                         {idx === 0 ? "1. Problem" : idx === 1 ? "2. Strategia" : "3. Efekt"}
                                                     </p>
                                                 </div>
                                             ))}
                                         </div>
                                     )}
-                                    <div className="w-full text-slate-200 whitespace-pre-wrap text-lg leading-relaxed">
-                                        {generatedText}
+                                    <div className="w-full text-slate-200 whitespace-pre-wrap text-lg leading-relaxed font-serif">
+                                        <div dangerouslySetInnerHTML={{ __html: generatedText.replace(/\n/g, '<br/>') }} />
                                     </div>
                                 </div>
                             </div>
