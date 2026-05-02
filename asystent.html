@@ -93,9 +93,6 @@
             { id: 'rodzice', label: 'Komunikacja z Rodzicem', icon: '🤝' }
         ];
 
-        // =========================================================================
-        // POTĘŻNE PROMPTY ZABEZPIECZAJĄCE PRZED BŁĘDAMI
-        // =========================================================================
         const getSystemPrompt = (module, docType, customHeaders, formatLength) => {
             if (module === 'dokumenty') {
                 let lengthInstruction = formatLength === 'epic' 
@@ -194,16 +191,17 @@ ZASADY KRYTYCZNE:
             }, [authCode]);
 
             // ==================================================================================
-            // BEZPIECZNY KONTROLER API - ŻADNYCH KLUCZY W KODZIE FRONTENDU
+            // BEZPIECZNY KONTROLER API - Z NAPRAWIONYM KLUCZEM CANVAS
             // ==================================================================================
             const secureApiCall = async (payload, type = 'text') => {
-                const previewApiKey = ""; 
+                // Ta zmienna musi nazywać się DOKŁADNIE apiKey, by Canvas ją wstrzyknął
+                const apiKey = ""; 
 
-                if (previewApiKey) {
-                    // TRYB TESTOWY W CANVAAS
+                if (apiKey) {
+                    // TRYB TESTOWY W CANVAS (Z wstrzykniętym kluczem!)
                     const url = type === 'text' 
-                        ? `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${previewApiKey}`
-                        : `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${previewApiKey}`;
+                        ? `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`
+                        : `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${apiKey}`;
                     
                     const fetchWithRetry = async (url, options, retries = 5) => {
                         const delays = [1000, 2000, 4000, 8000, 16000];
@@ -227,7 +225,7 @@ ZASADY KRYTYCZNE:
                 } else {
                     // TRYB VERCEL LUB LOKALNY
                     if (window.location.protocol === 'file:') {
-                        throw new Error("Odpaliłeś plik prosto z dysku (lokalnie)! 🛑 Aby chronić Twój klucz API, zablokowałem połączenie. Wgraj kod na swojego GitHuba (Vercela) i otwórz przez link w internecie, lub testuj przez przycisk 'Podgląd' (Preview) w czacie!");
+                        throw new Error("Odpaliłeś plik prosto z dysku (lokalnie)! 🛑 Przeglądarka zablokowała połączenie. Wgraj plik na Vercel lub kliknij 'Podgląd' (Preview) w czacie.");
                     }
 
                     try {
@@ -237,9 +235,15 @@ ZASADY KRYTYCZNE:
                             body: JSON.stringify({ payload: payload, type: type })
                         });
 
+                        // PANCAERNA OCHRONA PRZED BŁĘDEM <DOCTYPE HTML>
+                        const contentType = response.headers.get("content-type");
+                        if (!contentType || !contentType.includes("application/json")) {
+                            throw new Error("Oczekiwano JSON, a otrzymano stronę błędu HTML. Sprawdź, czy na Vercelu na pewno istnieje plik api/gemini.js.");
+                        }
+
                         if (!response.ok) {
                             const errData = await response.json().catch(() => ({}));
-                            throw new Error(`Błąd Vercela: ${errData.error || response.statusText}. Sprawdź, czy masz klucz API w ustawieniach swojego Vercela.`);
+                            throw new Error(`Błąd Vercela: ${errData.error || response.statusText}. Sprawdź, czy masz klucz API w ustawieniach Vercel.`);
                         }
                         
                         return await response.json();
@@ -486,19 +490,6 @@ ZASADY KRYTYCZNE:
                                                 <textarea value={naglowki} onChange={(e) => setNaglowki(e.target.value)} placeholder="Wklej tutaj puste nagłówki ze szkolnego druczku (np. 1. Zachowanie, 2. Umiejętności). AI dokładnie wypełni Twój szablon!" className="w-full h-28 input-bg rounded-xl p-4 text-sm resize-none border-amber-900/50 focus:border-amber-500"></textarea>
                                             </div>
                                         </div>
-
-                                        <div className="bg-slate-900/50 p-4 rounded-xl border border-slate-800 mb-2">
-                                            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-3">Długość wygenerowanego dokumentu</label>
-                                            <div className="flex gap-4">
-                                                <label className="flex items-center gap-2 cursor-pointer text-sm text-slate-300">
-                                                    <input type="radio" checked={formatLength === 'epic'} onChange={() => setFormatLength('epic')} className="w-4 h-4 accent-red-500" /> Rozbudowany (Lany tekst)
-                                                </label>
-                                                <label className="flex items-center gap-2 cursor-pointer text-sm text-slate-300">
-                                                    <input type="radio" checked={formatLength === 'short'} onChange={() => setFormatLength('short')} className="w-4 h-4 accent-red-500" /> Zwięzły (Krótkie punkty)
-                                                </label>
-                                            </div>
-                                        </div>
-
                                         <div>
                                             <label className="text-xs font-bold text-emerald-400 uppercase tracking-wider block mb-2">Mocne Strony ucznia (Zasoby)</label>
                                             <textarea value={mocneStrony} onChange={(e) => setMocneStrony(e.target.value)} placeholder="Co uczeń potrafi, w czym jest dobry..." className="w-full h-24 input-bg rounded-xl p-4 text-sm resize-none border-emerald-900/30 focus:border-emerald-500"></textarea>
@@ -511,7 +502,7 @@ ZASADY KRYTYCZNE:
                                 ) : (
                                     <div className="space-y-4">
                                         <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">Opisz temat lub problem</label>
-                                        <textarea value={genericInput} onChange={(e) => setGenericInput(e.target.value)} placeholder={activeModule === 'rymowanki' ? "Np. O myciu rąk dla 4-latków" : "Opisz krótko sytuację, z którą pracujemy..."} className="w-full h-48 input-bg rounded-2xl p-5 text-base resize-none"></textarea>
+                                        <textarea value={genericInput} onChange={(e) => setGenericInput(e.target.value)} placeholder="Opisz krótko sytuację, z którą pracujemy..." className="w-full h-48 input-bg rounded-2xl p-5 text-base resize-none"></textarea>
                                     </div>
                                 )}
                             </div>
@@ -560,7 +551,9 @@ ZASADY KRYTYCZNE:
                                             ))}
                                         </div>
                                     )}
-                                    <div className="w-full text-slate-200 whitespace-pre-wrap text-lg leading-relaxed font-serif" dangerouslySetInnerHTML={{ __html: generatedText }} />
+                                    <div className="w-full text-slate-200 whitespace-pre-wrap text-lg leading-relaxed font-serif">
+                                        <div dangerouslySetInnerHTML={{ __html: generatedText.replace(/\n/g, '<br/>') }} />
+                                    </div>
                                 </div>
                             </div>
                         )}
