@@ -256,28 +256,40 @@
                 setIsGeneratingStory(true); setStoryError(''); setGeneratedStory(''); setGeneratedImage('');
 
                 try {
+                    // 1. Zlecenie do AI: Napisz bajkę ORAZ podaj nam gotowy, angielski prompt dla grafika
                     const textPayload = { 
-                        contents: [{ parts: [{ text: `Napisz radosną, uspokajającą rymowankę (max 4 zdania) dla dziecka ze spektrum autyzmu. Dziecko: ${storyProblem}. Zakończ pochwałą.` }] }], 
+                        contents: [{ parts: [{ text: `Napisz radosną, uspokajającą rymowankę (max 4 zdania) dla dziecka. Sytuacja/Lęk dziecka: ${storyProblem}. Zakończ pochwałą.\n\nDodatkowo, stwórz szczegółowy, wizualny opis (prompt) w JĘZYKU ANGIELSKIM opisujący sytuację z rymowanki, aby generator obrazków mógł narysować idealnie pasującą ilustrację (radosną, uspokajającą, bez tekstu).\n\nZwróć odpowiedź WYŁĄCZNIE jako obiekt JSON w formacie:\n{"story": "polska rymowanka...", "image_prompt": "angielski opis sceny..."}` }] }], 
+                        systemInstruction: { parts: [{ text: "Jesteś ekspertem ds. bajkoterapii. Odpowiadaj TYLKO w formacie JSON." }] },
                         generationConfig: { temperature: 0.7 } 
                     };
                     const textData = await secureApiCall(textPayload, 'text');
-                    let story = textData.candidates?.[0]?.content?.parts?.[0]?.text;
-                    if (story) story = story.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+                    let rawText = textData.candidates?.[0]?.content?.parts?.[0]?.text;
+                    if (!rawText) throw new Error("Brak odpowiedzi tekstowej z API.");
+                    
+                    // Bezpieczne wyodrębnienie JSON
+                    rawText = rawText.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+                    let jsonStr = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
+                    const start = jsonStr.indexOf('{');
+                    const end = jsonStr.lastIndexOf('}');
+                    if (start !== -1 && end !== -1) jsonStr = jsonStr.substring(start, end + 1);
+                    
+                    const parsedData = JSON.parse(jsonStr);
+                    const story = parsedData.story;
+                    const dynamicImagePrompt = parsedData.image_prompt;
 
+                    // 2. Wysyłamy idealnie dopasowany, wyreżyserowany prompt do generatora obrazków
                     const imgPayload = { 
-                        instances: { prompt: `Cute 2D illustration for children book, a happy child resolving this problem: ${storyProblem}. Bright colors, therapeutic, calming. NO TEXT.` }, 
+                        instances: [{ prompt: `Cute 2D illustration for children book, flat vector style. ${dynamicImagePrompt}. Bright colors, therapeutic, calming. NO TEXT, NO LETTERS, NO NUMBERS.` }], 
                         parameters: { sampleCount: 1 } 
                     };
                     const imgData = await secureApiCall(imgPayload, 'image');
                     
-                    // Ponieważ api/gemini.js po prostu odsyła to samo co bezpośrednie Google API,
-                    // struktura obiektu jest w obu przypadkach (Canvas i Vercel) taka sama:
                     if (imgData.predictions && imgData.predictions[0] && imgData.predictions[0].bytesBase64Encoded) {
                         const base64Image = imgData.predictions[0].bytesBase64Encoded;
                         setGeneratedStory(story); 
                         setGeneratedImage(`data:image/png;base64,${base64Image}`);
                     } else {
-                        throw new Error("Brak obrazka w odpowiedzi. Zła struktura odpowiedzi z API.");
+                        throw new Error("Brak obrazka w odpowiedzi. Sprawdź, czy Twój klucz API obsługuje model graficzny.");
                     }
                 } catch (err) {
                     setStoryError('Błąd połączenia: ' + err.message);
