@@ -93,6 +93,9 @@
             { id: 'rodzice', label: 'Komunikacja z Rodzicem', icon: '🤝' }
         ];
 
+        // =========================================================================
+        // POTĘŻNE PROMPTY ZABEZPIECZAJĄCE PRZED BŁĘDAMI
+        // =========================================================================
         const getSystemPrompt = (module, docType, customHeaders, formatLength) => {
             if (module === 'dokumenty') {
                 let lengthInstruction = formatLength === 'epic' 
@@ -113,16 +116,29 @@
                 return base;
             }
             if (module === 'historyjki') {
-                return `Jesteś pedagogiem specjalnym. Napisz rozbudowaną 'Historyjkę Społeczną'. Napisz ją w pierwszej osobie ("Ja"). Podziel tekst na 3 akapity: 1. PROBLEM, 2. STRATEGIA, 3. EFEKT. Zwróć tylko sformatowany tekst w HTML.`;
+                return `Jesteś pedagogiem specjalnym. Napisz rozbudowaną 'Historyjkę Społeczną'. Napisz ją w pierwszej osobie ("Ja"). Podziel tekst na 3 akapity: 1. PROBLEM, 2. STRATEGIA, 3. EFEKT.
+                
+Zwróć odpowiedź WYŁĄCZNIE jako obiekt JSON w formacie:
+{
+  "text": "Twój gotowy tekst w formacie HTML z użyciem <br> do oddzielania linii.",
+  "prompt1": "Szczegółowy opis po ANGIELSKU do pierwszego obrazka (Problem). Opisz dokładnie wiek, płeć i wygląd bohatera na podstawie tematu (np. jeśli to Basia, napisz 'little girl').",
+  "prompt2": "Szczegółowy opis po ANGIELSKU do drugiego obrazka (Strategia radzenia sobie). Ten sam bohater co na obrazku 1.",
+  "prompt3": "Szczegółowy opis po ANGIELSKU do trzeciego obrazka (Pozytywny Efekt). Ten sam bohater, uśmiechnięty."
+}`;
             }
             if (module === 'rymowanki') {
-                return `Jesteś autorem bardzo prostych rymowanek dla dzieci w wieku przedszkolnym. ZASADY KRYTYCZNE: 1. Pisz tylko i wyłącznie w układzie AABB (wers 1 musi rymować się z 2, a wers 3 z 4). 2. Używaj najprostszych, bardzo dokładnych i dźwięcznych rymów. 3. Zachowaj równy, melodyjny rytm. 4. Zwróć SAM TEKST rymowanki w formacie HTML (używaj <br> do oddzielania linijek). Żadnych propozycji czy wstępów, TYLKO wierszyk!`;
+                return `Jesteś wybitnym autorem bardzo prostych rymowanek dla dzieci w wieku przedszkolnym. 
+ZASADY KRYTYCZNE: 
+1. Pisz tylko i wyłącznie w układzie AABB lub ABAB. 
+2. Używaj najprostszych, bardzo dokładnych i dźwięcznych rymów. 
+3. Zachowaj równy, melodyjny rytm. Długość: max 2-3 zwrotki. 
+4. Zwróć SAM TEKST rymowanki. Absolutnie żadnych wstępów, propozycji metodycznych czy komentarzy. Żadnych referatów. Tylko wierszyk!`;
             }
             if (module === 'tus') {
-                return `Jesteś certyfikowanym trenerem TUS (Trening Umiejętności Społecznych). Na podstawie podanego problemu skonstruuj SZCZEGÓŁOWY i praktyczny scenariusz zajęć (ok. 30 minut). Struktura (użyj znaczników HTML <h2>, <p>, <ul>): 1. Powitanie i Rundka, 2. Psychoedukacja, 3. Scenki / Odgrywanie Ról, 4. Relaksacja, 5. Pożegnanie. Zwróć tylko gotowy sformatowany scenariusz.`;
+                return `Jesteś certyfikowanym trenerem TUS (Trening Umiejętności Społecznych). Na podstawie podanego problemu skonstruuj SZCZEGÓŁOWY i praktyczny scenariusz zajęć (ok. 30 minut). Struktura (użyj znaczników HTML <h2>, <p>, <ul>): 1. Powitanie i Rundka, 2. Psychoedukacja, 3. Scenki / Odgrywanie Ról, 4. Relaksacja, 5. Pożegnanie. Zwróć tylko gotowy sformatowany scenariusz. Żadnych wstępów.`;
             }
             if (module === 'rodzice') {
-                return `Jesteś empatycznym, asertywnym pedagogiem. Przetłumacz emocjonalny tekst na profesjonalną, formalną wiadomość e-dziennika do rodziców. Stosuj 'metodę kanapki' (pozytyw-problem-pozytyw). Zwróć tylko gotowy tekst (użyj <br> dla akapitów), bez komentarza z Twojej strony.`;
+                return `Jesteś empatycznym, asertywnym pedagogiem. Przetłumacz emocjonalny tekst na profesjonalną, formalną wiadomość e-dziennika do rodziców. Stosuj 'metodę kanapki' (pozytyw-problem-pozytyw). Zwróć tylko gotowy tekst, bez komentarza z Twojej strony.`;
             }
             return "Jesteś ekspertem edukacyjnym.";
         };
@@ -181,11 +197,10 @@
             // BEZPIECZNY KONTROLER API - ŻADNYCH KLUCZY W KODZIE FRONTENDU
             // ==================================================================================
             const secureApiCall = async (payload, type = 'text') => {
-                // Ta zmienna będzie wstrzyknięta przez środowisko Canvas, ale w internecie pozostanie PUSTA.
                 const previewApiKey = ""; 
 
                 if (previewApiKey) {
-                    // TRYB TESTOWY W CANVAAS (Darmowy test w tym czacie)
+                    // TRYB TESTOWY W CANVAAS
                     const url = type === 'text' 
                         ? `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${previewApiKey}`
                         : `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${previewApiKey}`;
@@ -210,12 +225,11 @@
                         body: JSON.stringify(payload)
                     });
                 } else {
-                    // TRYB PRODUKCYJNY LUB LOKALNY
+                    // TRYB VERCEL LUB LOKALNY
                     if (window.location.protocol === 'file:') {
                         throw new Error("Odpaliłeś plik prosto z dysku (lokalnie)! 🛑 Aby chronić Twój klucz API, zablokowałem połączenie. Wgraj kod na swojego GitHuba (Vercela) i otwórz przez link w internecie, lub testuj przez przycisk 'Podgląd' (Preview) w czacie!");
                     }
 
-                    // JESTEŚMY NA VERCELU (Łączymy się ze "Strażnikiem Klucza" czyli /api/gemini)
                     try {
                         const response = await fetch('/api/gemini', {
                             method: 'POST',
@@ -225,7 +239,7 @@
 
                         if (!response.ok) {
                             const errData = await response.json().catch(() => ({}));
-                            throw new Error(`Błąd Vercela: ${errData.error || response.statusText}. Sprawdź, czy masz klucz GEMINI_API_KEY w ustawieniach (Settings -> Environment Variables) swojego Vercela.`);
+                            throw new Error(`Błąd Vercela: ${errData.error || response.statusText}. Sprawdź, czy masz klucz API w ustawieniach swojego Vercela.`);
                         }
                         
                         return await response.json();
@@ -265,21 +279,22 @@
 
             const handleGenerate = async () => {
                 if (!isUnlocked) { setError("Wpisz poprawny kod aktywacyjny (np. KAWA2024) w panelu po lewej stronie!"); return; }
+                if (activeModule !== 'dokumenty' && !genericInput.trim()) { setError("Wpisz temat lub problem w puste pole!"); return; }
                 
                 setIsGenerating(true); 
                 setError(''); 
                 setGeneratedText(''); 
                 setGeneratedImages([]);
-                setLoadingMsg('Przygotowuję treść dokumentu...');
+                setLoadingMsg('Analizuję zapytanie i przygotowuję treść...');
 
                 try {
                     let finalPrompt = "";
                     if (activeModule === 'dokumenty') {
                         finalPrompt = `Dokument: ${docType}\nDiagnoza: ${diagnoza}\nMocne strony: ${mocneStrony}\nTrudności: ${trudnosci}\n\nDODATKOWE PLIKI OD NAUCZYCIELA DO ANALIZY:\n${uploadedFilesText}`;
                     } else if (activeModule === 'rymowanki') {
-                        finalPrompt = `Napisz rymowankę edukacyjną na temat: ${genericInput}`;
+                        finalPrompt = `Napisz rymowankę edukacyjną dla dzieci na temat: ${genericInput}`;
                     } else if (activeModule === 'historyjki') {
-                        finalPrompt = `Napisz historyjkę społeczną na temat trudności: ${genericInput}`;
+                        finalPrompt = `Napisz historyjkę społeczną o problemie: ${genericInput}`;
                     } else if (activeModule === 'tus') {
                         finalPrompt = `Opracuj scenariusz zajęć TUS, problem grupy to: ${genericInput}`;
                     } else if (activeModule === 'rodzice') {
@@ -299,31 +314,62 @@
                     if (!story) throw new Error("AI nie zwróciło tekstu. Spróbuj wygenerować jeszcze raz.");
                     
                     let cleanText = story.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
-                    setGeneratedText(cleanText);
-                    
+                    let finalHtmlText = cleanText;
+
+                    // Domyślne, puste prompty dla grafiki (gdyby JSON nie zadziałał)
+                    let imgPrompts = [
+                        `2D Flat vector illustration, children's book style. Scene showing the problem: ${genericInput}. Soft pastel colors. NO TEXT.`,
+                        `2D Flat vector illustration, children's book style. Scene showing coping strategy for: ${genericInput}. Soft blue colors. NO TEXT.`,
+                        `2D Flat vector illustration, children's book style. Scene showing success and happiness after overcoming: ${genericInput}. Bright colors. NO TEXT.`
+                    ];
+
+                    // WYCIĄGANIE DANYCH "REŻYSERA" (Dla Historyjek)
+                    if (activeModule === 'historyjki') {
+                        try {
+                            let jsonStr = cleanText.replace(/```json/gi, '').replace(/```/g, '').trim();
+                            const start = jsonStr.indexOf('{');
+                            const end = jsonStr.lastIndexOf('}');
+                            if(start !== -1 && end !== -1) {
+                                jsonStr = jsonStr.substring(start, end + 1);
+                                const parsed = JSON.parse(jsonStr);
+                                if (parsed.text) finalHtmlText = parsed.text;
+                                if (parsed.prompt1 && parsed.prompt2 && parsed.prompt3) {
+                                    // Nadpisujemy opisy "Reżysera"
+                                    imgPrompts = [
+                                        `2D Flat vector illustration, children's book style. ${parsed.prompt1}. NO TEXT, NO LETTERS.`,
+                                        `2D Flat vector illustration, children's book style. ${parsed.prompt2}. NO TEXT, NO LETTERS.`,
+                                        `2D Flat vector illustration, children's book style. ${parsed.prompt3}. NO TEXT, NO LETTERS.`
+                                    ];
+                                }
+                            }
+                        } catch(e) { console.warn("Nie udało się sparsować JSONa z historyjki", e); }
+                    }
+
+                    // Formatowanie Rymowanki, by enter był zachowany w HTML
+                    if (activeModule === 'rymowanki') {
+                        finalHtmlText = finalHtmlText.replace(/\n/g, '<br/>');
+                    }
+
+                    setGeneratedText(finalHtmlText);
                     setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
 
-                    // 2. GENEROWANIE OBRAZÓW (Sekwencyjnie - chroni przed banem za spamowanie API)
+                    // 2. GENEROWANIE OBRAZÓW (Tylko dla Historyjek!)
                     if (activeModule === 'historyjki') {
-                        const prompts = [
-                            `2D Flat vector illustration, storybook style. A charming friendly character looking pensive and thoughtful in a school environment. Soft pastel colors, innocent look. NO TEXT.`,
-                            `2D Flat vector illustration, storybook style. A charming friendly character taking a deep breath and feeling very calm and peaceful. School environment. Soft blue colors. NO TEXT.`,
-                            `2D Flat vector illustration, storybook style. A charming friendly character with a very big happy smile, feeling proud and successful. Bright joyful colors. NO TEXT.`
-                        ];
-                        
                         try {
                             const newImages = [];
                             
-                            for (let i = 0; i < prompts.length; i++) {
-                                setLoadingMsg(`Maluję obrazek ${i + 1} z 3...`);
+                            for (let i = 0; i < imgPrompts.length; i++) {
+                                setLoadingMsg(`Maluję precyzyjny obrazek ${i + 1} z 3...`);
                                 
                                 const res = await secureApiCall({ 
-                                    instances: [{ prompt: prompts[i] }], 
+                                    instances: [{ prompt: imgPrompts[i] }], 
                                     parameters: { sampleCount: 1 } 
                                 }, 'image');
                                 
                                 if (res.predictions && res.predictions[0] && res.predictions[0].bytesBase64Encoded) {
                                     newImages.push(`data:image/png;base64,${res.predictions[0].bytesBase64Encoded}`);
+                                } else if (res.isVercelUrl) {
+                                    newImages.push(res.url); // Jeśli z Vercela wraca URL
                                 }
                             }
                             
@@ -465,7 +511,7 @@
                                 ) : (
                                     <div className="space-y-4">
                                         <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">Opisz temat lub problem</label>
-                                        <textarea value={genericInput} onChange={(e) => setGenericInput(e.target.value)} placeholder="Opisz krótko sytuację, z którą pracujemy..." className="w-full h-48 input-bg rounded-2xl p-5 text-base resize-none"></textarea>
+                                        <textarea value={genericInput} onChange={(e) => setGenericInput(e.target.value)} placeholder={activeModule === 'rymowanki' ? "Np. O myciu rąk dla 4-latków" : "Opisz krótko sytuację, z którą pracujemy..."} className="w-full h-48 input-bg rounded-2xl p-5 text-base resize-none"></textarea>
                                     </div>
                                 )}
                             </div>
@@ -514,9 +560,7 @@
                                             ))}
                                         </div>
                                     )}
-                                    <div className="w-full text-slate-200 whitespace-pre-wrap text-lg leading-relaxed font-serif">
-                                        <div dangerouslySetInnerHTML={{ __html: generatedText.replace(/\n/g, '<br/>') }} />
-                                    </div>
+                                    <div className="w-full text-slate-200 whitespace-pre-wrap text-lg leading-relaxed font-serif" dangerouslySetInnerHTML={{ __html: generatedText }} />
                                 </div>
                             </div>
                         )}
