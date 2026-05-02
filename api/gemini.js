@@ -6,19 +6,18 @@ export default async function handler(req, res) {
 
   const { payload, type } = req.body;
   
-  // Odczytujemy klucz z ustawień Twojego Vercela! (Zakładka Settings -> Environment Variables)
-  // Upewnij się, że masz tam dodaną zmienną o nazwie GEMINI_API_KEY
+  // Pobieramy Twój klucz z zaplecza Vercela
   const apiKey = process.env.GEMINI_API_KEY;
 
   if (!apiKey) {
-    return res.status(500).json({ error: 'Brak klucza GEMINI_API_KEY w ustawieniach Vercel!' });
+    return res.status(500).json({ error: 'Brak klucza GEMINI_API_KEY na Vercelu!' });
   }
 
   try {
-    // Rozdzielamy zapytania na tekstowe (Gemini 2.5) i graficzne (Imagen 4.0)
+    // ZMIANA: Używamy stabilnych, publicznie dostępnych modeli Google (1.5 Flash)
     const url = type === 'text' 
-        ? `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`
-        : `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${apiKey}`;
+        ? `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`
+        : `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-001:predict?key=${apiKey}`;
 
     const response = await fetch(url, {
       method: 'POST',
@@ -29,7 +28,7 @@ export default async function handler(req, res) {
     const data = await response.json();
 
     if (!response.ok) {
-      return res.status(response.status).json({ error: data.error?.message || "Błąd bezpośrednio od Google API" });
+      return res.status(response.status).json({ error: data.error?.message || "Błąd API Google" });
     }
 
     res.status(200).json(data);
