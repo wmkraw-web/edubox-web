@@ -100,26 +100,22 @@
             const FREE_TRIES_LIMIT = 3;
             // =========================================================================
 
-            // Stan autoryzacji i licznika darmowych prób
             const [isAuthenticated, setIsAuthenticated] = useState(false);
             const [freeTries, setFreeTries] = useState(0);
             const [showPaywall, setShowPaywall] = useState(false);
             const [passwordInput, setPasswordInput] = useState('');
             
-            // Stany generatora
             const [promptInput, setPromptInput] = useState('');
-            const [styleOption, setStyleOption] = useState('szkola'); // 'przedszkole', 'szkola', 'mandala'
+            const [styleOption, setStyleOption] = useState('szkola'); 
             const [generatedImage, setGeneratedImage] = useState(null);
             const [isGenerating, setIsGenerating] = useState(false);
             const [error, setError] = useState('');
 
             const resultRef = useRef(null);
 
-            // Wczytywanie stanu darmowych prób i autoryzacji z localStorage
             useEffect(() => {
                 const savedAuth = localStorage.getItem('magicColorAuth') === 'true';
                 if (savedAuth) setIsAuthenticated(true);
-
                 const savedTries = parseInt(localStorage.getItem('magicColorFreeTries') || '0');
                 setFreeTries(savedTries);
             }, []);
@@ -151,7 +147,7 @@
                         body: JSON.stringify({ payload, type: 'image' })
                     });
                 } else {
-                    const apiKey = ""; // Podgląd Canvas wstrzykuje tu klucz testowy
+                    const apiKey = ""; 
                     const url = `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${apiKey}`;
                     return await fetchWithRetry(url, {
                         method: 'POST',
@@ -162,12 +158,10 @@
             };
 
             const generateColoringPage = async () => {
-                // Sprawdzenie limitu darmowych prób
                 if (!isAuthenticated && freeTries >= FREE_TRIES_LIMIT) {
                     setShowPaywall(true);
                     return;
                 }
-
                 if (!promptInput.trim()) {
                     setError('Musisz wpisać, co chcesz narysować!');
                     return;
@@ -178,21 +172,23 @@
                 setGeneratedImage(null);
 
                 try {
-                    // Modyfikator stylów na podstawie wyboru użytkownika
+                    // Precyzyjne zdefiniowanie grubości kresek dla poszczególnych stylów
                     let styleModifier = "";
                     if (styleOption === 'przedszkole') {
-                        styleModifier = "Very simple and easy line art for toddlers, thick bold black outlines, minimal details, lots of white space, cartoon style";
+                        styleModifier = "Very simple toddler coloring book, thick bold black contours, minimal details";
                     } else if (styleOption === 'szkola') {
-                        styleModifier = "Clean black outlines, standard children's coloring book page, clear subject, balanced details, vector line art";
+                        styleModifier = "Standard kids coloring book page, clear black outlines";
                     } else if (styleOption === 'mandala') {
-                        styleModifier = "Intricate adult coloring book style, complex geometric patterns, beautiful mandala design, highly detailed black line art";
+                        styleModifier = "Intricate adult coloring page, beautiful complex mandala design, detailed black lines";
                     }
 
-                    // TZW. ZŁOTY PROMPT (Temat ZAWSZE na początku, by AI się nie gubiło)
-                    const hiddenInstruction = `Subject: ${promptInput}. ${styleModifier}, pure white background, no shading, no grayscale, no colors.`;
+                    // TZW. PANCERNY PROMPT (Zabrania kolorów pod rygorem błędu)
+                    const hiddenInstruction = `A black and white coloring page, uncolored line art ONLY. Subject: ${promptInput}. ${styleModifier}. Absolutely NO colors, no grayscale, pure white background.`;
 
+                    // Potrójne ubezpieczenie w payloadzie (dla bezpieczeństwa odczytu przez Twój nowy serwer)
                     const payload = {
-                        instances: { prompt: hiddenInstruction },
+                        prompt: hiddenInstruction, // Główny parametr czytany przez serwer
+                        instances: { prompt: hiddenInstruction }, // Zapasowy wariant z obiektu
                         parameters: { sampleCount: 1 }
                     };
 
@@ -202,13 +198,11 @@
                     if (base64Image) {
                         setGeneratedImage(`data:image/png;base64,${base64Image}`);
                         
-                        // Zwiększenie licznika użyć jeśli użytkownik nie ma premium
                         if (!isAuthenticated) {
                             const newTries = freeTries + 1;
                             setFreeTries(newTries);
                             localStorage.setItem('magicColorFreeTries', newTries.toString());
                         }
-
                         setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
                     } else {
                         throw new Error("Pusta odpowiedź API graficznego.");
@@ -216,8 +210,7 @@
 
                 } catch (err) {
                     console.error("Błąd grafiki:", err);
-                    setError('Błąd połączenia z siecią serwerów graficznych. Spróbuj jeszcze raz.');
-                    setIsGenerating(false);
+                    setError('Wystąpił problem z przetworzeniem żądania. Serwer mógł być obciążony, spróbuj kliknąć jeszcze raz.');
                 } finally {
                     setIsGenerating(false);
                 }
@@ -288,7 +281,6 @@
                     <div className="aura-blob aura-1 print-hidden"></div>
                     <div className="aura-blob aura-2 print-hidden"></div>
 
-                    {/* NAWIGACJA */}
                     <nav className="fixed top-0 w-full z-50 glass-nav print-hidden">
                         <div className="max-w-5xl mx-auto px-4 sm:px-6 h-20 flex items-center justify-between">
                             <div className="flex items-center gap-3">
@@ -326,7 +318,6 @@
                     <main className="flex-grow pt-32 pb-20 px-4 sm:px-6 print:pt-0 print:pb-0">
                         <div className="max-w-3xl mx-auto">
                             
-                            {/* Nagłówek */}
                             <div className="text-center mb-12 fade-in print-hidden">
                                 <div className="inline-flex items-center gap-2 bg-pink-900/30 border border-pink-500/30 px-4 py-1.5 rounded-full text-[10px] font-black text-pink-400 uppercase tracking-widest mb-4">
                                     Inteligentny Rysownik
@@ -339,10 +330,8 @@
                                 </p>
                             </div>
 
-                            {/* Panel Sterowania */}
                             <div className="glass-panel p-6 sm:p-10 rounded-[2.5rem] fade-in border border-slate-700/50 print-hidden" style={{animationDelay: '0.1s'}}>
                                 
-                                {/* Wybór stylu kolorowanki */}
                                 <div className="mb-8">
                                     <label className="block text-slate-300 font-bold mb-3 text-sm uppercase tracking-wider">Wybierz stopień trudności (Styl):</label>
                                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -384,7 +373,6 @@
                                     <span className="absolute right-5 top-1/2 -translate-y-1/2 text-2xl">🪄</span>
                                 </div>
 
-                                {/* Podpowiedzi */}
                                 <div className="mt-6 flex flex-wrap gap-2">
                                     <span className="text-xs text-slate-500 font-bold uppercase mt-2 mr-2">Szybkie pomysły:</span>
                                     {['Wesoły dinozaur jedzący pizzę', 'Zamek księżniczki na chmurze', 'Piesek jadący na deskorolce', 'Sowa w okularach'].map(idea => (
@@ -404,13 +392,12 @@
                                             ${isGenerating ? 'bg-slate-700 cursor-not-allowed' : 'bg-gradient-to-r from-pink-600 to-amber-500 hover:scale-105'}`}
                                     >
                                         {isGenerating ? (
-                                            <><svg className="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> AI chwyta za pędzel...</>
+                                            <><svg className="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Rysowanie w toku...</>
                                         ) : (!isAuthenticated && freeTries >= FREE_TRIES_LIMIT ? 'Odblokuj dostęp PRO' : 'Wygeneruj Kolorowankę')}
                                     </button>
                                 </div>
                             </div>
 
-                            {/* Wynik Generowania */}
                             {generatedImage && (
                                 <div ref={resultRef} className="mt-12 fade-in print:mt-0 flex flex-col items-center">
                                     
@@ -421,7 +408,6 @@
                                         </button>
                                     </div>
 
-                                    {/* Obrazek - Otrzymuje klasę print-only-image podczas druku */}
                                     <div className="bg-white p-4 rounded-3xl magic-border shadow-2xl print:shadow-none print:p-0">
                                         <img src={generatedImage} alt="Kolorowanka wygenerowana przez AI" className="w-full max-w-2xl rounded-xl print-only-image" />
                                     </div>
