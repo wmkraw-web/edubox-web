@@ -65,7 +65,7 @@
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        /* Ustawienia do wydruku - perfekcyjne formatowanie urzędowe */
+        /* Ustawienia do wydruku */
         @media print {
             @page { margin: 1.5cm; size: A4 portrait; }
             body, html, #root { 
@@ -76,32 +76,23 @@
                 padding: 0 !important;
                 font-size: 12pt !important;
             }
-            
-            /* Ukrywamy interfejs (przyciski, menu, ciemne tła) */
             .print-hidden { display: none !important; }
-            
-            /* Pokazujemy WYŁĄCZNIE ukrytą warstwę do druku */
             .print-only { 
                 display: block !important; 
                 width: 100% !important;
                 max-width: 100% !important;
-                padding: 2cm 2.5cm !important; /* Wymuszone fizyczne marginesy: 2cm góra/dół, 2.5cm boki */
+                padding: 1.5cm 2cm !important; 
                 box-sizing: border-box !important;
             }
-            
-            /* Zabezpieczenie przed łamaniem strony w połowie akapitu */
             .print-break-avoid { 
                 page-break-inside: avoid !important; 
                 break-inside: avoid !important; 
                 display: block !important;
                 margin-bottom: 20pt !important;
             }
-            
             h1 { font-size: 16pt !important; text-align: center !important; margin-bottom: 10pt !important; font-weight: bold !important; }
             h2 { font-size: 14pt !important; margin-top: 15pt !important; margin-bottom: 8pt !important; font-weight: bold !important; }
             p { text-align: justify !important; line-height: 1.6 !important; font-size: 12pt !important; margin-bottom: 10pt !important; }
-            
-            /* Miejsce na podpisy */
             .signatures { display: flex !important; justify-content: space-between !important; margin-top: 50pt !important; }
             .signatures > div { width: 40% !important; text-align: center !important; }
             .signatures p { text-align: center !important; margin-bottom: 5pt !important; }
@@ -115,86 +106,120 @@
         const { useState, useEffect } = React;
 
         const BUY_COFFEE_LINK = "https://buycoffee.to/magiccolor";
-        // UWAGA: Usunięto pole apiKey. Korzystamy z backendu Vercel!
 
         // ==========================================
-        // BAZA DANYCH - WYMAGANIA I GOTOWCE
+        // POTĘŻNA BAZA DANYCH WYMAGAŃ I GOTOWCÓW
         // ==========================================
         const AWANS_DATA = {
             mianowany: [
                 {
-                    id: 'm1',
-                    law: "§ 7 ust. 2 pkt 1",
-                    title: "Prowadzenie zajęć w sposób zapewniający właściwą realizację statutowych zadań szkoły",
-                    icon: "ph-chalkboard-teacher",
+                    id: 'm1', law: "§ 7 ust. 2 pkt 1", title: "Prowadzenie zajęć i realizacja zadań szkoły", icon: "ph-chalkboard-teacher",
                     checklist: [
-                        { id: 'm1_c1', text: "Nawiązanie współpracy z mentorem (opracowanie kontraktu)" },
+                        { id: 'm1_c1', text: "Nawiązanie współpracy z mentorem (kontrakt)" },
                         { id: 'm1_c2', text: "Obserwacja zajęć prowadzonych przez mentora" },
-                        { id: 'm1_c3', text: "Prowadzenie zajęć w obecności mentora" },
-                        { id: 'm1_c4', text: "Prowadzenie zajęć w obecności dyrektora" }
+                        { id: 'm1_c3', text: "Prowadzenie zajęć w obecności mentora/dyrektora" },
+                        { id: 'm1_c4', text: "Aktywny udział w szkoleniach Rady Pedagogicznej (WDN)" },
+                        { id: 'm1_c5', text: "Organizacja wycieczek i uroczystości szkolnych" }
                     ],
                     examples: [
-                        {
-                            name: "Współpraca z mentorem",
-                            plan: "Podjęcie współpracy z mentorem. Opracowanie kontraktu oraz harmonogramu spotkań. Obserwacja zajęć.",
-                            report: "Nawiązałam współpracę z mentorem, z którym zawarłam kontrakt. Zgodnie z harmonogramem obserwowałam zajęcia prowadzone przez mentora, co pozwoliło mi na wzbogacenie warsztatu pracy o nowe formy aktywizujące. Ponadto prowadziłam zajęcia w jego obecności, a późniejsza ewaluacja przyczyniła się do korekty moich metod nauczania."
-                        }
+                        { name: "Współpraca z mentorem", plan: "Nawiązanie współpracy z mentorem. Opracowanie kontraktu, harmonogramu obserwacji zajęć własnych i mentora.", report: "Nawiązałam ścisłą współpracę z powołanym mentorem. Opracowałyśmy jasny kontrakt i plan działań. Regularnie obserwowałam lekcje mentora, czerpiąc z jego doświadczenia, szczególnie w obszarze aktywizacji uczniów. Prowadziłam również zajęcia w obecności mentora, a nasze powizytacyjne rozmowy pozwalały mi na głęboką autoewaluację." },
+                        { name: "Organizacja uroczystości i wycieczek", plan: "Organizacja wycieczek edukacyjnych oraz współtworzenie apeli z kalendarza imprez szkolnych.", report: "Jako wychowawca zorganizowałem wycieczki integrujące zespół klasowy (np. wyjazd do muzeum). Współtworzyłem również uroczystości szkolne (m.in. Dzień Nauczyciela), co pozwoliło na kształtowanie postaw patriotycznych u uczniów oraz budowanie tradycji szkolnej." },
+                        { name: "Szkolenia WDN i kursy", plan: "Udział w wewnątrzszkolnym doskonaleniu nauczycieli oraz zewnętrznych formach wsparcia.", report: "Systematycznie doskonaliłam swój warsztat pracy biorąc udział w szkoleniach WDN oraz webinariach zewnętrznych (np. Kurs 'Bezpieczny Internet'). Zdobytą wiedzę na bieżąco adaptowałam na gruncie klasy, wdrażając nowe metody neurodydaktyki." }
                     ]
                 },
                 {
-                    id: 'm2',
-                    law: "§ 7 ust. 2 pkt 2",
-                    title: "Umiejętność rozpoznawania potrzeb rozwojowych uczniów",
-                    icon: "ph-users-three",
+                    id: 'm2', law: "§ 7 ust. 2 pkt 2", title: "Rozpoznawanie potrzeb rozwojowych i edukacyjnych", icon: "ph-users-three",
                     checklist: [
-                        { id: 'm2_c1', text: "Analiza opinii i orzeczeń z Poradni Psychologiczno-Pedagogicznej" },
-                        { id: 'm2_c2', text: "Dostosowanie wymagań edukacyjnych do zdiagnozowanych potrzeb" },
-                        { id: 'm2_c3', text: "Indywidualizacja pracy na zajęciach (karty pracy, tempo)" }
+                        { id: 'm2_c1', text: "Analiza opinii i orzeczeń z Poradni PPP" },
+                        { id: 'm2_c2', text: "Dostosowanie wymagań edukacyjnych (KIPU / WOPFU)" },
+                        { id: 'm2_c3', text: "Praca z uczniem zdolnym (kółka zainteresowań, konkursy)" },
+                        { id: 'm2_c4', text: "Współpraca z pedagogiem/psychologiem szkolnym" }
                     ],
                     examples: [
-                        {
-                            name: "Dostosowanie wymagań edukacyjnych",
-                            plan: "Diagnoza potrzeb uczniów. Dostosowanie wymagań edukacyjnych do zaleceń PPP. Tworzenie autorskich materiałów.",
-                            report: "Dokonałam wnikliwej diagnozy potrzeb moich uczniów, opierając się na opiniach PPP. Systematycznie dostosowywałam metody i formy pracy. Dla uczniów z trudnościami przygotowywałam uproszczone karty pracy, natomiast dla uczniów uzdolnionych zadania o podwyższonym stopniu trudności, co wpłynęło na ich motywację wewnętrzną."
-                        }
+                        { name: "Dostosowanie wymagań (SPE)", plan: "Diagnoza potrzeb uczniów. Analiza dokumentów z PPP oraz tworzenie dostosowań wymagań.", report: "Na podstawie wnikliwej analizy orzeczeń oraz opinii z Poradni Psychologiczno-Pedagogicznej dokonałam dostosowania wymagań edukacyjnych. Przygotowywałam zindywidualizowane karty pracy dla uczniów z dysleksją oraz stosowałam wydłużony czas na sprawdzianach, co obniżyło poziom stresu edukacyjnego u badanych uczniów." },
+                        { name: "Uczeń uzdolniony", plan: "Rozwijanie pasji uczniów poprzez przygotowanie ich do konkursów i olimpiad.", report: "Oprócz pracy z uczniami z trudnościami, wspierałam rozwój uczniów szczególnie uzdolnionych. Organizowałam dla nich dodatkowe wyzwania projektowe na lekcjach i przygotowywałam ich do konkursów międzyszkolnych, w których osiągali znaczące sukcesy." }
                     ]
                 },
                 {
-                    id: 'm3',
-                    law: "§ 7 ust. 2 pkt 3",
-                    title: "Wykorzystanie w pracy technologii informacyjno-komunikacyjnej (TIK)",
-                    icon: "ph-desktop",
+                    id: 'm3', law: "§ 7 ust. 2 pkt 3", title: "Wykorzystanie w pracy TIK", icon: "ph-desktop",
                     checklist: [
-                        { id: 'm3_c1', text: "Wykorzystanie tablicy interaktywnej/projektora na zajęciach" },
-                        { id: 'm3_c2', text: "Korzystanie z aplikacji edukacyjnych (np. Wordwall, Quizizz, Canva)" },
-                        { id: 'm3_c3', text: "Prowadzenie dokumentacji w dzienniku elektronicznym" }
+                        { id: 'm3_c1', text: "Tworzenie interaktywnych materiałów (Genially, Canva)" },
+                        { id: 'm3_c2', text: "Grywalizacja i quizy na lekcjach (Wordwall, Blooket)" },
+                        { id: 'm3_c3', text: "Prowadzenie dokumentacji w e-dzienniku" },
+                        { id: 'm3_c4', text: "Współpraca online (np. Teams, Classroom)" }
                     ],
                     examples: [
-                        {
-                            name: "Nowoczesne technologie na lekcjach",
-                            plan: "Wykorzystanie platform edukacyjnych, tablicy interaktywnej oraz narzędzi online do aktywizowania uczniów.",
-                            report: "W codziennej pracy systematycznie korzystałam z TIK. Wykorzystywałam tablicę interaktywną do prezentacji. Regularnie tworzyłam interaktywne quizy sprawdzające wiedzę (Quizizz, Blooket), co zwiększyło atrakcyjność zajęć. Biegle obsługiwałam dziennik elektroniczny, co usprawniło komunikację z rodzicami."
-                        }
+                        { name: "Aplikacje i grywalizacja na lekcjach", plan: "Wykorzystanie platform edukacyjnych (Wordwall, Quizizz) do uatrakcyjnienia przekazu wiedzy.", report: "W codziennej pracy dydaktycznej wykorzystywałam TIK jako naturalne środowisko uczenia się dzisiejszej młodzieży. Projektowałam interaktywne gry, quizy podsumowujące (w aplikacjach Blooket, Kahoot) oraz wirtualne Escape Roomy (Genially). Narzędzia te pozwoliły na znaczne podniesienie poziomu zaangażowania uczniów." },
+                        { name: "Dokumentacja elektroniczna", plan: "Biegłe korzystanie z narzędzi administracyjnych szkoły (e-dziennik).", report: "Biegle i systematycznie posługiwałam się dziennikiem elektronicznym. Usprawniło to przepływ informacji pomiędzy szkołą a rodzicami. Korzystałam z e-dziennika nie tylko do wpisywania ocen, ale również jako platformy do szybkiej komunikacji wychowawczej i przesyłania pochwał opisowych." }
+                    ]
+                },
+                {
+                    id: 'm4', law: "§ 7 ust. 2 pkt 4", title: "Wiedza z zakresu psychologii, pedagogiki i dydaktyki", icon: "ph-brain",
+                    checklist: [
+                        { id: 'm4_c1', text: "Samodzielne studiowanie literatury metodycznej" },
+                        { id: 'm4_c2', text: "Rozwiązywanie konfliktów rówieśniczych (mediacje)" },
+                        { id: 'm4_c3', text: "Stosowanie metod aktywizujących (np. projekt, burza mózgów)" }
+                    ],
+                    examples: [
+                        { name: "Studiowanie literatury i aktywizacja", plan: "Poznawanie nowych koncepcji pedagogicznych poprzez lekturę. Wdrażanie metod aktywizujących.", report: "Stale poszerzałam swoją wiedzę studiując literaturę z zakresu neurodydaktyki i psychologii rozwojowej (m.in. artykuły na portalach edukacyjnych). Zdobytą wiedzę przekuwałam w praktykę, odchodząc od metody podającej na rzecz metod aktywizujących – często stosowałam pracę w grupach, metodę projektu i mapy myśli." },
+                        { name: "Rozwiązywanie problemów wychowawczych", plan: "Bieżąca interwencja wychowawcza w oparciu o wiedzę psychologiczną.", report: "W sytuacjach konfliktowych w klasie stosowałam wiedzę z zakresu psychologii komunikacji (np. elementy Porozumienia Bez Przemocy - NVC). Pełniłam rolę bezstronnego mediatora, ucząc dzieci rozpoznawania własnych emocji i empatii, co skutecznie zapobiegało eskalacji problemów." }
+                    ]
+                },
+                {
+                    id: 'm5', law: "§ 7 ust. 2 pkt 5", title: "Posługiwanie się przepisami prawa oświatowego", icon: "ph-scales",
+                    checklist: [
+                        { id: 'm5_c1', text: "Analiza aktualnych aktów prawnych (Karta Nauczyciela, RODO)" },
+                        { id: 'm5_c2', text: "Prowadzenie dokumentacji zgodnie z przepisami" },
+                        { id: 'm5_c3', text: "Udział w pracach komisji (np. egzaminacyjnej, inwentaryzacyjnej)" }
+                    ],
+                    examples: [
+                        { name: "Znajomość Prawa", plan: "Zaznajomienie się z aktualnymi aktami prawnymi regulującymi pracę szkoły.", report: "W okresie stażu/awansu dokonałam szczegółowej analizy aktów prawnych, w tym Ustawy o systemie oświaty oraz Karty Nauczyciela. Śledziłam zmiany w prawie za pośrednictwem portalu MEN. Pozwoliło mi to na prawidłowe prowadzenie dokumentacji szkolnej, przestrzeganie zasad RODO oraz zgodne z procedurami organizowanie wyjść poza teren placówki." }
                     ]
                 }
             ],
             dyplomowany: [
                 {
-                    id: 'd1',
-                    law: "Wymaganie Dyplomowany 1",
-                    title: "Doskonalenie warsztatu pracy, dzielenie się wiedzą",
-                    icon: "ph-share-network",
+                    id: 'd1', law: "§ 8 ust. 3 pkt 1", title: "Podejmowanie działań innowacyjnych i nowatorskich", icon: "ph-lightbulb",
                     checklist: [
-                        { id: 'd1_c1', text: "Prowadzenie zajęć otwartych dla innych nauczycieli" },
-                        { id: 'd1_c2', text: "Pełnienie funkcji mentora lub opiekuna praktyk studenckich" },
-                        { id: 'd1_c3', text: "Szkoleniowe Rady Pedagogiczne (prowadzenie WDN)" }
+                        { id: 'd1_c1', text: "Opracowanie i wdrożenie innowacji pedagogicznej" },
+                        { id: 'd1_c2', text: "Wykorzystanie nieszablonowych metod pracy (np. design thinking)" },
+                        { id: 'd1_c3', text: "Stworzenie autorskiego programu kółka zainteresowań" }
                     ],
                     examples: [
-                        {
-                            name: "Prowadzenie zajęć otwartych",
-                            plan: "Zorganizowanie zajęć otwartych dla nauczycieli. Opracowanie i udostępnienie materiałów metodycznych.",
-                            report: "Aktywnie dzieliłam się swoją wiedzą i doświadczeniem. Zorganizowałam zajęcia otwarte, w których uczestniczyli młodzi nauczyciele. Przygotowywałam pakiety materiałów metodycznych (scenariusze, karty pracy), które udostępniałam w szkolnej bazie wiedzy. Omawianie zajęć sprzyjało autoewaluacji."
-                        }
+                        { name: "Innowacja pedagogiczna", plan: "Opracowanie i wdrożenie innowacji metodycznej w obrębie nauczanego przedmiotu.", report: "W odpowiedzi na zdiagnozowane potrzeby edukacyjne stworzyłam i wdrożyłam innowację pedagogiczną pt. '[Tytuł]'. Polegała ona na regularnym wprowadzaniu [np. elementów kodowania / outdoor education] do codziennych zajęć. Ewaluacja programu wykazała znaczący wzrost motywacji wewnętrznej uczniów oraz lepsze przyswajanie trudnych zagadnień." }
+                    ]
+                },
+                {
+                    id: 'd2', law: "§ 8 ust. 3 pkt 2", title: "Dzielenie się wiedzą z innymi nauczycielami", icon: "ph-share-network",
+                    checklist: [
+                        { id: 'd2_c1', text: "Prowadzenie zajęć otwartych dla Rady Pedagogicznej" },
+                        { id: 'd2_c2', text: "Pełnienie funkcji mentora dla nauczyciela początkującego" },
+                        { id: 'd2_c3', text: "Publikacja autorskich scenariuszy w sieci (np. na portalach dla nauczycieli)" }
+                    ],
+                    examples: [
+                        { name: "Zajęcia otwarte", plan: "Prowadzenie lekcji otwartych oraz udostępnianie stworzonych materiałów.", report: "Aktywnie wspierałam rozwój wewnątrzszkolny dzieląc się swoją wiedzą. Przeprowadziłam lekcje otwarte, w których brali udział nauczyciele początkujący. Ponadto udostępniłam w szkolnym zasobie chmurowym zbiór moich autorskich kart pracy i prezentacji. Dyskusje metodyczne po zajęciach wzbogaciły warsztat obu stron." }
+                    ]
+                },
+                {
+                    id: 'd3', law: "§ 8 ust. 3 pkt 3", title: "Zaawansowane wykorzystanie narzędzi multimedialnych", icon: "ph-monitor-play",
+                    checklist: [
+                        { id: 'd3_c1', text: "Administrowanie stroną internetową / szkolnym FB" },
+                        { id: 'd3_c2', text: "Stworzenie bazy e-learningowej dla uczniów (np. padlet klasy)" },
+                        { id: 'd3_c3', text: "Tworzenie własnych materiałów wideo lub gier edukacyjnych" }
+                    ],
+                    examples: [
+                        { name: "E-learning i szkolne media", plan: "Wdrażanie zaawansowanych narzędzi e-learningowych oraz wsparcie medialne szkoły.", report: "Samodzielnie opracowywałam zaawansowane materiały multimedialne. Stworzyłam dla moich uczniów klasowego Padleta, który stanowił całodobową bazę wiedzy i miejsce na zamieszczanie projektów. Dodatkowo wspierałam szkołę współtworząc treści na szkolny fanpage, co budowało pozytywny wizerunek placówki w środowisku lokalnym." }
+                    ]
+                },
+                {
+                    id: 'd4', law: "§ 8 ust. 3 pkt 4a/b", title: "Opracowanie programów i współpraca z instytucjami", icon: "ph-handshake",
+                    checklist: [
+                        { id: 'd4_c1', text: "Opracowanie autorskiego programu zajęć wyrównawczych" },
+                        { id: 'd4_c2', text: "Współpraca z poradniami, policją, strażą pożarną" },
+                        { id: 'd4_c3', text: "Organizacja akcji charytatywnych i wolontariatu" }
+                    ],
+                    examples: [
+                        { name: "Współpraca lokalna i wolontariat", plan: "Rozwijanie współpracy z organizacjami wspierającymi edukację oraz propagowanie wolontariatu.", report: "W celu wszechstronnego rozwoju uczniów nawiązałam współpracę z lokalnymi instytucjami (np. Biblioteką Miejską, Policją), organizując spotkania edukacyjno-profilaktyczne. Dodatkowo byłam koordynatorem szkolnego Koła Wolontariatu. Przeprowadziliśmy wspólnie akcję 'Szlachetna Paczka', co uwrażliwiło dzieci na potrzeby drugiego człowieka." }
                     ]
                 }
             ]
@@ -202,7 +227,7 @@
 
         function EduAwansApp() {
             // --- STATE APLIKACJI ---
-            const [activeTab, setActiveTab] = useState('kreator'); // 'kreator' | 'dokument'
+            const [activeTab, setActiveTab] = useState('kreator');
             const [selectedPath, setSelectedPath] = useState('mianowany');
             const [expandedReqId, setExpandedReqId] = useState('m1');
             const [checkedTasks, setCheckedTasks] = useState([]);
@@ -210,9 +235,10 @@
             // --- STATE DOKUMENTU ---
             const [docItems, setDocItems] = useState([]); 
             
-            // --- STATE AI ---
+            // --- STATE AI GENERATORA ---
             const [aiInput, setAiInput] = useState('');
             const [aiOutput, setAiOutput] = useState('');
+            const [aiCategory, setAiCategory] = useState('sprawozdanie'); // sprawozdanie | plan | wniosek
             const [isGenerating, setIsGenerating] = useState(false);
             const [toastMessage, setToastMessage] = useState('');
 
@@ -230,95 +256,95 @@
                 }
             };
 
-            // Dodawanie do wirtualnego dokumentu
+            // Dokument wirtualny
             const handleAddToDocument = (textToInsert, forcedSectionName = null) => {
                 const activeReq = AWANS_DATA[selectedPath].find(r => r.id === expandedReqId);
-                const sectionTitle = forcedSectionName || (activeReq ? activeReq.title : "Inne działania");
-                
-                setDocItems([...docItems, { 
-                    id: Date.now(), 
-                    section: sectionTitle, 
-                    text: textToInsert 
-                }]);
-                
+                const sectionTitle = forcedSectionName || (activeReq ? activeReq.title : "Nowy nagłówek");
+                setDocItems([...docItems, { id: Date.now(), section: sectionTitle, text: textToInsert }]);
                 showToast("✅ Dodano do Twojego dokumentu!");
             };
 
-            // Aktualizacja tekstu wirtualnego dokumentu
             const updateDocItem = (id, field, value) => {
                 setDocItems(docItems.map(item => item.id === id ? { ...item, [field]: value } : item));
             };
 
-            // Usuwanie z wirtualnego dokumentu
             const removeDocItem = (id) => {
                 if(window.confirm("Na pewno usunąć ten fragment dokumentu?")) {
                     setDocItems(docItems.filter(item => item.id !== id));
                 }
             };
 
-            // --- POŁĄCZENIE Z AI PRZEZ VERCEL (Bezpieczne!) ---
+            // Kopiowanie całego dokumentu do schowka
+            const copyEntireDocument = () => {
+                if(docItems.length === 0) return showToast("⚠️ Dokument jest pusty!");
+                let textToCopy = `SPRAWOZDANIE Z REALIZACJI PLANU ROZWOJU ZAWODOWEGO\nŚcieżka: Nauczyciel ${selectedPath === 'mianowany' ? 'Mianowany' : 'Dyplomowany'}\n\n`;
+                docItems.forEach((item, index) => {
+                    textToCopy += `${index + 1}. ${item.section}\n${item.text}\n\n`;
+                });
+                navigator.clipboard.writeText(textToCopy);
+                showToast("✅ Cały dokument skopiowany do schowka!");
+            };
+
+            // --- POŁĄCZENIE Z AI PRZEZ VERCEL (OPENAI BACKEND) ---
             const generateAIText = async () => {
                 if (!aiInput.trim()) return;
                 setIsGenerating(true);
                 setAiOutput('');
 
-                const prompt = `Jesteś ekspertem ds. awansu zawodowego nauczycieli w Polsce. 
-                Zadanie: Zamień poniższe potoczne zdanie na oficjalny, elokwentny, urzędowy akapit (ok. 3-4 zdania), 
-                idealny do teczki/sprawozdania z awansu zawodowego nauczyciela. 
-                Używaj czasu przeszłego (np. zorganizowałam/em, wdrożyłam/em) i specjalistycznego żargonu pedagogicznego. 
-                Tekst potoczny nauczyciela: "${aiInput}"`;
+                // Tworzymy mądry, dedykowany prompt na podstawie wybranej z listy kategorii
+                let contextInstruction = "";
+                if (aiCategory === "sprawozdanie") {
+                    contextInstruction = "Zamień to na rozbudowany, piękny urzędowy akapit do Sprawozdania z Awansu. Używaj czasu przeszłego (np. 'Zorganizowałem/am'). Użyj profesjonalnego żargonu pedagogicznego.";
+                } else if (aiCategory === "plan") {
+                    contextInstruction = "Zamień to na krótki, zwięzły cel operacyjny do Planu Rozwoju Zawodowego. Używaj bezokoliczników (np. 'Zorganizowanie', 'Nawiązanie', 'Wdrożenie').";
+                } else if (aiCategory === "wniosek") {
+                    contextInstruction = "Napisz na podstawie tego refleksyjny Wniosek/Ewaluację dla nauczyciela (np. 'Podjęte działania sprawiły, że...', 'Dzięki temu proces nauczania stał się...').";
+                }
 
-                const fetchWithRetry = async (url, options, retries = 5, delay = 1000) => {
-                    for (let i = 0; i < retries; i++) {
-                        try {
-                            const res = await fetch(url, options);
-                            if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-                            return await res.json();
-                        } catch (e) {
-                            if (i === retries - 1) throw e;
-                            await new Promise(res => setTimeout(res, delay * Math.pow(2, i)));
-                        }
-                    }
-                };
+                const prompt = `Jesteś ekspertem ds. awansu zawodowego nauczycieli w Polsce. ${contextInstruction} \n\nSzkic od nauczyciela: "${aiInput}"`;
 
                 try {
-                    // Żądamy wygenerowania z NASZEGO serwera (api/gemini)
-                    const url = '/api/gemini';
-                    
-                    const data = await fetchWithRetry(url, {
+                    const response = await fetch('/api/gemini', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ prompt: prompt })
                     });
                     
-                    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "Błąd generowania tekstu. Spróbuj ponownie.";
+                    const data = await response.json();
+                    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "Błąd generowania tekstu. Sprawdź plik api/gemini.js.";
                     setAiOutput(text);
                 } catch (error) {
                     console.error("Backend Error:", error);
-                    setAiOutput("Wystąpił błąd podczas łączenia z serwerem. Upewnij się, że masz poprawnie skonfigurowany plik api/gemini na Vercelu.");
+                    setAiOutput("Wystąpił błąd podczas łączenia z serwerem. Upewnij się, że masz poprawnie skonfigurowany plik backendu.");
                 } finally {
                     setIsGenerating(false);
                 }
             };
 
-            // Pasek postępu checklist
+            // Obliczanie statystyk
             const requirements = AWANS_DATA[selectedPath];
             const allChecklistItems = requirements.flatMap(req => req.checklist);
             const totalTasks = allChecklistItems.length;
             const completedTasks = allChecklistItems.filter(task => checkedTasks.includes(task.id)).length;
             const progressPercent = totalTasks === 0 ? 0 : Math.round((completedTasks / totalTasks) * 100);
+            
+            const totalWords = docItems.reduce((acc, item) => acc + (item.text.match(/\b[-?a-zA-ZąćęłńóśźżĄĆĘŁŃÓŚŹŻ]+\b/gi) || []).length, 0);
 
-            // --- WIDOK APLIKACJI ---
+            // Magiczne pigułki (podpowiedzi dla AI)
+            const aiPills = [
+                "Gazetki w klasie", "Rozmowy z rodzicami", "Udział w webinarach", "Rozwiązanie kłótni", "Sprawdziany"
+            ];
+
             return (
                 <div className="min-h-screen relative flex flex-col pb-10">
                     <div className="hero-glow print-hidden"></div>
 
                     {/* Powiadomienia (Toast) */}
                     <div className={`fixed top-24 left-1/2 -translate-x-1/2 z-[200] bg-emerald-600 text-white px-6 py-3 rounded-full font-bold shadow-[0_10px_40px_rgba(16,185,129,0.5)] transition-all duration-300 flex items-center gap-2 print-hidden ${toastMessage ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-10 pointer-events-none'}`}>
-                        {toastMessage}
+                        <i className="ph-bold ph-check-circle text-xl"></i> {toastMessage}
                     </div>
 
-                    {/* Górna Nawigacja (Menu główne) */}
+                    {/* Nawigacja */}
                     <nav className="w-full z-[100] glass-nav print-hidden sticky top-0">
                         <div className="max-w-[90rem] mx-auto px-6 h-20 flex items-center justify-between">
                             <div className="flex items-center gap-3">
@@ -328,22 +354,13 @@
                                 <span className="text-xl font-extrabold tracking-tight text-white hidden sm:block">EduAwans<span className="text-blue-500">PRO MAX</span></span>
                             </div>
                             
-                            {/* Zakładki */}
                             <div className="flex bg-slate-900/80 p-1.5 rounded-full border border-slate-700/50">
-                                <button 
-                                    onClick={() => setActiveTab('kreator')}
-                                    className={`px-6 py-2 text-sm font-bold rounded-full transition-all flex items-center gap-2 ${activeTab === 'kreator' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
-                                >
-                                    <i className="ph-bold ph-magic-wand"></i> Kreator
+                                <button onClick={() => setActiveTab('kreator')} className={`px-6 py-2 text-sm font-bold rounded-full transition-all flex items-center gap-2 ${activeTab === 'kreator' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}>
+                                    <i className="ph-bold ph-magic-wand"></i> Baza & AI
                                 </button>
-                                <button 
-                                    onClick={() => setActiveTab('dokument')}
-                                    className={`px-6 py-2 text-sm font-bold rounded-full transition-all flex items-center gap-2 relative ${activeTab === 'dokument' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
-                                >
-                                    <i className="ph-bold ph-file-text"></i> Twój Dokument
-                                    {docItems.length > 0 && (
-                                        <span className="absolute -top-1 -right-1 bg-emerald-500 text-white text-[10px] w-5 h-5 flex items-center justify-center rounded-full animate-bounce">{docItems.length}</span>
-                                    )}
+                                <button onClick={() => setActiveTab('dokument')} className={`px-6 py-2 text-sm font-bold rounded-full transition-all flex items-center gap-2 relative ${activeTab === 'dokument' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}>
+                                    <i className="ph-bold ph-file-text"></i> Dokument
+                                    {docItems.length > 0 && <span className="absolute -top-1 -right-1 bg-emerald-500 text-white text-[10px] w-5 h-5 flex items-center justify-center rounded-full animate-bounce">{docItems.length}</span>}
                                 </button>
                             </div>
 
@@ -359,29 +376,27 @@
                     {activeTab === 'kreator' && (
                         <main className="flex-grow max-w-[90rem] w-full mx-auto px-4 sm:px-6 py-8 relative z-10 flex flex-col xl:flex-row gap-8 items-start print-hidden animate-[reveal_0.4s_ease-out]">
                             
-                            {/* LEWA KOLUMNA: Wymagania */}
+                            {/* LEWA KOLUMNA: Baza i Akordeon */}
                             <div className="w-full xl:w-7/12 flex flex-col gap-6">
                                 <div className="glass-panel rounded-[2rem] p-6 md:p-8">
                                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
                                         <div>
                                             <h2 className="text-3xl font-black text-white tracking-tight">Katalog Wymagań</h2>
-                                            <p className="text-sm text-slate-400 mt-1">Wybierz wymaganie i dodaj gotowe wpisy do swojego dokumentu.</p>
+                                            <p className="text-sm text-slate-400 mt-1">Wybierz wymaganie i dodaj gotowe wpisy do dokumentu.</p>
                                         </div>
                                         <div className="w-full sm:w-48 bg-slate-800 rounded-2xl p-3 border border-slate-700">
                                             <div className="flex justify-between text-xs font-bold mb-1 text-slate-300">
-                                                <span>Postęp (Checklista)</span>
+                                                <span>Checklista</span>
                                                 <span className="text-blue-400">{progressPercent}%</span>
                                             </div>
-                                            <div className="w-full bg-slate-900 rounded-full h-2 overflow-hidden">
-                                                <div className="bg-blue-500 h-2 rounded-full transition-all duration-500" style={{ width: `${progressPercent}%` }}></div>
-                                            </div>
+                                            <div className="w-full bg-slate-900 rounded-full h-2 overflow-hidden"><div className="bg-blue-500 h-2 rounded-full transition-all duration-500" style={{ width: `${progressPercent}%` }}></div></div>
                                         </div>
                                     </div>
 
-                                    {/* Przełącznik Stopnia Awansu */}
+                                    {/* Przełącznik Stopnia */}
                                     <div className="flex p-1.5 bg-slate-900/80 rounded-2xl mb-8 border border-slate-700/50 relative">
-                                        <button onClick={() => { setSelectedPath('mianowany'); setExpandedReqId(AWANS_DATA['mianowany'][0].id); }} className={`flex-1 py-4 text-sm font-black rounded-xl z-10 ${selectedPath === 'mianowany' ? 'text-white' : 'text-slate-500'}`}>Nauczyciel Mianowany</button>
-                                        <button onClick={() => { setSelectedPath('dyplomowany'); setExpandedReqId(AWANS_DATA['dyplomowany'][0].id); }} className={`flex-1 py-4 text-sm font-black rounded-xl z-10 ${selectedPath === 'dyplomowany' ? 'text-white' : 'text-slate-500'}`}>Nauczyciel Dyplomowany</button>
+                                        <button onClick={() => { setSelectedPath('mianowany'); setExpandedReqId(AWANS_DATA['mianowany'][0].id); }} className={`flex-1 py-4 text-sm font-black rounded-xl z-10 ${selectedPath === 'mianowany' ? 'text-white' : 'text-slate-500 hover:text-slate-300'}`}>Nauczyciel Mianowany</button>
+                                        <button onClick={() => { setSelectedPath('dyplomowany'); setExpandedReqId(AWANS_DATA['dyplomowany'][0].id); }} className={`flex-1 py-4 text-sm font-black rounded-xl z-10 ${selectedPath === 'dyplomowany' ? 'text-white' : 'text-slate-500 hover:text-slate-300'}`}>Nauczyciel Dyplomowany</button>
                                         <div className={`absolute top-1.5 bottom-1.5 w-[calc(50%-6px)] bg-blue-600 rounded-xl transition-transform duration-300 ${selectedPath === 'mianowany' ? 'translate-x-0' : 'translate-x-[calc(100%+6px)]'}`}></div>
                                     </div>
 
@@ -404,10 +419,9 @@
 
                                                     {isExpanded && (
                                                         <div className="px-5 pb-6 pt-2 border-t border-slate-700/50 bg-slate-900/50">
-                                                            
                                                             {/* Checklista */}
                                                             <div className="mb-6">
-                                                                <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2"><i className="ph-bold ph-check-square"></i> Pomysły na działania (Odhacz zrobione):</h4>
+                                                                <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2"><i className="ph-bold ph-check-square"></i> Pomysły na działania (Checklista):</h4>
                                                                 <div className="space-y-2">
                                                                     {req.checklist.map(task => {
                                                                         const isChecked = checkedTasks.includes(task.id);
@@ -424,19 +438,26 @@
                                                                 </div>
                                                             </div>
 
-                                                            {/* Gotowe Wpisy */}
-                                                            <div className="mb-2 border-t border-slate-700/50 pt-4">
-                                                                <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2"><i className="ph-bold ph-books"></i> Gotowe wpisy (Dodaj do dokumentu):</h4>
+                                                            {/* Gotowce */}
+                                                            <div className="border-t border-slate-700/50 pt-4">
+                                                                <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2"><i className="ph-bold ph-books"></i> Pełne wpisy (Do dodania):</h4>
                                                                 {req.examples.map((ex, idx) => (
-                                                                    <div key={idx} className="bg-slate-800/40 border border-slate-700 rounded-xl p-4 mb-3">
-                                                                        <div className="font-bold text-white mb-3">{ex.name}</div>
-                                                                        <div className="grid grid-cols-1 gap-4">
-                                                                            <div className="bg-slate-900/50 p-3 rounded-lg border border-slate-700/50">
-                                                                                <div className="text-[10px] text-amber-400 uppercase font-black mb-2 flex justify-between">
-                                                                                    Wzór Sprawozdania: 
-                                                                                    <button onClick={() => handleAddToDocument(ex.report, req.title)} className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1"><i className="ph-bold ph-file-plus"></i> Dodaj do dokumentu</button>
+                                                                    <div key={idx} className="bg-slate-800/40 border border-slate-700 rounded-xl p-4 mb-4">
+                                                                        <div className="font-bold text-white mb-3 text-sm">{ex.name}</div>
+                                                                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                                                            <div className="bg-slate-900/50 p-3 rounded-lg border border-slate-700/50 flex flex-col justify-between">
+                                                                                <div>
+                                                                                    <div className="text-[10px] text-emerald-400 uppercase font-black mb-2 flex items-center gap-1"><i className="ph-fill ph-file-text"></i> Do Planu Rozwoju</div>
+                                                                                    <p className="text-sm text-slate-400 italic mb-3">{ex.plan}</p>
                                                                                 </div>
-                                                                                <p className="text-sm text-slate-300">{ex.report}</p>
+                                                                                <button onClick={() => handleAddToDocument(ex.plan, req.title)} className="text-xs text-blue-400 hover:text-blue-300 self-start font-bold"><i className="ph-bold ph-file-plus"></i> Dodaj do dokumentu</button>
+                                                                            </div>
+                                                                            <div className="bg-slate-900/50 p-3 rounded-lg border border-slate-700/50 flex flex-col justify-between">
+                                                                                <div>
+                                                                                    <div className="text-[10px] text-amber-400 uppercase font-black mb-2 flex items-center gap-1"><i className="ph-fill ph-file-text"></i> Do Sprawozdania</div>
+                                                                                    <p className="text-sm text-slate-300 mb-3">{ex.report}</p>
+                                                                                </div>
+                                                                                <button onClick={() => handleAddToDocument(ex.report, req.title)} className="text-xs text-blue-400 hover:text-blue-300 self-start font-bold"><i className="ph-bold ph-file-plus"></i> Dodaj do dokumentu</button>
                                                                             </div>
                                                                         </div>
                                                                     </div>
@@ -451,38 +472,60 @@
                                 </div>
                             </div>
 
-                            {/* PRAWA KOLUMNA: AI Generator */}
+                            {/* PRAWA KOLUMNA: Ulepszony AI Generator */}
                             <div className="w-full xl:w-5/12 flex flex-col gap-6 sticky top-24">
                                 <div className="glass-panel rounded-[2rem] p-6 md:p-8 relative border border-purple-500/30">
                                     <div className="absolute top-0 right-0 p-8 opacity-[0.03] pointer-events-none"><i className="ph-fill ph-brain text-9xl text-purple-500"></i></div>
                                     <div className="relative z-10">
                                         <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest mb-4 bg-purple-500/20 text-purple-400 border border-purple-500/30">
-                                            <i className="ph-fill ph-sparkle"></i> Tłumacz AI
+                                            <i className="ph-fill ph-sparkle"></i> Kreator Akapitów AI
                                         </div>
-                                        <h2 className="text-2xl font-black text-white mb-2 tracking-tight">Kreator Akapitów</h2>
-                                        <p className="text-slate-400 text-sm mb-6">Napisz prosto co zrobiłeś, a AI zamieni to w oficjalny tekst, który będziesz mógł od razu edytować i dodać do dokumentu.</p>
+                                        <h2 className="text-2xl font-black text-white mb-2 tracking-tight">Osobisty Tłumacz</h2>
+                                        <p className="text-slate-400 text-sm mb-6">Napisz swoimi słowami, a AI przetłumaczy to na język kuratoryjny.</p>
 
                                         <div className="space-y-4">
-                                            <textarea 
-                                                value={aiInput} onChange={(e) => setAiInput(e.target.value)}
-                                                placeholder="Np. zorganizowałem wycieczkę do teatru dla klasy 4..."
-                                                className="w-full h-24 bg-slate-900/80 border border-slate-700 text-white rounded-xl p-4 focus:outline-none focus:border-purple-500 transition-colors shadow-inner text-sm custom-scrollbar"
-                                            ></textarea>
+                                            {/* ZMIANA: Dodano wybór kontekstu dla AI */}
+                                            <div>
+                                                <label className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 block">Co dokładnie piszemy?</label>
+                                                <select value={aiCategory} onChange={(e) => setAiCategory(e.target.value)} className="w-full bg-slate-900 border border-slate-700 text-white rounded-xl p-3 focus:outline-none focus:border-purple-500 text-sm">
+                                                    <option value="sprawozdanie">Rozbudowany akapit do Sprawozdania</option>
+                                                    <option value="plan">Zwięzły cel do Planu Rozwoju (bezokoliczniki)</option>
+                                                    <option value="wniosek">Refleksja / Wniosek podsumowujący działania</option>
+                                                </select>
+                                            </div>
+
+                                            <div>
+                                                <label className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 block">Szkic działania:</label>
+                                                <textarea 
+                                                    value={aiInput} onChange={(e) => setAiInput(e.target.value)}
+                                                    placeholder="Wpisz np. 'pomagałem słabszym uczniom robiąc łatwiejsze sprawdziany'..."
+                                                    className="w-full h-24 bg-slate-900/80 border border-slate-700 text-white rounded-xl p-4 focus:outline-none focus:border-purple-500 transition-colors shadow-inner text-sm custom-scrollbar"
+                                                ></textarea>
+                                                
+                                                {/* ZMIANA: Szablony - Szybkie podpowiedzi */}
+                                                <div className="flex flex-wrap gap-2 mt-3">
+                                                    {aiPills.map(pill => (
+                                                        <button key={pill} onClick={() => setAiInput(pill)} className="text-[10px] uppercase font-bold tracking-wider bg-slate-800 hover:bg-purple-900 text-slate-400 hover:text-purple-300 px-3 py-1.5 rounded-full border border-slate-700 transition-colors">
+                                                            {pill}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
 
                                             <button 
                                                 onClick={generateAIText} disabled={isGenerating || !aiInput.trim()}
-                                                className="w-full bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-purple-500 hover:to-fuchsia-500 disabled:opacity-50 text-white py-3.5 rounded-xl font-bold btn-bounce flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(168,85,247,0.3)]"
+                                                className="w-full bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-purple-500 hover:to-fuchsia-500 disabled:opacity-50 text-white py-3.5 rounded-xl font-bold btn-bounce flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(168,85,247,0.3)] mt-2"
                                             >
-                                                {isGenerating ? <div className="loader"></div> : <><i className="ph-bold ph-magic-wand text-lg"></i> Wygeneruj urzędowy tekst</>}
+                                                {isGenerating ? <div className="loader"></div> : <><i className="ph-bold ph-magic-wand text-lg"></i> Zredaguj profesjonalnie</>}
                                             </button>
 
                                             {/* Wynik AI - EDYTOWALNY */}
                                             {aiOutput && (
                                                 <div className="mt-6 border-t border-slate-700/50 pt-6 animate-[reveal_0.3s_ease-out]">
-                                                    <label className="text-xs font-bold text-purple-400 uppercase tracking-widest block mb-2">Wygenerowany Tekst (Możesz go poprawić!):</label>
+                                                    <label className="text-xs font-bold text-purple-400 uppercase tracking-widest block mb-2">Wynik (Możesz go poprawić przed dodaniem):</label>
                                                     <textarea 
                                                         value={aiOutput} onChange={(e) => setAiOutput(e.target.value)}
-                                                        className="w-full h-40 bg-purple-900/10 border border-purple-500/50 text-slate-200 rounded-xl p-4 focus:outline-none focus:border-purple-400 text-sm leading-relaxed custom-scrollbar mb-4 resize-y"
+                                                        className="w-full min-h-[160px] bg-purple-900/10 border border-purple-500/50 text-slate-200 rounded-xl p-4 focus:outline-none focus:border-purple-400 text-sm leading-relaxed custom-scrollbar mb-4 resize-y"
                                                     ></textarea>
                                                     
                                                     <button 
@@ -506,17 +549,30 @@
                     {activeTab === 'dokument' && (
                         <main className="flex-grow w-full max-w-5xl mx-auto px-4 sm:px-6 py-8 relative z-10 print-hidden animate-[reveal_0.4s_ease-out]">
                             
-                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-6 gap-4">
+                            <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-6 gap-4">
                                 <div>
                                     <h2 className="text-3xl font-black text-white">Zbudowany Dokument</h2>
-                                    <p className="text-slate-400 text-sm mt-1">Tutaj widzisz strukturę swojego sprawozdania. Popraw teksty i wydrukuj.</p>
+                                    <p className="text-slate-400 text-sm mt-1">Popraw wygenerowane teksty i eksportuj sprawozdanie.</p>
+                                    {/* Statystyki */}
+                                    {docItems.length > 0 && (
+                                        <div className="flex gap-4 mt-3">
+                                            <span className="text-xs font-bold bg-slate-800 text-blue-400 px-3 py-1 rounded-full"><i className="ph-bold ph-text-align-left"></i> Słów: {totalWords}</span>
+                                            <span className="text-xs font-bold bg-slate-800 text-purple-400 px-3 py-1 rounded-full"><i className="ph-bold ph-list-numbers"></i> Akapitów: {docItems.length}</span>
+                                        </div>
+                                    )}
                                 </div>
-                                <button onClick={() => window.print()} className="bg-emerald-600 hover:bg-emerald-500 text-white px-8 py-3 rounded-xl font-bold transition-all shadow-[0_0_20px_rgba(16,185,129,0.4)] btn-bounce text-sm uppercase tracking-wider flex items-center gap-2 w-full sm:w-auto justify-center">
-                                    <i className="ph-bold ph-printer text-xl"></i> Drukuj PDF
-                                </button>
+                                
+                                <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+                                    <button onClick={copyEntireDocument} className="bg-slate-800 hover:bg-slate-700 text-white px-6 py-3 rounded-xl font-bold transition-all border border-slate-600 btn-bounce text-sm flex items-center justify-center gap-2">
+                                        <i className="ph-bold ph-copy text-xl"></i> Kopiuj Całość
+                                    </button>
+                                    <button onClick={() => window.print()} className="bg-emerald-600 hover:bg-emerald-500 text-white px-8 py-3 rounded-xl font-bold transition-all shadow-[0_0_20px_rgba(16,185,129,0.4)] btn-bounce text-sm uppercase tracking-wider flex items-center justify-center gap-2">
+                                        <i className="ph-bold ph-printer text-xl"></i> Drukuj PDF
+                                    </button>
+                                </div>
                             </div>
 
-                            <div className="bg-slate-100 rounded-sm shadow-2xl p-6 md:p-16 min-h-[1056px] text-slate-900 font-serif relative">
+                            <div className="bg-slate-100 rounded-sm shadow-2xl p-6 md:p-16 min-h-[1056px] text-slate-900 font-serif relative border border-slate-300">
                                 <div className="border-b-2 border-slate-900 pb-4 mb-8 text-center">
                                     <h1 className="text-3xl font-bold uppercase tracking-wider">Sprawozdanie Zawodowe</h1>
                                     <p className="text-lg text-slate-600 mt-2">Dostosuj zawartość poniżej</p>
@@ -526,16 +582,16 @@
                                     <div className="text-center text-slate-400 mt-20 border-2 border-dashed border-slate-300 p-10 rounded-xl">
                                         <i className="ph-duotone ph-file-dashed text-6xl mb-4"></i>
                                         <p className="text-lg font-bold text-slate-600">Twój dokument jest pusty!</p>
-                                        <p className="text-sm mt-2">Wróć do zakładki "Kreator", poszukaj wymagań i dodaj interesujące Cię wpisy.</p>
+                                        <p className="text-sm mt-2">Wróć do zakładki "Kreator", aby wygenerować i ułożyć pierwsze akapity.</p>
                                     </div>
                                 ) : (
                                     <div className="space-y-8">
                                         {docItems.map((item, index) => (
-                                            <div key={item.id} className="relative group p-4 border border-transparent hover:border-slate-300 hover:bg-white rounded-lg transition-colors">
+                                            <div key={item.id} className="relative group p-4 border border-transparent hover:border-slate-300 hover:bg-white hover:shadow-sm rounded-lg transition-all">
                                                 
                                                 <button 
                                                     onClick={() => removeDocItem(item.id)}
-                                                    className="absolute -left-3 -top-3 bg-red-500 text-white w-8 h-8 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-md"
+                                                    className="absolute -left-3 -top-3 bg-red-500 text-white w-8 h-8 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-md z-10"
                                                     title="Usuń ten wpis"
                                                 >
                                                     <i className="ph-bold ph-trash"></i>
@@ -546,13 +602,13 @@
                                                     value={item.section} 
                                                     onChange={(e) => updateDocItem(item.id, 'section', e.target.value)}
                                                     className="w-full font-bold text-xl mb-3 border-b border-transparent hover:border-slate-300 focus:border-blue-500 outline-none bg-transparent"
-                                                    placeholder="Tytuł Nagłówka"
+                                                    placeholder="Tytuł Wymagania / Sekcji"
                                                 />
                                                 
                                                 <textarea 
                                                     value={item.text} 
                                                     onChange={(e) => updateDocItem(item.id, 'text', e.target.value)}
-                                                    className="w-full min-h-[150px] resize-y text-justify leading-relaxed border border-transparent hover:border-slate-300 focus:border-blue-500 outline-none bg-transparent p-2 rounded"
+                                                    className="w-full min-h-[150px] resize-y text-justify leading-relaxed border border-transparent hover:border-slate-300 focus:border-blue-500 outline-none bg-transparent p-2 rounded custom-scrollbar"
                                                     placeholder="Treść sprawozdania..."
                                                 ></textarea>
                                             </div>
@@ -561,10 +617,10 @@
                                 )}
                                 
                                 <button 
-                                    onClick={() => handleAddToDocument("", "Nowy Nagłówek Własny")}
+                                    onClick={() => handleAddToDocument("", "Własny nowy punkt")}
                                     className="mt-10 w-full py-4 border-2 border-dashed border-slate-300 text-slate-500 font-bold hover:bg-slate-200 hover:text-slate-700 transition-colors rounded-xl flex items-center justify-center gap-2"
                                 >
-                                    <i className="ph-bold ph-plus"></i> Dodaj pusty akapit
+                                    <i className="ph-bold ph-plus"></i> Dodaj pusty blok tekstowy
                                 </button>
                             </div>
                         </main>
@@ -572,9 +628,7 @@
 
                     {/* ================================================================= */}
                     {/* WIDOK: TYLKO DO DRUKU (@media print)                              */}
-                    {/* Ten element renderuje się fizycznie TYLKO na kartce z drukarki    */}
                     {/* ================================================================= */}
-                    
                     <div className="hidden print-only">
                         <div className="text-center mb-10 border-b-2 border-black pb-4 print-break-avoid">
                             <h1 className="uppercase tracking-wider">Sprawozdanie z realizacji planu rozwoju zawodowego</h1>
@@ -582,7 +636,7 @@
                         </div>
 
                         {docItems.length === 0 ? (
-                            <p className="italic text-center text-gray-500">Brak dodanych treści.</p>
+                            <p className="italic text-center text-gray-500">Brak dodanych treści do wydruku.</p>
                         ) : (
                             docItems.map((item, index) => (
                                 <div key={`print-${item.id}`} className="mb-6 print-break-avoid">
@@ -592,7 +646,6 @@
                             ))
                         )}
                         
-                        {/* Miejsce na podpisy */}
                         <div className="signatures print-break-avoid">
                             <div>
                                 <p>....................................................</p>
