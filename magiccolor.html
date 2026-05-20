@@ -257,8 +257,7 @@
                         // Krok 2: Rysujemy pobrany obrazek
                         ctx.drawImage(img, 0, 0);
                         
-                        // Krok 3: PANCERNY WYBIELACZ PIKSELI
-                        // Pobieramy dane o każdym pojedynczym pikselu na obrazku
+                        // Krok 3: INTELIGENTNY WYBIELACZ PIKSELI (Złagodzony)
                         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
                         const data = imageData.data;
                         
@@ -270,20 +269,24 @@
                             // Obliczamy jasność (luminancję) piksela
                             const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
                             
-                            // Jeśli piksel jest szary (jasność powyżej 150) - robimy z niego absolutną śnieżną biel.
-                            // To kompletnie niszczy wszelkie "ołówkowe" cieniowanie wewnątrz psa!
-                            if (luminance > 150) { 
-                                data[i] = 255;     // Czerwony = max
-                                data[i + 1] = 255; // Zielony = max
-                                data[i + 2] = 255; // Niebieski = max
+                            // Zmiana progu z 150 na 220! 
+                            // Kasujemy TYLKO bardzo jasne, szare tło. 
+                            // Linie łap (które mogły mieć np. jasność 170-190) przetrwają!
+                            if (luminance > 220) { 
+                                data[i] = 255;
+                                data[i + 1] = 255;
+                                data[i + 2] = 255;
                             } else {
-                                // W przeciwnym razie (czarne kontury) upewniamy się, że są w 100% czarne
-                                data[i] = 0;
-                                data[i + 1] = 0;
-                                data[i + 2] = 0;
+                                // Zamiast brutalnie robić wszystko na czarno, 
+                                // przyciemniamy naturalny kolor linii. 
+                                // Wygładza to krawędzie (zachowuje antyaliasing).
+                                const darken = Math.max(0, luminance - 100);
+                                data[i] = darken;
+                                data[i + 1] = darken;
+                                data[i + 2] = darken;
                             }
                         }
-                        // Zapisujemy idealnie czystą, binarną kolorowankę z powrotem na płótno
+                        // Zapisujemy poprawioną kolorowankę na płótno
                         ctx.putImageData(imageData, 0, 0);
                         
                         // Przygotowujemy mazaki do malowania przez dzieci
