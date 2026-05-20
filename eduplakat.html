@@ -128,8 +128,6 @@
             };
 
             const secureApiCall = async (payload) => {
-                // POPRAWKA: Weryfikacja tylko po vercel.app. 
-                // Unika błędu 401 poprzez odpowiednie wykrywanie podglądu (Canvas).
                 const isProduction = window.location.hostname.includes('vercel.app');
 
                 if (isProduction) {
@@ -142,7 +140,6 @@
                     const apiKey = ""; 
                     const url = `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${apiKey}`;
                     
-                    // Ściśle formatujemy payload dla środowiska podglądu
                     const previewPayload = {
                         instances: { prompt: payload.instances.prompt },
                         parameters: { sampleCount: 1 }
@@ -172,22 +169,21 @@
                     let styleModifier = "";
                     let stylePreset = "digital-art"; 
 
+                    // KROK 1: Usunąłem słowa "scenic" (widokowy) i "landscape" (krajobraz)
                     if (styleOption === 'akwarela') {
-                        styleModifier = "beautiful scenic watercolor painting, soft vibrant colors, artistic scene, pure visual art";
+                        styleModifier = "beautiful watercolor painting, soft vibrant colors, artistic illustration, detailed character focus";
                         stylePreset = "photographic";
                     } else if (styleOption === '3d') {
-                        styleModifier = "cute 3d render style, pixar style, colorful, highly detailed, perfect for kids";
+                        styleModifier = "cute 3d render style, pixar style, colorful, highly detailed characters";
                         stylePreset = "3d-model";
                     } else if (styleOption === 'plakat') {
-                        styleModifier = "modern flat vector art landscape, bold vibrant colors, minimalist illustration";
+                        styleModifier = "modern flat vector art, bold vibrant colors, minimalist illustration";
                         stylePreset = "digital-art";
                     }
 
-                    // KROK 1: Zmieniony prompt pozytywny. Żadnych słów typu "NO TEXT", "event", "poster".
-                    // Zmuszamy sztuczną inteligencję do myślenia o "czystym obrazie", a nie o plakacie.
-                    const hiddenInstruction = `A beautiful, purely visual artwork and scenic illustration depicting: ${promptInput}. ${styleModifier}. Masterpiece, clear focus, perfect composition, purely visual art.`;
+                    // KROK 2: Wymuszamy, że wpis użytkownika to GŁÓWNY TEMAT, na którym AI ma się skupić (MAIN SUBJECT)
+                    const hiddenInstruction = `A beautiful, purely visual artwork. MAIN SUBJECT: ${promptInput}. ${styleModifier}. Masterpiece, clear focus on the main subject and characters, perfect composition, purely visual art.`;
                     
-                    // KROK 2: Super-pancerne zakazy dla tekstów. Dodałem słowa: kartki okolicznościowe, numery, alfabet.
                     const negativePrompt = "text, words, letters, alphabet, numbers, writing, signature, watermark, typography, font, title, heading, label, graphic design layout, poster layout, greeting card, book cover, ugly, deformed, blurry";
 
                     const payload = {
@@ -357,7 +353,6 @@
                                 <label className="block text-white font-bold mb-4 text-lg">Co mam dzisiaj narysować?</label>
                                 
                                 <div className="relative">
-                                    {/* NOWOŚĆ: Zmiana placeholder'a żeby kierować użytkownika na opisywanie scen, a nie świąt */}
                                     <input 
                                         type="text" 
                                         value={promptInput}
@@ -371,7 +366,6 @@
 
                                 <div className="mt-6 flex flex-wrap gap-2">
                                     <span className="text-xs text-slate-500 font-bold uppercase mt-2 mr-2">Szybkie pomysły:</span>
-                                    {/* NOWOŚĆ: Szybkie pomysły zostały zmienione na poprawne opisy wizualne */}
                                     {['Mama z dziećmi, pełno kwiatów', 'Uśmiechnięta Ziemia w kosmosie', 'Kolorowe kropki i dzieci', 'Sowa w birecie na książkach'].map(idea => (
                                         <button key={idea} onClick={() => setPromptInput(idea)} className="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs px-3 py-2 rounded-lg border border-slate-700 transition-colors">
                                             {idea}
@@ -393,7 +387,6 @@
                                         ) : (!isAuthenticated && freeTries >= FREE_TRIES_LIMIT ? 'Odblokuj dostęp PRO' : 'Zaprojektuj Plakat')}
                                     </button>
                                 </div>
-                                {/* NOWOŚĆ: Ważna rada dla użytkownika pod przyciskiem */}
                                 <div className="text-center mt-6 p-4 bg-slate-800/50 rounded-xl border border-slate-700">
                                     <p className="text-slate-400 text-sm font-medium leading-relaxed">
                                         <span className="text-amber-400">💡 Ważna wskazówka:</span> Sztuczna inteligencja nie potrafi pisać po polsku. 
