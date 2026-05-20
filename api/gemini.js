@@ -14,36 +14,60 @@ export default async function handler(req, res) {
 
   try {
     // ==============================================================
-    // 1. OBSŁUGA NOWYCH APLIKACJI (EduAwans PRO MAX, EduTIK PRO) - GEMINI
+    // 1. OBSŁUGA NOWYCH APLIKACJI (EduAwans, EduTIK) - AUTONAPRAWA GEMINI
     // ==============================================================
     if (prompt) {
       if (!geminiKey) {
-        // Trik: Zwracamy błąd jako WYGENEROWANY TEKST, żebyś widział go na ekranie!
         return res.status(200).json({
-            candidates: [{ content: { parts: [{ text: "🚨 BŁĄD VERCEL: Serwer nie widzi klucza GEMINI_API_KEY. Prawdopodobnie zapomniałeś wejść w Deployments i kliknąć 'Redeploy' po dodaniu klucza!" }] } }]
+            candidates: [{ content: { parts: [{ text: "🚨 BŁĄD VERCEL: Serwer nie widzi klucza GEMINI_API_KEY. Wejdź w Settings -> Environment Variables na Vercel, a następnie w zakładce Deployments kliknij 'Redeploy'!" }] } }]
         });
       }
-      
-      // ZMIANA: Zaktualizowana nazwa modelu na 'gemini-1.5-flash-latest'
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${geminiKey}`;
-      
-      const response = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
-      });
 
-      const data = await response.json();
+      // Lista alternatywnych punktów dostępu (Google czasami blokuje wersje beta w UE)
+      const endpoints = [
+        // Opcja A: Stabilna, produkcyjna wersja v1 (Zalecana dla gemini-1.5-flash)
+        `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${geminiKey}`,
+        // Opcja B: Wersja v1beta dla gemini-1.5-flash
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`,
+        // Opcja C: Najnowszy model gemini-1.5-flash-latest na v1beta
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${geminiKey}`,
+        // Opcja D: Klasyczny, niezawodny model gemini-pro jako ostatnia deska ratunku
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${geminiKey}`
+      ];
 
-      if (!response.ok) {
-          console.error("Błąd od Google:", data);
-          // Zwracamy prawdziwy błąd Google prosto na Twój ekran
-          return res.status(200).json({
-              candidates: [{ content: { parts: [{ text: `🚨 BŁĄD GOOGLE API: ${data.error?.message || 'Nieznany błąd'}. Sprawdź swój klucz API!` }] } }]
+      let lastError = null;
+      let successData = null;
+
+      // Pętla próbująca po kolei każdego modelu, aż któryś zadziała!
+      for (const url of endpoints) {
+        try {
+          const response = await fetch(url, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
           });
+
+          const data = await response.json();
+
+          if (response.ok && data.candidates) {
+            successData = data;
+            break; // Sukces! Przerywamy pętlę i zwracamy dane
+          } else {
+            lastError = data.error?.message || 'Nieznany błąd modelu';
+          }
+        } catch (e) {
+          lastError = e.message;
+        }
       }
 
-      return res.status(200).json(data);
+      // Jeśli żaden z 4 sposobów nie zadziałał, wyświetlamy jasną instrukcję dla Ciebie na ekranie
+      if (!successData) {
+        return res.status(200).json({
+            candidates: [{ content: { parts: [{ text: `🚨 BŁĄD GOOGLE API (Próbowano 4 modeli): ${lastError}. \n\nMożliwe przyczyny:\n1. Twój klucz API jest nieaktywny lub błędny.\n2. Jeśli klucz był tworzony w Google Cloud Console, musisz ręcznie włączyć tam usługę "Generative Language API".\n3. Najlepiej wygenerować nowy, darmowy klucz bezpośrednio na: https://aistudio.google.com/` }] } }]
+        });
+      }
+
+      return res.status(200).json(successData);
     }
 
     // ==============================================================
@@ -144,16 +168,14 @@ export default async function handler(req, res) {
       });
     } 
     
-    // Zabezpieczenie na wypadek nierozpoznanego zapytania
     else {
         return res.status(200).json({
-            candidates: [{ content: { parts: [{ text: "🚨 BŁĄD VERCEL: Nie podano parametru 'prompt' w zapytaniu." }] } }]
+            candidates: [{ content: { parts: [{ text: "🚨 BŁĄD VERCEL: Nieprawidłowe zapytanie." }] } }]
         });
     }
     
   } catch (error) {
     console.error("Błąd API:", error);
-    // Przekazanie błędu serwera prosto na ekran
     return res.status(200).json({
         candidates: [{ content: { parts: [{ text: `🚨 KRYTYCZNY BŁĄD SERWERA: ${error.message}` }] } }]
     });
