@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="google" content="notranslate">
-    <title>EduPECS AI - Generator Kart Komunikacyjnych</title>
+    <title>EduSymbol AI - Generator Kart AAC</title>
     
     <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-3RQ9R0N0K8"></script>
@@ -32,7 +32,7 @@
             padding: 0;
         }
         
-        /* Stylistyka EduPECS: Bursztynowy (Amber) i Pomarańczowy (Orange) */
+        /* Stylistyka: Bursztynowy (Amber) i Pomarańczowy (Orange) */
         .aura-blob {
             position: absolute;
             border-radius: 50%;
@@ -73,7 +73,7 @@
             100% { background-position: 0% 50%; }
         }
 
-        .pecs-item-enter { animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+        .symbol-item-enter { animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
         @keyframes popIn { from { opacity: 0; transform: scale(0.8); } to { opacity: 1; transform: scale(1); } }
     </style>
 </head>
@@ -93,33 +93,38 @@
             const [showPaywall, setShowPaywall] = useState(false);
             const [passwordInput, setPasswordInput] = useState('');
             
-            // Zmienne PECS
+            // Zmienne Generatora
             const [promptInput, setPromptInput] = useState('');
-            const [ageGroup, setAgeGroup] = useState('przedszkolaki'); // Grupa wiekowa
-            const [cardSize, setCardSize] = useState('5'); // 5cm lub 4cm (do wydruku)
+            const [ageGroup, setAgeGroup] = useState('przedszkolaki');
+            const [cardSize, setCardSize] = useState('5'); 
             const [generatedImage, setGeneratedImage] = useState(null);
             const [isGenerating, setIsGenerating] = useState(false);
             const [error, setError] = useState('');
             
             // Baza zebranych kart
-            const [pecsCards, setPecsCards] = useState([]);
+            const [symbolCards, setSymbolCards] = useState([]);
             const resultRef = useRef(null);
 
+            // Zmiana kluczy z PECS na Symbol dla odświeżenia obciążonej pamięci
             useEffect(() => {
-                const savedAuth = localStorage.getItem('eduPecsAuth') === 'true';
+                const savedAuth = localStorage.getItem('eduSymbolAuth') === 'true';
                 if (savedAuth) setIsAuthenticated(true);
-                const savedTries = parseInt(localStorage.getItem('eduPecsFreeTries') || '0');
+                const savedTries = parseInt(localStorage.getItem('eduSymbolFreeTries') || '0');
                 setFreeTries(savedTries);
                 
-                const savedCards = localStorage.getItem('eduPecsCards');
+                const savedCards = localStorage.getItem('eduSymbolCards');
                 if (savedCards) {
-                    try { setPecsCards(JSON.parse(savedCards)); } catch(e) {}
+                    try { setSymbolCards(JSON.parse(savedCards)); } catch(e) {}
                 }
             }, []);
 
             useEffect(() => {
-                localStorage.setItem('eduPecsCards', JSON.stringify(pecsCards));
-            }, [pecsCards]);
+                try {
+                    localStorage.setItem('eduSymbolCards', JSON.stringify(symbolCards));
+                } catch (e) {
+                    console.warn("Przeglądarka ma zapchaną pamięć localStorage. Karta może nie przetrwać odświeżenia.");
+                }
+            }, [symbolCards]);
 
             const secureApiCall = async (payload) => {
                 try {
@@ -156,7 +161,7 @@
                 }
             };
 
-            const generatePecsCard = async () => {
+            const generateSymbolCard = async () => {
                 if (!isAuthenticated && freeTries >= FREE_TRIES_LIMIT) {
                     setShowPaywall(true); return;
                 }
@@ -171,7 +176,7 @@
                 try {
                     const cleanPrompt = promptInput.toLowerCase().trim();
                     
-                    // --- 1. INTELIGENTNY DETEKTOR LITER I CYFR ---
+                    // --- 1. INTELIGENTNY DETEKTOR LITER I CYFR (DARMOWY RYSOWNIK) ---
                     const typoMatch = cleanPrompt.match(/(?:cyfra|litera|liczba|znak|duża|mała|wielka)\s+([a-z0-9ąćęłńóśźż]{1,3})/i) || cleanPrompt.match(/^([a-z0-9ąćęłńóśźż]{1,3})$/i);
                     if (typoMatch) {
                         const charToDraw = typoMatch[1].toUpperCase();
@@ -190,7 +195,7 @@
                         return; 
                     }
 
-                    // --- 2. INTELIGENTNY DETEKTOR FIGUR GEOMETRYCZNYCH ---
+                    // --- 2. INTELIGENTNY DETEKTOR FIGUR GEOMETRYCZNYCH (BIAŁE WNĘTRZE) ---
                     const shapeMatch = cleanPrompt.match(/^(kwadrat|prostokąt|koło|kółko|trójkąt|gwiazda|gwiazdka|serce|serduszko|owal|romb)$/i) || cleanPrompt.match(/(?:figura|kształt)\s+(kwadrat|prostokąt|koło|kółko|trójkąt|gwiazda|gwiazdka|serce|serduszko|owal|romb)/i);
                     if (shapeMatch) {
                         const shape = (shapeMatch[1] || shapeMatch[2]).toLowerCase();
@@ -199,8 +204,8 @@
                         const ctx = canvas.getContext('2d');
                         
                         ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, 1024, 1024);
-                        ctx.lineWidth = 30; ctx.strokeStyle = '#000000';
-                        ctx.fillStyle = '#3b82f6'; // Jasnoniebieski uniwersalny kolor dla figur
+                        ctx.lineWidth = 35; ctx.strokeStyle = '#000000'; // Gruba czarna obwódka
+                        ctx.fillStyle = '#ffffff'; // Czyste białe wnętrze figury
                         ctx.lineJoin = 'round'; ctx.lineCap = 'round';
                         ctx.beginPath();
                         const cx = 512, cy = 512;
@@ -210,7 +215,6 @@
                         else if (shape.includes('koł')) { ctx.arc(cx, cy, 350, 0, Math.PI * 2); } 
                         else if (shape === 'trójkąt') { ctx.moveTo(cx, 200); ctx.lineTo(850, 850); ctx.lineTo(174, 850); ctx.closePath(); } 
                         else if (shape.includes('gwiazd')) {
-                            ctx.fillStyle = '#fbbf24'; // Żółty dla gwiazdki
                             for (let i = 0; i < 5; i++) {
                                 ctx.lineTo(Math.cos((18 + i * 72) / 180 * Math.PI) * 350 + cx, -Math.sin((18 + i * 72) / 180 * Math.PI) * 350 + cy);
                                 ctx.lineTo(Math.cos((54 + i * 72) / 180 * Math.PI) * 150 + cx, -Math.sin((54 + i * 72) / 180 * Math.PI) * 150 + cy);
@@ -218,7 +222,6 @@
                             ctx.closePath();
                         } 
                         else if (shape.includes('serc')) {
-                            ctx.fillStyle = '#ef4444'; // Czerwony dla serca
                             ctx.moveTo(cx, 300); ctx.bezierCurveTo(cx, 250, cx - 50, 150, cx - 200, 150); ctx.bezierCurveTo(cx - 400, 150, cx - 400, 400, cx - 400, 400); ctx.bezierCurveTo(cx - 400, 600, cx - 150, 750, cx, 850); ctx.bezierCurveTo(cx + 150, 750, cx + 400, 600, cx + 400, 400); ctx.bezierCurveTo(cx + 400, 400, cx + 400, 150, cx + 200, 150); ctx.bezierCurveTo(cx + 50, 150, cx, 250, cx, 300);
                         } 
                         else if (shape === 'owal') { ctx.ellipse(cx, cy, 400, 250, 0, 0, Math.PI * 2); } 
@@ -241,8 +244,7 @@
                         styleModifier = "clear illustration, nice flat colors, clean black outlines, white background, educational visual aid, slightly more detailed";
                     }
 
-                    // Twarda reguła (CRITICAL) dla czasowników
-                    const hiddenInstruction = `An isolated icon on a pure white background for an autism PECS communication card. EXACT SUBJECT: ${promptInput}. (CRITICAL: If the subject is a verb or action like "eat", "play", "run", you MUST draw a simple, cute generic character performing this exact action). Strictly NO background scenery, NO extra characters. Style: ${styleModifier}. Highly recognizable, single object or single character focus.`;
+                    const hiddenInstruction = `An isolated icon on a pure white background for an autism communication card. EXACT SUBJECT: ${promptInput}. (CRITICAL: If the subject is an action or verb like "eat", "play", "run", you MUST draw a simple, cute generic character performing this exact action). Strictly NO background scenery, NO extra characters. Style: ${styleModifier}. Highly recognizable, single object or single character focus.`;
                     
                     const negativePrompt = "realistic, shadows, gradients, multiple subjects, complex scene, background scenery, watermark, messy lines, grayscale, text, words, letters, random text";
 
@@ -266,7 +268,7 @@
                         if (!isAuthenticated) {
                             const newTries = freeTries + 1;
                             setFreeTries(newTries);
-                            localStorage.setItem('eduPecsFreeTries', newTries.toString());
+                            localStorage.setItem('eduSymbolFreeTries', newTries.toString());
                         }
                         setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
                     } else {
@@ -282,28 +284,47 @@
 
             const addCard = () => {
                 if (generatedImage) {
-                    const newItem = {
-                        id: Date.now(),
-                        img: generatedImage,
-                        label: promptInput.substring(0, 15).toUpperCase() // Krótki podpis dla PECS
+                    // ROZWIĄZANIE PROBLEMU Z BŁĘDEM I ZNIKANIEM APLIKACJI
+                    // Skalujemy potężny obraz 1024x1024 w dół do lekkiego 400x400 JPEG, żeby nie zapchać pamięci
+                    const img = new Image();
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = 400; 
+                        canvas.height = 400;
+                        const ctx = canvas.getContext('2d');
+                        
+                        ctx.fillStyle = '#ffffff';
+                        ctx.fillRect(0, 0, 400, 400);
+                        ctx.drawImage(img, 0, 0, 400, 400);
+                        
+                        // Kompresja oszczędza 90% pojemności w localStorage!
+                        const compressedImg = canvas.toDataURL('image/jpeg', 0.85); 
+                        
+                        const newItem = {
+                            id: Date.now(),
+                            img: compressedImg,
+                            label: promptInput.substring(0, 15).toUpperCase()
+                        };
+                        
+                        setSymbolCards(prev => [...prev, newItem]);
+                        setGeneratedImage(null);
+                        setPromptInput('');
                     };
-                    setPecsCards([...pecsCards, newItem]);
-                    setGeneratedImage(null);
-                    setPromptInput('');
+                    img.src = generatedImage;
                 }
             };
 
             const removeCard = (id) => {
-                setPecsCards(pecsCards.filter(item => item.id !== id));
+                setSymbolCards(symbolCards.filter(item => item.id !== id));
             };
 
             const updateLabel = (id, newLabel) => {
-                setPecsCards(pecsCards.map(item => item.id === id ? { ...item, label: newLabel } : item));
+                setSymbolCards(symbolCards.map(item => item.id === id ? { ...item, label: newLabel } : item));
             };
 
             const clearCards = () => {
                 if(confirm("Czy na pewno chcesz usunąć wszystkie zebrane karty z tablicy?")) {
-                    setPecsCards([]);
+                    setSymbolCards([]);
                 }
             };
 
@@ -311,21 +332,18 @@
                 if (passwordInput === SECRET_PIN) {
                     setIsAuthenticated(true);
                     setShowPaywall(false);
-                    localStorage.setItem('eduPecsAuth', 'true');
+                    localStorage.setItem('eduSymbolAuth', 'true');
                 } else {
                     alert('Nieprawidłowy kod PIN!');
                 }
             };
 
-            // Dedykowany wydruk PECS - gęsta siatka idealna do wycinania i segregacji
-            const handlePrintPecs = () => {
-                if (pecsCards.length === 0) return;
+            const handlePrintSymbols = () => {
+                if (symbolCards.length === 0) return;
                 
-                // Ustalanie rozmiaru z suwaka
                 const sizeCm = cardSize; 
-                
-                const itemsHtml = pecsCards.map(item => `
-                    <div class="pecs-card">
+                const itemsHtml = symbolCards.map(item => `
+                    <div class="symbol-card">
                         <div class="img-container">
                             <img src="${item.img}" />
                         </div>
@@ -337,7 +355,7 @@
                     <!DOCTYPE html>
                     <html>
                     <head>
-                        <title>Karty PECS - EduPECS AI</title>
+                        <title>Karty AAC - EduSymbol AI</title>
                         <style>
                             @page { margin: 1cm; size: A4 portrait; }
                             body { font-family: 'Arial', sans-serif; margin: 0; padding: 0; background: white; }
@@ -346,16 +364,14 @@
                             .print-header h1 { font-size: 20px; text-transform: uppercase; margin: 0; padding: 0; }
                             .print-header p { font-size: 12px; color: #666; margin: 5px 0 0 0; }
                             
-                            /* Siatka kart PECS */
-                            .pecs-grid { 
+                            .symbol-grid { 
                                 display: grid; 
-                                /* Dopasowuje ilość kolumn na podstawie wybranego rozmiaru kartki */
                                 grid-template-columns: repeat(auto-fill, ${sizeCm}cm); 
-                                gap: 0.5cm; /* Odstęp na nożyczki */
+                                gap: 0.5cm; 
                                 justify-content: center; 
                             }
                             
-                            .pecs-card { 
+                            .symbol-card { 
                                 width: ${sizeCm}cm;
                                 height: ${sizeCm}cm;
                                 border: 2px solid #000; 
@@ -372,7 +388,7 @@
                                 align-items: center;
                                 justify-content: center;
                                 padding: 2px;
-                                height: calc(100% - 15px); /* Zostawia miejsce na podpis */
+                                height: calc(100% - 15px);
                             }
                             
                             img { 
@@ -382,7 +398,7 @@
                             }
                             
                             .label { 
-                                height: 15px; /* Sztywna wysokość podpisu */
+                                height: 15px; 
                                 display: flex;
                                 align-items: center;
                                 justify-content: center;
@@ -398,10 +414,10 @@
                     </head>
                     <body>
                         <div class="print-header">
-                            <h1>Materiały PECS</h1>
+                            <h1>Wizualne Symbole AAC</h1>
                             <p>Wydrukuj, zalaminuj i wytnij. Pamiętaj o rzepach.</p>
                         </div>
-                        <div class="pecs-grid">
+                        <div class="symbol-grid">
                             ${itemsHtml}
                         </div>
                     </body>
@@ -430,7 +446,7 @@
                                 <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
                             </div>
                             <h2 className="text-3xl font-black text-white mb-2">Dostęp PRO</h2>
-                            <p className="text-slate-300 text-sm mb-8 font-medium">Systemy wspierające komunikację specjalną (AAC/PECS) wymagają pełnego dostępu. Postaw wirtualną kawę, aby otrzymać kod PIN!</p>
+                            <p className="text-slate-300 text-sm mb-8 font-medium">Systemy wspierające komunikację specjalną (AAC) wymagają pełnego dostępu. Postaw wirtualną kawę, aby otrzymać kod PIN!</p>
                             
                             <input 
                                 type="password" value={passwordInput} onChange={(e) => setPasswordInput(e.target.value)}
@@ -469,7 +485,7 @@
                                 <div className="w-10 h-10 bg-gradient-to-br from-amber-500 to-orange-500 rounded-xl flex items-center justify-center shadow-lg">
                                     <span className="text-white text-xl">🗣️</span>
                                 </div>
-                                <span className="text-xl font-extrabold tracking-tight text-white hidden sm:block">EduPECS<span className="text-amber-400">AI</span></span>
+                                <span className="text-xl font-extrabold tracking-tight text-white hidden sm:block">EduSymbol<span className="text-amber-400">AI</span></span>
                             </div>
                             <div className="flex items-center gap-4">
                                 {!isAuthenticated ? (
@@ -482,7 +498,7 @@
                                             <span className="w-2 h-2 rounded-full bg-amber-400"></span>
                                             Konto PRO
                                         </div>
-                                        <button onClick={() => { setIsAuthenticated(false); localStorage.removeItem('eduPecsAuth'); }} className="text-xs text-slate-400 hover:text-white transition-colors underline">
+                                        <button onClick={() => { setIsAuthenticated(false); localStorage.removeItem('eduSymbolAuth'); }} className="text-xs text-slate-400 hover:text-white transition-colors underline">
                                             Wyloguj
                                         </button>
                                     </div>
@@ -494,7 +510,7 @@
                         </div>
                     </nav>
 
-                    <main className="flex-grow pt-32 pb-32 px-4 sm:px-6">
+                    <main className="flex-grow pt-32 pb-16 px-4 sm:px-6">
                         <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8">
                             
                             {/* LEWA KOLUMNA: GENERATOR */}
@@ -504,7 +520,7 @@
                                         Autyzm / Terapia AAC
                                     </div>
                                     <h1 className="text-3xl sm:text-4xl font-black text-white mb-3 tracking-tight">
-                                        Generator <br/><span className="text-gradient">Kart PECS.</span>
+                                        Generator <br/><span className="text-gradient">Kart AAC.</span>
                                     </h1>
                                     <p className="text-slate-400 text-sm">
                                         Twórz izolowane, czytelne grafiki do ksiąg komunikacyjnych. System sam ułoży je w siatkę do wycięcia!
@@ -543,14 +559,14 @@
                                             type="text" 
                                             value={promptInput}
                                             onChange={(e) => setPromptInput(e.target.value)}
-                                            onKeyPress={(e) => { if(e.key === 'Enter') generatePecsCard(); }}
-                                            placeholder="Np. jabłko, toaleta, cyfra 5, litera A..."
+                                            onKeyPress={(e) => { if(e.key === 'Enter') generateSymbolCard(); }}
+                                            placeholder="Np. jabłko, cyfra 5, kwadrat, biega..."
                                             className="w-full bg-slate-900/80 border border-slate-600 text-white rounded-xl px-5 py-4 focus:ring-2 focus:ring-amber-500 outline-none pr-12"
                                         />
                                     </div>
 
                                     <button 
-                                        onClick={generatePecsCard}
+                                        onClick={generateSymbolCard}
                                         disabled={isGenerating || !promptInput}
                                         className={`w-full py-4 rounded-xl font-black text-white text-lg transition-all flex items-center justify-center gap-3 shadow-[0_0_20px_rgba(245,158,11,0.2)] btn-bounce
                                             ${isGenerating ? 'bg-slate-700 cursor-not-allowed' : 'bg-gradient-to-r from-amber-500 to-orange-500 hover:scale-105'}`}
@@ -560,9 +576,8 @@
                                         ) : (!isAuthenticated && freeTries >= FREE_TRIES_LIMIT ? 'Odblokuj PRO' : 'Wygeneruj Obrazek')}
                                     </button>
 
-                                    {/* NOWA WSKAZÓWKA EDUKACYJNA DLA UŻYTKOWNIKA */}
                                     <div className="mt-4 p-4 bg-amber-900/20 rounded-xl border border-amber-500/30 text-slate-300 text-xs text-center leading-relaxed">
-                                        <span className="text-amber-400 font-bold">💡 Wskazówka:</span> Zamiast wpisywać same czasowniki (np. "jeść", "bawić się"), napisz konkretnie kto to robi, np. <b>"chłopiec je jabłko"</b> lub <b>"dziewczynka bawi się klockami"</b>. System narysuje to o wiele precyzyjniej!
+                                        <span className="text-amber-400 font-bold">💡 Wskazówka:</span> Zamiast wpisywać same czasowniki (np. "jeść", "bawić się"), napisz konkretnie kto to robi, np. <b>"chłopiec je jabłko"</b> lub <b>"dziewczynka bawi się klockami"</b>. Zwiększa to precyzję AI!
                                     </div>
 
                                     {error && <div className="mt-4 p-3 bg-red-900/30 border border-red-500/50 rounded-lg text-red-400 text-xs font-medium text-center">{error}</div>}
@@ -574,7 +589,7 @@
                                         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-amber-400 to-orange-500"></div>
                                         <h3 className="text-sm font-bold text-white mb-4">Twój Symbol</h3>
                                         <div className="bg-white p-2 rounded-xl mx-auto w-40 h-40 flex items-center justify-center mb-6 border-2 border-slate-300">
-                                            <img src={generatedImage} alt="PECS Card" className="max-w-full max-h-full object-contain mix-blend-multiply" />
+                                            <img src={generatedImage} alt="Symbol AAC" className="max-w-full max-h-full object-contain mix-blend-multiply" />
                                         </div>
                                         <button 
                                             onClick={addCard} 
@@ -586,13 +601,13 @@
                                 )}
                             </div>
 
-                            {/* PRAWA KOLUMNA: TABLICA KART PECS */}
+                            {/* PRAWA KOLUMNA: TABLICA KART AAC */}
                             <div className="lg:col-span-7 glass-panel rounded-[2.5rem] p-6 sm:p-8 border border-slate-700/50 flex flex-col h-full min-h-[600px]">
                                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 pb-4 border-b border-slate-700/50 gap-4">
                                     <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
                                         <h2 className="text-2xl font-black text-white flex items-center gap-2">
                                             📂 Zebrane Karty
-                                            <span className="bg-amber-500 text-white text-xs px-2 py-1 rounded-full">{pecsCards.length}</span>
+                                            <span className="bg-amber-500 text-white text-xs px-2 py-1 rounded-full">{symbolCards.length}</span>
                                         </h2>
                                         <div className="flex items-center gap-2 bg-slate-800/80 px-3 py-1.5 rounded-lg border border-slate-600">
                                             <span className="text-xs text-slate-400 font-bold uppercase">Rozmiar wydruku:</span>
@@ -602,19 +617,19 @@
                                             </select>
                                         </div>
                                     </div>
-                                    {pecsCards.length > 0 && (
+                                    {symbolCards.length > 0 && (
                                         <div className="flex flex-wrap items-center gap-3">
                                             <button onClick={clearCards} className="text-slate-400 hover:text-red-400 text-sm font-bold px-2 py-2 rounded-lg hover:bg-slate-800 transition-colors">
                                                 Wyczyść
                                             </button>
-                                            <button onClick={handlePrintPecs} className="bg-white text-amber-900 hover:bg-amber-50 px-4 py-2 rounded-xl font-black flex items-center gap-2 transition-all shadow-lg btn-bounce">
+                                            <button onClick={handlePrintSymbols} className="bg-white text-amber-900 hover:bg-amber-50 px-4 py-2 rounded-xl font-black flex items-center gap-2 transition-all shadow-lg btn-bounce">
                                                 🖨️ Drukuj Karty
                                             </button>
                                         </div>
                                     )}
                                 </div>
 
-                                {pecsCards.length === 0 ? (
+                                {symbolCards.length === 0 ? (
                                     <div className="flex-grow flex flex-col items-center justify-center text-center opacity-50">
                                         <span className="text-6xl mb-4">🗂️</span>
                                         <p className="text-slate-300 font-bold text-lg">Tablica z kartami jest pusta.</p>
@@ -622,8 +637,8 @@
                                     </div>
                                 ) : (
                                     <div className="flex flex-wrap gap-4 auto-rows-max overflow-y-auto pr-2 pb-10 content-start" style={{ maxHeight: "calc(100vh - 250px)" }}>
-                                        {pecsCards.map((item) => (
-                                            <div key={item.id} className="bg-white rounded-xl border-2 border-slate-300 w-28 h-28 flex flex-col relative group pecs-item-enter overflow-hidden shadow-md">
+                                        {symbolCards.map((item) => (
+                                            <div key={item.id} className="bg-white rounded-xl border-2 border-slate-300 w-28 h-28 flex flex-col relative group symbol-item-enter overflow-hidden shadow-md">
                                                 <button 
                                                     onClick={() => removeCard(item.id)}
                                                     className="absolute -top-1 -right-1 bg-red-500 hover:bg-red-600 text-white w-6 h-6 rounded-full flex items-center justify-center shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-10 btn-bounce text-xs font-bold"
@@ -632,7 +647,7 @@
                                                     ✖
                                                 </button>
                                                 <div className="flex-grow flex items-center justify-center p-1">
-                                                    <img src={item.img} className="max-w-full max-h-full object-contain mix-blend-multiply" alt="PECS" />
+                                                    <img src={item.img} className="max-w-full max-h-full object-contain mix-blend-multiply" alt="Symbol AAC" />
                                                 </div>
                                                 <div className="border-t-2 border-slate-300 h-6">
                                                     <input 
@@ -649,6 +664,12 @@
                             </div>
 
                         </div>
+
+                        {/* NOTA PRAWNA */}
+                        <div className="mt-12 mb-4 text-[10px] text-slate-500 text-center max-w-4xl mx-auto border-t border-slate-800/50 pt-6 leading-relaxed print-hidden">
+                            <p><strong className="text-slate-400">Nota prawna (Disclaimer):</strong> Nazwa PECS® jest zastrzeżonym znakiem towarowym Pyramid Educational Consultants, Inc. Ta aplikacja nie jest powiązana, autoryzowana, licencjonowana ani w żaden sposób wspierana przez właściciela znaku PECS®. Aplikacja "EduSymbol AI" służy wyłącznie do wspomagania nauczycieli poprzez automatyczne generowanie uniwersalnych i spersonalizowanych symboli komunikacji alternatywnej (AAC).</p>
+                        </div>
+
                     </main>
                 </div>
             );
