@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="pl" translate="no" class="notranslate">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="google" content="notranslate">
+    <title>EduPlakat AI - Generator Grafiki</title>
+    <!-- Biblioteki -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        body { 
+            font-family: 'Plus Jakarta Sans', sans-serif; 
+            background-color: #020617; 
+            color: #f8fafc; 
+            scroll-behavior: smooth; 
+            overflow-x: hidden;
+            margin: 0;
+            padding: 0;
+        }
+        
+        /* Zmiana kolorów poświaty na fioletowo-błękitne dla odróżnienia od MagicColor */
+        .aura-blob {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(120px);
+            opacity: 0.35;
+            z-index: -1;
+            animation: float 15s infinite ease-in-out alternate;
+            pointer-events: none;
+        }
+        .aura-1 { top: -10%; left: -10%; width: 50vw; height: 600px; background: radial-gradient(circle, #8b5cf6, transparent 70%); }
+        .aura-2 { top: 40%; right: -10%; width: 50vw; height: 600px; background: radial-gradient(circle, #06b6d4, transparent 70%); animation-delay: -5s; }
+
+        @keyframes float {
+            0% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(30px, -50px) scale(1.05); }
+            100% { transform: translate(-30px, 30px) scale(0.95); }
+        }
+
+        .glass-panel { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(24px); border: 1px solid rgba(255, 255, 255, 0.08); }
+        .glass-nav { background: rgba(2, 6, 23, 0.85); backdrop-filter: blur(24px); border-bottom: 1px solid rgba(255, 255, 255, 0.08); }
+        
+        .text-gradient { background: linear-gradient(135deg, #a855f7 0%, #06b6d4 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        
+        .btn-bounce:active { transform: scale(0.95); }
+        .fade-in { animation: fadeIn 0.4s ease-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        .magic-border { position: relative; }
+        .magic-border::before {
+            content: ''; position: absolute; inset: -4px;
+            background: linear-gradient(45deg, #a855f7, #06b6d4, #a855f7);
+            border-radius: inherit; z-index: -1;
+            animation: borderGlow 3s linear infinite; background-size: 200% 200%;
+        }
+        @keyframes borderGlow {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        /* Poprawione drukowanie plakatów w formacie A4 */
+        @media print {
+            body { background-color: white !important; color: black !important; }
+            .print-hidden { display: none !important; }
+            .print-only-image { 
+                display: block !important; 
+                width: 100% !important; 
+                height: 100% !important; 
+                max-height: 27cm; /* Zapas na marginesy kartki A4 */
+                object-fit: contain;
+                margin: 0 auto;
+                box-shadow: none !important;
+            }
+            .glass-panel, .magic-border::before { display: none !important; }
+            @page { margin: 1cm; size: portrait; }
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        function App() {
+            const SECRET_PIN = "KAWA2024"; 
+            const BUY_COFFEE_LINK = "https://buycoffee.to/eduboxpro";
+            const FREE_TRIES_LIMIT = 3;
+
+            const [isAuthenticated, setIsAuthenticated] = useState(false);
+            const [freeTries, setFreeTries] = useState(0);
+            const [showPaywall, setShowPaywall] = useState(false);
+            const [passwordInput, setPasswordInput] = useState('');
+            
+            const [promptInput, setPromptInput] = useState('');
+            const [styleOption, setStyleOption] = useState('akwarela'); 
+            const [generatedImage, setGeneratedImage] = useState(null);
+            const [isGenerating, setIsGenerating] = useState(false);
+            const [error, setError] = useState('');
+            const resultRef = useRef(null);
+
+            useEffect(() => {
+                const savedAuth = localStorage.getItem('eduPlakatAuth') === 'true';
+                if (savedAuth) setIsAuthenticated(true);
+                const savedTries = parseInt(localStorage.getItem('eduPlakatFreeTries') || '0');
+                setFreeTries(savedTries);
+            }, []);
+
+            const fetchWithRetry = async (url, options, retries = 3, delay = 1000) => {
+                for (let i = 0; i < retries; i++) {
+                    try {
+                        const response = await fetch(url, options);
+                        if (!response.ok) {
+                            const errData = await response.json().catch(() => ({}));
+                            throw new Error(errData.error || `Status API: ${response.status}`);
+                        }
+                        return await response.json();
+                    } catch (e) {
+                        if (i === retries - 1) throw e;
+                        await new Promise(res => setTimeout(res, delay * Math.pow(2, i)));
+                    }
+                }
+            };
+
+            const secureApiCall = async (payload) => {
+                // POPRAWKA: Weryfikacja tylko po vercel.app. 
+                // Unika błędu 401 poprzez odpowiednie wykrywanie podglądu (Canvas).
+                const isProduction = window.location.hostname.includes('vercel.app');
+
+                if (isProduction) {
+                    return await fetchWithRetry('/api/gemini', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ payload, type: 'image' })
+                    });
+                } else {
+                    const apiKey = ""; 
+                    const url = `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${apiKey}`;
+                    
+                    // Ściśle formatujemy payload dla środowiska podglądu
+                    const previewPayload = {
+                        instances: { prompt: payload.instances.prompt },
+                        parameters: { sampleCount: 1 }
+                    };
+
+                    return await fetchWithRetry(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(previewPayload)
+                    });
+                }
+            };
+
+            const generatePoster = async () => {
+                if (!isAuthenticated && freeTries >= FREE_TRIES_LIMIT) {
+                    setShowPaywall(true); return;
+                }
+                if (!promptInput.trim()) {
+                    setError('Wpisz co ma być na plakacie!'); return;
+                }
+
+                setIsGenerating(true);
+                setError('');
+                setGeneratedImage(null);
+
+                try {
+                    let styleModifier = "";
+                    let stylePreset = "digital-art"; 
+
+                    if (styleOption === 'akwarela') {
+                        styleModifier = "beautiful scenic watercolor painting, soft vibrant colors, artistic scene, pure visual art";
+                        stylePreset = "photographic";
+                    } else if (styleOption === '3d') {
+                        styleModifier = "cute 3d render style, pixar style, colorful, highly detailed, perfect for kids";
+                        stylePreset = "3d-model";
+                    } else if (styleOption === 'plakat') {
+                        styleModifier = "modern flat vector art landscape, bold vibrant colors, minimalist illustration";
+                        stylePreset = "digital-art";
+                    }
+
+                    // KROK 1: Zmieniony prompt pozytywny. Żadnych słów typu "NO TEXT", "event", "poster".
+                    // Zmuszamy sztuczną inteligencję do myślenia o "czystym obrazie", a nie o plakacie.
+                    const hiddenInstruction = `A beautiful, purely visual artwork and scenic illustration depicting: ${promptInput}. ${styleModifier}. Masterpiece, clear focus, perfect composition, purely visual art.`;
+                    
+                    // KROK 2: Super-pancerne zakazy dla tekstów. Dodałem słowa: kartki okolicznościowe, numery, alfabet.
+                    const negativePrompt = "text, words, letters, alphabet, numbers, writing, signature, watermark, typography, font, title, heading, label, graphic design layout, poster layout, greeting card, book cover, ugly, deformed, blurry";
+
+                    const payload = {
+                        prompt: hiddenInstruction, 
+                        negative_prompt: negativePrompt, 
+                        style_preset: stylePreset,
+                        instances: { prompt: hiddenInstruction }, 
+                        parameters: { sampleCount: 1 }
+                    };
+
+                    const data = await secureApiCall(payload);
+                    const base64Image = data.predictions?.[0]?.bytesBase64Encoded || data.artifacts?.[0]?.base64 || data.image; 
+                    
+                    if (base64Image) {
+                        const finalImage = base64Image.startsWith('data:image') ? base64Image : `data:image/png;base64,${base64Image}`;
+                        setGeneratedImage(finalImage);
+                        
+                        if (!isAuthenticated) {
+                            const newTries = freeTries + 1;
+                            setFreeTries(newTries);
+                            localStorage.setItem('eduPlakatFreeTries', newTries.toString());
+                        }
+                        setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
+                    } else {
+                        throw new Error("Pusta odpowiedź API.");
+                    }
+                } catch (err) {
+                    console.error(err);
+                    setError('Wystąpił problem z przetworzeniem żądania. Spróbuj ponownie.');
+                } finally {
+                    setIsGenerating(false);
+                }
+            };
+
+            const handleLogin = () => {
+                if (passwordInput === SECRET_PIN) {
+                    setIsAuthenticated(true);
+                    setShowPaywall(false);
+                    localStorage.setItem('eduPlakatAuth', 'true');
+                } else {
+                    alert('Nieprawidłowy kod PIN!');
+                }
+            };
+
+            const handlePrint = () => {
+                window.print(); 
+            };
+
+            if (showPaywall) {
+                return (
+                    <div className="min-h-screen relative flex items-center justify-center p-4 print-hidden">
+                        <div className="aura-blob aura-1"></div>
+                        <div className="aura-blob aura-2"></div>
+                        
+                        <div className="glass-panel p-10 rounded-3xl max-w-md w-full text-center shadow-[0_0_50px_rgba(168,85,247,0.2)] border border-purple-500/30 fade-in relative z-10">
+                            <div className="w-24 h-24 bg-gradient-to-br from-purple-500 to-cyan-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
+                                <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                            </div>
+                            <h2 className="text-3xl font-black text-white mb-2">Limit wyczerpany!</h2>
+                            <p className="text-slate-300 text-sm mb-8 font-medium">Wykorzystałeś swoje darmowe próby ({FREE_TRIES_LIMIT}/{FREE_TRIES_LIMIT}). Podaj kod PIN, aby uzyskać nielimitowany dostęp PRO.</p>
+                            
+                            <input 
+                                type="password" value={passwordInput} onChange={(e) => setPasswordInput(e.target.value)}
+                                onKeyPress={(e) => { if (e.key === 'Enter') handleLogin(); }}
+                                placeholder="Wpisz PIN..."
+                                className="w-full bg-slate-900 border border-slate-600 text-center text-white rounded-xl px-5 py-4 focus:ring-2 focus:ring-purple-500 outline-none mb-6 text-2xl tracking-[0.5em] font-bold uppercase"
+                            />
+                            
+                            <button 
+                                onClick={handleLogin}
+                                className="w-full bg-gradient-to-r from-purple-600 to-cyan-500 hover:from-purple-500 hover:to-cyan-400 text-white font-black py-4 rounded-xl transition-all transform hover:scale-105 btn-bounce text-lg shadow-lg mb-4"
+                            >
+                                Odblokuj System
+                            </button>
+                            <button onClick={() => setShowPaywall(false)} className="text-slate-400 hover:text-white text-sm font-bold mb-8">
+                                Wróć do strony głównej
+                            </button>
+                            <div className="pt-6 border-t border-slate-700/50">
+                                <a href={BUY_COFFEE_LINK} target="_blank" rel="noopener noreferrer" className="w-full bg-slate-800/80 hover:bg-slate-700 border border-slate-600 text-white font-bold py-3.5 rounded-xl transition-all flex items-center justify-center gap-3 text-sm btn-bounce hover:border-cyan-500/50 hover:text-cyan-400 shadow-md">
+                                    <span className="text-xl">☕</span> Postaw Kawę i odbierz PIN
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="min-h-screen relative flex flex-col">
+                    <div className="aura-blob aura-1 print-hidden"></div>
+                    <div className="aura-blob aura-2 print-hidden"></div>
+
+                    <nav className="fixed top-0 w-full z-50 glass-nav print-hidden">
+                        <div className="max-w-5xl mx-auto px-4 sm:px-6 h-20 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-cyan-500 rounded-xl flex items-center justify-center shadow-lg">
+                                    <span className="text-white text-xl">🖼️</span>
+                                </div>
+                                <span className="text-xl font-extrabold tracking-tight text-white hidden sm:block">EduPlakat<span className="text-purple-400">AI PRO</span></span>
+                            </div>
+                            <div className="flex items-center gap-4">
+                                {!isAuthenticated ? (
+                                    <div className="bg-slate-800/80 border border-slate-600 px-3 py-1.5 rounded-full text-xs font-bold text-slate-300 flex items-center gap-2">
+                                        <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
+                                        Darmowe próby: {FREE_TRIES_LIMIT - freeTries}
+                                    </div>
+                                ) : (
+                                    <div className="bg-emerald-500/20 border border-emerald-500/50 px-3 py-1.5 rounded-full text-xs font-bold text-emerald-400 flex items-center gap-2">
+                                        <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                                        Konto PRO Aktywne
+                                    </div>
+                                )}
+                                <a href="index.html" className="flex items-center gap-2 text-xs sm:text-sm font-bold text-slate-300 hover:text-white transition-colors bg-slate-800 hover:bg-slate-700 px-4 py-2.5 rounded-xl border border-slate-600">
+                                    Wróć
+                                </a>
+                            </div>
+                        </div>
+                    </nav>
+
+                    <main className="flex-grow pt-32 pb-20 px-4 sm:px-6 print:pt-0 print:pb-0">
+                        <div className="max-w-4xl mx-auto">
+                            
+                            <div className="text-center mb-12 fade-in print-hidden">
+                                <div className="inline-flex items-center gap-2 bg-purple-900/30 border border-purple-500/30 px-4 py-1.5 rounded-full text-[10px] font-black text-purple-400 uppercase tracking-widest mb-4">
+                                    Dekoracje i Gazetki
+                                </div>
+                                <h1 className="text-4xl md:text-5xl font-black text-white mb-4 tracking-tight">
+                                    Twórz piękne <span className="text-gradient">plakaty szkolne.</span>
+                                </h1>
+                                <p className="text-slate-400 text-lg">
+                                    Opisz krótko jaką grafikę potrzebujesz, a my wygenerujemy puste tło plakatowe, na którym samodzielnie dodasz napisy (np. w Canvie).
+                                </p>
+                            </div>
+
+                            <div className="glass-panel p-6 sm:p-10 rounded-[2.5rem] fade-in border border-slate-700/50 print-hidden" style={{animationDelay: '0.1s'}}>
+                                
+                                <div className="mb-8">
+                                    <label className="block text-slate-300 font-bold mb-3 text-sm uppercase tracking-wider">Wybierz styl artystyczny:</label>
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                        <button 
+                                            onClick={() => setStyleOption('akwarela')}
+                                            className={`p-4 rounded-xl border-2 font-bold text-sm transition-all flex flex-col items-center justify-center gap-2 ${styleOption === 'akwarela' ? 'bg-purple-600/20 border-purple-500 text-purple-400' : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:border-slate-500'}`}
+                                        >
+                                            <span className="text-3xl">🎨</span> 
+                                            <span>Akwarela</span>
+                                            <span className="text-[10px] font-normal opacity-80 text-center">Miękkie, malarskie barwy. Idealne na Dzień Matki.</span>
+                                        </button>
+                                        <button 
+                                            onClick={() => setStyleOption('3d')}
+                                            className={`p-4 rounded-xl border-2 font-bold text-sm transition-all flex flex-col items-center justify-center gap-2 ${styleOption === '3d' ? 'bg-cyan-600/20 border-cyan-500 text-cyan-400' : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:border-slate-500'}`}
+                                        >
+                                            <span className="text-3xl">🧸</span> 
+                                            <span>Magiczne 3D</span>
+                                            <span className="text-[10px] font-normal opacity-80 text-center">Styl bajkowy. Świetny dla przedszkolaków.</span>
+                                        </button>
+                                        <button 
+                                            onClick={() => setStyleOption('plakat')}
+                                            className={`p-4 rounded-xl border-2 font-bold text-sm transition-all flex flex-col items-center justify-center gap-2 ${styleOption === 'plakat' ? 'bg-pink-600/20 border-pink-500 text-pink-400' : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:border-slate-500'}`}
+                                        >
+                                            <span className="text-3xl">📐</span> 
+                                            <span>Nowoczesny Wektor</span>
+                                            <span className="text-[10px] font-normal opacity-80 text-center">Czyste, płaskie kolory i kształty (Minimalizm).</span>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <label className="block text-white font-bold mb-4 text-lg">Co mam dzisiaj narysować?</label>
+                                
+                                <div className="relative">
+                                    {/* NOWOŚĆ: Zmiana placeholder'a żeby kierować użytkownika na opisywanie scen, a nie świąt */}
+                                    <input 
+                                        type="text" 
+                                        value={promptInput}
+                                        onChange={(e) => setPromptInput(e.target.value)}
+                                        onKeyPress={(e) => { if(e.key === 'Enter') generatePoster(); }}
+                                        placeholder="Np. Mama przytulająca dzieci w wiosennym ogrodzie..."
+                                        className="w-full bg-slate-900/80 border border-slate-600 text-white rounded-2xl px-6 py-5 focus:ring-2 focus:ring-purple-500 outline-none text-lg pr-16"
+                                    />
+                                    <span className="absolute right-5 top-1/2 -translate-y-1/2 text-2xl">✨</span>
+                                </div>
+
+                                <div className="mt-6 flex flex-wrap gap-2">
+                                    <span className="text-xs text-slate-500 font-bold uppercase mt-2 mr-2">Szybkie pomysły:</span>
+                                    {/* NOWOŚĆ: Szybkie pomysły zostały zmienione na poprawne opisy wizualne */}
+                                    {['Mama z dziećmi, pełno kwiatów', 'Uśmiechnięta Ziemia w kosmosie', 'Kolorowe kropki i dzieci', 'Sowa w birecie na książkach'].map(idea => (
+                                        <button key={idea} onClick={() => setPromptInput(idea)} className="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs px-3 py-2 rounded-lg border border-slate-700 transition-colors">
+                                            {idea}
+                                        </button>
+                                    ))}
+                                </div>
+
+                                {error && <div className="mt-6 p-4 bg-red-900/30 border border-red-500/50 rounded-xl text-red-400 text-sm font-medium text-center">{error}</div>}
+
+                                <div className="mt-10 flex justify-center">
+                                    <button 
+                                        onClick={generatePoster}
+                                        disabled={isGenerating || !promptInput}
+                                        className={`w-full sm:w-auto px-12 py-5 rounded-2xl font-black text-white text-lg transition-all flex items-center justify-center gap-3 shadow-[0_0_20px_rgba(168,85,247,0.3)] btn-bounce
+                                            ${isGenerating ? 'bg-slate-700 cursor-not-allowed' : 'bg-gradient-to-r from-purple-600 to-cyan-500 hover:scale-105'}`}
+                                    >
+                                        {isGenerating ? (
+                                            <><svg className="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Projektowanie...</>
+                                        ) : (!isAuthenticated && freeTries >= FREE_TRIES_LIMIT ? 'Odblokuj dostęp PRO' : 'Zaprojektuj Plakat')}
+                                    </button>
+                                </div>
+                                {/* NOWOŚĆ: Ważna rada dla użytkownika pod przyciskiem */}
+                                <div className="text-center mt-6 p-4 bg-slate-800/50 rounded-xl border border-slate-700">
+                                    <p className="text-slate-400 text-sm font-medium leading-relaxed">
+                                        <span className="text-amber-400">💡 Ważna wskazówka:</span> Sztuczna inteligencja nie potrafi pisać po polsku. 
+                                        Zamiast wpisywać nazwę święta (np. "Dzień Matki"), opisz <span className="text-white">CO ma być na rysunku</span> 
+                                        (np. "Mama przytulająca dzieci, dużo kwiatów"). Idealne napisy dodasz sobie później w Wordzie lub Canva!
+                                    </p>
+                                </div>
+                            </div>
+
+                            {generatedImage && (
+                                <div ref={resultRef} className="mt-12 fade-in print:mt-0 flex flex-col items-center">
+                                    
+                                    <div className="flex flex-col sm:flex-row items-center justify-between w-full mb-6 print-hidden gap-4">
+                                        <h3 className="text-xl font-bold text-white text-center sm:text-left">Twój Gotowy Plakat</h3>
+                                        <button onClick={handlePrint} className="bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 transition-all btn-bounce shadow-[0_0_15px_rgba(16,185,129,0.3)] w-full sm:w-auto justify-center">
+                                            🖨️ Drukuj (Format A4)
+                                        </button>
+                                    </div>
+
+                                    <div className="bg-white p-2 rounded-3xl magic-border shadow-2xl print:shadow-none print:p-0 w-full max-w-2xl">
+                                        <img src={generatedImage} alt="Plakat edukacyjny" className="w-full h-auto rounded-2xl print-only-image" />
+                                    </div>
+
+                                </div>
+                            )}
+
+                        </div>
+                    </main>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
