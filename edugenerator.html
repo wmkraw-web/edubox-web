@@ -240,7 +240,7 @@
                 let fullPrompt = `MAIN SUBJECT TO DRAW: ${translatedPrompt}. STYLE: ${styleModifier}. ${layoutModifier}. PERFECT human anatomy.`;
                 
                 try {
-                    // UWAGA: Wykorzystujemy Twój istniejący backend na Vercelu!
+                    // Wykorzystujemy backend na Vercelu
                     const response = await fetch('/api/generate', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -269,7 +269,7 @@
                 setTextFormats(prev => ({ ...prev, [field]: { ...prev[field], [key]: value } }));
             };
 
-            // Ulepszony pasek narzędzi tekstu (Z wbudowanym wyborem koloru!)
+            // PRECYZYJNY PASEK NARZĘDZI TEKSTU (Z POLAMI HEX)
             const TextFormatToolbar = ({ format, onChange, maxSize = 120 }) => (
                 <div className="flex items-center gap-1.5 mt-2 bg-slate-900/80 p-2 rounded-xl border border-slate-700 shadow-sm transition-colors overflow-x-auto custom-scrollbar">
                     <button onClick={() => onChange('bold', !format.bold)} className={`w-8 h-8 shrink-0 flex items-center justify-center rounded-lg text-sm font-serif transition-colors ${format.bold ? 'bg-indigo-600 text-white shadow-inner' : 'hover:bg-slate-700 text-slate-300'}`}><b>B</b></button>
@@ -279,7 +279,12 @@
                     <input type="range" min="10" max={maxSize} value={format.size} onChange={e => onChange('size', Number(e.target.value))} className="w-20 sm:w-24 shrink-0 accent-indigo-500 h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer" />
                     <span className="text-[10px] font-bold text-slate-400 w-8 text-right shrink-0">{format.size}px</span>
                     <div className="w-px h-6 bg-slate-700 mx-1 shrink-0"></div>
-                    <input type="color" value={format.color} onChange={e => onChange('color', e.target.value)} className="w-8 h-8 shrink-0 rounded cursor-pointer border border-slate-600 bg-transparent p-0.5" title="Kolor czcionki"/>
+                    
+                    {/* Precyzyjny selektor koloru */}
+                    <div className="flex items-center bg-slate-800 rounded border border-slate-600 overflow-hidden shrink-0 h-8 w-[5.5rem]">
+                        <input type="color" value={format.color} onChange={e => onChange('color', e.target.value)} className="w-6 h-full cursor-pointer bg-transparent p-0 border-none shrink-0" title="Wybierz kolor"/>
+                        <input type="text" value={format.color} onChange={e => onChange('color', e.target.value)} className="flex-1 w-full text-[10px] bg-transparent text-white px-1 outline-none text-center uppercase font-mono tracking-wider" />
+                    </div>
                 </div>
             );
 
@@ -294,7 +299,6 @@
                     <div className="relative w-full h-full flex items-center justify-center p-4 drop-shadow-2xl">
                         <svg viewBox="0 0 100 120" className="w-full h-full" preserveAspectRatio="none">
                             <path d={svgPath} fill={diplomaBgColor} stroke={diplomaBorderColor} strokeWidth={borderWidth/3} strokeDasharray={borderStyle === 'dashed' ? '3,3' : 'none'} strokeLinejoin="round" />
-                            {/* Dziurki na sznurek */}
                             <circle cx="20" cy="15" r="2.5" fill="#ffffff" stroke="#cbd5e1" strokeWidth="0.5"/>
                             <circle cx="80" cy="15" r="2.5" fill="#ffffff" stroke="#cbd5e1" strokeWidth="0.5"/>
                         </svg>
@@ -317,8 +321,21 @@
             return (
                 <div className={`min-h-screen flex flex-col ${selectedFont}`}>
                     
-                    {/* DYNAMICZNY STYL DO WYDRUKU (Magia zmieniająca układ kartki!) */}
+                    {/* DYNAMICZNY STYL DO WYDRUKU */}
                     <style>{`
+                        input[type="color"] {
+                            -webkit-appearance: none;
+                            border: none;
+                            background: transparent;
+                        }
+                        input[type="color"]::-webkit-color-swatch-wrapper {
+                            padding: 0;
+                        }
+                        input[type="color"]::-webkit-color-swatch {
+                            border: none;
+                            border-radius: 4px;
+                        }
+
                         @media print {
                             @page { 
                                 size: A4 ${activeTab === 'diploma' && diplomaOrientation === 'horizontal' ? 'landscape' : 'portrait'}; 
@@ -326,7 +343,33 @@
                             }
                             body * { visibility: hidden; }
                             #print-area, #print-area * { visibility: visible; }
-                            #print-area { position: absolute; left: 0; top: 0; width: 100%; height: 100%; border: none !important; margin: 0 !important; padding: 0 !important; box-shadow: none !important; background: transparent !important; }
+                            
+                            ${activeTab === 'diploma' ? `
+                            #print-area { 
+                                position: fixed !important; 
+                                left: 0 !important; 
+                                top: 0 !important; 
+                                width: 100vw !important; 
+                                height: 100vh !important; 
+                                margin: 0 !important; 
+                                padding: 12mm !important; 
+                                box-shadow: none !important; 
+                                border-radius: 0 !important; 
+                                aspect-ratio: auto !important;
+                                box-sizing: border-box !important;
+                                transform: none !important;
+                            }
+                            ` : `
+                            #print-area { 
+                                position: absolute !important; 
+                                left: 0 !important; 
+                                top: 0 !important; 
+                                width: 100% !important; 
+                                margin: 0 !important; 
+                                padding: 0 !important; 
+                                box-shadow: none !important; 
+                            }
+                            `}
                             .print-hidden { display: none !important; }
                             .page-break { page-break-after: always; height: 100vh; width: 100vw; display: flex; align-items: center; justify-content: center; visibility: visible !important; margin: 0; padding: 0;}
                             body, html { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; background: white !important; margin:0; padding:0; }
@@ -469,6 +512,14 @@
                                             <div className="bg-amber-900/10 p-5 rounded-2xl border border-amber-500/30">
                                                 <label className="text-[10px] font-bold text-amber-400 uppercase tracking-widest block mb-3 text-center">Napisz słowo (1 litera = 1 strona A4)</label>
                                                 <input type="text" value={garlandText} onChange={e => setGarlandText(e.target.value.toUpperCase())} className="w-full p-5 bg-amber-900/30 border border-amber-500/50 rounded-xl font-black text-2xl text-white text-center outline-none tracking-[0.5rem] focus:border-amber-400 transition-colors" />
+                                                
+                                                <div className="mt-4 flex flex-col items-center">
+                                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Kolor Liter</label>
+                                                    <div className="flex items-center bg-slate-800 rounded-xl border border-slate-600 overflow-hidden w-full max-w-[140px] p-1 h-10">
+                                                        <input type="color" value={garlandTextColor} onChange={e => setGarlandTextColor(e.target.value)} className="w-8 h-full cursor-pointer bg-transparent p-0 border-none" />
+                                                        <input type="text" value={garlandTextColor} onChange={e => setGarlandTextColor(e.target.value)} className="flex-1 min-w-0 text-[10px] bg-transparent text-white px-1 outline-none text-center uppercase font-mono tracking-wider" />
+                                                    </div>
+                                                </div>
                                             </div>
                                             
                                             <div>
@@ -581,14 +632,27 @@
                                         <div className="space-y-6 animate-[reveal_0.2s_ease-out]">
                                             <div className="bg-slate-900 p-5 rounded-2xl border border-slate-700">
                                                 <label className="text-[10px] font-bold text-sky-400 uppercase tracking-widest mb-4 flex items-center justify-center gap-2"><i className="ph-bold ph-palette"></i> Kolory Papieru i Ramki</label>
-                                                <div className="grid grid-cols-2 gap-4">
+                                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                                                     <div className="flex flex-col items-center">
-                                                        <input type="color" value={diplomaBgColor} onChange={e => setDiplomaBgColor(e.target.value)} className="w-16 h-10 rounded-lg cursor-pointer bg-slate-800 p-1 border border-slate-600" />
-                                                        <span className="text-[9px] mt-1 font-bold text-slate-400 uppercase">Tło Karki</span>
+                                                        <div className="flex items-center bg-slate-800 rounded-xl border border-slate-600 overflow-hidden w-full max-w-[140px] p-1 h-10">
+                                                            <input type="color" value={diplomaBgColor} onChange={e => setDiplomaBgColor(e.target.value)} className="w-8 h-full cursor-pointer border-none bg-transparent p-0 rounded-lg" />
+                                                            <input type="text" value={diplomaBgColor} onChange={e => setDiplomaBgColor(e.target.value)} className="flex-1 min-w-0 text-[10px] bg-transparent text-white px-1 outline-none text-center uppercase font-mono tracking-wider" />
+                                                        </div>
+                                                        <span className="text-[9px] mt-2 font-bold text-slate-400 uppercase text-center">Tło Karki</span>
                                                     </div>
                                                     <div className="flex flex-col items-center">
-                                                        <input type="color" value={diplomaBorderColor} onChange={e => setDiplomaBorderColor(e.target.value)} className="w-16 h-10 rounded-lg cursor-pointer bg-slate-800 p-1 border border-slate-600" />
-                                                        <span className="text-[9px] mt-1 font-bold text-slate-400 uppercase">Kolor Ramki</span>
+                                                        <div className="flex items-center bg-slate-800 rounded-xl border border-slate-600 overflow-hidden w-full max-w-[140px] p-1 h-10">
+                                                            <input type="color" value={diplomaBorderColor} onChange={e => setDiplomaBorderColor(e.target.value)} className="w-8 h-full cursor-pointer border-none bg-transparent p-0 rounded-lg" />
+                                                            <input type="text" value={diplomaBorderColor} onChange={e => setDiplomaBorderColor(e.target.value)} className="flex-1 min-w-0 text-[10px] bg-transparent text-white px-1 outline-none text-center uppercase font-mono tracking-wider" />
+                                                        </div>
+                                                        <span className="text-[9px] mt-2 font-bold text-slate-400 uppercase text-center">Kolor Ramki</span>
+                                                    </div>
+                                                    <div className="flex flex-col items-center col-span-2 sm:col-span-1">
+                                                        <div className="flex items-center bg-slate-800 rounded-xl border border-slate-600 overflow-hidden w-full max-w-[140px] p-1 h-10">
+                                                            <input type="color" value={diplomaTextColor} onChange={e => setDiplomaTextColor(e.target.value)} className="w-8 h-full cursor-pointer border-none bg-transparent p-0 rounded-lg" />
+                                                            <input type="text" value={diplomaTextColor} onChange={e => setDiplomaTextColor(e.target.value)} className="flex-1 min-w-0 text-[10px] bg-transparent text-white px-1 outline-none text-center uppercase font-mono tracking-wider" />
+                                                        </div>
+                                                        <span className="text-[9px] mt-2 font-bold text-slate-400 uppercase text-center">Podpisy na dole</span>
                                                     </div>
                                                 </div>
                                             </div>
