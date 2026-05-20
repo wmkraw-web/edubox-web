@@ -10,64 +10,48 @@ export default async function handler(req, res) {
   // Pobieramy bezpiecznie klucze z ustawień Vercela
   const openaiKey = process.env.OPENAI_API_KEY;
   const stabilityKey = process.env.STABILITY_API_KEY; 
-  const geminiKey = process.env.GEMINI_API_KEY;
 
   try {
     // ==============================================================
-    // 1. OBSŁUGA NOWYCH APLIKACJI (EduAwans, EduTIK) - AUTONAPRAWA GEMINI
+    // 1. OBSŁUGA NOWYCH APLIKACJI (EduAwans, EduTIK) 
+    // PRZEPIĘTE NA OPENAI (gpt-4o-mini) ZAMIAST GOOGLE!
     // ==============================================================
     if (prompt) {
-      if (!geminiKey) {
+      if (!openaiKey) {
         return res.status(200).json({
-            candidates: [{ content: { parts: [{ text: "🚨 BŁĄD VERCEL: Serwer nie widzi klucza GEMINI_API_KEY. Wejdź w Settings -> Environment Variables na Vercel, a następnie w zakładce Deployments kliknij 'Redeploy'!" }] } }]
+            candidates: [{ content: { parts: [{ text: "🚨 BŁĄD VERCEL: Brak klucza OPENAI_API_KEY na serwerze." }] } }]
         });
       }
 
-      // Lista alternatywnych punktów dostępu (Google czasami blokuje wersje beta w UE)
-      const endpoints = [
-        // Opcja A: Stabilna, produkcyjna wersja v1 (Zalecana dla gemini-1.5-flash)
-        `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${geminiKey}`,
-        // Opcja B: Wersja v1beta dla gemini-1.5-flash
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`,
-        // Opcja C: Najnowszy model gemini-1.5-flash-latest na v1beta
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${geminiKey}`,
-        // Opcja D: Klasyczny, niezawodny model gemini-pro jako ostatnia deska ratunku
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${geminiKey}`
-      ];
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${openaiKey}`
+          },
+          body: JSON.stringify({ 
+            model: "gpt-4o-mini",
+            messages: [
+              { role: "system", content: "Jesteś ekspertką ds. edukacji w Polsce. Tworzysz urzędowe sprawozdania awansowe, testy wiedzy i materiały na lekcje. Jesteś bardzo elokwentna i profesjonalna." },
+              { role: "user", content: prompt }
+            ],
+            temperature: 0.7
+          })
+      });
 
-      let lastError = null;
-      let successData = null;
+      const data = await response.json();
 
-      // Pętla próbująca po kolei każdego modelu, aż któryś zadziała!
-      for (const url of endpoints) {
-        try {
-          const response = await fetch(url, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
-          });
-
-          const data = await response.json();
-
-          if (response.ok && data.candidates) {
-            successData = data;
-            break; // Sukces! Przerywamy pętlę i zwracamy dane
-          } else {
-            lastError = data.error?.message || 'Nieznany błąd modelu';
-          }
-        } catch (e) {
-          lastError = e.message;
-        }
-      }
-
-      // Jeśli żaden z 4 sposobów nie zadziałał, wyświetlamy jasną instrukcję dla Ciebie na ekranie
-      if (!successData) {
+      if (!response.ok) {
+        console.error("Błąd OpenAI:", data);
         return res.status(200).json({
-            candidates: [{ content: { parts: [{ text: `🚨 BŁĄD GOOGLE API (Próbowano 4 modeli): ${lastError}. \n\nMożliwe przyczyny:\n1. Twój klucz API jest nieaktywny lub błędny.\n2. Jeśli klucz był tworzony w Google Cloud Console, musisz ręcznie włączyć tam usługę "Generative Language API".\n3. Najlepiej wygenerować nowy, darmowy klucz bezpośrednio na: https://aistudio.google.com/` }] } }]
+            candidates: [{ content: { parts: [{ text: `🚨 BŁĄD OPENAI API: ${data.error?.message || 'Nieznany błąd'}` }] } }]
         });
       }
 
-      return res.status(200).json(successData);
+      // Udajemy strukturę odpowiedzi Google, żeby pliki HTML z nowymi apkami działały bez absolutnie żadnych modyfikacji!
+      return res.status(200).json({
+        candidates: [{ content: { parts: [{ text: data.choices[0].message.content }] } }]
+      });
     }
 
     // ==============================================================
