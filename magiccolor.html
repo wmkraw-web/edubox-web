@@ -20,7 +20,6 @@
             overflow-x: hidden;
             margin: 0;
             padding: 0;
-            /* Zapobiega przypadkowemu przewijaniu strony podczas rysowania po ekranie na telefonach */
             overscroll-behavior-y: contain; 
         }
         
@@ -51,7 +50,6 @@
         .fade-in { animation: fadeIn 0.4s ease-out forwards; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-        /* Magiczny efekt ramki obrazka */
         .magic-border {
             position: relative;
         }
@@ -71,13 +69,11 @@
             100% { background-position: 0% 50%; }
         }
 
-        /* Ustawienia dla wirtualnego płótna */
         canvas {
             touch-action: none; 
             cursor: crosshair;
         }
 
-        /* PERFEKCYJNY WYDRUK KOLOROWANKI */
         @media print {
             body { background-color: white !important; color: black !important; }
             .print-hidden { display: none !important; }
@@ -101,14 +97,10 @@
         const { useState, useRef, useEffect } = React;
 
         function App() {
-            // =========================================================================
-            // Kod PIN dla aplikacji (Zostawiłem bez zmian)
             const SECRET_PIN = "KAWA2024"; 
             const BUY_COFFEE_LINK = "https://buycoffee.to/magiccolor";
             const FREE_TRIES_LIMIT = 3;
-            // =========================================================================
 
-            // ZMIENNE STANU (Twoje + narzędzia do rysowania)
             const [isAuthenticated, setIsAuthenticated] = useState(false);
             const [freeTries, setFreeTries] = useState(0);
             const [showPaywall, setShowPaywall] = useState(false);
@@ -120,20 +112,15 @@
             const [isGenerating, setIsGenerating] = useState(false);
             const [error, setError] = useState('');
 
-            // Zmienne do kolorowania
-            const [selectedColor, setSelectedColor] = useState("#f43f5e"); // Domyślny kolor pasujący do motywu
+            const [selectedColor, setSelectedColor] = useState("#f43f5e"); 
             const [brushSize, setBrushSize] = useState(10); 
             const canvasRef = useRef(null);
             const [isDrawing, setIsDrawing] = useState(false); 
             const ctxRef = useRef(null);
             const resultRef = useRef(null);
 
-            // Paleta kolorów
             const colors = ["#f43f5e", "#fbbf24", "#10b981", "#3b82f6", "#8b5cf6", "#ec4899", "#000000", "#ffffff"];
 
-            // -------------------------------------------------------------
-            // TWOJE FUNKCJE DO ŁADOWANIA DANYCH I API (Zostawiłem bez zmian)
-            // -------------------------------------------------------------
             useEffect(() => {
                 const savedAuth = localStorage.getItem('magicColorAuth') === 'true';
                 if (savedAuth) setIsAuthenticated(true);
@@ -193,28 +180,37 @@
                 setGeneratedImage(null);
 
                 try {
+                    // KROK 1: Jeszcze twardsze modyfikatory stylów
                     let styleModifier = "";
                     if (styleOption === 'przedszkole') {
-                        styleModifier = "Very simple toddler coloring book, thick bold black contours, minimal details";
+                        styleModifier = "very thick black outlines, bold minimalist shapes, toddler style, lots of empty white space inside";
                     } else if (styleOption === 'szkola') {
-                        styleModifier = "Standard kids coloring book page, clear black outlines";
+                        styleModifier = "clear black outlines, empty white space inside, standard children's line art style";
                     } else if (styleOption === 'mandala') {
-                        styleModifier = "Intricate adult coloring page, beautiful complex mandala design, detailed black lines";
+                        styleModifier = "complex intricate black line art, highly detailed geometric patterns, uncolored adult relaxation style";
                     }
 
-                    const hiddenInstruction = `B&W vector line art coloring page, strictly uncolored contours ONLY. Subject: ${promptInput}. ${styleModifier}. Pure monochrome, pure white background, thick black bold lines, NO colors, no shading, no grayscale.`;
+                    // KROK 2: Całkowicie omijamy słowo "coloring page" i zmuszamy do "Line art drawing"
+                    const hiddenInstruction = `Black and white line art drawing of ${promptInput}. ${styleModifier}. Strictly uncolored, pure white background, pure black outlines ONLY. No colors, no grayscale, no shading, no text, no labels.`;
+                    
+                    // KROK 3: Pancerne instrukcje NEGATYWNE dla Stability AI (czego ma NIE RYSOWAĆ)
+                    const negativePrompt = "color, colors, shading, shadows, grayscale, gradients, filled areas, text, words, labels, watermark, realistic, 3d, painted, colored covers";
 
+                    // KROK 4: Pakujemy wszystko z uwzględnieniem negative_prompt
                     const payload = {
                         prompt: hiddenInstruction, 
-                        instances: { prompt: hiddenInstruction }, 
+                        negative_prompt: negativePrompt, // Przekazujemy ten klucz na serwer!
+                        instances: { prompt: hiddenInstruction }, // Fallback dla środowiska testowego
                         parameters: { sampleCount: 1 }
                     };
 
                     const data = await secureApiCall(payload);
-                    const base64Image = data.predictions?.[0]?.bytesBase64Encoded;
+                    const base64Image = data.predictions?.[0]?.bytesBase64Encoded || data.artifacts?.[0]?.base64 || data.image; // Uwzględniamy różne odpowiedzi serwera
                     
                     if (base64Image) {
-                        setGeneratedImage(`data:image/png;base64,${base64Image}`);
+                        // Sprawdzamy czy API nie zwróciło przypadkiem już prefiksu data:image (niektóre API to robią)
+                        const finalImage = base64Image.startsWith('data:image') ? base64Image : `data:image/png;base64,${base64Image}`;
+                        setGeneratedImage(finalImage);
                         
                         if (!isAuthenticated) {
                             const newTries = freeTries + 1;
@@ -228,7 +224,7 @@
 
                 } catch (err) {
                     console.error("Błąd grafiki:", err);
-                    setError('Wystąpił problem z przetworzeniem żądania. Serwer mógł być obciążony, spróbuj kliknąć jeszcze raz.');
+                    setError('Wystąpił problem z przetworzeniem żądania. Spróbuj ponownie lub zmień trochę opis.');
                 } finally {
                     setIsGenerating(false);
                 }
@@ -244,9 +240,6 @@
                 }
             };
 
-            // -------------------------------------------------------------
-            // FUNKCJE RYSOWANIA PO PŁÓTNIE (CANVAS)
-            // -------------------------------------------------------------
             useEffect(() => {
                 if (generatedImage && canvasRef.current) {
                     const canvas = canvasRef.current;
@@ -256,7 +249,6 @@
                         canvas.width = img.width;
                         canvas.height = img.height;
                         
-                        // Zapewniamy białe tło dla poprawnego mieszania kolorów (multiply)
                         ctx.fillStyle = "#ffffff";
                         ctx.fillRect(0, 0, canvas.width, canvas.height);
                         
@@ -353,9 +345,6 @@
                 }
             };
 
-            // ==========================================
-            // EKRAN BLOKADY (PAYWALL) 
-            // ==========================================
             if (showPaywall) {
                 return (
                     <div className="min-h-screen relative flex items-center justify-center p-4 print-hidden">
@@ -400,9 +389,6 @@
                 );
             }
 
-            // ==========================================
-            // GŁÓWNY WIDOK APLIKACJI
-            // ==========================================
             return (
                 <div className="min-h-screen relative flex flex-col">
                     <div className="aura-blob aura-1 print-hidden"></div>
@@ -525,13 +511,11 @@
                                 </div>
                             </div>
 
-                            {/* WYNIK - POŁĄCZONY MOTYW CIEMNY Z NARZĘDZIAMI DO KOLOROWANIA */}
                             {generatedImage && (
                                 <div ref={resultRef} className="mt-12 fade-in print:mt-0">
                                     
                                     <div className="flex flex-col lg:flex-row gap-8">
                                         
-                                        {/* LEWA STRONA: WIRTUALNE PŁÓTNO */}
                                         <div className="flex-1 flex flex-col items-center">
                                             <div className="w-full text-center sm:text-left mb-6 print-hidden">
                                                 <h3 className="text-2xl font-bold text-white mb-2">Twoja Kolorowanka</h3>
@@ -553,7 +537,6 @@
                                             </div>
                                         </div>
 
-                                        {/* PRAWA STRONA: PANEL Z NARZĘDZIAMI */}
                                         <div className="w-full lg:w-80 print-hidden">
                                             <div className="glass-panel p-6 rounded-[2rem] border border-slate-700/50 flex flex-col gap-6 sticky top-28">
                                                 
