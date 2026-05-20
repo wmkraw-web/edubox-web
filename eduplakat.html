@@ -98,7 +98,7 @@
             const [passwordInput, setPasswordInput] = useState('');
             
             const [promptInput, setPromptInput] = useState('');
-            const [styleOption, setStyleOption] = useState('akwarela'); 
+            const [styleOption, setStyleOption] = useState('3d'); 
             const [generatedImage, setGeneratedImage] = useState(null);
             const [isGenerating, setIsGenerating] = useState(false);
             const [error, setError] = useState('');
@@ -128,7 +128,8 @@
             };
 
             const secureApiCall = async (payload) => {
-                const isProduction = window.location.hostname.includes('vercel.app');
+                // POPRAWKA: Precyzyjne wykrywanie wyłącznie Twojej docelowej domeny
+                const isProduction = window.location.hostname === 'eduboxpro-ai.vercel.app' || window.location.hostname === 'www.eduboxpro-ai.vercel.app';
 
                 if (isProduction) {
                     return await fetchWithRetry('/api/gemini', {
@@ -137,6 +138,7 @@
                         body: JSON.stringify({ payload, type: 'image' })
                     });
                 } else {
+                    // Ten blok zadziała bezpiecznie w podglądzie (Canvas)
                     const apiKey = ""; 
                     const url = `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${apiKey}`;
                     
@@ -169,22 +171,22 @@
                     let styleModifier = "";
                     let stylePreset = "digital-art"; 
 
-                    // KROK 1: Usunąłem słowa "scenic" (widokowy) i "landscape" (krajobraz)
+                    // KROK 1: Zaktualizowane prompty wymuszające znacznie lepszą estetykę postaci
                     if (styleOption === 'akwarela') {
-                        styleModifier = "beautiful watercolor painting, soft vibrant colors, artistic illustration, detailed character focus";
+                        styleModifier = "beautiful watercolor painting, soft vibrant colors, gorgeous and expressive faces, highly detailed and charming characters, classic storybook illustration";
                         stylePreset = "photographic";
                     } else if (styleOption === '3d') {
-                        styleModifier = "cute 3d render style, pixar style, colorful, highly detailed characters";
+                        styleModifier = "cute 3d render style, modern disney pixar animation style, beautiful charming faces, big expressive eyes, highly detailed adorable characters, 8k resolution";
                         stylePreset = "3d-model";
                     } else if (styleOption === 'plakat') {
-                        styleModifier = "modern flat vector art, bold vibrant colors, minimalist illustration";
+                        styleModifier = "modern flat vector art, bold vibrant colors, beautiful stylized and elegant characters, minimalist illustration";
                         stylePreset = "digital-art";
                     }
 
-                    // KROK 2: Wymuszamy, że wpis użytkownika to GŁÓWNY TEMAT, na którym AI ma się skupić (MAIN SUBJECT)
-                    const hiddenInstruction = `A beautiful, purely visual artwork. MAIN SUBJECT: ${promptInput}. ${styleModifier}. Masterpiece, clear focus on the main subject and characters, perfect composition, purely visual art.`;
+                    const hiddenInstruction = `A beautiful, purely visual artwork. MAIN SUBJECT: ${promptInput}. ${styleModifier}. Masterpiece, clear focus on the beautiful characters, perfect composition, purely visual art.`;
                     
-                    const negativePrompt = "text, words, letters, alphabet, numbers, writing, signature, watermark, typography, font, title, heading, label, graphic design layout, poster layout, greeting card, book cover, ugly, deformed, blurry";
+                    // KROK 2: Nowe zakazy niszczące "brzydotę" w rysowaniu ludzi (ugly faces, bad anatomy)
+                    const negativePrompt = "text, words, letters, alphabet, numbers, writing, signature, watermark, typography, font, title, heading, label, graphic design layout, poster layout, greeting card, book cover, ugly faces, bad anatomy, poorly drawn characters, deformed, distorted, blurry";
 
                     const payload = {
                         prompt: hiddenInstruction, 
@@ -212,7 +214,7 @@
                     }
                 } catch (err) {
                     console.error(err);
-                    setError('Wystąpił problem z przetworzeniem żądania. Spróbuj ponownie.');
+                    setError('Wystąpił problem z połączeniem lub odrzucono zapytanie. Spróbuj ponownie.');
                 } finally {
                     setIsGenerating(false);
                 }
