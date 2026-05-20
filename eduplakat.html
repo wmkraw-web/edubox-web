@@ -22,7 +22,6 @@
             padding: 0;
         }
         
-        /* Zmiana kolorów poświaty na fioletowo-błękitne dla odróżnienia od MagicColor */
         .aura-blob {
             position: absolute;
             border-radius: 50%;
@@ -63,27 +62,19 @@
             100% { background-position: 0% 50%; }
         }
 
-        /* Poprawione drukowanie plakatów w formacie A4 i większych */
         @media print {
-            @page { margin: 0; size: auto; } /* Dostosowuje się do papieru wybranego w drukarce */
-            body, html { background-color: white !important; width: 100%; height: 100%; margin: 0; padding: 0; }
+            body { background-color: white !important; color: black !important; }
             .print-hidden { display: none !important; }
-            
             .print-only-image { 
-                position: fixed !important;
-                top: 0 !important;
-                left: 0 !important;
-                width: 100vw !important; 
-                height: 100vh !important; 
-                object-fit: contain !important; /* Gwarantuje zachowanie proporcji */
-                padding: 1cm !important; /* Bezpieczny margines, aby drukarka nie ucięła krawędzi */
-                box-sizing: border-box !important;
-                border-radius: 0 !important; /* Wyłącza zaokrąglone rogi na wydruku */
-                background-color: white !important;
-                margin: 0 !important;
-                z-index: 9999 !important;
+                display: block !important; 
+                width: 100% !important; 
+                height: 100% !important; 
+                object-fit: contain;
+                margin: 0 auto;
+                box-shadow: none !important;
             }
             .glass-panel, .magic-border::before { display: none !important; }
+            @page { margin: 1cm; size: portrait; }
         }
     </style>
 </head>
@@ -134,7 +125,6 @@
             };
 
             const secureApiCall = async (payload) => {
-                // POPRAWKA: Precyzyjne wykrywanie wyłącznie Twojej docelowej domeny
                 const isProduction = window.location.hostname === 'eduboxpro-ai.vercel.app' || window.location.hostname === 'www.eduboxpro-ai.vercel.app';
 
                 if (isProduction) {
@@ -144,7 +134,6 @@
                         body: JSON.stringify({ payload, type: 'image' })
                     });
                 } else {
-                    // Ten blok zadziała bezpiecznie w podglądzie (Canvas)
                     const apiKey = ""; 
                     const url = `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${apiKey}`;
                     
@@ -177,7 +166,6 @@
                     let styleModifier = "";
                     let stylePreset = "digital-art"; 
 
-                    // KROK 1: Turbodoładowanie jakości obrazu i detali twarzy (8k, masterpiece, flawless faces)
                     if (styleOption === 'akwarela') {
                         styleModifier = "stunning watercolor painting, luminous soft vibrant colors, flawless expressive faces, highly detailed characters, award-winning storybook illustration, 8k resolution, crisp details";
                         stylePreset = "photographic";
@@ -191,7 +179,6 @@
 
                     const hiddenInstruction = `A breathtaking, purely visual artwork. MAIN SUBJECT: ${promptInput}. ${styleModifier}. Masterpiece, highly detailed, perfect composition, clear focus on the beautiful flawless characters.`;
                     
-                    // KROK 2: Mordercze zakazy dla złej anatomii, rozmazanych twarzy i zniekształceń
                     const negativePrompt = "text, words, letters, alphabet, numbers, writing, signature, watermark, typography, font, title, heading, label, graphic design layout, poster layout, greeting card, book cover, ugly faces, bad anatomy, mutated hands, poorly drawn faces, disfigured, deformed, distorted, blurry, low resolution, bad proportions";
 
                     const payload = {
@@ -236,6 +223,19 @@
                 }
             };
 
+            // Funkcja pozwalająca zapisać obraz na dysk
+            const handleDownload = () => {
+                if (generatedImage) {
+                    const a = document.createElement('a');
+                    a.href = generatedImage;
+                    a.download = `EduPlakat_${new Date().getTime()}.png`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                }
+            };
+
+            // Nowa funkcja drukowania - Plakat całkowicie wypełnia stronę
             const handlePrint = () => {
                 if (generatedImage) {
                     const windowContent = `
@@ -244,27 +244,29 @@
                         <head>
                             <title>Twój Plakat - EduPlakat PRO</title>
                             <style>
-                                @page { size: A4 portrait; margin: 0; }
+                                /* Eliminujemy systemowe marginesy drukarki */
+                                @page { margin: 0; }
                                 html, body { 
                                     margin: 0; 
                                     padding: 0; 
                                     width: 100vw; 
                                     height: 100vh; 
                                     background-color: #fff; 
+                                    overflow: hidden;
                                 }
                                 .print-container {
+                                    position: absolute;
+                                    top: 0;
+                                    left: 0;
                                     width: 100%;
                                     height: 100%;
-                                    padding: 0.5cm; /* Minimalny margines bezpieczeństwa dla drukarki */
-                                    box-sizing: border-box;
-                                    display: flex;
-                                    justify-content: center;
-                                    align-items: center;
                                 }
                                 img { 
                                     width: 100%; 
                                     height: 100%; 
-                                    object-fit: contain; 
+                                    /* object-fit: cover sprawia, że plakat rozciąga się na 100% kartki (np. A4 lub A3), ucinając delikatnie boki */
+                                    object-fit: cover; 
+                                    object-position: center;
                                 }
                             </style>
                         </head>
@@ -455,9 +457,14 @@
                                     
                                     <div className="flex flex-col sm:flex-row items-center justify-between w-full mb-6 print-hidden gap-4">
                                         <h3 className="text-xl font-bold text-white text-center sm:text-left">Twój Gotowy Plakat</h3>
-                                        <button onClick={handlePrint} className="bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 transition-all btn-bounce shadow-[0_0_15px_rgba(16,185,129,0.3)] w-full sm:w-auto justify-center">
-                                            🖨️ Drukuj (Format A4)
-                                        </button>
+                                        <div className="flex gap-3 w-full sm:w-auto flex-col sm:flex-row">
+                                            <button onClick={handleDownload} className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-3 rounded-xl font-bold flex items-center gap-2 transition-all btn-bounce shadow-lg justify-center">
+                                                📥 Pobierz (do Canvy)
+                                            </button>
+                                            <button onClick={handlePrint} className="bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-3 rounded-xl font-bold flex items-center gap-2 transition-all btn-bounce shadow-lg justify-center">
+                                                🖨️ Drukuj (np. na A4/A3)
+                                            </button>
+                                        </div>
                                     </div>
 
                                     <div className="bg-white p-2 rounded-3xl magic-border shadow-2xl print:shadow-none print:p-0 w-full max-w-2xl">
