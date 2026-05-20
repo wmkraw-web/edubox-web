@@ -5,15 +5,16 @@ export default async function handler(req, res) {
 
   const { payload, type } = req.body;
   
-  // Używamy Twojego pancernego klucza
+  // Pobieramy oba klucze z Vercela
   const openaiKey = process.env.OPENAI_API_KEY;
-
-  if (!openaiKey) {
-    return res.status(500).json({ error: 'Brak klucza OPENAI_API_KEY w ustawieniach Vercel!' });
-  }
+  const stabilityKey = process.env.STABILITY_API_KEY; 
 
   try {
     if (type === 'text') {
+      if (!openaiKey) {
+        return res.status(500).json({ error: 'Brak klucza OPENAI_API_KEY w ustawieniach Vercel!' });
+      }
+
       // 1. ODCZYTANIE DANYCH W FORMACIE GEMINI
       let systemPrompt = "Jesteś asystentem edukacyjnym.";
       if (payload.systemInstruction?.parts?.[0]?.text) {
@@ -27,7 +28,7 @@ export default async function handler(req, res) {
       
       let temp = payload.generationConfig?.temperature ?? 0.5;
 
-      // 2. WYSŁANIE ZAPYTANIA DO STABILNEGO OPENAI (GPT-4o-mini)
+      // 2. WYSŁANIE ZAPYTANIA DO STABILNEGO OPENAI (Dla funkcji tekstowych)
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: { 
@@ -47,7 +48,7 @@ export default async function handler(req, res) {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error?.message || "Błąd OpenAI");
 
-      // 3. ZWROT W FORMACIE UDAJĄCYM GEMINI (Aby aplikacje HTML działały bez poprawek)
+      // 3. ZWROT DO FRONTENDU
       return res.status(200).json({
         candidates: [{ 
             content: { parts: [{ text: data.choices[0].message.content }] } 
@@ -55,41 +56,43 @@ export default async function handler(req, res) {
       });
 
     } else if (type === 'image') {
-      // 1. ODCZYTANIE PROMPTU OBRAZKOWEGO
-      const prompt = payload.instances?.[0]?.prompt || "Edukacyjna ilustracja dla dzieci";
+      // NOWOŚĆ: Blokujemy dostęp, jeśli na Vercelu nie ma klucza Stability
+      if (!stabilityKey) {
+        return res.status(500).json({ error: 'Brak klucza STABILITY_API_KEY w ustawieniach Vercel!' });
+      }
 
-      // 2. WYSŁANIE DO NOWEGO MODELU OPENAI BEZ PROBLEMATYCZNYCH PARAMETRÓW
-      const response = await fetch('https://api.openai.com/v1/images/generations', {
+      // 1. ODCZYTANIE PROMPTU OBRAZKOWEGO ORAZ NEGATYWNEGO (ZAKAZANE SŁOWA)
+      const prompt = payload.prompt || payload.instances?.[0]?.prompt || "Edukacyjna ilustracja dla dzieci";
+      const negativePrompt = payload.negative_prompt || "color, colors, shading, text, grayscale";
+
+      // 2. WYSŁANIE DO PRAWDZIWEGO STABILITY AI (SDXL)
+      const response = await fetch('https://api.stability.ai/v1/generation/stable-diffusion-xl-1024-v1-0/text-to-image', {
         method: 'POST',
         headers: { 
-            'Content-Type': 'application/json', 
-            'Authorization': `Bearer ${openaiKey}` 
+            'Content-Type': 'application/json',
+            'Accept': 'application/json', // Ważne dla otrzymania poprawnej odpowiedzi JSON
+            'Authorization': `Bearer ${stabilityKey}` 
         },
         body: JSON.stringify({
-          model: "gpt-image-1-mini",
-          prompt: prompt,
-          n: 1,
-          size: "1024x1024"
+          text_prompts: [
+            { text: prompt, weight: 1 }, // Pozytywna instrukcja
+            { text: negativePrompt, weight: -1 } // NEGATYWNA instrukcja wymuszająca brak kolorów
+          ],
+          cfg_scale: 7,
+          height: 1024,
+          width: 1024,
+          steps: 30,
+          samples: 1
         })
       });
 
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error?.message || "Błąd modelu gpt-image-1-mini");
+      if (!response.ok) throw new Error(data.message || "Błąd modelu Stability AI");
 
-      // 3. BEZPIECZNE POBRANIE OBRAZKA I ZAMIANA W TLE NA BASE64
-      const imgData = data.data[0].url || data.data[0].b64_json;
-      let base64 = "";
+      // 3. BEZPIECZNE POBRANIE OBRAZKA W FORMACIE BASE64
+      const base64 = data.artifacts[0].base64;
 
-      if (imgData.startsWith('http')) {
-          const imageResponse = await fetch(imgData);
-          if (!imageResponse.ok) throw new Error("Serwer wygenerował obraz, ale nie mógł go pobrać.");
-          const arrayBuffer = await imageResponse.arrayBuffer();
-          base64 = Buffer.from(arrayBuffer).toString('base64');
-      } else {
-          base64 = imgData;
-      }
-
-      // 4. ZWROT W FORMACIE UDAJĄCYM IMAGEN
+      // 4. ZWROT W FORMACIE, KTÓREGO OCZEKUJE TWOJA APLIKACJA
       return res.status(200).json({
         predictions: [{ bytesBase64Encoded: base64 }]
       });
