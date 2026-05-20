@@ -4,7 +4,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Metoda niedozwolona' });
   }
 
-  // Pobieramy dane z zapytania (prompt z nowych apek, payload i type ze starych)
+  // Pobieramy dane z zapytania
   const { payload, type, prompt } = req.body;
   
   // Pobieramy bezpiecznie klucze z ustawień Vercela
@@ -21,7 +21,8 @@ export default async function handler(req, res) {
         return res.status(500).json({ error: 'Brak klucza GEMINI_API_KEY na serwerze' });
       }
       
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${geminiKey}`;
+      // POPRAWKA: Używamy stabilnego, publicznego modelu (gemini-1.5-flash)
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`;
       
       const response = await fetch(url, {
           method: 'POST',
@@ -30,6 +31,13 @@ export default async function handler(req, res) {
       });
 
       const data = await response.json();
+
+      // POPRAWKA: Jeśli Google zwróci błąd (np. zły klucz), przekazujemy go dalej
+      if (!response.ok) {
+          console.error("Błąd od Google:", data);
+          return res.status(500).json({ error: data.error?.message || 'Błąd API Google' });
+      }
+
       return res.status(200).json(data);
     }
 
