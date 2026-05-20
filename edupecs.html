@@ -169,37 +169,69 @@
                 setGeneratedImage(null);
 
                 try {
-                    // --- INTELIGENTNY DETEKTOR LITER I CYFR (BEZ KOSZTÓW API) ---
                     const cleanPrompt = promptInput.toLowerCase().trim();
-                    // Wyłapuje do 3 znaków: np. "8", "12", "cyfra 8", "duża litera A"
-                    const typoMatch = cleanPrompt.match(/(?:cyfra|litera|liczba|znak|duża|mała|wielka)\s+([a-z0-9ąćęłńóśźż]{1,3})/i) || cleanPrompt.match(/^([a-z0-9ąćęłńóśźż]{1,3})$/i);
                     
+                    // --- 1. INTELIGENTNY DETEKTOR LITER I CYFR ---
+                    const typoMatch = cleanPrompt.match(/(?:cyfra|litera|liczba|znak|duża|mała|wielka)\s+([a-z0-9ąćęłńóśźż]{1,3})/i) || cleanPrompt.match(/^([a-z0-9ąćęłńóśźż]{1,3})$/i);
                     if (typoMatch) {
-                        // Zamiast prosić AI, przeglądarka rysuje idealny znak w 0.1 sekundy za darmo!
                         const charToDraw = typoMatch[1].toUpperCase();
                         const canvas = document.createElement('canvas');
-                        canvas.width = 1024;
-                        canvas.height = 1024;
+                        canvas.width = 1024; canvas.height = 1024;
                         const ctx = canvas.getContext('2d');
-                        
-                        ctx.fillStyle = '#ffffff';
-                        ctx.fillRect(0, 0, 1024, 1024);
-                        
-                        ctx.fillStyle = '#000000'; // Czysty czarny
-                        const fontSize = charToDraw.length > 1 ? 600 : 800; // Mniejsza czcionka dla liczb dwucyfrowych
+                        ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, 1024, 1024);
+                        ctx.fillStyle = '#000000'; 
+                        const fontSize = charToDraw.length > 1 ? 600 : 800; 
                         ctx.font = `bold ${fontSize}px "Plus Jakarta Sans", Arial, sans-serif`;
-                        ctx.textAlign = 'center';
-                        ctx.textBaseline = 'middle';
+                        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
                         ctx.fillText(charToDraw, 512, 540); 
-                        
                         setGeneratedImage(canvas.toDataURL('image/png'));
                         setIsGenerating(false);
                         setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
-                        return; // KOŃCZYMY FUNKCJĘ - Omijamy Stability AI!
+                        return; 
                     }
-                    // ------------------------------------------------------------
 
-                    // Precyzyjne sterowanie skomplikowaniem symbolu na podstawie grupy wiekowej
+                    // --- 2. INTELIGENTNY DETEKTOR FIGUR GEOMETRYCZNYCH ---
+                    const shapeMatch = cleanPrompt.match(/^(kwadrat|prostokąt|koło|kółko|trójkąt|gwiazda|gwiazdka|serce|serduszko|owal|romb)$/i) || cleanPrompt.match(/(?:figura|kształt)\s+(kwadrat|prostokąt|koło|kółko|trójkąt|gwiazda|gwiazdka|serce|serduszko|owal|romb)/i);
+                    if (shapeMatch) {
+                        const shape = (shapeMatch[1] || shapeMatch[2]).toLowerCase();
+                        const canvas = document.createElement('canvas');
+                        canvas.width = 1024; canvas.height = 1024;
+                        const ctx = canvas.getContext('2d');
+                        
+                        ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, 1024, 1024);
+                        ctx.lineWidth = 30; ctx.strokeStyle = '#000000';
+                        ctx.fillStyle = '#3b82f6'; // Jasnoniebieski uniwersalny kolor dla figur
+                        ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+                        ctx.beginPath();
+                        const cx = 512, cy = 512;
+
+                        if (shape === 'kwadrat') { ctx.rect(212, 212, 600, 600); } 
+                        else if (shape === 'prostokąt') { ctx.rect(162, 312, 700, 400); } 
+                        else if (shape.includes('koł')) { ctx.arc(cx, cy, 350, 0, Math.PI * 2); } 
+                        else if (shape === 'trójkąt') { ctx.moveTo(cx, 200); ctx.lineTo(850, 850); ctx.lineTo(174, 850); ctx.closePath(); } 
+                        else if (shape.includes('gwiazd')) {
+                            ctx.fillStyle = '#fbbf24'; // Żółty dla gwiazdki
+                            for (let i = 0; i < 5; i++) {
+                                ctx.lineTo(Math.cos((18 + i * 72) / 180 * Math.PI) * 350 + cx, -Math.sin((18 + i * 72) / 180 * Math.PI) * 350 + cy);
+                                ctx.lineTo(Math.cos((54 + i * 72) / 180 * Math.PI) * 150 + cx, -Math.sin((54 + i * 72) / 180 * Math.PI) * 150 + cy);
+                            }
+                            ctx.closePath();
+                        } 
+                        else if (shape.includes('serc')) {
+                            ctx.fillStyle = '#ef4444'; // Czerwony dla serca
+                            ctx.moveTo(cx, 300); ctx.bezierCurveTo(cx, 250, cx - 50, 150, cx - 200, 150); ctx.bezierCurveTo(cx - 400, 150, cx - 400, 400, cx - 400, 400); ctx.bezierCurveTo(cx - 400, 600, cx - 150, 750, cx, 850); ctx.bezierCurveTo(cx + 150, 750, cx + 400, 600, cx + 400, 400); ctx.bezierCurveTo(cx + 400, 400, cx + 400, 150, cx + 200, 150); ctx.bezierCurveTo(cx + 50, 150, cx, 250, cx, 300);
+                        } 
+                        else if (shape === 'owal') { ctx.ellipse(cx, cy, 400, 250, 0, 0, Math.PI * 2); } 
+                        else if (shape === 'romb') { ctx.moveTo(cx, 150); ctx.lineTo(850, cy); ctx.lineTo(cx, 850); ctx.lineTo(150, cy); ctx.closePath(); }
+
+                        ctx.fill(); ctx.stroke();
+                        setGeneratedImage(canvas.toDataURL('image/png'));
+                        setIsGenerating(false);
+                        setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
+                        return; 
+                    }
+
+                    // --- 3. GENEROWANIE PRZEZ AI ---
                     let styleModifier = "";
                     if (ageGroup === 'maluchy') {
                         styleModifier = "ultra simple minimalist illustration, giant single object, extremely thick bold black outlines, high contrast flat vibrant colors, strictly no small details, purely white background, minimal cognitive load";
@@ -209,10 +241,9 @@
                         styleModifier = "clear illustration, nice flat colors, clean black outlines, white background, educational visual aid, slightly more detailed";
                     }
 
-                    // Główna instrukcja dla prawdziwych obrazków
-                    const hiddenInstruction = `An isolated icon on a pure white background for an autism PECS communication card. EXACT SUBJECT: ${promptInput}. Strictly NO background scenery, NO extra characters or people unless requested. Style: ${styleModifier}. Highly recognizable, single object focus.`;
+                    // Twarda reguła (CRITICAL) dla czasowników
+                    const hiddenInstruction = `An isolated icon on a pure white background for an autism PECS communication card. EXACT SUBJECT: ${promptInput}. (CRITICAL: If the subject is a verb or action like "eat", "play", "run", you MUST draw a simple, cute generic character performing this exact action). Strictly NO background scenery, NO extra characters. Style: ${styleModifier}. Highly recognizable, single object or single character focus.`;
                     
-                    // Przywracamy zakaz liter, żeby na piktogramach nie było "krzaczków"
                     const negativePrompt = "realistic, shadows, gradients, multiple subjects, complex scene, background scenery, watermark, messy lines, grayscale, text, words, letters, random text";
 
                     const payload = {
@@ -528,6 +559,11 @@
                                             <><svg className="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Tworzenie karty...</>
                                         ) : (!isAuthenticated && freeTries >= FREE_TRIES_LIMIT ? 'Odblokuj PRO' : 'Wygeneruj Obrazek')}
                                     </button>
+
+                                    {/* NOWA WSKAZÓWKA EDUKACYJNA DLA UŻYTKOWNIKA */}
+                                    <div className="mt-4 p-4 bg-amber-900/20 rounded-xl border border-amber-500/30 text-slate-300 text-xs text-center leading-relaxed">
+                                        <span className="text-amber-400 font-bold">💡 Wskazówka:</span> Zamiast wpisywać same czasowniki (np. "jeść", "bawić się"), napisz konkretnie kto to robi, np. <b>"chłopiec je jabłko"</b> lub <b>"dziewczynka bawi się klockami"</b>. System narysuje to o wiele precyzyjniej!
+                                    </div>
 
                                     {error && <div className="mt-4 p-3 bg-red-900/30 border border-red-500/50 rounded-lg text-red-400 text-xs font-medium text-center">{error}</div>}
                                 </div>
