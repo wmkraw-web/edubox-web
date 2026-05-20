@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EduAwans PRO - Kreator Dokumentacji</title>
+    <title>EduAwans PRO MAX - Kreator Dokumentacji</title>
     
     <!-- Biblioteki -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
@@ -65,7 +65,7 @@
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        /* Ustawienia do wydruku - perfekcyjne formatowanie */
+        /* Ustawienia do wydruku - perfekcyjne formatowanie urzędowe */
         @media print {
             @page { margin: 1.5cm; size: A4 portrait; }
             body, html, #root { 
@@ -77,10 +77,10 @@
                 font-size: 12pt !important;
             }
             
-            /* Ukrywamy UI aplikacji */
+            /* Ukrywamy interfejs (przyciski, menu, ciemne tła) */
             .print-hidden { display: none !important; }
             
-            /* Pokazujemy to co ma być drukowane z mocnymi marginesami fizycznymi */
+            /* Pokazujemy WYŁĄCZNIE ukrytą warstwę do druku */
             .print-only { 
                 display: block !important; 
                 width: 100% !important;
@@ -89,7 +89,7 @@
                 box-sizing: border-box !important;
             }
             
-            /* Naprawa przecinających się linii i łamania stron */
+            /* Zabezpieczenie przed łamaniem strony w połowie akapitu */
             .print-break-avoid { 
                 page-break-inside: avoid !important; 
                 break-inside: avoid !important; 
@@ -101,6 +101,7 @@
             h2 { font-size: 14pt !important; margin-top: 15pt !important; margin-bottom: 8pt !important; font-weight: bold !important; }
             p { text-align: justify !important; line-height: 1.6 !important; font-size: 12pt !important; margin-bottom: 10pt !important; }
             
+            /* Miejsce na podpisy */
             .signatures { display: flex !important; justify-content: space-between !important; margin-top: 50pt !important; }
             .signatures > div { width: 40% !important; text-align: center !important; }
             .signatures p { text-align: center !important; margin-bottom: 5pt !important; }
@@ -114,9 +115,11 @@
         const { useState, useEffect } = React;
 
         const BUY_COFFEE_LINK = "https://buycoffee.to/magiccolor";
-        const apiKey = ""; // API KEY is injected by environment
+        // UWAGA: Usunięto pole apiKey. Korzystamy z backendu Vercel!
 
-        // BAZA DANYCH WYMAGAŃ PRAWNYCH I PRZYKŁADÓW
+        // ==========================================
+        // BAZA DANYCH - WYMAGANIA I GOTOWCE
+        // ==========================================
         const AWANS_DATA = {
             mianowany: [
                 {
@@ -125,7 +128,7 @@
                     title: "Prowadzenie zajęć w sposób zapewniający właściwą realizację statutowych zadań szkoły",
                     icon: "ph-chalkboard-teacher",
                     checklist: [
-                        { id: 'm1_c1', text: "Nawiązanie współpracy z mentorem (opracowanie planu/kontraktu)" },
+                        { id: 'm1_c1', text: "Nawiązanie współpracy z mentorem (opracowanie kontraktu)" },
                         { id: 'm1_c2', text: "Obserwacja zajęć prowadzonych przez mentora" },
                         { id: 'm1_c3', text: "Prowadzenie zajęć w obecności mentora" },
                         { id: 'm1_c4', text: "Prowadzenie zajęć w obecności dyrektora" }
@@ -204,16 +207,16 @@
             const [expandedReqId, setExpandedReqId] = useState('m1');
             const [checkedTasks, setCheckedTasks] = useState([]);
             
-            // --- STATE KREATORA DOKUMENTU ---
-            const [docItems, setDocItems] = useState([]); // { id, section, text }
+            // --- STATE DOKUMENTU ---
+            const [docItems, setDocItems] = useState([]); 
             
-            // --- STATE AI GENERATORA ---
+            // --- STATE AI ---
             const [aiInput, setAiInput] = useState('');
             const [aiOutput, setAiOutput] = useState('');
             const [isGenerating, setIsGenerating] = useState(false);
             const [toastMessage, setToastMessage] = useState('');
 
-            // --- FUNKCJE POMOCNICZE ---
+            // --- FUNKCJE ---
             const showToast = (msg) => {
                 setToastMessage(msg);
                 setTimeout(() => setToastMessage(''), 3000);
@@ -227,7 +230,7 @@
                 }
             };
 
-            // Doda do dokumentu (Kluczowa funkcja)
+            // Dodawanie do wirtualnego dokumentu
             const handleAddToDocument = (textToInsert, forcedSectionName = null) => {
                 const activeReq = AWANS_DATA[selectedPath].find(r => r.id === expandedReqId);
                 const sectionTitle = forcedSectionName || (activeReq ? activeReq.title : "Inne działania");
@@ -241,17 +244,19 @@
                 showToast("✅ Dodano do Twojego dokumentu!");
             };
 
-            // Aktualizacja tekstu w dokumencie
+            // Aktualizacja tekstu wirtualnego dokumentu
             const updateDocItem = (id, field, value) => {
                 setDocItems(docItems.map(item => item.id === id ? { ...item, [field]: value } : item));
             };
 
-            // Usuwanie z dokumentu
+            // Usuwanie z wirtualnego dokumentu
             const removeDocItem = (id) => {
-                setDocItems(docItems.filter(item => item.id !== id));
+                if(window.confirm("Na pewno usunąć ten fragment dokumentu?")) {
+                    setDocItems(docItems.filter(item => item.id !== id));
+                }
             };
 
-            // --- LOGIKA AI ---
+            // --- POŁĄCZENIE Z AI PRZEZ VERCEL (Bezpieczne!) ---
             const generateAIText = async () => {
                 if (!aiInput.trim()) return;
                 setIsGenerating(true);
@@ -277,39 +282,43 @@
                 };
 
                 try {
-                    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+                    // Żądamy wygenerowania z NASZEGO serwera (api/gemini)
+                    const url = '/api/gemini';
+                    
                     const data = await fetchWithRetry(url, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+                        body: JSON.stringify({ prompt: prompt })
                     });
+                    
                     const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "Błąd generowania tekstu. Spróbuj ponownie.";
                     setAiOutput(text);
                 } catch (error) {
-                    setAiOutput("Wystąpił błąd podczas łączenia z AI. Sprawdź połączenie.");
+                    console.error("Backend Error:", error);
+                    setAiOutput("Wystąpił błąd podczas łączenia z serwerem. Upewnij się, że masz poprawnie skonfigurowany plik api/gemini na Vercelu.");
                 } finally {
                     setIsGenerating(false);
                 }
             };
 
-            // Postęp
+            // Pasek postępu checklist
             const requirements = AWANS_DATA[selectedPath];
             const allChecklistItems = requirements.flatMap(req => req.checklist);
             const totalTasks = allChecklistItems.length;
             const completedTasks = allChecklistItems.filter(task => checkedTasks.includes(task.id)).length;
             const progressPercent = totalTasks === 0 ? 0 : Math.round((completedTasks / totalTasks) * 100);
 
-            // --- RENDEROWANIE ---
+            // --- WIDOK APLIKACJI ---
             return (
                 <div className="min-h-screen relative flex flex-col pb-10">
                     <div className="hero-glow print-hidden"></div>
 
-                    {/* Powiadomienia */}
+                    {/* Powiadomienia (Toast) */}
                     <div className={`fixed top-24 left-1/2 -translate-x-1/2 z-[200] bg-emerald-600 text-white px-6 py-3 rounded-full font-bold shadow-[0_10px_40px_rgba(16,185,129,0.5)] transition-all duration-300 flex items-center gap-2 print-hidden ${toastMessage ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-10 pointer-events-none'}`}>
                         {toastMessage}
                     </div>
 
-                    {/* Nawigacja Główna (Ukryta przy druku) */}
+                    {/* Górna Nawigacja (Menu główne) */}
                     <nav className="w-full z-[100] glass-nav print-hidden sticky top-0">
                         <div className="max-w-[90rem] mx-auto px-6 h-20 flex items-center justify-between">
                             <div className="flex items-center gap-3">
@@ -345,7 +354,7 @@
                     </nav>
 
                     {/* ================================================================= */}
-                    {/* WIDOK: KREATOR (Wyszukiwanie, AI, Checklisty)                     */}
+                    {/* ZAKŁADKA 1: KREATOR (Baza wymagań + AI Generator)                 */}
                     {/* ================================================================= */}
                     {activeTab === 'kreator' && (
                         <main className="flex-grow max-w-[90rem] w-full mx-auto px-4 sm:px-6 py-8 relative z-10 flex flex-col xl:flex-row gap-8 items-start print-hidden animate-[reveal_0.4s_ease-out]">
@@ -369,7 +378,7 @@
                                         </div>
                                     </div>
 
-                                    {/* Przełącznik Stopnia */}
+                                    {/* Przełącznik Stopnia Awansu */}
                                     <div className="flex p-1.5 bg-slate-900/80 rounded-2xl mb-8 border border-slate-700/50 relative">
                                         <button onClick={() => { setSelectedPath('mianowany'); setExpandedReqId(AWANS_DATA['mianowany'][0].id); }} className={`flex-1 py-4 text-sm font-black rounded-xl z-10 ${selectedPath === 'mianowany' ? 'text-white' : 'text-slate-500'}`}>Nauczyciel Mianowany</button>
                                         <button onClick={() => { setSelectedPath('dyplomowany'); setExpandedReqId(AWANS_DATA['dyplomowany'][0].id); }} className={`flex-1 py-4 text-sm font-black rounded-xl z-10 ${selectedPath === 'dyplomowany' ? 'text-white' : 'text-slate-500'}`}>Nauczyciel Dyplomowany</button>
@@ -408,7 +417,6 @@
                                                                                     <div className={`w-5 h-5 rounded flex items-center justify-center border ${isChecked ? 'bg-blue-500 border-blue-500 text-white' : 'bg-slate-900 border-slate-600 text-transparent'}`}><i className="ph-bold ph-check text-xs"></i></div>
                                                                                     <div className={`text-sm ${isChecked ? 'text-slate-400 line-through' : 'text-slate-200'}`}>{task.text}</div>
                                                                                 </div>
-                                                                                {/* Dodawanie do dokumentu prosto z checklisty */}
                                                                                 <button onClick={() => handleAddToDocument(task.text, req.title)} className="text-xs font-bold text-blue-400 bg-blue-500/10 hover:bg-blue-500/20 px-3 py-1.5 rounded-lg transition-colors border border-blue-500/20 whitespace-nowrap opacity-0 group-hover:opacity-100 flex items-center gap-1"><i className="ph-bold ph-plus"></i> Do dok.</button>
                                                                             </div>
                                                                         );
@@ -418,14 +426,14 @@
 
                                                             {/* Gotowe Wpisy */}
                                                             <div className="mb-2 border-t border-slate-700/50 pt-4">
-                                                                <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2"><i className="ph-bold ph-books"></i> Gotowe wpisy (Skopiuj do dokumentu):</h4>
+                                                                <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2"><i className="ph-bold ph-books"></i> Gotowe wpisy (Dodaj do dokumentu):</h4>
                                                                 {req.examples.map((ex, idx) => (
                                                                     <div key={idx} className="bg-slate-800/40 border border-slate-700 rounded-xl p-4 mb-3">
                                                                         <div className="font-bold text-white mb-3">{ex.name}</div>
                                                                         <div className="grid grid-cols-1 gap-4">
                                                                             <div className="bg-slate-900/50 p-3 rounded-lg border border-slate-700/50">
                                                                                 <div className="text-[10px] text-amber-400 uppercase font-black mb-2 flex justify-between">
-                                                                                    Sprawozdanie: 
+                                                                                    Wzór Sprawozdania: 
                                                                                     <button onClick={() => handleAddToDocument(ex.report, req.title)} className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1"><i className="ph-bold ph-file-plus"></i> Dodaj do dokumentu</button>
                                                                                 </div>
                                                                                 <p className="text-sm text-slate-300">{ex.report}</p>
@@ -463,12 +471,12 @@
 
                                             <button 
                                                 onClick={generateAIText} disabled={isGenerating || !aiInput.trim()}
-                                                className="w-full bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-purple-500 hover:to-fuchsia-500 disabled:opacity-50 text-white py-3.5 rounded-xl font-bold btn-bounce flex items-center justify-center gap-2"
+                                                className="w-full bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-purple-500 hover:to-fuchsia-500 disabled:opacity-50 text-white py-3.5 rounded-xl font-bold btn-bounce flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(168,85,247,0.3)]"
                                             >
-                                                {isGenerating ? <div className="loader"></div> : <><i className="ph-bold ph-magic-wand text-lg"></i> Wygeneruj tekst</>}
+                                                {isGenerating ? <div className="loader"></div> : <><i className="ph-bold ph-magic-wand text-lg"></i> Wygeneruj urzędowy tekst</>}
                                             </button>
 
-                                            {/* Wynik AI - EDYTOWALNY! */}
+                                            {/* Wynik AI - EDYTOWALNY */}
                                             {aiOutput && (
                                                 <div className="mt-6 border-t border-slate-700/50 pt-6 animate-[reveal_0.3s_ease-out]">
                                                     <label className="text-xs font-bold text-purple-400 uppercase tracking-widest block mb-2">Wygenerowany Tekst (Możesz go poprawić!):</label>
@@ -481,7 +489,7 @@
                                                         onClick={() => handleAddToDocument(aiOutput)}
                                                         className="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 btn-bounce shadow-lg"
                                                     >
-                                                        <i className="ph-bold ph-file-plus text-lg"></i> Dodaj tekst do Mój Dokument
+                                                        <i className="ph-bold ph-file-plus text-lg"></i> Dodaj do 'Twój Dokument'
                                                     </button>
                                                 </div>
                                             )}
@@ -493,17 +501,17 @@
                     )}
 
                     {/* ================================================================= */}
-                    {/* WIDOK: TWÓJ DOKUMENT (Edytor typu WYSIWYG przed wydrukiem)        */}
+                    {/* ZAKŁADKA 2: TWÓJ DOKUMENT (Edytor i przygotowanie do druku)       */}
                     {/* ================================================================= */}
                     {activeTab === 'dokument' && (
                         <main className="flex-grow w-full max-w-5xl mx-auto px-4 sm:px-6 py-8 relative z-10 print-hidden animate-[reveal_0.4s_ease-out]">
                             
-                            <div className="flex justify-between items-end mb-6">
+                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-6 gap-4">
                                 <div>
                                     <h2 className="text-3xl font-black text-white">Zbudowany Dokument</h2>
-                                    <p className="text-slate-400 text-sm mt-1">Tutaj możesz poprawić wszystkie teksty i wydrukować gotowe sprawozdanie.</p>
+                                    <p className="text-slate-400 text-sm mt-1">Tutaj widzisz strukturę swojego sprawozdania. Popraw teksty i wydrukuj.</p>
                                 </div>
-                                <button onClick={() => window.print()} className="bg-emerald-600 hover:bg-emerald-500 text-white px-8 py-3 rounded-xl font-bold transition-all shadow-lg btn-bounce text-sm uppercase tracking-wider flex items-center gap-2">
+                                <button onClick={() => window.print()} className="bg-emerald-600 hover:bg-emerald-500 text-white px-8 py-3 rounded-xl font-bold transition-all shadow-[0_0_20px_rgba(16,185,129,0.4)] btn-bounce text-sm uppercase tracking-wider flex items-center gap-2 w-full sm:w-auto justify-center">
                                     <i className="ph-bold ph-printer text-xl"></i> Drukuj PDF
                                 </button>
                             </div>
@@ -517,15 +525,14 @@
                                 {docItems.length === 0 ? (
                                     <div className="text-center text-slate-400 mt-20 border-2 border-dashed border-slate-300 p-10 rounded-xl">
                                         <i className="ph-duotone ph-file-dashed text-6xl mb-4"></i>
-                                        <p className="text-lg font-bold">Twój dokument jest pusty!</p>
-                                        <p className="text-sm">Przejdź do zakładki "Kreator", aby wygenerować i dodać pierwsze akapity.</p>
+                                        <p className="text-lg font-bold text-slate-600">Twój dokument jest pusty!</p>
+                                        <p className="text-sm mt-2">Wróć do zakładki "Kreator", poszukaj wymagań i dodaj interesujące Cię wpisy.</p>
                                     </div>
                                 ) : (
                                     <div className="space-y-8">
                                         {docItems.map((item, index) => (
                                             <div key={item.id} className="relative group p-4 border border-transparent hover:border-slate-300 hover:bg-white rounded-lg transition-colors">
                                                 
-                                                {/* Przycisk Usuń (widoczny tylko po najechaniu) */}
                                                 <button 
                                                     onClick={() => removeDocItem(item.id)}
                                                     className="absolute -left-3 -top-3 bg-red-500 text-white w-8 h-8 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-md"
@@ -534,33 +541,30 @@
                                                     <i className="ph-bold ph-trash"></i>
                                                 </button>
 
-                                                {/* Edytowalny Nagłówek Sekcji */}
                                                 <input 
                                                     type="text" 
                                                     value={item.section} 
                                                     onChange={(e) => updateDocItem(item.id, 'section', e.target.value)}
                                                     className="w-full font-bold text-xl mb-3 border-b border-transparent hover:border-slate-300 focus:border-blue-500 outline-none bg-transparent"
-                                                    placeholder="Nazwa Wymagania / Sekcji"
+                                                    placeholder="Tytuł Nagłówka"
                                                 />
                                                 
-                                                {/* Edytowalny Tekst (Textarea z automatycznym dopasowaniem wysokości do minimum) */}
                                                 <textarea 
                                                     value={item.text} 
                                                     onChange={(e) => updateDocItem(item.id, 'text', e.target.value)}
-                                                    className="w-full min-h-[120px] resize-y text-justify leading-relaxed border border-transparent hover:border-slate-300 focus:border-blue-500 outline-none bg-transparent p-2 rounded"
-                                                    placeholder="Wpisz lub popraw tekst sprawozdania..."
+                                                    className="w-full min-h-[150px] resize-y text-justify leading-relaxed border border-transparent hover:border-slate-300 focus:border-blue-500 outline-none bg-transparent p-2 rounded"
+                                                    placeholder="Treść sprawozdania..."
                                                 ></textarea>
                                             </div>
                                         ))}
                                     </div>
                                 )}
                                 
-                                {/* Przycisk dodawania pustego bloku bezpośrednio w dokumencie */}
                                 <button 
                                     onClick={() => handleAddToDocument("", "Nowy Nagłówek Własny")}
                                     className="mt-10 w-full py-4 border-2 border-dashed border-slate-300 text-slate-500 font-bold hover:bg-slate-200 hover:text-slate-700 transition-colors rounded-xl flex items-center justify-center gap-2"
                                 >
-                                    <i className="ph-bold ph-plus"></i> Dodaj pusty akapit do napisania
+                                    <i className="ph-bold ph-plus"></i> Dodaj pusty akapit
                                 </button>
                             </div>
                         </main>
@@ -568,9 +572,8 @@
 
                     {/* ================================================================= */}
                     {/* WIDOK: TYLKO DO DRUKU (@media print)                              */}
+                    {/* Ten element renderuje się fizycznie TYLKO na kartce z drukarki    */}
                     {/* ================================================================= */}
-                    {/* Ta sekcja wyświetla się fizycznie TYLKO na podglądzie wydruku     */}
-                    {/* Rozwiązuje to problem nachodzących na siebie linii (break-inside) */}
                     
                     <div className="hidden print-only">
                         <div className="text-center mb-10 border-b-2 border-black pb-4 print-break-avoid">
