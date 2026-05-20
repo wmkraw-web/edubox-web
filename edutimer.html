@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="pl" translate="no" class="notranslate">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduTimer PRO - Asystent Czasu Lekcji</title>
+    
+    <!-- Biblioteki (zgodne z Twoim portfolio) -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    
+    <!-- Ikony Phosphor dla spójności -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+    <style>
+        body { 
+            font-family: 'Plus Jakarta Sans', sans-serif; 
+            background-color: #020617; /* Głęboki granat/czerń - ten sam co w portfolio */
+            color: #f8fafc; 
+            overflow-x: hidden;
+            min-height: 100vh;
+        }
+        
+        /* Szklane panele Premium - skopiowane z Twojego kodu */
+        .glass-panel { 
+            background: rgba(30, 41, 59, 0.4); 
+            backdrop-filter: blur(16px); 
+            -webkit-backdrop-filter: blur(16px); 
+            border: 1px solid rgba(255, 255, 255, 0.05); 
+        }
+
+        .glass-nav { 
+            background: rgba(2, 6, 23, 0.8); 
+            backdrop-filter: blur(20px); 
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05); 
+        }
+
+        .text-gradient { 
+            background: linear-gradient(135deg, #60a5fa 0%, #a855f7 100%); 
+            -webkit-background-clip: text; 
+            -webkit-text-fill-color: transparent; 
+        }
+
+        .btn-bounce:active { transform: scale(0.95); transition: transform 0.1s; }
+
+        /* Wielka poświata w tle */
+        .hero-glow {
+            position: absolute;
+            top: 10%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 800px;
+            height: 800px;
+            background: radial-gradient(circle, rgba(59, 130, 246, 0.15) 0%, rgba(2, 6, 23, 0) 60%);
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        /* Niestandardowy scrollbar */
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #0f172a; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+
+        /* Animacja pulsująca dla kończącego się czasu */
+        @keyframes pulse-red {
+            0%, 100% { filter: drop-shadow(0 0 15px rgba(239, 68, 68, 0.4)); }
+            50% { filter: drop-shadow(0 0 35px rgba(239, 68, 68, 0.8)); }
+        }
+        .timer-warning {
+            animation: pulse-red 1s infinite;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // --- KOMPONENTY IKON (dla przycisków) ---
+        const IconPlay = () => <i className="ph-fill ph-play text-xl"></i>;
+        const IconPause = () => <i className="ph-fill ph-pause text-xl"></i>;
+        const IconStop = () => <i className="ph-fill ph-stop text-xl"></i>;
+        const IconSkip = () => <i className="ph-bold ph-caret-double-right text-xl"></i>;
+        const IconPlus = () => <i className="ph-bold ph-plus text-lg"></i>;
+        const IconTrash = () => <i className="ph-bold ph-trash text-lg"></i>;
+
+        // --- GŁÓWNA APLIKACJA ---
+        function EduTimerApp() {
+            // Domyślny harmonogram lekcji
+            const [phases, setPhases] = useState([
+                { id: 1, name: "Wprowadzenie i cele", duration: 5 * 60 },
+                { id: 2, name: "Burza mózgów (Klasa)", duration: 10 * 60 },
+                { id: 3, name: "Praca w grupach", duration: 20 * 60 },
+                { id: 4, name: "Prezentacja wyników", duration: 7 * 60 },
+                { id: 5, name: "Karta Wyjścia (Podsumowanie)", duration: 3 * 60 },
+            ]);
+
+            const [currentPhaseIndex, setCurrentPhaseIndex] = useState(0);
+            const [timeLeft, setTimeLeft] = useState(phases[0]?.duration || 0);
+            const [isRunning, setIsRunning] = useState(false);
+            
+            // State do dodawania nowej fazy
+            const [newPhaseName, setNewPhaseName] = useState("");
+            const [newPhaseMin, setNewPhaseMin] = useState("5");
+
+            // Efekt odliczania
+            useEffect(() => {
+                let interval = null;
+                if (isRunning && timeLeft > 0) {
+                    interval = setInterval(() => {
+                        setTimeLeft((prev) => prev - 1);
+                    }, 1000);
+                } else if (isRunning && timeLeft === 0) {
+                    // Czas minął - odtwórz dźwięk i przejdź do następnej fazy
+                    playAlarm();
+                    handleNextPhase();
+                }
+                return () => clearInterval(interval);
+            }, [isRunning, timeLeft]);
+
+            // Reset czasu, gdy zmieniamy fazę manualnie
+            useEffect(() => {
+                if (phases.length > 0 && currentPhaseIndex < phases.length) {
+                    setTimeLeft(phases[currentPhaseIndex].duration);
+                }
+            }, [currentPhaseIndex, phases]);
+
+            const playAlarm = () => {
+                // Prosty alarm w przeglądarce (częstotliwość 800Hz, krótki pisk)
+                try {
+                    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.type = 'bell';
+                    osc.frequency.setValueAtTime(800, ctx.currentTime);
+                    gain.gain.setValueAtTime(0.1, ctx.currentTime); // głośność
+                    osc.start();
+                    gain.gain.exponentialRampToValueAtTime(0.00001, ctx.currentTime + 1);
+                    osc.stop(ctx.currentTime + 1);
+                } catch(e) {
+                    console.log("Audio not supported or blocked");
+                }
+            };
+
+            const toggleTimer = () => setIsRunning(!isRunning);
+            
+            const stopTimer = () => {
+                setIsRunning(false);
+                setTimeLeft(phases[currentPhaseIndex]?.duration || 0);
+            };
+
+            const handleNextPhase = () => {
+                if (currentPhaseIndex < phases.length - 1) {
+                    setCurrentPhaseIndex(prev => prev + 1);
+                } else {
+                    setIsRunning(false);
+                }
+            };
+
+            const addPhase = () => {
+                if (newPhaseName.trim() === "" || parseInt(newPhaseMin) <= 0) return;
+                const newPhase = {
+                    id: Date.now(),
+                    name: newPhaseName,
+                    duration: parseInt(newPhaseMin) * 60
+                };
+                setPhases([...phases, newPhase]);
+                setNewPhaseName("");
+                setNewPhaseMin("5");
+                if (phases.length === 0) {
+                    setTimeLeft(newPhase.duration);
+                    setCurrentPhaseIndex(0);
+                }
+            };
+
+            const removePhase = (indexToRemove) => {
+                const newPhases = phases.filter((_, idx) => idx !== indexToRemove);
+                setPhases(newPhases);
+                if (currentPhaseIndex >= newPhases.length) {
+                    setCurrentPhaseIndex(Math.max(0, newPhases.length - 1));
+                }
+                if (currentPhaseIndex === indexToRemove && newPhases.length > 0) {
+                    setTimeLeft(newPhases[Math.max(0, indexToRemove - 1)].duration);
+                    setIsRunning(false);
+                }
+            };
+
+            const setManualPhase = (index) => {
+                setCurrentPhaseIndex(index);
+                setIsRunning(false);
+            };
+
+            // Formatowanie czasu (MM:SS)
+            const formatTime = (seconds) => {
+                const m = Math.floor(seconds / 60);
+                const s = seconds % 60;
+                return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+            };
+
+            // Obliczanie całkowitego czasu lekcji
+            const totalDuration = phases.reduce((acc, phase) => acc + phase.duration, 0);
+            const totalDurationMinutes = Math.floor(totalDuration / 60);
+
+            // Obliczanie postępu kółka SVG
+            const currentTotalTime = phases[currentPhaseIndex]?.duration || 1;
+            const progress = (timeLeft / currentTotalTime);
+            const circleRadius = 140;
+            const circleCircumference = 2 * Math.PI * circleRadius;
+            const strokeDashoffset = circleCircumference - progress * circleCircumference;
+
+            // Zmiana koloru w zależności od czasu (zielony -> żółty -> czerwony)
+            let timerColor = "#3b82f6"; // blue-500
+            let isWarning = false;
+            if (timeLeft <= 60 && currentTotalTime > 60) {
+                timerColor = "#ef4444"; // red-500
+                isWarning = true;
+            } else if (timeLeft <= currentTotalTime * 0.3) {
+                timerColor = "#eab308"; // yellow-500
+            }
+
+            return (
+                <div className="min-h-screen relative flex flex-col">
+                    <div className="hero-glow"></div>
+
+                    {/* Prosta Nawigacja - spójna z portfolio */}
+                    <nav className="w-full z-[100] glass-nav">
+                        <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center shadow-[0_0_15px_rgba(59,130,246,0.5)]">
+                                    <i className="ph-bold ph-clock-countdown text-white text-xl"></i>
+                                </div>
+                                <span className="text-xl font-extrabold tracking-tight text-white">EduTimer<span className="text-blue-500">PRO</span></span>
+                            </div>
+                            <div className="text-xs font-black text-slate-400 uppercase tracking-widest hidden md:block">
+                                Aplikacja dla: EduBox AI
+                            </div>
+                        </div>
+                    </nav>
+
+                    {/* Główny kontener */}
+                    <main className="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 py-12 flex flex-col lg:flex-row gap-8 items-start relative z-10">
+                        
+                        {/* LEWA KOLUMNA: Stoper i sterowanie */}
+                        <div className="w-full lg:w-7/12 flex flex-col items-center">
+                            
+                            <div className="glass-panel w-full rounded-[2.5rem] p-8 md:p-12 flex flex-col items-center relative overflow-hidden group">
+                                <div className="absolute top-0 right-0 bg-blue-600 text-white text-[10px] font-black px-4 py-2 rounded-bl-2xl uppercase tracking-widest z-10">
+                                    AKTYWNA FAZA
+                                </div>
+
+                                {/* Tytuł aktualnej fazy */}
+                                <h2 className="text-2xl md:text-3xl font-bold text-white mb-2 tracking-tight text-center mt-4">
+                                    {phases[currentPhaseIndex]?.name || "Brak zaplanowanych faz"}
+                                </h2>
+                                <p className="text-slate-400 text-sm font-medium uppercase tracking-widest mb-10">
+                                    Krok {phases.length > 0 ? currentPhaseIndex + 1 : 0} z {phases.length}
+                                </p>
+
+                                {/* Wielki Zegar SVG */}
+                                <div className={`relative flex items-center justify-center mb-12 ${isWarning ? 'timer-warning' : ''}`}>
+                                    {/* Tło kółka */}
+                                    <svg className="w-80 h-80 md:w-96 md:h-96 transform -rotate-90">
+                                        <circle 
+                                            cx="50%" cy="50%" r={circleRadius} 
+                                            stroke="#1e293b" // slate-800
+                                            strokeWidth="12" 
+                                            fill="none" 
+                                        />
+                                        {/* Progres kółka */}
+                                        <circle 
+                                            cx="50%" cy="50%" r={circleRadius} 
+                                            stroke={timerColor}
+                                            strokeWidth="12" 
+                                            fill="none" 
+                                            strokeLinecap="round"
+                                            style={{
+                                                strokeDasharray: circleCircumference,
+                                                strokeDashoffset: isNaN(strokeDashoffset) ? 0 : strokeDashoffset,
+                                                transition: "stroke-dashoffset 1s linear, stroke 0.5s ease"
+                                            }}
+                                        />
+                                    </svg>
+
+                                    {/* Cyfry wewnątrz */}
+                                    <div className="absolute flex flex-col items-center">
+                                        <span className="text-6xl md:text-8xl font-black tabular-nums tracking-tighter" style={{ color: timerColor }}>
+                                            {formatTime(timeLeft)}
+                                        </span>
+                                        {isRunning && !isWarning && (
+                                            <span className="text-slate-400 text-sm mt-2 uppercase tracking-widest font-bold flex items-center gap-2">
+                                                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span> W toku
+                                            </span>
+                                        )}
+                                        {isWarning && (
+                                            <span className="text-red-400 text-sm mt-2 uppercase tracking-widest font-bold flex items-center gap-2">
+                                                <i className="ph-fill ph-warning"></i> Czas mija!
+                                            </span>
+                                        )}
+                                        {!isRunning && timeLeft > 0 && phases.length > 0 && (
+                                            <span className="text-slate-500 text-sm mt-2 uppercase tracking-widest font-bold">
+                                                Zapauzowano
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Panel Sterowania */}
+                                <div className="flex items-center gap-4 bg-slate-900/50 p-3 rounded-full border border-slate-700/50 backdrop-blur-md">
+                                    <button 
+                                        onClick={stopTimer}
+                                        disabled={phases.length === 0}
+                                        className="w-14 h-14 rounded-full flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800 disabled:opacity-50 transition-colors btn-bounce"
+                                        title="Zresetuj obecną fazę"
+                                    >
+                                        <IconStop />
+                                    </button>
+
+                                    <button 
+                                        onClick={toggleTimer}
+                                        disabled={phases.length === 0 || (timeLeft === 0 && currentPhaseIndex === phases.length - 1)}
+                                        className={`w-20 h-20 rounded-full flex items-center justify-center text-white shadow-lg btn-bounce transition-all ${
+                                            isRunning ? 'bg-amber-500 hover:bg-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.4)]' : 'bg-blue-600 hover:bg-blue-500 shadow-[0_0_20px_rgba(59,130,246,0.4)]'
+                                        } disabled:opacity-50 disabled:shadow-none`}
+                                    >
+                                        {isRunning ? <IconPause /> : <IconPlay />}
+                                    </button>
+
+                                    <button 
+                                        onClick={handleNextPhase}
+                                        disabled={currentPhaseIndex >= phases.length - 1}
+                                        className="w-14 h-14 rounded-full flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800 disabled:opacity-50 transition-colors btn-bounce"
+                                        title="Pomiń i przejdź do następnej"
+                                    >
+                                        <IconSkip />
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* PRAWA KOLUMNA: Agenda / Harmonogram */}
+                        <div className="w-full lg:w-5/12 flex flex-col gap-6">
+                            
+                            <div className="glass-panel rounded-[2rem] p-6 flex flex-col h-full max-h-[700px]">
+                                <div className="flex justify-between items-end mb-6 pb-4 border-b border-slate-700/50">
+                                    <div>
+                                        <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                                            <i className="ph-fill ph-list-numbers text-blue-500"></i> Plan Lekcji
+                                        </h3>
+                                        <p className="text-sm text-slate-400 mt-1">
+                                            Całkowity czas: <span className="text-white font-bold">{totalDurationMinutes} min</span>
+                                        </p>
+                                    </div>
+                                    <div className="bg-slate-800 text-slate-300 text-xs px-3 py-1 rounded-full font-bold border border-slate-700">
+                                        {phases.length} etapów
+                                    </div>
+                                </div>
+
+                                {/* Lista faz (scrollowalna) */}
+                                <div className="flex-grow overflow-y-auto custom-scrollbar pr-2 space-y-3">
+                                    {phases.length === 0 ? (
+                                        <div className="text-center py-10 text-slate-500 text-sm">
+                                            <i className="ph-duotone ph-calendar-blank text-4xl mb-2"></i>
+                                            <p>Brak zaplanowanych zadań.</p>
+                                        </div>
+                                    ) : (
+                                        phases.map((phase, idx) => (
+                                            <div 
+                                                key={phase.id} 
+                                                onClick={() => setManualPhase(idx)}
+                                                className={`group flex items-center justify-between p-4 rounded-xl cursor-pointer transition-all border ${
+                                                    currentPhaseIndex === idx 
+                                                        ? 'bg-blue-600/20 border-blue-500/50 shadow-[0_0_15px_rgba(59,130,246,0.15)]' 
+                                                        : 'bg-slate-800/50 border-slate-700/50 hover:bg-slate-800 hover:border-slate-600'
+                                                }`}
+                                            >
+                                                <div className="flex items-center gap-3 overflow-hidden">
+                                                    <div className={`w-8 h-8 shrink-0 rounded-lg flex items-center justify-center font-black text-xs ${
+                                                        currentPhaseIndex === idx ? 'bg-blue-600 text-white' : 'bg-slate-900 text-slate-400'
+                                                    }`}>
+                                                        {idx + 1}
+                                                    </div>
+                                                    <div className="truncate">
+                                                        <div className={`font-semibold text-sm truncate ${currentPhaseIndex === idx ? 'text-white' : 'text-slate-300'}`}>
+                                                            {phase.name}
+                                                        </div>
+                                                        <div className="text-xs text-slate-500">
+                                                            {Math.floor(phase.duration / 60)} min
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                
+                                                <button 
+                                                    onClick={(e) => { e.stopPropagation(); removePhase(idx); }}
+                                                    className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 p-2 transition-all"
+                                                    title="Usuń etap"
+                                                >
+                                                    <IconTrash />
+                                                </button>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+
+                                {/* Dodawanie nowej fazy */}
+                                <div className="mt-6 pt-4 border-t border-slate-700/50 bg-slate-900/40 rounded-2xl p-4">
+                                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Dodaj nowy etap</h4>
+                                    <div className="flex gap-2">
+                                        <input 
+                                            type="text" 
+                                            placeholder="Nazwa zadania..." 
+                                            value={newPhaseName}
+                                            onChange={(e) => setNewPhaseName(e.target.value)}
+                                            onKeyPress={(e) => e.key === 'Enter' && addPhase()}
+                                            className="flex-grow bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-colors"
+                                        />
+                                        <input 
+                                            type="number" 
+                                            min="1"
+                                            value={newPhaseMin}
+                                            onChange={(e) => setNewPhaseMin(e.target.value)}
+                                            onKeyPress={(e) => e.key === 'Enter' && addPhase()}
+                                            className="w-20 bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors text-center"
+                                        />
+                                        <button 
+                                            onClick={addPhase}
+                                            className="bg-blue-600 hover:bg-blue-500 text-white w-10 h-10 rounded-lg flex items-center justify-center transition-colors shadow-lg btn-bounce shrink-0"
+                                        >
+                                            <IconPlus />
+                                        </button>
+                                    </div>
+                                </div>
+
+                            </div>
+                        </div>
+
+                    </main>
+                </div>
+            );
+        }
+
+        // Renderowanie aplikacji
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<EduTimerApp />);
+    </script>
+</body>
+</html>
