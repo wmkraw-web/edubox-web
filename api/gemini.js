@@ -5,36 +5,20 @@ export default async function handler(req, res) {
 
   const { payload, type } = req.body;
   
-  // Pobieramy oba klucze z Vercela
   const openaiKey = process.env.OPENAI_API_KEY;
   const stabilityKey = process.env.STABILITY_API_KEY; 
 
   try {
     if (type === 'text') {
-      if (!openaiKey) {
-        return res.status(500).json({ error: 'Brak klucza OPENAI_API_KEY w ustawieniach Vercel!' });
-      }
+      if (!openaiKey) return res.status(500).json({ error: 'Brak klucza OPENAI_API_KEY!' });
 
-      // 1. ODCZYTANIE DANYCH W FORMACIE GEMINI
-      let systemPrompt = "Jesteś asystentem edukacyjnym.";
-      if (payload.systemInstruction?.parts?.[0]?.text) {
-         systemPrompt = payload.systemInstruction.parts[0].text;
-      }
-      
-      let userPrompt = "Działaj.";
-      if (payload.contents?.[0]?.parts?.[0]?.text) {
-         userPrompt = payload.contents[0].parts[0].text;
-      }
-      
+      let systemPrompt = payload.systemInstruction?.parts?.[0]?.text || "Jesteś asystentem edukacyjnym.";
+      let userPrompt = payload.contents?.[0]?.parts?.[0]?.text || "Działaj.";
       let temp = payload.generationConfig?.temperature ?? 0.5;
 
-      // 2. WYSŁANIE ZAPYTANIA DO STABILNEGO OPENAI (Dla funkcji tekstowych)
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
-        headers: { 
-            'Content-Type': 'application/json', 
-            'Authorization': `Bearer ${openaiKey}` 
-        },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${openaiKey}` },
         body: JSON.stringify({
           model: "gpt-4o-mini",
           messages: [
@@ -45,69 +29,44 @@ export default async function handler(req, res) {
         })
       });
 
-      if (!response.ok) {
-          const errText = await response.text();
-          throw new Error(`Błąd OpenAI: ${errText}`);
-      }
+      if (!response.ok) throw new Error(`Błąd OpenAI: ${await response.text()}`);
       const data = await response.json();
 
-      // 3. ZWROT DO FRONTENDU
       return res.status(200).json({
-        candidates: [{ 
-            content: { parts: [{ text: data.choices[0].message.content }] } 
-        }]
+        candidates: [{ content: { parts: [{ text: data.choices[0].message.content }] } }]
       });
 
     } else if (type === 'image') {
-      if (!stabilityKey) {
-        return res.status(500).json({ error: 'Brak klucza STABILITY_API_KEY w ustawieniach Vercel!' });
-      }
-      if (!openaiKey) {
-        return res.status(500).json({ error: 'Brak klucza OPENAI_API_KEY do tłumaczenia promptów!' });
-      }
+      if (!stabilityKey) return res.status(500).json({ error: 'Brak klucza STABILITY_API_KEY!' });
+      if (!openaiKey) return res.status(500).json({ error: 'Brak klucza OPENAI_API_KEY (tłumacz)!' });
 
-      const rawPrompt = payload.prompt || payload.instances?.[0]?.prompt || "Edukacyjna ilustracja dla dzieci";
+      const rawPrompt = payload.prompt || payload.instances?.[0]?.prompt || "Edukacyjna ilustracja";
+      // Jeśli aplikacja nie poda własnych zakazów, domyślnie zakazujemy kolorów (dla starych kolorowanek)
       const negativePrompt = payload.negative_prompt || "color, colors, shading, text, grayscale";
 
-      // --- NOWOŚĆ: Błyskawiczne tłumaczenie promptu na angielski (SDXL nie rozumie polskiego!) ---
       let englishPrompt = rawPrompt;
       try {
           const translateRes = await fetch('https://api.openai.com/v1/chat/completions', {
               method: 'POST',
-              headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${openaiKey}`
-              },
+              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${openaiKey}` },
               body: JSON.stringify({
-                  model: "gpt-4o-mini", // Najszybszy model do prostego zadania
+                  model: "gpt-4o-mini",
                   messages: [
-                      { role: "system", content: "You translate texts to English accurately. Return ONLY the English translation. Do not add any conversational text." },
+                      { role: "system", content: "You translate texts to English accurately. Return ONLY the English translation." },
                       { role: "user", content: rawPrompt }
                   ],
                   temperature: 0.1
               })
           });
-          
           if (translateRes.ok) {
               const tData = await translateRes.json();
               englishPrompt = tData.choices[0].message.content.trim();
-          } else {
-              console.warn("Błąd podczas próby tłumaczenia, używam oryginału.");
           }
-      } catch (e) {
-          console.warn("Wyjątek podczas tłumaczenia:", e);
-      }
-      // --------------------------------------------------------------------------------------------
+      } catch (e) { console.warn("Błąd tłumaczenia", e); }
 
-      // 2. WYSŁANIE DO PRAWDZIWEGO STABILITY AI (SDXL) Z PRZETŁUMACZONYM POLECENIEM
-      const response = await fetch('https://api.stability.ai/v1/generation/stable-diffusion-xl-1024-v1-0/text-to-image', {
-        method: 'POST',
-        headers: { 
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'Authorization': `Bearer ${stabilityKey}` 
-        },
-        body: JSON.stringify({
+      // NOWOŚĆ: Budujemy paczkę dla Stability. 
+      // Jeśli aplikacja prosi o "style_preset" (np. 3d-model lub line-art), dodajemy go.
+      const stabilityBody = {
           text_prompts: [
             { text: englishPrompt, weight: 1 }, 
             { text: negativePrompt, weight: -1 } 
@@ -115,35 +74,36 @@ export default async function handler(req, res) {
           cfg_scale: 7,
           height: 1024,
           width: 1024,
-          steps: 15, // Zmniejszono do 15, aby zrekompensować czas potrzebny na tłumaczenie (limit Vercel 10s)
-          samples: 1,
-          style_preset: "line-art" 
-        })
+          steps: 20, 
+          samples: 1
+      };
+      
+      // Magiczny włącznik trybów (Kolorowanka vs Plakat)
+      if (payload.style_preset) {
+          stabilityBody.style_preset = payload.style_preset;
+      }
+
+      const response = await fetch('https://api.stability.ai/v1/generation/stable-diffusion-xl-1024-v1-0/text-to-image', {
+        method: 'POST',
+        headers: { 
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'Authorization': `Bearer ${stabilityKey}` 
+        },
+        body: JSON.stringify(stabilityBody)
       });
 
-      // 3. ODCZYTYWANIE ODPOWIEDZI I BŁĘDÓW
       const textResponse = await response.text();
-      let data;
-      try {
-          data = JSON.parse(textResponse);
-      } catch (e) {
-          throw new Error(`Nieoczekiwana odpowiedź API: ${textResponse.substring(0, 100)}`);
-      }
+      let data = JSON.parse(textResponse);
 
-      if (!response.ok) {
-          console.error("Szczegóły błędu Stability AI:", data);
-          throw new Error(data.message || `Błąd Stability AI (Kod: ${response.status}). Sprawdź logi Vercel.`);
-      }
+      if (!response.ok) throw new Error(data.message || `Błąd Stability AI.`);
 
-      const base64 = data.artifacts[0].base64;
-
-      // 4. ZWROT W FORMACIE, KTÓREGO OCZEKUJE TWOJA APLIKACJA
       return res.status(200).json({
-        predictions: [{ bytesBase64Encoded: base64 }]
+        predictions: [{ bytesBase64Encoded: data.artifacts[0].base64 }]
       });
     }
   } catch (error) {
-    console.error("Błąd Translacji API:", error);
+    console.error("Błąd API:", error);
     res.status(500).json({ error: error.message });
   }
 }
