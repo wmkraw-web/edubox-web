@@ -95,6 +95,7 @@
             
             // Zmienne PECS
             const [promptInput, setPromptInput] = useState('');
+            const [ageGroup, setAgeGroup] = useState('przedszkolaki'); // Grupa wiekowa
             const [cardSize, setCardSize] = useState('5'); // 5cm lub 4cm (do wydruku)
             const [generatedImage, setGeneratedImage] = useState(null);
             const [isGenerating, setIsGenerating] = useState(false);
@@ -168,10 +169,20 @@
                 setGeneratedImage(null);
 
                 try {
-                    // Instrukcja skrojona pod PECS (izolowany obiekt, grube linie, białe tło)
-                    const hiddenInstruction = `A single, isolated illustration for an autism PECS communication card. MAIN SUBJECT: ${promptInput}. Style: flat vibrant vector illustration, thick clear black outlines, pure white background, highly recognizable, no distracting details, single object focus, educational AAC symbol.`;
+                    // Precyzyjne sterowanie skomplikowaniem symbolu na podstawie grupy wiekowej
+                    let styleModifier = "";
+                    if (ageGroup === 'maluchy') {
+                        styleModifier = "ultra simple minimalist illustration, giant single object, extremely thick bold black outlines, high contrast flat vibrant colors, strictly no small details, purely white background, minimal cognitive load";
+                    } else if (ageGroup === 'przedszkolaki') {
+                        styleModifier = "simple cute flat vector illustration, clear thick black outlines, flat vibrant colors, pure white background, standard educational AAC symbol";
+                    } else if (ageGroup === 'szkolne') {
+                        styleModifier = "clear illustration, nice flat colors, clean black outlines, white background, educational visual aid, slightly more detailed";
+                    }
+
+                    // Główna instrukcja skrojona pod PECS (izolowany obiekt)
+                    const hiddenInstruction = `A single, isolated illustration for an autism PECS communication card. MAIN SUBJECT: ${promptInput}. Style: ${styleModifier}. Highly recognizable, no distracting details, single object focus.`;
                     
-                    const negativePrompt = "text, words, letters, background details, realistic, shadows, gradients, multiple subjects, complex scene, watermark, messy lines";
+                    const negativePrompt = "text, words, letters, background details, realistic, shadows, gradients, multiple subjects, complex scene, watermark, messy lines, grayscale, uncolored";
 
                     const payload = {
                         prompt: hiddenInstruction, 
@@ -440,14 +451,38 @@
 
                                 <div className="glass-panel p-6 sm:p-8 rounded-[2rem] fade-in border border-slate-700/50">
                                     
-                                    <label className="block text-white font-bold mb-3 text-sm">Przedmiot, czynność lub kategoria:</label>
+                                    <div className="mb-6">
+                                        <label className="block text-slate-300 font-bold mb-3 text-xs uppercase tracking-wider">Poziom detali (wiek dziecka):</label>
+                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                            <button 
+                                                onClick={() => setAgeGroup('maluchy')}
+                                                className={`p-2 rounded-xl border-2 font-bold text-xs transition-all flex flex-col items-center justify-center gap-1 ${ageGroup === 'maluchy' ? 'bg-amber-600/20 border-amber-500 text-amber-400' : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:border-slate-500'}`}
+                                            >
+                                                <span className="text-xl">🧸</span> Maluchy
+                                            </button>
+                                            <button 
+                                                onClick={() => setAgeGroup('przedszkolaki')}
+                                                className={`p-2 rounded-xl border-2 font-bold text-xs transition-all flex flex-col items-center justify-center gap-1 ${ageGroup === 'przedszkolaki' ? 'bg-orange-600/20 border-orange-500 text-orange-400' : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:border-slate-500'}`}
+                                            >
+                                                <span className="text-xl">🎨</span> Przedszkole
+                                            </button>
+                                            <button 
+                                                onClick={() => setAgeGroup('szkolne')}
+                                                className={`p-2 rounded-xl border-2 font-bold text-xs transition-all flex flex-col items-center justify-center gap-1 ${ageGroup === 'szkolne' ? 'bg-blue-600/20 border-blue-500 text-blue-400' : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:border-slate-500'}`}
+                                            >
+                                                <span className="text-xl">🎒</span> Szkolne
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <label className="block text-white font-bold mb-3 text-sm">Słowo, czynność, cyfra lub litera:</label>
                                     <div className="relative mb-6">
                                         <input 
                                             type="text" 
                                             value={promptInput}
                                             onChange={(e) => setPromptInput(e.target.value)}
                                             onKeyPress={(e) => { if(e.key === 'Enter') generatePecsCard(); }}
-                                            placeholder="Np. jabłko, toaleta, chcę, zmęczony..."
+                                            placeholder="Np. jabłko, toaleta, cyfra 5, litera A..."
                                             className="w-full bg-slate-900/80 border border-slate-600 text-white rounded-xl px-5 py-4 focus:ring-2 focus:ring-amber-500 outline-none pr-12"
                                         />
                                     </div>
@@ -459,7 +494,7 @@
                                             ${isGenerating ? 'bg-slate-700 cursor-not-allowed' : 'bg-gradient-to-r from-amber-500 to-orange-500 hover:scale-105'}`}
                                     >
                                         {isGenerating ? (
-                                            <><svg className="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Rysowanie symbolu...</>
+                                            <><svg className="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Tworzenie karty...</>
                                         ) : (!isAuthenticated && freeTries >= FREE_TRIES_LIMIT ? 'Odblokuj PRO' : 'Wygeneruj Obrazek')}
                                     </button>
 
