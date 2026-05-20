@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="pl" translate="no" class="notranslate">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="google" content="notranslate">
+    <title>EduPECS AI - Generator Kart Komunikacyjnych</title>
+    
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-3RQ9R0N0K8"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-3RQ9R0N0K8');
+    </script>
+    
+    <!-- Biblioteki -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        body { 
+            font-family: 'Plus Jakarta Sans', sans-serif; 
+            background-color: #020617; 
+            color: #f8fafc; 
+            scroll-behavior: smooth; 
+            overflow-x: hidden;
+            margin: 0;
+            padding: 0;
+        }
+        
+        /* Stylistyka EduPECS: Bursztynowy (Amber) i Pomarańczowy (Orange) */
+        .aura-blob {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(120px);
+            opacity: 0.35;
+            z-index: -1;
+            animation: float 15s infinite ease-in-out alternate;
+            pointer-events: none;
+        }
+        .aura-1 { top: -10%; left: -10%; width: 50vw; height: 600px; background: radial-gradient(circle, #f59e0b, transparent 70%); }
+        .aura-2 { top: 40%; right: -10%; width: 50vw; height: 600px; background: radial-gradient(circle, #f97316, transparent 70%); animation-delay: -5s; }
+
+        @keyframes float {
+            0% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(30px, -50px) scale(1.05); }
+            100% { transform: translate(-30px, 30px) scale(0.95); }
+        }
+
+        .glass-panel { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(24px); border: 1px solid rgba(255, 255, 255, 0.08); }
+        .glass-nav { background: rgba(2, 6, 23, 0.85); backdrop-filter: blur(24px); border-bottom: 1px solid rgba(255, 255, 255, 0.08); }
+        
+        .text-gradient { background: linear-gradient(135deg, #fbbf24 0%, #ea580c 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        
+        .btn-bounce:active { transform: scale(0.95); }
+        .fade-in { animation: fadeIn 0.4s ease-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        .magic-border { position: relative; }
+        .magic-border::before {
+            content: ''; position: absolute; inset: -4px;
+            background: linear-gradient(45deg, #f59e0b, #f97316, #f59e0b);
+            border-radius: inherit; z-index: -1;
+            animation: borderGlow 3s linear infinite; background-size: 200% 200%;
+        }
+        @keyframes borderGlow {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .pecs-item-enter { animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+        @keyframes popIn { from { opacity: 0; transform: scale(0.8); } to { opacity: 1; transform: scale(1); } }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        function App() {
+            const SECRET_PIN = "KAWA2024"; 
+            const BUY_COFFEE_LINK = "https://buycoffee.to/eduboxpro";
+            const FREE_TRIES_LIMIT = 0; 
+
+            const [isAuthenticated, setIsAuthenticated] = useState(false);
+            const [freeTries, setFreeTries] = useState(0);
+            const [showPaywall, setShowPaywall] = useState(false);
+            const [passwordInput, setPasswordInput] = useState('');
+            
+            // Zmienne PECS
+            const [promptInput, setPromptInput] = useState('');
+            const [cardSize, setCardSize] = useState('5'); // 5cm lub 4cm (do wydruku)
+            const [generatedImage, setGeneratedImage] = useState(null);
+            const [isGenerating, setIsGenerating] = useState(false);
+            const [error, setError] = useState('');
+            
+            // Baza zebranych kart
+            const [pecsCards, setPecsCards] = useState([]);
+            const resultRef = useRef(null);
+
+            useEffect(() => {
+                const savedAuth = localStorage.getItem('eduPecsAuth') === 'true';
+                if (savedAuth) setIsAuthenticated(true);
+                const savedTries = parseInt(localStorage.getItem('eduPecsFreeTries') || '0');
+                setFreeTries(savedTries);
+                
+                const savedCards = localStorage.getItem('eduPecsCards');
+                if (savedCards) {
+                    try { setPecsCards(JSON.parse(savedCards)); } catch(e) {}
+                }
+            }, []);
+
+            useEffect(() => {
+                localStorage.setItem('eduPecsCards', JSON.stringify(pecsCards));
+            }, [pecsCards]);
+
+            const secureApiCall = async (payload) => {
+                try {
+                    const res = await fetch('/api/gemini', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ payload, type: 'image' })
+                    });
+                    
+                    if (res.ok) return await res.json();
+                    
+                    if (res.status === 404 || res.status === 405) throw new Error("USE_FALLBACK");
+                    
+                    const errData = await res.json();
+                    throw new Error(errData.error || `Status API: ${res.status}`);
+                    
+                } catch (e) {
+                    if (e.message === "USE_FALLBACK" || e.message.includes("Failed to fetch") || e.message.includes("Unexpected token")) {
+                        const apiKey = ""; 
+                        const url = `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${apiKey}`;
+                        const previewPayload = {
+                            instances: { prompt: payload.instances.prompt },
+                            parameters: { sampleCount: 1 }
+                        };
+                        const fallbackRes = await fetch(url, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(previewPayload)
+                        });
+                        if (!fallbackRes.ok) throw new Error("Wgraj plik na Vercel (Tryb podglądu zablokowany).");
+                        return await fallbackRes.json();
+                    }
+                    throw e;
+                }
+            };
+
+            const generatePecsCard = async () => {
+                if (!isAuthenticated && freeTries >= FREE_TRIES_LIMIT) {
+                    setShowPaywall(true); return;
+                }
+                if (!promptInput.trim()) {
+                    setError('Wpisz, co ma przedstawiać karta!'); return;
+                }
+
+                setIsGenerating(true);
+                setError('');
+                setGeneratedImage(null);
+
+                try {
+                    // Instrukcja skrojona pod PECS (izolowany obiekt, grube linie, białe tło)
+                    const hiddenInstruction = `A single, isolated illustration for an autism PECS communication card. MAIN SUBJECT: ${promptInput}. Style: flat vibrant vector illustration, thick clear black outlines, pure white background, highly recognizable, no distracting details, single object focus, educational AAC symbol.`;
+                    
+                    const negativePrompt = "text, words, letters, background details, realistic, shadows, gradients, multiple subjects, complex scene, watermark, messy lines";
+
+                    const payload = {
+                        prompt: hiddenInstruction, 
+                        negative_prompt: negativePrompt, 
+                        style_preset: "digital-art",
+                        width: 1024,
+                        height: 1024,
+                        instances: { prompt: hiddenInstruction }, 
+                        parameters: { sampleCount: 1 }
+                    };
+
+                    const data = await secureApiCall(payload);
+                    const base64Image = data.predictions?.[0]?.bytesBase64Encoded || data.artifacts?.[0]?.base64 || data.image; 
+                    
+                    if (base64Image) {
+                        const finalImage = base64Image.startsWith('data:image') ? base64Image : `data:image/png;base64,${base64Image}`;
+                        setGeneratedImage(finalImage);
+                        
+                        if (!isAuthenticated) {
+                            const newTries = freeTries + 1;
+                            setFreeTries(newTries);
+                            localStorage.setItem('eduPecsFreeTries', newTries.toString());
+                        }
+                        setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
+                    } else {
+                        throw new Error("Pusta odpowiedź API.");
+                    }
+                } catch (err) {
+                    console.error(err);
+                    setError(err.message || 'Wystąpił problem z generowaniem obrazu.');
+                } finally {
+                    setIsGenerating(false);
+                }
+            };
+
+            const addCard = () => {
+                if (generatedImage) {
+                    const newItem = {
+                        id: Date.now(),
+                        img: generatedImage,
+                        label: promptInput.substring(0, 15).toUpperCase() // Krótki podpis dla PECS
+                    };
+                    setPecsCards([...pecsCards, newItem]);
+                    setGeneratedImage(null);
+                    setPromptInput('');
+                }
+            };
+
+            const removeCard = (id) => {
+                setPecsCards(pecsCards.filter(item => item.id !== id));
+            };
+
+            const updateLabel = (id, newLabel) => {
+                setPecsCards(pecsCards.map(item => item.id === id ? { ...item, label: newLabel } : item));
+            };
+
+            const clearCards = () => {
+                if(confirm("Czy na pewno chcesz usunąć wszystkie zebrane karty z tablicy?")) {
+                    setPecsCards([]);
+                }
+            };
+
+            const handleLogin = () => {
+                if (passwordInput === SECRET_PIN) {
+                    setIsAuthenticated(true);
+                    setShowPaywall(false);
+                    localStorage.setItem('eduPecsAuth', 'true');
+                } else {
+                    alert('Nieprawidłowy kod PIN!');
+                }
+            };
+
+            // Dedykowany wydruk PECS - gęsta siatka idealna do wycinania i segregacji
+            const handlePrintPecs = () => {
+                if (pecsCards.length === 0) return;
+                
+                // Ustalanie rozmiaru z suwaka
+                const sizeCm = cardSize; 
+                
+                const itemsHtml = pecsCards.map(item => `
+                    <div class="pecs-card">
+                        <div class="img-container">
+                            <img src="${item.img}" />
+                        </div>
+                        <div class="label">${item.label}</div>
+                    </div>
+                `).join('');
+
+                const windowContent = `
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <title>Karty PECS - EduPECS AI</title>
+                        <style>
+                            @page { margin: 1cm; size: A4 portrait; }
+                            body { font-family: 'Arial', sans-serif; margin: 0; padding: 0; background: white; }
+                            
+                            .print-header { text-align: center; margin-bottom: 20px; }
+                            .print-header h1 { font-size: 20px; text-transform: uppercase; margin: 0; padding: 0; }
+                            .print-header p { font-size: 12px; color: #666; margin: 5px 0 0 0; }
+                            
+                            /* Siatka kart PECS */
+                            .pecs-grid { 
+                                display: grid; 
+                                /* Dopasowuje ilość kolumn na podstawie wybranego rozmiaru kartki */
+                                grid-template-columns: repeat(auto-fill, ${sizeCm}cm); 
+                                gap: 0.5cm; /* Odstęp na nożyczki */
+                                justify-content: center; 
+                            }
+                            
+                            .pecs-card { 
+                                width: ${sizeCm}cm;
+                                height: ${sizeCm}cm;
+                                border: 2px solid #000; 
+                                box-sizing: border-box;
+                                display: flex; 
+                                flex-direction: column; 
+                                background-color: white;
+                                page-break-inside: avoid;
+                            }
+                            
+                            .img-container {
+                                flex-grow: 1;
+                                display: flex;
+                                align-items: center;
+                                justify-content: center;
+                                padding: 2px;
+                                height: calc(100% - 15px); /* Zostawia miejsce na podpis */
+                            }
+                            
+                            img { 
+                                max-width: 100%; 
+                                max-height: 100%; 
+                                object-fit: contain; 
+                            }
+                            
+                            .label { 
+                                height: 15px; /* Sztywna wysokość podpisu */
+                                display: flex;
+                                align-items: center;
+                                justify-content: center;
+                                border-top: 2px solid #000;
+                                font-weight: 900; 
+                                font-size: ${sizeCm == '4' ? '9px' : '11px'}; 
+                                text-transform: uppercase; 
+                                letter-spacing: 0.5px;
+                                overflow: hidden;
+                                white-space: nowrap;
+                            }
+                        </style>
+                    </head>
+                    <body>
+                        <div class="print-header">
+                            <h1>Materiały PECS</h1>
+                            <p>Wydrukuj, zalaminuj i wytnij. Pamiętaj o rzepach.</p>
+                        </div>
+                        <div class="pecs-grid">
+                            ${itemsHtml}
+                        </div>
+                    </body>
+                    </html>
+                `;
+                const printWin = window.open('', '', 'width=800,height=800');
+                printWin.document.open();
+                printWin.document.write(windowContent);
+                printWin.document.close();
+                
+                setTimeout(() => {
+                    printWin.focus();
+                    printWin.print();
+                    printWin.close();
+                }, 500);
+            };
+
+            if (showPaywall) {
+                return (
+                    <div className="min-h-screen relative flex items-center justify-center p-4">
+                        <div className="aura-blob aura-1"></div>
+                        <div className="aura-blob aura-2"></div>
+                        
+                        <div className="glass-panel p-10 rounded-3xl max-w-md w-full text-center shadow-[0_0_50px_rgba(245,158,11,0.2)] border border-amber-500/30 fade-in relative z-10">
+                            <div className="w-24 h-24 bg-gradient-to-br from-amber-500 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
+                                <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                            </div>
+                            <h2 className="text-3xl font-black text-white mb-2">Dostęp PRO</h2>
+                            <p className="text-slate-300 text-sm mb-8 font-medium">Systemy wspierające komunikację specjalną (AAC/PECS) wymagają pełnego dostępu. Postaw wirtualną kawę, aby otrzymać kod PIN!</p>
+                            
+                            <input 
+                                type="password" value={passwordInput} onChange={(e) => setPasswordInput(e.target.value)}
+                                onKeyPress={(e) => { if (e.key === 'Enter') handleLogin(); }}
+                                placeholder="Wpisz PIN..."
+                                className="w-full bg-slate-900 border border-slate-600 text-center text-white rounded-xl px-5 py-4 focus:ring-2 focus:ring-amber-500 outline-none mb-6 text-2xl tracking-[0.5em] font-bold uppercase"
+                            />
+                            
+                            <button 
+                                onClick={handleLogin}
+                                className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white font-black py-4 rounded-xl transition-all transform hover:scale-105 btn-bounce text-lg shadow-lg mb-4"
+                            >
+                                Odblokuj System
+                            </button>
+                            <button onClick={() => setShowPaywall(false)} className="text-slate-400 hover:text-white text-sm font-bold mb-8">
+                                Wróć do strony głównej
+                            </button>
+                            <div className="pt-6 border-t border-slate-700/50">
+                                <a href={BUY_COFFEE_LINK} target="_blank" rel="noopener noreferrer" className="w-full bg-slate-800/80 hover:bg-slate-700 border border-slate-600 text-white font-bold py-3.5 rounded-xl transition-all flex items-center justify-center gap-3 text-sm btn-bounce hover:border-orange-500/50 hover:text-orange-400 shadow-md">
+                                    <span className="text-xl">☕</span> Postaw Kawę i odbierz PIN
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="min-h-screen relative flex flex-col">
+                    <div className="aura-blob aura-1"></div>
+                    <div className="aura-blob aura-2"></div>
+
+                    <nav className="fixed top-0 w-full z-50 glass-nav">
+                        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-20 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 bg-gradient-to-br from-amber-500 to-orange-500 rounded-xl flex items-center justify-center shadow-lg">
+                                    <span className="text-white text-xl">🗣️</span>
+                                </div>
+                                <span className="text-xl font-extrabold tracking-tight text-white hidden sm:block">EduPECS<span className="text-amber-400">AI</span></span>
+                            </div>
+                            <div className="flex items-center gap-4">
+                                {!isAuthenticated ? (
+                                    <a href={BUY_COFFEE_LINK} target="_blank" rel="noopener noreferrer" className="bg-gradient-to-r from-amber-600 to-orange-500 hover:scale-105 transition-all px-4 py-1.5 rounded-full text-xs font-bold text-white flex items-center gap-2 shadow-lg btn-bounce">
+                                        <span>☕</span> Postaw Kawę
+                                    </a>
+                                ) : (
+                                    <div className="flex items-center gap-3">
+                                        <div className="bg-amber-500/20 border border-amber-500/50 px-3 py-1.5 rounded-full text-xs font-bold text-amber-400 flex items-center gap-2">
+                                            <span className="w-2 h-2 rounded-full bg-amber-400"></span>
+                                            Konto PRO
+                                        </div>
+                                        <button onClick={() => { setIsAuthenticated(false); localStorage.removeItem('eduPecsAuth'); }} className="text-xs text-slate-400 hover:text-white transition-colors underline">
+                                            Wyloguj
+                                        </button>
+                                    </div>
+                                )}
+                                <a href="index.html" className="flex items-center gap-2 text-xs sm:text-sm font-bold text-slate-300 hover:text-white transition-colors bg-slate-800 hover:bg-slate-700 px-4 py-2.5 rounded-xl border border-slate-600">
+                                    Wróć
+                                </a>
+                            </div>
+                        </div>
+                    </nav>
+
+                    <main className="flex-grow pt-32 pb-32 px-4 sm:px-6">
+                        <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8">
+                            
+                            {/* LEWA KOLUMNA: GENERATOR */}
+                            <div className="lg:col-span-5 space-y-6">
+                                <div className="text-left mb-8 fade-in">
+                                    <div className="inline-flex items-center gap-2 bg-amber-900/30 border border-amber-500/30 px-4 py-1.5 rounded-full text-[10px] font-black text-amber-400 uppercase tracking-widest mb-4">
+                                        Autyzm / Terapia AAC
+                                    </div>
+                                    <h1 className="text-3xl sm:text-4xl font-black text-white mb-3 tracking-tight">
+                                        Generator <br/><span className="text-gradient">Kart PECS.</span>
+                                    </h1>
+                                    <p className="text-slate-400 text-sm">
+                                        Twórz izolowane, czytelne grafiki do ksiąg komunikacyjnych. System sam ułoży je w siatkę do wycięcia!
+                                    </p>
+                                </div>
+
+                                <div className="glass-panel p-6 sm:p-8 rounded-[2rem] fade-in border border-slate-700/50">
+                                    
+                                    <label className="block text-white font-bold mb-3 text-sm">Przedmiot, czynność lub kategoria:</label>
+                                    <div className="relative mb-6">
+                                        <input 
+                                            type="text" 
+                                            value={promptInput}
+                                            onChange={(e) => setPromptInput(e.target.value)}
+                                            onKeyPress={(e) => { if(e.key === 'Enter') generatePecsCard(); }}
+                                            placeholder="Np. jabłko, toaleta, chcę, zmęczony..."
+                                            className="w-full bg-slate-900/80 border border-slate-600 text-white rounded-xl px-5 py-4 focus:ring-2 focus:ring-amber-500 outline-none pr-12"
+                                        />
+                                    </div>
+
+                                    <button 
+                                        onClick={generatePecsCard}
+                                        disabled={isGenerating || !promptInput}
+                                        className={`w-full py-4 rounded-xl font-black text-white text-lg transition-all flex items-center justify-center gap-3 shadow-[0_0_20px_rgba(245,158,11,0.2)] btn-bounce
+                                            ${isGenerating ? 'bg-slate-700 cursor-not-allowed' : 'bg-gradient-to-r from-amber-500 to-orange-500 hover:scale-105'}`}
+                                    >
+                                        {isGenerating ? (
+                                            <><svg className="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Rysowanie symbolu...</>
+                                        ) : (!isAuthenticated && freeTries >= FREE_TRIES_LIMIT ? 'Odblokuj PRO' : 'Wygeneruj Obrazek')}
+                                    </button>
+
+                                    {error && <div className="mt-4 p-3 bg-red-900/30 border border-red-500/50 rounded-lg text-red-400 text-xs font-medium text-center">{error}</div>}
+                                </div>
+                                
+                                {/* WYNIK GENEROWANIA */}
+                                {generatedImage && (
+                                    <div ref={resultRef} className="glass-panel p-6 rounded-[2rem] fade-in border border-amber-500/30 text-center relative overflow-hidden">
+                                        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-amber-400 to-orange-500"></div>
+                                        <h3 className="text-sm font-bold text-white mb-4">Twój Symbol</h3>
+                                        <div className="bg-white p-2 rounded-xl mx-auto w-40 h-40 flex items-center justify-center mb-6 border-2 border-slate-300">
+                                            <img src={generatedImage} alt="PECS Card" className="max-w-full max-h-full object-contain mix-blend-multiply" />
+                                        </div>
+                                        <button 
+                                            onClick={addCard} 
+                                            className="w-full bg-amber-600 hover:bg-amber-500 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all btn-bounce shadow-lg"
+                                        >
+                                            ➕ Przypnij na Tablicę
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* PRAWA KOLUMNA: TABLICA KART PECS */}
+                            <div className="lg:col-span-7 glass-panel rounded-[2.5rem] p-6 sm:p-8 border border-slate-700/50 flex flex-col h-full min-h-[600px]">
+                                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 pb-4 border-b border-slate-700/50 gap-4">
+                                    <h2 className="text-2xl font-black text-white flex items-center gap-2">
+                                        📂 Zebrane Karty
+                                        <span className="bg-amber-500 text-white text-xs px-2 py-1 rounded-full">{pecsCards.length}</span>
+                                    </h2>
+                                    {pecsCards.length > 0 && (
+                                        <div className="flex flex-wrap items-center gap-3">
+                                            <div className="flex items-center gap-2 bg-slate-800/80 px-3 py-1.5 rounded-lg border border-slate-600">
+                                                <span className="text-xs text-slate-400 font-bold uppercase">Rozmiar:</span>
+                                                <select value={cardSize} onChange={e => setCardSize(e.target.value)} className="bg-transparent text-white text-sm font-bold outline-none cursor-pointer">
+                                                    <option value="4">Małe (4x4 cm)</option>
+                                                    <option value="5">Duże (5x5 cm)</option>
+                                                </select>
+                                            </div>
+                                            <button onClick={clearCards} className="text-slate-400 hover:text-red-400 text-sm font-bold px-2 py-2 rounded-lg hover:bg-slate-800 transition-colors">
+                                                Wyczyść
+                                            </button>
+                                            <button onClick={handlePrintPecs} className="bg-white text-amber-900 hover:bg-amber-50 px-4 py-2 rounded-xl font-black flex items-center gap-2 transition-all shadow-lg btn-bounce">
+                                                🖨️ Drukuj Karty
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {pecsCards.length === 0 ? (
+                                    <div className="flex-grow flex flex-col items-center justify-center text-center opacity-50">
+                                        <span className="text-6xl mb-4">🗂️</span>
+                                        <p className="text-slate-300 font-bold text-lg">Tablica z kartami jest pusta.</p>
+                                        <p className="text-slate-400 text-sm max-w-xs mt-2">Wygeneruj potrzebne przedmioty i emocje po lewej stronie, aby zebrać materiał do druku.</p>
+                                    </div>
+                                ) : (
+                                    <div className="flex flex-wrap gap-4 auto-rows-max overflow-y-auto pr-2 pb-10 content-start" style={{ maxHeight: "calc(100vh - 250px)" }}>
+                                        {pecsCards.map((item) => (
+                                            <div key={item.id} className="bg-white rounded-xl border-2 border-slate-300 w-28 h-28 flex flex-col relative group pecs-item-enter overflow-hidden shadow-md">
+                                                <button 
+                                                    onClick={() => removeCard(item.id)}
+                                                    className="absolute -top-1 -right-1 bg-red-500 hover:bg-red-600 text-white w-6 h-6 rounded-full flex items-center justify-center shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-10 btn-bounce text-xs font-bold"
+                                                    title="Usuń"
+                                                >
+                                                    ✖
+                                                </button>
+                                                <div className="flex-grow flex items-center justify-center p-1">
+                                                    <img src={item.img} className="max-w-full max-h-full object-contain mix-blend-multiply" alt="PECS" />
+                                                </div>
+                                                <div className="border-t-2 border-slate-300 h-6">
+                                                    <input 
+                                                        type="text" 
+                                                        value={item.label} 
+                                                        onChange={(e) => updateLabel(item.id, e.target.value)}
+                                                        className="w-full h-full bg-white text-slate-900 text-center text-[9px] font-black outline-none uppercase px-1"
+                                                    />
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                        </div>
+                    </main>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
