@@ -195,63 +195,29 @@
                         return; 
                     }
 
-                    // --- 2. INTELIGENTNY DETEKTOR FIGUR GEOMETRYCZNYCH (BIAŁE WNĘTRZE) ---
-                    const shapeMatch = cleanPrompt.match(/^(kwadrat|prostokąt|koło|kółko|trójkąt|gwiazda|gwiazdka|serce|serduszko|owal|romb)$/i) || cleanPrompt.match(/(?:figura|kształt)\s+(kwadrat|prostokąt|koło|kółko|trójkąt|gwiazda|gwiazdka|serce|serduszko|owal|romb)/i);
-                    if (shapeMatch) {
-                        const shape = (shapeMatch[1] || shapeMatch[2]).toLowerCase();
-                        const canvas = document.createElement('canvas');
-                        canvas.width = 1024; canvas.height = 1024;
-                        const ctx = canvas.getContext('2d');
-                        
-                        ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, 1024, 1024);
-                        ctx.lineWidth = 35; ctx.strokeStyle = '#000000'; // Gruba czarna obwódka
-                        ctx.fillStyle = '#ffffff'; // Czyste białe wnętrze figury
-                        ctx.lineJoin = 'round'; ctx.lineCap = 'round';
-                        ctx.beginPath();
-                        const cx = 512, cy = 512;
-
-                        if (shape === 'kwadrat') { ctx.rect(212, 212, 600, 600); } 
-                        else if (shape === 'prostokąt') { ctx.rect(162, 312, 700, 400); } 
-                        else if (shape.includes('koł')) { ctx.arc(cx, cy, 350, 0, Math.PI * 2); } 
-                        else if (shape === 'trójkąt') { ctx.moveTo(cx, 200); ctx.lineTo(850, 850); ctx.lineTo(174, 850); ctx.closePath(); } 
-                        else if (shape.includes('gwiazd')) {
-                            for (let i = 0; i < 5; i++) {
-                                ctx.lineTo(Math.cos((18 + i * 72) / 180 * Math.PI) * 350 + cx, -Math.sin((18 + i * 72) / 180 * Math.PI) * 350 + cy);
-                                ctx.lineTo(Math.cos((54 + i * 72) / 180 * Math.PI) * 150 + cx, -Math.sin((54 + i * 72) / 180 * Math.PI) * 150 + cy);
-                            }
-                            ctx.closePath();
-                        } 
-                        else if (shape.includes('serc')) {
-                            ctx.moveTo(cx, 300); ctx.bezierCurveTo(cx, 250, cx - 50, 150, cx - 200, 150); ctx.bezierCurveTo(cx - 400, 150, cx - 400, 400, cx - 400, 400); ctx.bezierCurveTo(cx - 400, 600, cx - 150, 750, cx, 850); ctx.bezierCurveTo(cx + 150, 750, cx + 400, 600, cx + 400, 400); ctx.bezierCurveTo(cx + 400, 400, cx + 400, 150, cx + 200, 150); ctx.bezierCurveTo(cx + 50, 150, cx, 250, cx, 300);
-                        } 
-                        else if (shape === 'owal') { ctx.ellipse(cx, cy, 400, 250, 0, 0, Math.PI * 2); } 
-                        else if (shape === 'romb') { ctx.moveTo(cx, 150); ctx.lineTo(850, cy); ctx.lineTo(cx, 850); ctx.lineTo(150, cy); ctx.closePath(); }
-
-                        ctx.fill(); ctx.stroke();
-                        setGeneratedImage(canvas.toDataURL('image/png'));
-                        setIsGenerating(false);
-                        setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
-                        return; 
-                    }
-
-                    // --- 3. GENEROWANIE PRZEZ AI ---
+                    // --- 3. GENEROWANIE PRZEZ AI (ZAAWANSOWANE STYLE) ---
                     let styleModifier = "";
+                    let apiStylePreset = "digital-art"; // Zmienna sterująca głównym silnikiem
+
                     if (ageGroup === 'maluchy') {
-                        styleModifier = "ultra simple minimalist illustration, giant single object, extremely thick bold black outlines, high contrast flat vibrant colors, strictly no small details, purely white background, minimal cognitive load";
+                        styleModifier = "Ultra minimalist flat 2D vector clipart, extremely thick bold black outlines, primary flat colors only, zero background details, simple shapes, baby flashcard style. NO shading, NO gradients, NO 3D.";
+                        apiStylePreset = "comic-book"; // Wymusza płaski, gruby komiksowy kontur
                     } else if (ageGroup === 'przedszkolaki') {
-                        styleModifier = "simple cute flat vector illustration, clear thick black outlines, flat vibrant colors, pure white background, standard educational AAC symbol";
+                        styleModifier = "Cute colorful children's book illustration, friendly and engaging, flat vector art, vibrant colors, clear outlines, simple educational symbol.";
+                        apiStylePreset = "digital-art"; // Domyślny, ładny, przyjazny wektor
                     } else if (ageGroup === 'szkolne') {
-                        styleModifier = "clear illustration, nice flat colors, clean black outlines, white background, educational visual aid, slightly more detailed";
+                        styleModifier = "Highly detailed and realistic educational illustration, mature textbook style, accurate proportions, highly precise, professional artwork.";
+                        apiStylePreset = "enhance"; // Realizm i wysoka szczegółowość
                     }
 
                     const hiddenInstruction = `An isolated icon on a pure white background for an autism communication card. EXACT SUBJECT: ${promptInput}. (CRITICAL: If the subject is an action or verb like "eat", "play", "run", you MUST draw a simple, cute generic character performing this exact action). Strictly NO background scenery, NO extra characters. Style: ${styleModifier}. Highly recognizable, single object or single character focus.`;
                     
-                    const negativePrompt = "realistic, shadows, gradients, multiple subjects, complex scene, background scenery, watermark, messy lines, grayscale, text, words, letters, random text";
+                    const negativePrompt = "multiple subjects, complex scene, background scenery, watermark, messy lines, text, words, letters, random text";
 
                     const payload = {
                         prompt: hiddenInstruction, 
                         negative_prompt: negativePrompt, 
-                        style_preset: "digital-art",
+                        style_preset: apiStylePreset,
                         width: 1024,
                         height: 1024,
                         instances: { prompt: hiddenInstruction }, 
