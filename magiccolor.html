@@ -180,35 +180,33 @@
                 setGeneratedImage(null);
 
                 try {
-                    // KROK 1: Jeszcze twardsze modyfikatory stylów
+                    // KROK 1: Nowe, wektorowe i "płaskie" modyfikatory (brak szkiców!)
                     let styleModifier = "";
                     if (styleOption === 'przedszkole') {
-                        styleModifier = "very thick black outlines, bold minimalist shapes, toddler style, lots of empty white space inside";
+                        styleModifier = "extremely simple toddler coloring page, thick bold black vector lines, large empty white spaces";
                     } else if (styleOption === 'szkola') {
-                        styleModifier = "clear black outlines, empty white space inside, standard children's line art style";
+                        styleModifier = "standard kids coloring book page, clean bold black outlines, uncolored, 2D flat vector style";
                     } else if (styleOption === 'mandala') {
-                        styleModifier = "complex intricate black line art, highly detailed geometric patterns, uncolored adult relaxation style";
+                        styleModifier = "detailed mandala coloring page, crisp black outlines, uncolored, geometric";
                     }
 
-                    // KROK 2: Całkowicie omijamy słowo "coloring page" i zmuszamy do "Line art drawing"
-                    const hiddenInstruction = `Black and white line art drawing of ${promptInput}. ${styleModifier}. Strictly uncolored, pure white background, pure black outlines ONLY. No colors, no grayscale, no shading, no text, no labels.`;
+                    // KROK 2: Wymuszamy płaską (flat 2d) grafikę, a nie rysunek ołówkiem
+                    const hiddenInstruction = `Monochrome coloring book page of ${promptInput}. ${styleModifier}. Strictly black outlines on pure white background. Flat 2D vector art. No shading, no grayscale, no halftones, no colors.`;
                     
-                    // KROK 3: Pancerne instrukcje NEGATYWNE dla Stability AI (czego ma NIE RYSOWAĆ)
-                    const negativePrompt = "color, colors, shading, shadows, grayscale, gradients, filled areas, text, words, labels, watermark, realistic, 3d, painted, colored covers";
+                    // KROK 3: Zakazujemy ołówka, cieniowania i realizmu
+                    const negativePrompt = "shading, gradients, grayscale, sketch, pencil, realistic, 3d, colors, shadows, halftone, text, watermark, painted, complex background";
 
-                    // KROK 4: Pakujemy wszystko z uwzględnieniem negative_prompt
                     const payload = {
                         prompt: hiddenInstruction, 
-                        negative_prompt: negativePrompt, // Przekazujemy ten klucz na serwer!
-                        instances: { prompt: hiddenInstruction }, // Fallback dla środowiska testowego
+                        negative_prompt: negativePrompt, 
+                        instances: { prompt: hiddenInstruction }, 
                         parameters: { sampleCount: 1 }
                     };
 
                     const data = await secureApiCall(payload);
-                    const base64Image = data.predictions?.[0]?.bytesBase64Encoded || data.artifacts?.[0]?.base64 || data.image; // Uwzględniamy różne odpowiedzi serwera
+                    const base64Image = data.predictions?.[0]?.bytesBase64Encoded || data.artifacts?.[0]?.base64 || data.image; 
                     
                     if (base64Image) {
-                        // Sprawdzamy czy API nie zwróciło przypadkiem już prefiksu data:image (niektóre API to robią)
                         const finalImage = base64Image.startsWith('data:image') ? base64Image : `data:image/png;base64,${base64Image}`;
                         setGeneratedImage(finalImage);
                         
@@ -240,6 +238,9 @@
                 }
             };
 
+            // =========================================================================
+            // OBSŁUGA PŁÓTNA - Z MATEMATYCZNYM "WYBIELACZEM PIKSELI"
+            // =========================================================================
             useEffect(() => {
                 if (generatedImage && canvasRef.current) {
                     const canvas = canvasRef.current;
@@ -249,21 +250,43 @@
                         canvas.width = img.width;
                         canvas.height = img.height;
                         
+                        // Krok 1: Wylewamy czystą biel na tło
                         ctx.fillStyle = "#ffffff";
                         ctx.fillRect(0, 0, canvas.width, canvas.height);
                         
-                        // --- NOWOŚĆ: CYFROWY WYBIELACZ TŁA ---
-                        // Wymuszamy na płótnie ekstremalny kontrast. Cała szarość od AI stanie się 
-                        // absolutnie biała, a czarne kontury rysunku pozostaną nienaruszone.
-                        ctx.filter = 'grayscale(100%) contrast(300%) brightness(130%)';
-                        
+                        // Krok 2: Rysujemy pobrany obrazek
                         ctx.drawImage(img, 0, 0);
                         
-                        // Od razu wyłączamy filtr, aby mazaki (kolory) używane potem przez dzieci 
-                        // wyświetlały się normalnie, a nie na czarno-biało!
-                        ctx.filter = 'none';
-                        // --------------------------------------
+                        // Krok 3: PANCERNY WYBIELACZ PIKSELI
+                        // Pobieramy dane o każdym pojedynczym pikselu na obrazku
+                        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                        const data = imageData.data;
                         
+                        for (let i = 0; i < data.length; i += 4) {
+                            const r = data[i];
+                            const g = data[i + 1];
+                            const b = data[i + 2];
+                            
+                            // Obliczamy jasność (luminancję) piksela
+                            const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
+                            
+                            // Jeśli piksel jest szary (jasność powyżej 150) - robimy z niego absolutną śnieżną biel.
+                            // To kompletnie niszczy wszelkie "ołówkowe" cieniowanie wewnątrz psa!
+                            if (luminance > 150) { 
+                                data[i] = 255;     // Czerwony = max
+                                data[i + 1] = 255; // Zielony = max
+                                data[i + 2] = 255; // Niebieski = max
+                            } else {
+                                // W przeciwnym razie (czarne kontury) upewniamy się, że są w 100% czarne
+                                data[i] = 0;
+                                data[i + 1] = 0;
+                                data[i + 2] = 0;
+                            }
+                        }
+                        // Zapisujemy idealnie czystą, binarną kolorowankę z powrotem na płótno
+                        ctx.putImageData(imageData, 0, 0);
+                        
+                        // Przygotowujemy mazaki do malowania przez dzieci
                         ctx.globalCompositeOperation = 'multiply';
                         ctx.lineCap = "round";
                         ctx.lineJoin = "round";
@@ -354,8 +377,6 @@
                                     max-width: 100%; 
                                     max-height: 100%; 
                                     object-fit: contain; 
-                                    /* Magiczny filtr: wybiela szare tło z AI, nie psując kolorów i czarnych linii */
-                                    filter: contrast(130%) brightness(105%); 
                                 }
                             </style>
                         </head>
