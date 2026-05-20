@@ -18,10 +18,12 @@ export default async function handler(req, res) {
     // ==============================================================
     if (prompt) {
       if (!geminiKey) {
-        return res.status(500).json({ error: 'Brak klucza GEMINI_API_KEY na serwerze' });
+        // Trik: Zwracamy błąd jako WYGENEROWANY TEKST, żebyś widział go na ekranie!
+        return res.status(200).json({
+            candidates: [{ content: { parts: [{ text: "🚨 BŁĄD VERCEL: Serwer nie widzi klucza GEMINI_API_KEY. Prawdopodobnie zapomniałeś wejść w Deployments i kliknąć 'Redeploy' po dodaniu klucza!" }] } }]
+        });
       }
       
-      // POPRAWKA: Używamy stabilnego, publicznego modelu (gemini-1.5-flash)
       const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`;
       
       const response = await fetch(url, {
@@ -32,10 +34,12 @@ export default async function handler(req, res) {
 
       const data = await response.json();
 
-      // POPRAWKA: Jeśli Google zwróci błąd (np. zły klucz), przekazujemy go dalej
       if (!response.ok) {
           console.error("Błąd od Google:", data);
-          return res.status(500).json({ error: data.error?.message || 'Błąd API Google' });
+          // Zwracamy prawdziwy błąd Google prosto na Twój ekran
+          return res.status(200).json({
+              candidates: [{ content: { parts: [{ text: `🚨 BŁĄD GOOGLE API: ${data.error?.message || 'Nieznany błąd'}. Sprawdź swój klucz API!` }] } }]
+          });
       }
 
       return res.status(200).json(data);
@@ -141,11 +145,16 @@ export default async function handler(req, res) {
     
     // Zabezpieczenie na wypadek nierozpoznanego zapytania
     else {
-        return res.status(400).json({ error: 'Nieznany typ zapytania' });
+        return res.status(200).json({
+            candidates: [{ content: { parts: [{ text: "🚨 BŁĄD VERCEL: Nie podano parametru 'prompt' w zapytaniu." }] } }]
+        });
     }
     
   } catch (error) {
     console.error("Błąd API:", error);
-    res.status(500).json({ error: error.message });
+    // Przekazanie błędu serwera prosto na ekran
+    return res.status(200).json({
+        candidates: [{ content: { parts: [{ text: `🚨 KRYTYCZNY BŁĄD SERWERA: ${error.message}` }] } }]
+    });
   }
 }
