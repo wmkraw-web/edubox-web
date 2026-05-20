@@ -2,7 +2,7 @@
 <html lang="pl" translate="no" class="notranslate">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="google" content="notranslate">
     <title>Magic Color AI - Generator Kolorowanek</title>
     <!-- Biblioteki -->
@@ -20,6 +20,8 @@
             overflow-x: hidden;
             margin: 0;
             padding: 0;
+            /* Zapobiega przypadkowemu przewijaniu strony podczas rysowania po ekranie na telefonach */
+            overscroll-behavior-y: contain; 
         }
         
         .aura-blob {
@@ -69,6 +71,12 @@
             100% { background-position: 0% 50%; }
         }
 
+        /* Ustawienia dla wirtualnego płótna */
+        canvas {
+            touch-action: none; 
+            cursor: crosshair;
+        }
+
         /* PERFEKCYJNY WYDRUK KOLOROWANKI */
         @media print {
             body { background-color: white !important; color: black !important; }
@@ -94,12 +102,13 @@
 
         function App() {
             // =========================================================================
-            // Kod PIN dla aplikacji
+            // Kod PIN dla aplikacji (Zostawiłem bez zmian)
             const SECRET_PIN = "KAWA2024"; 
             const BUY_COFFEE_LINK = "https://buycoffee.to/magiccolor";
             const FREE_TRIES_LIMIT = 3;
             // =========================================================================
 
+            // ZMIENNE STANU (Twoje + narzędzia do rysowania)
             const [isAuthenticated, setIsAuthenticated] = useState(false);
             const [freeTries, setFreeTries] = useState(0);
             const [showPaywall, setShowPaywall] = useState(false);
@@ -111,8 +120,20 @@
             const [isGenerating, setIsGenerating] = useState(false);
             const [error, setError] = useState('');
 
+            // Zmienne do kolorowania
+            const [selectedColor, setSelectedColor] = useState("#f43f5e"); // Domyślny kolor pasujący do motywu
+            const [brushSize, setBrushSize] = useState(10); 
+            const canvasRef = useRef(null);
+            const [isDrawing, setIsDrawing] = useState(false); 
+            const ctxRef = useRef(null);
             const resultRef = useRef(null);
 
+            // Paleta kolorów
+            const colors = ["#f43f5e", "#fbbf24", "#10b981", "#3b82f6", "#8b5cf6", "#ec4899", "#000000", "#ffffff"];
+
+            // -------------------------------------------------------------
+            // TWOJE FUNKCJE DO ŁADOWANIA DANYCH I API (Zostawiłem bez zmian)
+            // -------------------------------------------------------------
             useEffect(() => {
                 const savedAuth = localStorage.getItem('magicColorAuth') === 'true';
                 if (savedAuth) setIsAuthenticated(true);
@@ -172,7 +193,6 @@
                 setGeneratedImage(null);
 
                 try {
-                    // Precyzyjne zdefiniowanie grubości kresek dla poszczególnych stylów
                     let styleModifier = "";
                     if (styleOption === 'przedszkole') {
                         styleModifier = "Very simple toddler coloring book, thick bold black contours, minimal details";
@@ -182,10 +202,8 @@
                         styleModifier = "Intricate adult coloring page, beautiful complex mandala design, detailed black lines";
                     }
 
-                    // EKSTREMALNY PROMPT: Wymusza absolutny brak kolorów i styl "line art" (Tylko kontury)
                     const hiddenInstruction = `B&W vector line art coloring page, strictly uncolored contours ONLY. Subject: ${promptInput}. ${styleModifier}. Pure monochrome, pure white background, thick black bold lines, NO colors, no shading, no grayscale.`;
 
-                    // Pancerne ubezpieczenie payloadu dla serwera
                     const payload = {
                         prompt: hiddenInstruction, 
                         instances: { prompt: hiddenInstruction }, 
@@ -223,6 +241,115 @@
                     localStorage.setItem('magicColorAuth', 'true');
                 } else {
                     alert('Nieprawidłowy kod PIN!');
+                }
+            };
+
+            // -------------------------------------------------------------
+            // FUNKCJE RYSOWANIA PO PŁÓTNIE (CANVAS)
+            // -------------------------------------------------------------
+            useEffect(() => {
+                if (generatedImage && canvasRef.current) {
+                    const canvas = canvasRef.current;
+                    const ctx = canvas.getContext("2d");
+                    const img = new Image();
+                    img.onload = () => {
+                        canvas.width = img.width;
+                        canvas.height = img.height;
+                        
+                        // Zapewniamy białe tło dla poprawnego mieszania kolorów (multiply)
+                        ctx.fillStyle = "#ffffff";
+                        ctx.fillRect(0, 0, canvas.width, canvas.height);
+                        
+                        ctx.drawImage(img, 0, 0);
+                        ctx.globalCompositeOperation = 'multiply';
+                        ctx.lineCap = "round";
+                        ctx.lineJoin = "round";
+                        ctxRef.current = ctx;
+                    };
+                    img.src = generatedImage;
+                }
+            }, [generatedImage]); 
+
+            const getCoordinates = (e) => {
+                const canvas = canvasRef.current;
+                const rect = canvas.getBoundingClientRect();
+                const scaleX = canvas.width / rect.width;
+                const scaleY = canvas.height / rect.height;
+                
+                let clientX, clientY;
+                if (e.touches && e.touches.length > 0) {
+                    clientX = e.touches[0].clientX;
+                    clientY = e.touches[0].clientY;
+                } else {
+                    clientX = e.clientX;
+                    clientY = e.clientY;
+                }
+                return {
+                    x: (clientX - rect.left) * scaleX,
+                    y: (clientY - rect.top) * scaleY
+                };
+            };
+
+            const startDrawing = (e) => {
+                if(e.cancelable) e.preventDefault(); 
+                const { x, y } = getCoordinates(e);
+                ctxRef.current.beginPath();
+                ctxRef.current.moveTo(x, y);
+                
+                if (selectedColor === "#ffffff") {
+                    ctxRef.current.globalCompositeOperation = 'source-over';
+                    ctxRef.current.strokeStyle = "#ffffff";
+                } else {
+                    ctxRef.current.globalCompositeOperation = 'multiply';
+                    ctxRef.current.strokeStyle = selectedColor;
+                }
+                
+                ctxRef.current.lineWidth = brushSize;
+                setIsDrawing(true);
+            };
+
+            const draw = (e) => {
+                if (!isDrawing) return;
+                if(e.cancelable) e.preventDefault();
+                const { x, y } = getCoordinates(e);
+                ctxRef.current.lineTo(x, y);
+                ctxRef.current.stroke();
+            };
+
+            const stopDrawing = () => {
+                ctxRef.current.closePath();
+                setIsDrawing(false);
+            };
+
+            const handlePrint = () => {
+                if (canvasRef.current) {
+                    const dataUrl = canvasRef.current.toDataURL("image/png");
+                    const windowContent = `
+                        <!DOCTYPE html>
+                        <html>
+                        <head>
+                            <title>Twoja Kolorowanka - EduBox PRO</title>
+                            <style>
+                                @page { size: A4; margin: 1cm; }
+                                body { margin: 0; display: flex; justify-content: center; align-items: center; background-color: white; height: 100vh; }
+                                img { max-width: 100%; max-height: 100%; object-fit: contain; }
+                            </style>
+                        </head>
+                        <body>
+                            <img src="${dataUrl}" />
+                        </body>
+                        </html>
+                    `;
+                    const printWin = window.open('', '', 'width=800,height=800');
+                    printWin.document.open();
+                    printWin.document.write(windowContent);
+                    printWin.document.close();
+                    
+                    setTimeout(() => {
+                        printWin.focus();
+                        printWin.print();
+                        printWin.close();
+                    }, 500);
                 }
             };
 
@@ -282,12 +409,11 @@
                     <div className="aura-blob aura-2 print-hidden"></div>
 
                     <nav className="fixed top-0 w-full z-50 glass-nav print-hidden">
-                        <div className="max-w-5xl mx-auto px-4 sm:px-6 h-20 flex items-center justify-between">
+                        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-20 flex items-center justify-between">
                             <div className="flex items-center gap-3">
                                 <div className="w-10 h-10 bg-gradient-to-br from-pink-500 to-amber-500 rounded-xl flex items-center justify-center shadow-lg">
                                     <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"/></svg>
                                 </div>
-                                {/* ZMIENIONY NAPIS NA PRO ABY POTWIERDZIĆ ODŚWIEŻENIE PAMIĘCI */}
                                 <span className="text-xl font-extrabold tracking-tight text-white hidden sm:block">MagicColor<span className="text-pink-400">AI PRO</span></span>
                             </div>
                             <div className="flex items-center gap-4">
@@ -317,7 +443,7 @@
                     </nav>
 
                     <main className="flex-grow pt-32 pb-20 px-4 sm:px-6 print:pt-0 print:pb-0">
-                        <div className="max-w-3xl mx-auto">
+                        <div className="max-w-5xl mx-auto">
                             
                             <div className="text-center mb-12 fade-in print-hidden">
                                 <div className="inline-flex items-center gap-2 bg-pink-900/30 border border-pink-500/30 px-4 py-1.5 rounded-full text-[10px] font-black text-pink-400 uppercase tracking-widest mb-4">
@@ -331,7 +457,7 @@
                                 </p>
                             </div>
 
-                            <div className="glass-panel p-6 sm:p-10 rounded-[2.5rem] fade-in border border-slate-700/50 print-hidden" style={{animationDelay: '0.1s'}}>
+                            <div className="glass-panel p-6 sm:p-10 rounded-[2.5rem] fade-in border border-slate-700/50 print-hidden max-w-3xl mx-auto" style={{animationDelay: '0.1s'}}>
                                 
                                 <div className="mb-8">
                                     <label className="block text-slate-300 font-bold mb-3 text-sm uppercase tracking-wider">Wybierz stopień trudności (Styl):</label>
@@ -399,20 +525,89 @@
                                 </div>
                             </div>
 
+                            {/* WYNIK - POŁĄCZONY MOTYW CIEMNY Z NARZĘDZIAMI DO KOLOROWANIA */}
                             {generatedImage && (
-                                <div ref={resultRef} className="mt-12 fade-in print:mt-0 flex flex-col items-center">
+                                <div ref={resultRef} className="mt-12 fade-in print:mt-0">
                                     
-                                    <div className="flex flex-col sm:flex-row items-center justify-between w-full mb-6 print-hidden gap-4">
-                                        <h3 className="text-xl font-bold text-white text-center sm:text-left">Twoja Kolorowanka ({styleOption === 'przedszkole' ? 'Grube linie' : styleOption === 'mandala' ? 'Mandala' : 'Standardowa'})</h3>
-                                        <button onClick={() => window.print()} className="bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 transition-all btn-bounce shadow-[0_0_15px_rgba(16,185,129,0.3)] w-full sm:w-auto justify-center">
-                                            🖨️ Wydrukuj Dzieciom
-                                        </button>
-                                    </div>
+                                    <div className="flex flex-col lg:flex-row gap-8">
+                                        
+                                        {/* LEWA STRONA: WIRTUALNE PŁÓTNO */}
+                                        <div className="flex-1 flex flex-col items-center">
+                                            <div className="w-full text-center sm:text-left mb-6 print-hidden">
+                                                <h3 className="text-2xl font-bold text-white mb-2">Twoja Kolorowanka</h3>
+                                                <p className="text-slate-400 text-sm">Pokoloruj ją na ekranie używając narzędzi obok, lub wydrukuj czystą!</p>
+                                            </div>
 
-                                    <div className="bg-white p-4 rounded-3xl magic-border shadow-2xl print:shadow-none print:p-0">
-                                        <img src={generatedImage} alt="Kolorowanka wygenerowana przez AI" className="w-full max-w-2xl rounded-xl print-only-image" />
-                                    </div>
+                                            <div className="bg-white p-2 sm:p-4 rounded-3xl magic-border shadow-2xl print:shadow-none print:p-0 w-full max-w-2xl relative">
+                                                <canvas
+                                                    ref={canvasRef}
+                                                    onMouseDown={startDrawing}
+                                                    onMouseMove={draw}
+                                                    onMouseUp={stopDrawing}
+                                                    onMouseOut={stopDrawing}
+                                                    onTouchStart={startDrawing}
+                                                    onTouchMove={draw}
+                                                    onTouchEnd={stopDrawing}
+                                                    className="w-full max-w-2xl rounded-xl touch-none bg-white block mx-auto print-only-image"
+                                                />
+                                            </div>
+                                        </div>
 
+                                        {/* PRAWA STRONA: PANEL Z NARZĘDZIAMI */}
+                                        <div className="w-full lg:w-80 print-hidden">
+                                            <div className="glass-panel p-6 rounded-[2rem] border border-slate-700/50 flex flex-col gap-6 sticky top-28">
+                                                
+                                                <div>
+                                                    <h3 className="text-white font-bold mb-4 text-sm uppercase tracking-wider border-b border-slate-700 pb-2">Magiczne pisaki</h3>
+                                                    <div className="flex flex-wrap gap-3">
+                                                        {colors.map((c) => (
+                                                            <button
+                                                                key={c}
+                                                                onClick={() => setSelectedColor(c)}
+                                                                className={`w-10 h-10 rounded-full shadow-md border-2 transition-transform ${
+                                                                    selectedColor === c ? "scale-125 border-white" : "border-slate-700 hover:scale-110"
+                                                                }`}
+                                                                style={{ backgroundColor: c }}
+                                                                title={c === "#ffffff" ? "Gumka" : "Kolor"}
+                                                            >
+                                                                {c === "#ffffff" && <span className="text-slate-500 text-[10px] flex justify-center mt-1.5 font-bold uppercase">Gumka</span>}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                </div>
+
+                                                <div>
+                                                    <h3 className="text-white font-bold mb-3 text-sm uppercase tracking-wider">Grubość pisaka</h3>
+                                                    <input 
+                                                        type="range" 
+                                                        min="5" 
+                                                        max="40" 
+                                                        value={brushSize}
+                                                        onChange={(e) => setBrushSize(e.target.value)}
+                                                        className="w-full accent-pink-500"
+                                                    />
+                                                    <div className="flex justify-between text-xs text-slate-400 mt-1 font-medium">
+                                                        <span>Cienki</span>
+                                                        <span>Gruby</span>
+                                                    </div>
+                                                </div>
+
+                                                <div className="mt-4 pt-6 border-t border-slate-700">
+                                                    <button 
+                                                        onClick={handlePrint}
+                                                        className="w-full bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-4 rounded-xl font-bold flex items-center justify-center gap-2 transition-all btn-bounce shadow-[0_0_15px_rgba(16,185,129,0.3)] text-lg"
+                                                    >
+                                                        🖨️ Wydrukuj Dzieciom
+                                                    </button>
+                                                    <p className="text-xs text-slate-500 text-center mt-4 leading-relaxed font-medium">
+                                                        Wskazówka: Rysuj palcem po ekranie!<br/>Zamalowania nie zasłonią czarnych kresek.
+                                                    </p>
+                                                </div>
+
+                                            </div>
+                                        </div>
+
+                                    </div>
                                 </div>
                             )}
 
