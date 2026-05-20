@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="pl" translate="no" class="notranslate">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduTIK PRO - Inspirator Lekcji</title>
+    
+    <!-- Biblioteki (zgodne z Twoim portfolio) -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    
+    <!-- Ikony Phosphor -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+    <style>
+        body { 
+            font-family: 'Plus Jakarta Sans', sans-serif; 
+            background-color: #020617; 
+            color: #f8fafc; 
+            overflow-x: hidden;
+            min-height: 100vh;
+        }
+        
+        .glass-panel { 
+            background: rgba(30, 41, 59, 0.4); 
+            backdrop-filter: blur(16px); 
+            -webkit-backdrop-filter: blur(16px); 
+            border: 1px solid rgba(255, 255, 255, 0.05); 
+        }
+
+        .glass-nav { 
+            background: rgba(2, 6, 23, 0.8); 
+            backdrop-filter: blur(20px); 
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05); 
+        }
+
+        .btn-bounce:active { transform: scale(0.95); transition: transform 0.1s; }
+
+        .hero-glow {
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 1000px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(168, 85, 247, 0.15) 0%, rgba(2, 6, 23, 0) 60%);
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #0f172a; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+
+        /* Animacja losowania */
+        @keyframes shuffle {
+            0% { transform: translateY(0); opacity: 1; }
+            50% { transform: translateY(-20px); opacity: 0; }
+            51% { transform: translateY(20px); opacity: 0; }
+            100% { transform: translateY(0); opacity: 1; }
+        }
+        .anim-shuffle {
+            animation: shuffle 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // Baza wiedzy (narzędzia i pomysły)
+        const IDEAS_DB = [
+            { id: 1, phase: 'rozgrzewka', tool: 'Mentimeter', name: 'Chmura Wyrazów', desc: 'Zadaj jedno pytanie (np. "Z czym kojarzy Ci się słowo Demokracja?") i poproś uczniów o wpisanie słów w telefonach. Stworzy to piękną, animowaną chmurę wyrazów na tablicy.', color: 'text-blue-400', bg: 'bg-blue-500/20' },
+            { id: 2, phase: 'rozgrzewka', tool: 'Wordwall', name: 'Koło Fortuny z Pytaniami', desc: 'Zamiast pytać ochotników, wylosuj ucznia lub pytanie startowe na wirtualnym kole fortuny. To natychmiast budzi klasę!', color: 'text-emerald-400', bg: 'bg-emerald-500/20' },
+            { id: 3, phase: 'wlasciwa', tool: 'Blooket', name: 'Tryb "Gold Quest"', desc: 'Przekształć zwykły quiz (np. ze słówek lub dat) w grę, w której uczniowie "kradną" sobie nawzajem złoto za poprawne odpowiedzi. Gwarantowany szał zaangażowania.', color: 'text-purple-400', bg: 'bg-purple-500/20' },
+            { id: 4, phase: 'wlasciwa', tool: 'Canva', name: 'Współtworzenie Infografiki', desc: 'Udostępnij uczniom jeden projekt w Canvie (z uprawnieniami do edycji). Niech każda grupa doda swój kafel z informacjami o innej planecie / epoce historycznej.', color: 'text-cyan-400', bg: 'bg-cyan-500/20' },
+            { id: 5, phase: 'podsumowanie', tool: 'Padlet', name: 'Bilet Wyjścia (Exit Ticket)', desc: 'Pod koniec lekcji wyślij link do Padletu. Uczniowie mają za zadanie dodać jedną cyfrową "karteczkę" z najważniejszą rzeczą, jakiej się dzisiaj nauczyli, zanim wyjdą z klasy.', color: 'text-pink-400', bg: 'bg-pink-500/20' },
+            { id: 6, phase: 'podsumowanie', tool: 'Quizizz', name: 'Szybki Test AI', desc: 'Użyj nowej funkcji AI w Quizizz - wklej tekst z dzisiejszej lekcji, a sztuczna inteligencja w 10 sekund wygeneruje z niego 5 pytań podsumowujących.', color: 'text-indigo-400', bg: 'bg-indigo-500/20' },
+            { id: 7, phase: 'wlasciwa', tool: 'Genially', name: 'Escape Room', desc: 'Zamknij materiał z lekcji w interaktywnym Escape Roomie. Uczniowie muszą rozwiązywać zadania z matematyki lub historii, aby zdobyć kod do "wyjścia z klasy".', color: 'text-amber-400', bg: 'bg-amber-500/20' },
+        ];
+
+        const BUY_COFFEE_LINK = "https://buycoffee.to/magiccolor";
+
+        function EduTikApp() {
+            const [selectedPhase, setSelectedPhase] = useState('wszystkie');
+            const [currentIdea, setCurrentIdea] = useState(null);
+            const [isAnimating, setIsAnimating] = useState(false);
+            const [savedIdeas, setSavedIdeas] = useState([]);
+
+            // Inicjalizacja pierwszego pomysłu
+            useEffect(() => {
+                generateIdea();
+            }, []);
+
+            const generateIdea = () => {
+                setIsAnimating(true);
+                
+                setTimeout(() => {
+                    let availableIdeas = IDEAS_DB;
+                    if (selectedPhase !== 'wszystkie') {
+                        availableIdeas = IDEAS_DB.filter(i => i.phase === selectedPhase);
+                    }
+                    
+                    // Jeśli nie zmieniamy kategorii, staramy się nie wylosować tego samego pod rząd
+                    if (availableIdeas.length > 1 && currentIdea) {
+                        availableIdeas = availableIdeas.filter(i => i.id !== currentIdea.id);
+                    }
+
+                    const randomIdea = availableIdeas[Math.floor(Math.random() * availableIdeas.length)];
+                    setCurrentIdea(randomIdea);
+                    setIsAnimating(false);
+                }, 400); // Czas trwania animacji CSS
+            };
+
+            const toggleSaveIdea = (idea) => {
+                if (savedIdeas.find(i => i.id === idea.id)) {
+                    setSavedIdeas(savedIdeas.filter(i => i.id !== idea.id));
+                } else {
+                    setSavedIdeas([...savedIdeas, idea]);
+                }
+            };
+
+            const isSaved = currentIdea && savedIdeas.find(i => i.id === currentIdea.id);
+
+            return (
+                <div className="min-h-screen relative flex flex-col">
+                    <div className="hero-glow"></div>
+
+                    {/* Nawigacja */}
+                    <nav className="w-full z-[100] glass-nav">
+                        <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 bg-fuchsia-600 rounded-xl flex items-center justify-center shadow-[0_0_15px_rgba(192,38,211,0.5)]">
+                                    <i className="ph-bold ph-lightbulb text-white text-xl"></i>
+                                </div>
+                                <span className="text-xl font-extrabold tracking-tight text-white">EduTIK<span className="text-fuchsia-500">PRO</span></span>
+                            </div>
+                            <div className="flex items-center gap-6">
+                                <div className="text-xs font-black text-slate-400 uppercase tracking-widest hidden md:block">
+                                    EkoSystem EduBox AI
+                                </div>
+                                <a href={BUY_COFFEE_LINK} target="_blank" className="hidden sm:flex items-center gap-2 bg-slate-800 border border-slate-700 text-amber-400 px-5 py-2.5 rounded-full hover:bg-slate-700 hover:border-amber-500/50 hover:text-amber-300 transition-all shadow-lg btn-bounce text-xs font-bold uppercase tracking-wider">
+                                    <i className="ph-fill ph-coffee text-base"></i> Postaw Kawę
+                                </a>
+                            </div>
+                        </div>
+                    </nav>
+
+                    {/* Główna sekcja */}
+                    <main className="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 py-12 relative z-10 flex flex-col lg:flex-row gap-8">
+                        
+                        {/* Lewa kolumna: Sterowanie */}
+                        <div className="w-full lg:w-1/3 flex flex-col gap-6">
+                            <div className="glass-panel rounded-[2rem] p-8">
+                                <h2 className="text-2xl font-bold text-white mb-2">Inspirator TIK</h2>
+                                <p className="text-slate-400 text-sm mb-8 leading-relaxed">
+                                    Wybierz etap lekcji i kliknij losuj, aby otrzymać angażujący pomysł z użyciem nowoczesnych technologii.
+                                </p>
+
+                                <div className="space-y-6">
+                                    {/* Wybór Etapu */}
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 block">Etap lekcji</label>
+                                        <div className="grid grid-cols-1 gap-2">
+                                            {[
+                                                { id: 'wszystkie', name: 'Zaskocz mnie!', icon: 'ph-magic-wand' },
+                                                { id: 'rozgrzewka', name: 'Rozgrzewka (Wstęp)', icon: 'ph-fire' },
+                                                { id: 'wlasciwa', name: 'Praca właściwa', icon: 'ph-brain' },
+                                                { id: 'podsumowanie', name: 'Podsumowanie', icon: 'ph-check-circle' }
+                                            ].map(phase => (
+                                                <button
+                                                    key={phase.id}
+                                                    onClick={() => setSelectedPhase(phase.id)}
+                                                    className={`flex items-center gap-3 p-3 rounded-xl border transition-all text-sm font-medium ${
+                                                        selectedPhase === phase.id 
+                                                        ? 'bg-fuchsia-600/20 border-fuchsia-500/50 text-white shadow-[0_0_15px_rgba(192,38,211,0.2)]' 
+                                                        : 'bg-slate-800/50 border-slate-700/50 text-slate-400 hover:bg-slate-800'
+                                                    }`}
+                                                >
+                                                    <i className={`ph-fill ${phase.icon} text-lg ${selectedPhase === phase.id ? 'text-fuchsia-400' : ''}`}></i>
+                                                    {phase.name}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* Główny przycisk */}
+                                    <button 
+                                        onClick={generateIdea}
+                                        className="w-full bg-gradient-to-r from-fuchsia-600 to-purple-600 hover:from-fuchsia-500 hover:to-purple-500 text-white py-4 rounded-xl font-bold text-lg shadow-[0_0_25px_rgba(192,38,211,0.4)] transition-all btn-bounce flex items-center justify-center gap-2 mt-4"
+                                    >
+                                        <i className="ph-bold ph-arrows-clockwise text-xl"></i> Losuj Pomysł
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Sekcja "Postaw Kawę" na lewym pasku */}
+                            <div className="glass-panel rounded-[2rem] p-6 text-center mt-auto flex flex-col items-center">
+                                <div className="w-12 h-12 bg-amber-500/10 border border-amber-500/20 rounded-full flex items-center justify-center mb-3">
+                                    <i className="ph-fill ph-coffee text-2xl text-amber-500 drop-shadow-[0_0_10px_rgba(245,158,11,0.5)]"></i>
+                                </div>
+                                <h3 className="text-sm font-bold text-white mb-2">Wspieraj rozwój</h3>
+                                <p className="text-xs text-slate-400 mb-5 leading-relaxed">
+                                    Narzędzie jest w 100% darmowe. Jeśli oszczędza Twój czas na przygotowania, wesprzyj twórców wirtualną kawą!
+                                </p>
+                                <a href={BUY_COFFEE_LINK} target="_blank" className="w-full bg-amber-500 hover:bg-amber-400 text-amber-950 font-black py-3 rounded-xl transition-all btn-bounce text-sm shadow-[0_0_20px_rgba(245,158,11,0.3)] flex items-center justify-center gap-2 uppercase tracking-wide">
+                                    Postaw Kawę ☕
+                                </a>
+                            </div>
+                        </div>
+
+                        {/* Prawa kolumna: Wyświetlacz i Ulubione */}
+                        <div className="w-full lg:w-2/3 flex flex-col gap-6">
+                            
+                            {/* Karta z wylosowanym pomysłem */}
+                            <div className="glass-panel rounded-[2rem] p-8 md:p-12 min-h-[400px] flex flex-col justify-center relative overflow-hidden">
+                                {currentIdea && (
+                                    <div className={isAnimating ? 'anim-shuffle' : ''}>
+                                        <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-black uppercase tracking-widest mb-6 ${currentIdea.bg} ${currentIdea.color} border border-slate-600/30`}>
+                                            <i className="ph-fill ph-wrench"></i> Narzędzie: {currentIdea.tool}
+                                        </div>
+                                        
+                                        <h1 className="text-3xl md:text-5xl font-black text-white mb-6 tracking-tight leading-tight">
+                                            {currentIdea.name}
+                                        </h1>
+                                        
+                                        <p className="text-lg md:text-xl text-slate-300 leading-relaxed font-medium mb-10">
+                                            {currentIdea.desc}
+                                        </p>
+
+                                        <div className="flex items-center gap-4 pt-8 border-t border-slate-700/50">
+                                            <button 
+                                                onClick={() => toggleSaveIdea(currentIdea)}
+                                                className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold transition-all btn-bounce ${
+                                                    isSaved 
+                                                    ? 'bg-slate-800 text-rose-400 border border-rose-500/30' 
+                                                    : 'bg-slate-800 text-white hover:bg-slate-700 border border-slate-700'
+                                                }`}
+                                            >
+                                                <i className={`text-xl ${isSaved ? 'ph-fill ph-heart text-rose-500' : 'ph-bold ph-heart'}`}></i>
+                                                {isSaved ? 'Zapisano w ulubionych' : 'Zapisz pomysł'}
+                                            </button>
+                                            
+                                            <a href={`https://www.google.com/search?q=${currentIdea.tool}+dla+nauczycieli`} target="_blank" className="flex items-center gap-2 px-6 py-3 rounded-xl font-bold bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 transition-all border border-blue-500/30 btn-bounce">
+                                                <i className="ph-bold ph-arrow-square-out"></i> Otwórz {currentIdea.tool}
+                                            </a>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Zapisane pomysły */}
+                            {savedIdeas.length > 0 && (
+                                <div className="glass-panel rounded-[2rem] p-8">
+                                    <h3 className="text-xl font-bold text-white flex items-center gap-2 mb-6">
+                                        <i className="ph-fill ph-bookmarks text-rose-500"></i> Moje Ulubione ({savedIdeas.length})
+                                    </h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        {savedIdeas.map(idea => (
+                                            <div key={idea.id} className="bg-slate-900/60 border border-slate-700/50 p-4 rounded-xl relative group">
+                                                <div className="text-xs text-fuchsia-400 font-bold mb-1">{idea.tool}</div>
+                                                <div className="font-bold text-white text-sm mb-2">{idea.name}</div>
+                                                <button 
+                                                    onClick={() => toggleSaveIdea(idea)}
+                                                    className="absolute top-3 right-3 text-slate-500 hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100"
+                                                >
+                                                    <i className="ph-fill ph-trash text-lg"></i>
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                        </div>
+
+                    </main>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<EduTikApp />);
+    </script>
+</body>
+</html>
