@@ -62,11 +62,44 @@ export default async function handler(req, res) {
       if (!stabilityKey) {
         return res.status(500).json({ error: 'Brak klucza STABILITY_API_KEY w ustawieniach Vercel!' });
       }
+      if (!openaiKey) {
+        return res.status(500).json({ error: 'Brak klucza OPENAI_API_KEY do tłumaczenia promptów!' });
+      }
 
-      const prompt = payload.prompt || payload.instances?.[0]?.prompt || "Edukacyjna ilustracja dla dzieci";
+      const rawPrompt = payload.prompt || payload.instances?.[0]?.prompt || "Edukacyjna ilustracja dla dzieci";
       const negativePrompt = payload.negative_prompt || "color, colors, shading, text, grayscale";
 
-      // 2. WYSŁANIE DO PRAWDZIWEGO STABILITY AI (SDXL)
+      // --- NOWOŚĆ: Błyskawiczne tłumaczenie promptu na angielski (SDXL nie rozumie polskiego!) ---
+      let englishPrompt = rawPrompt;
+      try {
+          const translateRes = await fetch('https://api.openai.com/v1/chat/completions', {
+              method: 'POST',
+              headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${openaiKey}`
+              },
+              body: JSON.stringify({
+                  model: "gpt-4o-mini", // Najszybszy model do prostego zadania
+                  messages: [
+                      { role: "system", content: "You translate texts to English accurately. Return ONLY the English translation. Do not add any conversational text." },
+                      { role: "user", content: rawPrompt }
+                  ],
+                  temperature: 0.1
+              })
+          });
+          
+          if (translateRes.ok) {
+              const tData = await translateRes.json();
+              englishPrompt = tData.choices[0].message.content.trim();
+          } else {
+              console.warn("Błąd podczas próby tłumaczenia, używam oryginału.");
+          }
+      } catch (e) {
+          console.warn("Wyjątek podczas tłumaczenia:", e);
+      }
+      // --------------------------------------------------------------------------------------------
+
+      // 2. WYSŁANIE DO PRAWDZIWEGO STABILITY AI (SDXL) Z PRZETŁUMACZONYM POLECENIEM
       const response = await fetch('https://api.stability.ai/v1/generation/stable-diffusion-xl-1024-v1-0/text-to-image', {
         method: 'POST',
         headers: { 
@@ -76,15 +109,15 @@ export default async function handler(req, res) {
         },
         body: JSON.stringify({
           text_prompts: [
-            { text: prompt, weight: 1 }, 
+            { text: englishPrompt, weight: 1 }, 
             { text: negativePrompt, weight: -1 } 
           ],
           cfg_scale: 7,
           height: 1024,
           width: 1024,
-          steps: 20, // ZMNIEJSZONO Z 30 NA 20: Chroni przed błędem 504 Timeout na Vercelu (limit 10 sekund)
+          steps: 15, // Zmniejszono do 15, aby zrekompensować czas potrzebny na tłumaczenie (limit Vercel 10s)
           samples: 1,
-          style_preset: "line-art" // NOWOŚĆ: Oficjalny parametr Stability wymuszający czarno-biały szkic!
+          style_preset: "line-art" 
         })
       });
 
@@ -98,9 +131,8 @@ export default async function handler(req, res) {
       }
 
       if (!response.ok) {
-          // Jeśli polecenie zawiedzie, błąd zapisze się do konsoli serwera Vercel (zakładka Logs)
           console.error("Szczegóły błędu Stability AI:", data);
-          throw new Error(data.message || `Błąd Stability AI (Kod: ${response.status}). Sprawdź kredyty na swoim koncie Stability!`);
+          throw new Error(data.message || `Błąd Stability AI (Kod: ${response.status}). Sprawdź logi Vercel.`);
       }
 
       const base64 = data.artifacts[0].base64;
