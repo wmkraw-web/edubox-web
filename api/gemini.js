@@ -45,8 +45,11 @@ export default async function handler(req, res) {
         })
       });
 
+      if (!response.ok) {
+          const errText = await response.text();
+          throw new Error(`Błąd OpenAI: ${errText}`);
+      }
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error?.message || "Błąd OpenAI");
 
       // 3. ZWROT DO FRONTENDU
       return res.status(200).json({
@@ -56,12 +59,10 @@ export default async function handler(req, res) {
       });
 
     } else if (type === 'image') {
-      // NOWOŚĆ: Blokujemy dostęp, jeśli na Vercelu nie ma klucza Stability
       if (!stabilityKey) {
         return res.status(500).json({ error: 'Brak klucza STABILITY_API_KEY w ustawieniach Vercel!' });
       }
 
-      // 1. ODCZYTANIE PROMPTU OBRAZKOWEGO ORAZ NEGATYWNEGO (ZAKAZANE SŁOWA)
       const prompt = payload.prompt || payload.instances?.[0]?.prompt || "Edukacyjna ilustracja dla dzieci";
       const negativePrompt = payload.negative_prompt || "color, colors, shading, text, grayscale";
 
@@ -70,26 +71,38 @@ export default async function handler(req, res) {
         method: 'POST',
         headers: { 
             'Content-Type': 'application/json',
-            'Accept': 'application/json', // Ważne dla otrzymania poprawnej odpowiedzi JSON
+            'Accept': 'application/json',
             'Authorization': `Bearer ${stabilityKey}` 
         },
         body: JSON.stringify({
           text_prompts: [
-            { text: prompt, weight: 1 }, // Pozytywna instrukcja
-            { text: negativePrompt, weight: -1 } // NEGATYWNA instrukcja wymuszająca brak kolorów
+            { text: prompt, weight: 1 }, 
+            { text: negativePrompt, weight: -1 } 
           ],
           cfg_scale: 7,
           height: 1024,
           width: 1024,
-          steps: 30,
-          samples: 1
+          steps: 20, // ZMNIEJSZONO Z 30 NA 20: Chroni przed błędem 504 Timeout na Vercelu (limit 10 sekund)
+          samples: 1,
+          style_preset: "line-art" // NOWOŚĆ: Oficjalny parametr Stability wymuszający czarno-biały szkic!
         })
       });
 
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.message || "Błąd modelu Stability AI");
+      // 3. ODCZYTYWANIE ODPOWIEDZI I BŁĘDÓW
+      const textResponse = await response.text();
+      let data;
+      try {
+          data = JSON.parse(textResponse);
+      } catch (e) {
+          throw new Error(`Nieoczekiwana odpowiedź API: ${textResponse.substring(0, 100)}`);
+      }
 
-      // 3. BEZPIECZNE POBRANIE OBRAZKA W FORMACIE BASE64
+      if (!response.ok) {
+          // Jeśli polecenie zawiedzie, błąd zapisze się do konsoli serwera Vercel (zakładka Logs)
+          console.error("Szczegóły błędu Stability AI:", data);
+          throw new Error(data.message || `Błąd Stability AI (Kod: ${response.status}). Sprawdź kredyty na swoim koncie Stability!`);
+      }
+
       const base64 = data.artifacts[0].base64;
 
       // 4. ZWROT W FORMACIE, KTÓREGO OCZEKUJE TWOJA APLIKACJA
