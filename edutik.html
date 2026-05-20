@@ -80,7 +80,7 @@
         const { useState, useEffect } = React;
 
         const BUY_COFFEE_LINK = "https://buycoffee.to/magiccolor";
-        const apiKey = ""; // API KEY injectowane w środowisku produkcyjnym
+        // USUNIĘTO ZMIENNĄ apiKey, poniewaz teraz korzystamy z backendu (Vercel Serverless)
 
         // ==========================================
         // BAZA DANYCH - NARZĘDZIA I PROMPTY DLA AI
@@ -218,8 +218,9 @@
                 };
 
                 try {
-                    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
-                    const payload = { contents: [{ parts: [{ text: prompt }] }] };
+                    // Łączymy się z NASZYM bezpiecznym plikiem na Vercelu
+                    const url = '/api/gemini';
+                    const payload = { prompt: prompt };
 
                     const data = await fetchWithRetry(url, {
                         method: 'POST',
@@ -227,11 +228,12 @@
                         body: JSON.stringify(payload)
                     });
 
+                    // Odczytujemy odpowiedź Google przekazaną przez nasz serwer
                     const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "Błąd generowania. Spróbuj ponownie.";
                     setAiContent(text);
                 } catch (error) {
-                    console.error("AI Error:", error);
-                    setAiContent("Wystąpił błąd podczas łączenia z AI. Upewnij się, że masz połączenie z internetem i spróbuj ponownie.");
+                    console.error("Backend Error:", error);
+                    setAiContent("Wystąpił błąd podczas łączenia z serwerem. Upewnij się, że masz połączenie z internetem i spróbuj ponownie.");
                 } finally {
                     setIsGenerating(false);
                 }
