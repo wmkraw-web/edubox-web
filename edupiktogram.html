@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="pl" translate="no" class="notranslate">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="google" content="notranslate">
+    <title>EduPiktogram AI - Kreator Planów Dnia AAC</title>
+    
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-3RQ9R0N0K8"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'G-3RQ9R0N0K8');
+    </script>
+    
+    <!-- Biblioteki -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        body { 
+            font-family: 'Plus Jakarta Sans', sans-serif; 
+            background-color: #020617; 
+            color: #f8fafc; 
+            scroll-behavior: smooth; 
+            overflow-x: hidden;
+            margin: 0;
+            padding: 0;
+        }
+        
+        /* Stylistyka EduPiktogram: Morski (Teal) i Niebieski (Blue) */
+        .aura-blob {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(120px);
+            opacity: 0.35;
+            z-index: -1;
+            animation: float 15s infinite ease-in-out alternate;
+            pointer-events: none;
+        }
+        .aura-1 { top: -10%; left: -10%; width: 50vw; height: 600px; background: radial-gradient(circle, #0ea5e9, transparent 70%); }
+        .aura-2 { top: 40%; right: -10%; width: 50vw; height: 600px; background: radial-gradient(circle, #14b8a6, transparent 70%); animation-delay: -5s; }
+
+        @keyframes float {
+            0% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(30px, -50px) scale(1.05); }
+            100% { transform: translate(-30px, 30px) scale(0.95); }
+        }
+
+        .glass-panel { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(24px); border: 1px solid rgba(255, 255, 255, 0.08); }
+        .glass-nav { background: rgba(2, 6, 23, 0.85); backdrop-filter: blur(24px); border-bottom: 1px solid rgba(255, 255, 255, 0.08); }
+        
+        .text-gradient { background: linear-gradient(135deg, #0ea5e9 0%, #14b8a6 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        
+        .btn-bounce:active { transform: scale(0.95); }
+        .fade-in { animation: fadeIn 0.4s ease-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        .magic-border { position: relative; }
+        .magic-border::before {
+            content: ''; position: absolute; inset: -4px;
+            background: linear-gradient(45deg, #0ea5e9, #14b8a6, #0ea5e9);
+            border-radius: inherit; z-index: -1;
+            animation: borderGlow 3s linear infinite; background-size: 200% 200%;
+        }
+        @keyframes borderGlow {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .picto-item-enter { animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+        @keyframes popIn { from { opacity: 0; transform: scale(0.8); } to { opacity: 1; transform: scale(1); } }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        function App() {
+            const SECRET_PIN = "KAWA2024"; 
+            const BUY_COFFEE_LINK = "https://buycoffee.to/eduboxpro";
+            const FREE_TRIES_LIMIT = 0; 
+
+            const [isAuthenticated, setIsAuthenticated] = useState(false);
+            const [freeTries, setFreeTries] = useState(0);
+            const [showPaywall, setShowPaywall] = useState(false);
+            const [passwordInput, setPasswordInput] = useState('');
+            
+            // Zmienne Piktogramu
+            const [promptInput, setPromptInput] = useState('');
+            const [colorMode, setColorMode] = useState('bw'); // 'bw' lub 'color'
+            const [generatedImage, setGeneratedImage] = useState(null);
+            const [isGenerating, setIsGenerating] = useState(false);
+            const [error, setError] = useState('');
+            
+            // Stan dla Planu Dnia (Koszyka)
+            const [schedule, setSchedule] = useState([]);
+
+            const resultRef = useRef(null);
+
+            useEffect(() => {
+                const savedAuth = localStorage.getItem('eduPictoAuth') === 'true';
+                if (savedAuth) setIsAuthenticated(true);
+                const savedTries = parseInt(localStorage.getItem('eduPictoFreeTries') || '0');
+                setFreeTries(savedTries);
+                
+                // Ładowanie zapisanego planu dnia, jeśli istnieje
+                const savedSchedule = localStorage.getItem('eduPictoSchedule');
+                if (savedSchedule) {
+                    try { setSchedule(JSON.parse(savedSchedule)); } catch(e) {}
+                }
+            }, []);
+
+            // Zapisywanie planu dnia do pamięci przeglądarki przy każdej zmianie
+            useEffect(() => {
+                localStorage.setItem('eduPictoSchedule', JSON.stringify(schedule));
+            }, [schedule]);
+
+            const secureApiCall = async (payload) => {
+                try {
+                    const res = await fetch('/api/gemini', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ payload, type: 'image' })
+                    });
+                    
+                    if (res.ok) return await res.json();
+                    
+                    if (res.status === 404 || res.status === 405) throw new Error("USE_FALLBACK");
+                    
+                    const errData = await res.json();
+                    throw new Error(errData.error || `Status API: ${res.status}`);
+                    
+                } catch (e) {
+                    if (e.message === "USE_FALLBACK" || e.message.includes("Failed to fetch") || e.message.includes("Unexpected token")) {
+                        const apiKey = ""; 
+                        const url = `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${apiKey}`;
+                        const previewPayload = {
+                            instances: { prompt: payload.instances.prompt },
+                            parameters: { sampleCount: 1 }
+                        };
+                        const fallbackRes = await fetch(url, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(previewPayload)
+                        });
+                        if (!fallbackRes.ok) throw new Error("Wgraj plik na Vercel (Tryb podglądu zablokowany).");
+                        return await fallbackRes.json();
+                    }
+                    throw e;
+                }
+            };
+
+            const generatePictogram = async () => {
+                if (!isAuthenticated && freeTries >= FREE_TRIES_LIMIT) {
+                    setShowPaywall(true); return;
+                }
+                if (!promptInput.trim()) {
+                    setError('Wpisz, co ma przedstawiać piktogram!'); return;
+                }
+
+                setIsGenerating(true);
+                setError('');
+                setGeneratedImage(null);
+
+                try {
+                    let hiddenInstruction = "";
+                    let apiStylePreset = "digital-art";
+
+                    if (colorMode === 'bw') {
+                        hiddenInstruction = `A simple, minimalist black and white pictogram icon. MAIN SUBJECT: ${promptInput}. Style: thick black outlines, pure white background, no shading, line art, flat 2d, educational AAC symbol, clear visual schedule icon.`;
+                        apiStylePreset = "line-art";
+                    } else {
+                        hiddenInstruction = `A simple, minimalist flat color pictogram icon. MAIN SUBJECT: ${promptInput}. Style: flat vibrant colors, thick black outlines, pure white background, no gradients, no 3d, educational AAC symbol, clear visual schedule icon.`;
+                        apiStylePreset = "digital-art";
+                    }
+                    
+                    const negativePrompt = "text, words, letters, realistic, 3d, complex details, detailed background, shadows, shading, ugly, distorted, messy lines, watermark";
+
+                    const payload = {
+                        prompt: hiddenInstruction, 
+                        negative_prompt: negativePrompt, 
+                        style_preset: apiStylePreset,
+                        width: 1024,
+                        height: 1024,
+                        instances: { prompt: hiddenInstruction }, 
+                        parameters: { sampleCount: 1 }
+                    };
+
+                    const data = await secureApiCall(payload);
+                    const base64Image = data.predictions?.[0]?.bytesBase64Encoded || data.artifacts?.[0]?.base64 || data.image; 
+                    
+                    if (base64Image) {
+                        const finalImage = base64Image.startsWith('data:image') ? base64Image : `data:image/png;base64,${base64Image}`;
+                        setGeneratedImage(finalImage);
+                        
+                        if (!isAuthenticated) {
+                            const newTries = freeTries + 1;
+                            setFreeTries(newTries);
+                            localStorage.setItem('eduPictoFreeTries', newTries.toString());
+                        }
+                        setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
+                    } else {
+                        throw new Error("Pusta odpowiedź API.");
+                    }
+                } catch (err) {
+                    console.error(err);
+                    setError(err.message || 'Wystąpił problem z generowaniem obrazu.');
+                } finally {
+                    setIsGenerating(false);
+                }
+            };
+
+            const addToSchedule = () => {
+                if (generatedImage) {
+                    const newItem = {
+                        id: Date.now(),
+                        img: generatedImage,
+                        label: promptInput.substring(0, 20).toUpperCase() // domyślny krótki podpis
+                    };
+                    setSchedule([...schedule, newItem]);
+                    // Wyczyść podgląd, aby zachęcić do stworzenia kolejnego
+                    setGeneratedImage(null);
+                    setPromptInput('');
+                }
+            };
+
+            const removeFromSchedule = (id) => {
+                setSchedule(schedule.filter(item => item.id !== id));
+            };
+
+            const updateLabel = (id, newLabel) => {
+                setSchedule(schedule.map(item => item.id === id ? { ...item, label: newLabel } : item));
+            };
+
+            const clearSchedule = () => {
+                if(confirm("Czy na pewno chcesz usunąć cały stworzony plan dnia?")) {
+                    setSchedule([]);
+                }
+            };
+
+            const handleLogin = () => {
+                if (passwordInput === SECRET_PIN) {
+                    setIsAuthenticated(true);
+                    setShowPaywall(false);
+                    localStorage.setItem('eduPictoAuth', 'true');
+                } else {
+                    alert('Nieprawidłowy kod PIN!');
+                }
+            };
+
+            // Dedykowane okno drukowania formujące idealne plany dnia (AAC)
+            const handlePrintSchedule = () => {
+                if (schedule.length === 0) return;
+                
+                const itemsHtml = schedule.map(item => `
+                    <div class="picto-box">
+                        <div class="img-container">
+                            <img src="${item.img}" />
+                        </div>
+                        <div class="label">${item.label}</div>
+                    </div>
+                `).join('');
+
+                const windowContent = `
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <title>Plan Dnia AAC - EduPiktogram</title>
+                        <style>
+                            @page { margin: 1.5cm; size: A4 portrait; }
+                            body { font-family: 'Arial', sans-serif; text-align: center; margin: 0; padding: 0; }
+                            h1 { font-size: 24px; text-transform: uppercase; margin-bottom: 30px; }
+                            
+                            /* Siatka na obrazki w formacie idealnym do rzepów (ok. 5x5 cm kwadrat) */
+                            .schedule-grid { 
+                                display: flex; 
+                                flex-wrap: wrap; 
+                                gap: 20px; 
+                                justify-content: center; 
+                            }
+                            
+                            .picto-box { 
+                                border: 3px solid #000; 
+                                border-radius: 8px; 
+                                width: 5.5cm; 
+                                display: flex; 
+                                flex-direction: column; 
+                                overflow: hidden;
+                                page-break-inside: avoid;
+                            }
+                            
+                            .img-container {
+                                width: 100%;
+                                height: 5.5cm;
+                                display: flex;
+                                align-items: center;
+                                justify-content: center;
+                                border-bottom: 3px solid #000;
+                            }
+                            
+                            img { 
+                                width: 100%; 
+                                height: 100%; 
+                                object-fit: contain; 
+                            }
+                            
+                            .label { 
+                                padding: 12px 5px; 
+                                font-weight: 900; 
+                                font-size: 16px; 
+                                text-transform: uppercase; 
+                                background-color: #fff;
+                                letter-spacing: 1px;
+                            }
+                        </style>
+                    </head>
+                    <body>
+                        <h1>Wizualny Plan Dnia</h1>
+                        <div class="schedule-grid">
+                            ${itemsHtml}
+                        </div>
+                    </body>
+                    </html>
+                `;
+                const printWin = window.open('', '', 'width=800,height=800');
+                printWin.document.open();
+                printWin.document.write(windowContent);
+                printWin.document.close();
+                
+                setTimeout(() => {
+                    printWin.focus();
+                    printWin.print();
+                    printWin.close();
+                }, 500);
+            };
+
+            if (showPaywall) {
+                return (
+                    <div className="min-h-screen relative flex items-center justify-center p-4">
+                        <div className="aura-blob aura-1"></div>
+                        <div className="aura-blob aura-2"></div>
+                        
+                        <div className="glass-panel p-10 rounded-3xl max-w-md w-full text-center shadow-[0_0_50px_rgba(14,165,233,0.2)] border border-teal-500/30 fade-in relative z-10">
+                            <div className="w-24 h-24 bg-gradient-to-br from-teal-500 to-sky-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
+                                <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                            </div>
+                            <h2 className="text-3xl font-black text-white mb-2">Dostęp PRO</h2>
+                            <p className="text-slate-300 text-sm mb-8 font-medium">Narzędzia wspierające terapię wymagają zaawansowanego serwera. Postaw wirtualną kawę, aby otrzymać kod PIN i odblokować nielimitowane piktogramy!</p>
+                            
+                            <input 
+                                type="password" value={passwordInput} onChange={(e) => setPasswordInput(e.target.value)}
+                                onKeyPress={(e) => { if (e.key === 'Enter') handleLogin(); }}
+                                placeholder="Wpisz PIN..."
+                                className="w-full bg-slate-900 border border-slate-600 text-center text-white rounded-xl px-5 py-4 focus:ring-2 focus:ring-teal-500 outline-none mb-6 text-2xl tracking-[0.5em] font-bold uppercase"
+                            />
+                            
+                            <button 
+                                onClick={handleLogin}
+                                className="w-full bg-gradient-to-r from-teal-500 to-sky-500 hover:from-teal-400 hover:to-sky-400 text-white font-black py-4 rounded-xl transition-all transform hover:scale-105 btn-bounce text-lg shadow-lg mb-4"
+                            >
+                                Odblokuj System
+                            </button>
+                            <button onClick={() => setShowPaywall(false)} className="text-slate-400 hover:text-white text-sm font-bold mb-8">
+                                Wróć do strony głównej
+                            </button>
+                            <div className="pt-6 border-t border-slate-700/50">
+                                <a href={BUY_COFFEE_LINK} target="_blank" rel="noopener noreferrer" className="w-full bg-slate-800/80 hover:bg-slate-700 border border-slate-600 text-white font-bold py-3.5 rounded-xl transition-all flex items-center justify-center gap-3 text-sm btn-bounce hover:border-sky-500/50 hover:text-sky-400 shadow-md">
+                                    <span className="text-xl">☕</span> Postaw Kawę i odbierz PIN
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="min-h-screen relative flex flex-col">
+                    <div className="aura-blob aura-1"></div>
+                    <div className="aura-blob aura-2"></div>
+
+                    <nav className="fixed top-0 w-full z-50 glass-nav">
+                        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-20 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 bg-gradient-to-br from-teal-500 to-sky-500 rounded-xl flex items-center justify-center shadow-lg">
+                                    <span className="text-white text-xl">🧩</span>
+                                </div>
+                                <span className="text-xl font-extrabold tracking-tight text-white hidden sm:block">EduPiktogram<span className="text-teal-400">AI</span></span>
+                            </div>
+                            <div className="flex items-center gap-4">
+                                {!isAuthenticated ? (
+                                    <a href={BUY_COFFEE_LINK} target="_blank" rel="noopener noreferrer" className="bg-gradient-to-r from-teal-600 to-sky-500 hover:scale-105 transition-all px-4 py-1.5 rounded-full text-xs font-bold text-white flex items-center gap-2 shadow-lg btn-bounce">
+                                        <span>☕</span> Postaw Kawę
+                                    </a>
+                                ) : (
+                                    <div className="flex items-center gap-3">
+                                        <div className="bg-teal-500/20 border border-teal-500/50 px-3 py-1.5 rounded-full text-xs font-bold text-teal-400 flex items-center gap-2">
+                                            <span className="w-2 h-2 rounded-full bg-teal-400"></span>
+                                            Konto PRO
+                                        </div>
+                                        <button onClick={() => { setIsAuthenticated(false); localStorage.removeItem('eduPictoAuth'); }} className="text-xs text-slate-400 hover:text-white transition-colors underline">
+                                            Wyloguj
+                                        </button>
+                                    </div>
+                                )}
+                                <a href="index.html" className="flex items-center gap-2 text-xs sm:text-sm font-bold text-slate-300 hover:text-white transition-colors bg-slate-800 hover:bg-slate-700 px-4 py-2.5 rounded-xl border border-slate-600">
+                                    Wróć
+                                </a>
+                            </div>
+                        </div>
+                    </nav>
+
+                    <main className="flex-grow pt-32 pb-32 px-4 sm:px-6">
+                        <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8">
+                            
+                            {/* LEWA KOLUMNA: GENERATOR */}
+                            <div className="lg:col-span-5 space-y-6">
+                                <div className="text-left mb-8 fade-in">
+                                    <div className="inline-flex items-center gap-2 bg-teal-900/30 border border-teal-500/30 px-4 py-1.5 rounded-full text-[10px] font-black text-teal-400 uppercase tracking-widest mb-4">
+                                        Terapia i AAC
+                                    </div>
+                                    <h1 className="text-3xl sm:text-4xl font-black text-white mb-3 tracking-tight">
+                                        Stwórz własny <br/><span className="text-gradient">Plan Dnia.</span>
+                                    </h1>
+                                    <p className="text-slate-400 text-sm">
+                                        Generuj proste i zrozumiałe piktogramy, twórz harmonogramy i drukuj gotowe karty komunikacyjne.
+                                    </p>
+                                </div>
+
+                                <div className="glass-panel p-6 sm:p-8 rounded-[2rem] fade-in border border-slate-700/50">
+                                    
+                                    <div className="mb-6 flex bg-slate-800/50 p-1 rounded-xl">
+                                        <button 
+                                            onClick={() => setColorMode('bw')} 
+                                            className={`flex-1 py-3 text-sm font-bold rounded-lg transition-all ${colorMode === 'bw' ? 'bg-slate-700 text-white shadow' : 'text-slate-400 hover:text-white'}`}
+                                        >
+                                            Czarno-białe (Kontur)
+                                        </button>
+                                        <button 
+                                            onClick={() => setColorMode('color')} 
+                                            className={`flex-1 py-3 text-sm font-bold rounded-lg transition-all ${colorMode === 'color' ? 'bg-teal-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}
+                                        >
+                                            Kolorowe (Płaskie)
+                                        </button>
+                                    </div>
+
+                                    <label className="block text-white font-bold mb-3 text-sm">Aktywność / Przedmiot:</label>
+                                    <div className="relative mb-6">
+                                        <input 
+                                            type="text" 
+                                            value={promptInput}
+                                            onChange={(e) => setPromptInput(e.target.value)}
+                                            onKeyPress={(e) => { if(e.key === 'Enter') generatePictogram(); }}
+                                            placeholder="Np. mycie rąk, jazda autobusem, cisza..."
+                                            className="w-full bg-slate-900/80 border border-slate-600 text-white rounded-xl px-5 py-4 focus:ring-2 focus:ring-teal-500 outline-none pr-12"
+                                        />
+                                    </div>
+
+                                    <button 
+                                        onClick={generatePictogram}
+                                        disabled={isGenerating || !promptInput}
+                                        className={`w-full py-4 rounded-xl font-black text-white text-lg transition-all flex items-center justify-center gap-3 shadow-[0_0_20px_rgba(20,184,166,0.2)] btn-bounce
+                                            ${isGenerating ? 'bg-slate-700 cursor-not-allowed' : 'bg-gradient-to-r from-teal-500 to-sky-500 hover:scale-105'}`}
+                                    >
+                                        {isGenerating ? (
+                                            <><svg className="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Rysowanie...</>
+                                        ) : (!isAuthenticated && freeTries >= FREE_TRIES_LIMIT ? 'Odblokuj PRO' : 'Stwórz Piktogram')}
+                                    </button>
+
+                                    {error && <div className="mt-4 p-3 bg-red-900/30 border border-red-500/50 rounded-lg text-red-400 text-xs font-medium text-center">{error}</div>}
+                                </div>
+                                
+                                {/* WYNIK GENEROWANIA - Gotowy do dodania */}
+                                {generatedImage && (
+                                    <div ref={resultRef} className="glass-panel p-6 rounded-[2rem] fade-in border border-teal-500/30 text-center">
+                                        <h3 className="text-sm font-bold text-white mb-4">Podgląd Piktogramu</h3>
+                                        <div className="bg-white p-3 rounded-2xl mx-auto w-48 h-48 flex items-center justify-center mb-6 shadow-xl border-2 border-slate-200">
+                                            <img src={generatedImage} alt="Piktogram" className="max-w-full max-h-full object-contain mix-blend-multiply" />
+                                        </div>
+                                        <button 
+                                            onClick={addToSchedule} 
+                                            className="w-full bg-teal-600 hover:bg-teal-500 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all btn-bounce shadow-lg"
+                                        >
+                                            ➕ Dodaj do Planu Dnia
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* PRAWA KOLUMNA: PLAN DNIA (KOSZYK) */}
+                            <div className="lg:col-span-7 glass-panel rounded-[2.5rem] p-6 sm:p-8 border border-slate-700/50 flex flex-col h-full min-h-[600px]">
+                                <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-700/50">
+                                    <h2 className="text-2xl font-black text-white flex items-center gap-2">
+                                        📋 Twój Plan Dnia
+                                        <span className="bg-teal-500 text-white text-xs px-2 py-1 rounded-full">{schedule.length}</span>
+                                    </h2>
+                                    {schedule.length > 0 && (
+                                        <div className="flex gap-2">
+                                            <button onClick={clearSchedule} className="text-slate-400 hover:text-red-400 text-sm font-bold px-3 py-2 rounded-lg hover:bg-slate-800 transition-colors">
+                                                Wyczyść
+                                            </button>
+                                            <button onClick={handlePrintSchedule} className="bg-white text-slate-900 hover:bg-teal-50 px-4 py-2 rounded-xl font-black flex items-center gap-2 transition-all shadow-lg btn-bounce">
+                                                🖨️ Drukuj PDF
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {schedule.length === 0 ? (
+                                    <div className="flex-grow flex flex-col items-center justify-center text-center opacity-50">
+                                        <span className="text-6xl mb-4">🧩</span>
+                                        <p className="text-slate-300 font-bold text-lg">Plan dnia jest pusty.</p>
+                                        <p className="text-slate-400 text-sm max-w-xs mt-2">Wygeneruj obrazek po lewej stronie i dodaj go tutaj, aby rozpocząć budowanie harmonogramu.</p>
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 auto-rows-max overflow-y-auto pr-2 pb-10" style={{ maxHeight: "calc(100vh - 250px)" }}>
+                                        {schedule.map((item, index) => (
+                                            <div key={item.id} className="bg-slate-800/80 rounded-2xl p-3 border border-slate-600 relative group picto-item-enter">
+                                                <div className="absolute top-2 left-2 bg-slate-900 text-slate-400 text-xs font-black w-6 h-6 rounded-full flex items-center justify-center z-10 border border-slate-700">
+                                                    {index + 1}
+                                                </div>
+                                                <button 
+                                                    onClick={() => removeFromSchedule(item.id)}
+                                                    className="absolute -top-2 -right-2 bg-red-500 hover:bg-red-600 text-white w-8 h-8 rounded-full flex items-center justify-center shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-10 btn-bounce"
+                                                    title="Usuń"
+                                                >
+                                                    ✖
+                                                </button>
+                                                <div className="bg-white aspect-square rounded-xl mb-3 p-2 flex items-center justify-center shadow-inner">
+                                                    <img src={item.img} className="max-w-full max-h-full object-contain mix-blend-multiply" alt="Picto" />
+                                                </div>
+                                                <input 
+                                                    type="text" 
+                                                    value={item.label} 
+                                                    onChange={(e) => updateLabel(item.id, e.target.value)}
+                                                    className="w-full bg-slate-900 border border-slate-700 text-white text-center text-xs font-bold p-2 rounded-lg focus:ring-1 focus:ring-teal-500 outline-none uppercase"
+                                                />
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                        </div>
+                    </main>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
