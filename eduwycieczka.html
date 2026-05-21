@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="pl" translate="no" class="notranslate">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduWycieczka - Asystent Wyjść Klasowych</title>
+    
+    <!-- Biblioteki (zgodne z portfolio) -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    
+    <!-- Ikony Phosphor -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+    <style>
+        body { 
+            font-family: 'Plus Jakarta Sans', sans-serif; 
+            background-color: #020617; 
+            color: #f8fafc; 
+            overflow-x: hidden;
+            min-height: 100vh;
+        }
+        
+        .glass-panel { 
+            background: rgba(30, 41, 59, 0.4); 
+            backdrop-filter: blur(16px); 
+            -webkit-backdrop-filter: blur(16px); 
+            border: 1px solid rgba(255, 255, 255, 0.05); 
+        }
+
+        .glass-nav { 
+            background: rgba(2, 6, 23, 0.8); 
+            backdrop-filter: blur(20px); 
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05); 
+        }
+
+        .btn-bounce:active { transform: scale(0.95); transition: transform 0.1s; }
+
+        .hero-glow {
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100vw;
+            height: 600px;
+            background: radial-gradient(circle, rgba(16, 185, 129, 0.15) 0%, rgba(2, 6, 23, 0) 60%);
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #0f172a; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+        
+        .loader {
+            border: 3px solid rgba(255,255,255,0.1);
+            border-left-color: #10b981; /* emerald-500 */
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* Ustawienia inteligentnego wydruku */
+        @media print {
+            @page { margin: 1.5cm; size: A4 portrait; }
+            body, html, #root { 
+                background: white !important; 
+                color: black !important; 
+                font-family: Arial, sans-serif !important; 
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+            .print-hidden { display: none !important; }
+            .print-only { 
+                display: block !important; 
+                width: 100% !important;
+            }
+            .scissors-line {
+                border-bottom: 2px dashed #999 !important;
+                margin: 20px 0 !important;
+                position: relative;
+            }
+            .scissors-icon {
+                position: absolute;
+                right: 20px;
+                top: -12px;
+                background: white;
+                padding: 0 10px;
+                font-size: 20px;
+                color: #999;
+            }
+            .print-consent-form {
+                page-break-inside: avoid;
+                margin-bottom: 20px;
+            }
+            h1, h2, h3 { color: black !important; page-break-after: avoid !important; }
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        const BUY_COFFEE_LINK = "https://buycoffee.to/magiccolor";
+
+        function EduWycieczkaApp() {
+            // --- STATE APLIKACJI ---
+            const [dest, setDest] = useState('');
+            const [cls, setCls] = useState('');
+            const [date, setDate] = useState('');
+            const [timeStart, setTimeStart] = useState('08:00');
+            const [timeEnd, setTimeEnd] = useState('14:00');
+            const [studentsCount, setStudentsCount] = useState(25);
+            
+            // --- STATE BUDŻETU ---
+            const [costs, setCosts] = useState([
+                { id: 1, name: 'Transport (Autokar)', amount: 600 },
+                { id: 2, name: 'Bilety wstępu', amount: 350 },
+            ]);
+            
+            const [newCostName, setNewCostName] = useState('');
+            const [newCostAmount, setNewCostAmount] = useState('');
+
+            // --- STATE WYNIKÓW ---
+            const [activeTab, setActiveTab] = useState('librus'); // librus | game | consent
+            const [librusMessage, setLibrusMessage] = useState('');
+            const [fieldGame, setFieldGame] = useState('');
+            const [isGenerating, setIsGenerating] = useState(false);
+            const [toastMessage, setToastMessage] = useState('');
+
+            // --- FUNKCJE POMOCNICZE ---
+            const showToast = (msg) => {
+                setToastMessage(msg);
+                setTimeout(() => setToastMessage(''), 3000);
+            };
+
+            const copyToClipboard = (text) => {
+                navigator.clipboard.writeText(text);
+                showToast("✅ Skopiowano do schowka!");
+            };
+
+            // --- LOGIKA BUDŻETU ---
+            const totalCost = costs.reduce((acc, curr) => acc + curr.amount, 0);
+            const costPerStudent = studentsCount > 0 ? (totalCost / studentsCount).toFixed(2) : 0;
+
+            const addCost = () => {
+                if (!newCostName.trim() || !newCostAmount || isNaN(newCostAmount)) return;
+                setCosts([...costs, { id: Date.now(), name: newCostName, amount: parseFloat(newCostAmount) }]);
+                setNewCostName('');
+                setNewCostAmount('');
+            };
+
+            const removeCost = (id) => {
+                setCosts(costs.filter(c => c.id !== id));
+            };
+
+            // --- LOGIKA AI (Vercel Backend) ---
+            const generateAIPackage = async () => {
+                if (!dest.trim() || !cls.trim()) {
+                    showToast("⚠️ Wpisz cel wycieczki i klasę!");
+                    return;
+                }
+                
+                setIsGenerating(true);
+                
+                const prompt = `Jesteś ekspertem edukacyjnym. Organizuję wycieczkę szkolną.
+Cel: ${dest}
+Klasa: ${cls}
+Termin: ${date || '[Data]'}, godz. ${timeStart} - ${timeEnd}
+Koszt na ucznia: ${costPerStudent} zł
+
+ZADANIE: Wygeneruj DWA teksty oddzielone dokładnie trzema znakami tyldy: "~~~".
+
+CZĘŚĆ 1 (Wiadomość do rodziców):
+Napisz profesjonalną wiadomość na dziennik elektroniczny (Librus) o wycieczce. Podaj cel, zbiórkę, powrót, koszt i poproś o dostarczenie zgód oraz wpłatę. Bądź miły i urzędowy.
+
+~~~
+CZĘŚĆ 2 (Gra terenowa):
+Wymyśl 3 kreatywne, ciekaave zadania lub zagadki terenowe (questy) do wykonania dla uczniów w miejscu: ${dest}. Muszą być powiązane z tym miejscem.`;
+
+                try {
+                    const response = await fetch('/api/gemini', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ prompt: prompt })
+                    });
+                    
+                    const data = await response.json();
+                    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                    
+                    if (!text || text.includes("🚨")) {
+                        showToast("🚨 Błąd serwera. Spróbuj ponownie.");
+                        console.error(text);
+                        return;
+                    }
+
+                    // Rozdzielanie odpowiedzi
+                    const parts = text.split('~~~');
+                    if (parts.length >= 2) {
+                        setLibrusMessage(parts[0].trim());
+                        setFieldGame(parts[1].trim());
+                        showToast("✨ Wygenerowano pakiet wycieczkowy!");
+                    } else {
+                        // Fallback jeśli AI zapomni znacznika
+                        setLibrusMessage(text);
+                        setFieldGame("AI nie oddzieliło poprawnie gry terenowej. Spróbuj wygenerować jeszcze raz.");
+                    }
+                    
+                } catch (error) {
+                    console.error("API Error:", error);
+                    showToast("🚨 Wystąpił błąd komunikacji z serwerem.");
+                } finally {
+                    setIsGenerating(false);
+                }
+            };
+
+            // Szablon Zgody Rodzica (HTML do druku)
+            const ConsentTemplate = () => (
+                <div className="print-consent-form bg-white text-black p-6 rounded-xl border border-slate-300 font-sans text-sm h-[45%] flex flex-col justify-between">
+                    <div>
+                        <h2 className="text-center font-bold text-lg mb-4 underline">ZGODA NA UDZIAŁ W WYCIECZCE</h2>
+                        <p className="mb-4 text-justify leading-relaxed">
+                            Wyrażam zgodę na udział mojego dziecka:<br/>
+                            .................................................................................................................................<br/>
+                            <span className="text-[10px] text-gray-500">(imię i nazwisko ucznia)</span>
+                        </p>
+                        <p className="mb-4 text-justify leading-relaxed">
+                            w wycieczce klasowej / szkolnej do: <strong>{dest || '...................................................'}</strong>.<br/>
+                            Termin wycieczki: <strong>{date || '............................'}</strong> w godz. <strong>{timeStart} - {timeEnd}</strong>.
+                        </p>
+                        <p className="mb-4 text-justify leading-relaxed">
+                            Zobowiązuję się do pokrycia kosztów wycieczki w wysokości: <strong>{costPerStudent} zł</strong>.<br/>
+                            Biorę na siebie odpowiedzialność finansową za szkody materialne wyrządzone przez moje dziecko podczas wycieczki.
+                        </p>
+                        <p className="mb-6">
+                            Ważne informacje o stanie zdrowia dziecka (choroby przewlekłe, przyjmowane leki, alergie):<br/>
+                            .................................................................................................................................
+                        </p>
+                    </div>
+                    <div className="flex justify-between mt-4">
+                        <div className="text-center w-40">
+                            <div className="border-b border-black mb-1"></div>
+                            <span className="text-[10px]">(miejscowość, data)</span>
+                        </div>
+                        <div className="text-center w-56">
+                            <div className="border-b border-black mb-1"></div>
+                            <span className="text-[10px]">(czytelny podpis rodzica/opiekuna)</span>
+                        </div>
+                    </div>
+                </div>
+            );
+
+            return (
+                <div className="min-h-screen relative flex flex-col pb-10">
+                    <div className="hero-glow print-hidden"></div>
+
+                    {/* Powiadomienia */}
+                    <div className={`fixed top-24 left-1/2 -translate-x-1/2 z-[200] bg-emerald-600 text-white px-6 py-3 rounded-full font-bold shadow-[0_10px_40px_rgba(16,185,129,0.5)] transition-all duration-300 flex items-center gap-2 print-hidden ${toastMessage ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-10 pointer-events-none'}`}>
+                        {toastMessage}
+                    </div>
+
+                    {/* Nawigacja Główna */}
+                    <nav className="w-full z-[100] glass-nav print-hidden sticky top-0">
+                        <div className="max-w-[90rem] mx-auto px-6 h-20 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 bg-emerald-600 rounded-xl flex items-center justify-center shadow-[0_0_15px_rgba(16,185,129,0.5)]">
+                                    <i className="ph-bold ph-bus text-white text-xl"></i>
+                                </div>
+                                <span className="text-xl font-extrabold tracking-tight text-white hidden sm:block">EduWycieczka</span>
+                            </div>
+                            
+                            <a href={BUY_COFFEE_LINK} target="_blank" className="flex items-center gap-2 bg-slate-800 border border-slate-700 text-amber-400 px-5 py-2.5 rounded-full hover:bg-slate-700 transition-all shadow-lg btn-bounce text-xs font-bold uppercase tracking-wider">
+                                <i className="ph-fill ph-coffee text-base"></i> Postaw Kawę
+                            </a>
+                        </div>
+                    </nav>
+
+                    <main className="flex-grow max-w-[90rem] w-full mx-auto px-4 sm:px-6 py-8 relative z-10 flex flex-col xl:flex-row gap-8 items-start">
+                        
+                        {/* ================================== */}
+                        {/* LEWA KOLUMNA: Wprowadzanie danych  */}
+                        {/* ================================== */}
+                        <div className="w-full xl:w-5/12 flex flex-col gap-6 print-hidden">
+                            
+                            {/* Panel Podstawowy */}
+                            <div className="glass-panel rounded-[2rem] p-6 md:p-8">
+                                <h2 className="text-2xl font-black text-white mb-6 flex items-center gap-2">
+                                    <i className="ph-bold ph-map-pin text-emerald-400"></i> Dane wyjścia
+                                </h2>
+                                
+                                <div className="space-y-4">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2">Cel wycieczki</label>
+                                            <input type="text" value={dest} onChange={e => setDest(e.target.value)} placeholder="Np. Skansen, Muzeum, Kino..." className="w-full bg-slate-900 border border-slate-700 text-white rounded-xl px-4 py-3 focus:outline-none focus:border-emerald-500 transition-colors text-sm" />
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2">Klasa / Grupa</label>
+                                            <input type="text" value={cls} onChange={e => setCls(e.target.value)} placeholder="Np. 4a" className="w-full bg-slate-900 border border-slate-700 text-white rounded-xl px-4 py-3 focus:outline-none focus:border-emerald-500 transition-colors text-sm" />
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="grid grid-cols-3 gap-4">
+                                        <div className="col-span-1">
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2">Data</label>
+                                            <input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full bg-slate-900 border border-slate-700 text-white rounded-xl px-3 py-3 focus:outline-none focus:border-emerald-500 transition-colors text-sm" />
+                                        </div>
+                                        <div className="col-span-1">
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2">Od</label>
+                                            <input type="time" value={timeStart} onChange={e => setTimeStart(e.target.value)} className="w-full bg-slate-900 border border-slate-700 text-white rounded-xl px-3 py-3 focus:outline-none focus:border-emerald-500 transition-colors text-sm" />
+                                        </div>
+                                        <div className="col-span-1">
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2">Do</label>
+                                            <input type="time" value={timeEnd} onChange={e => setTimeEnd(e.target.value)} className="w-full bg-slate-900 border border-slate-700 text-white rounded-xl px-3 py-3 focus:outline-none focus:border-emerald-500 transition-colors text-sm" />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Panel Budżetu */}
+                            <div className="glass-panel rounded-[2rem] p-6 md:p-8 border-t-4 border-emerald-500 shadow-[0_10px_30px_-15px_rgba(16,185,129,0.3)]">
+                                <h2 className="text-2xl font-black text-white mb-2 flex items-center gap-2">
+                                    <i className="ph-bold ph-calculator text-emerald-400"></i> Kalkulator Budżetu
+                                </h2>
+                                <p className="text-slate-400 text-sm mb-6">Wpisz łączne koszty dla całej klasy, a my obliczymy zrzutkę na 1 ucznia.</p>
+
+                                <div className="space-y-3 mb-6">
+                                    {costs.map((c, i) => (
+                                        <div key={c.id} className="flex justify-between items-center bg-slate-900/50 border border-slate-700 p-3 rounded-xl">
+                                            <span className="text-white text-sm flex items-center gap-2"><i className="ph-fill ph-money text-emerald-500"></i> {c.name}</span>
+                                            <div className="flex items-center gap-3">
+                                                <span className="font-mono text-emerald-400 font-bold">{c.amount.toFixed(2)} zł</span>
+                                                <button onClick={() => removeCost(c.id)} className="text-red-400 hover:text-red-300 p-1"><i className="ph-bold ph-trash"></i></button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                <div className="flex gap-2 mb-8">
+                                    <input type="text" placeholder="Nowy wydatek (np. Przewodnik)" value={newCostName} onChange={e => setNewCostName(e.target.value)} className="flex-grow bg-slate-800 border border-slate-600 text-white rounded-lg px-3 py-2 text-sm focus:border-emerald-500 outline-none" />
+                                    <input type="number" placeholder="Kwota" value={newCostAmount} onChange={e => setNewCostAmount(e.target.value)} className="w-24 bg-slate-800 border border-slate-600 text-white rounded-lg px-3 py-2 text-sm focus:border-emerald-500 outline-none text-center" />
+                                    <button onClick={addCost} className="bg-slate-700 hover:bg-slate-600 text-white px-3 py-2 rounded-lg font-bold transition-colors"><i className="ph-bold ph-plus"></i></button>
+                                </div>
+
+                                <div className="bg-slate-900 p-4 rounded-xl border border-emerald-500/30 flex justify-between items-center">
+                                    <div>
+                                        <div className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">Liczba Uczniów:</div>
+                                        <input type="number" min="1" value={studentsCount} onChange={e => setStudentsCount(e.target.value)} className="bg-transparent text-white font-bold text-lg w-16 border-b border-slate-600 outline-none focus:border-emerald-500 text-center" />
+                                    </div>
+                                    <div className="text-right">
+                                        <div className="text-[10px] text-emerald-400 uppercase tracking-widest font-bold">Składka na 1 ucznia</div>
+                                        <div className="text-3xl font-black text-white tabular-nums">{costPerStudent} zł</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <button 
+                                onClick={generateAIPackage} 
+                                disabled={isGenerating || !dest}
+                                className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:opacity-50 text-white py-4 rounded-xl font-bold shadow-[0_10px_30px_-10px_rgba(16,185,129,0.5)] transition-all btn-bounce uppercase tracking-widest flex items-center justify-center gap-3 text-sm"
+                            >
+                                {isGenerating ? <div className="loader"></div> : <><i className="ph-bold ph-magic-wand text-xl"></i> Wygeneruj Pakiet Organizatora</>}
+                            </button>
+                        </div>
+
+                        {/* ================================== */}
+                        {/* PRAWA KOLUMNA: Wyniki (AI & Druk)  */}
+                        {/* ================================== */}
+                        <div className="w-full xl:w-7/12 print:w-full print:m-0 flex flex-col h-full">
+                            
+                            <div className="glass-panel p-2 rounded-2xl flex gap-1 bg-slate-900/60 mb-6 print-hidden">
+                                <button onClick={() => setActiveTab('librus')} className={`flex-1 py-3 px-2 rounded-xl flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-widest transition-all ${activeTab === 'librus' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}><i className="ph-bold ph-envelope-simple text-lg"></i> Librus</button>
+                                <button onClick={() => setActiveTab('consent')} className={`flex-1 py-3 px-2 rounded-xl flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-widest transition-all ${activeTab === 'consent' ? 'bg-amber-600 text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}><i className="ph-bold ph-file-signature text-lg"></i> Zgody</button>
+                                <button onClick={() => setActiveTab('game')} className={`flex-1 py-3 px-2 rounded-xl flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-widest transition-all ${activeTab === 'game' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}><i className="ph-bold ph-compass text-lg"></i> Gra Terenowa</button>
+                            </div>
+
+                            <div className="glass-panel rounded-[2rem] p-6 md:p-8 flex-grow relative overflow-hidden print:p-0 print:border-none print:bg-transparent print:backdrop-filter-none">
+                                
+                                {/* WIDOK 1: LIBRUS */}
+                                {activeTab === 'librus' && (
+                                    <div className="animate-[reveal_0.2s_ease-out] print-hidden flex flex-col h-full">
+                                        <div className="flex justify-between items-center mb-6">
+                                            <div>
+                                                <h3 className="text-xl font-bold text-white">Wiadomość do rodziców</h3>
+                                                <p className="text-slate-400 text-xs">Gotowa do wklejenia w e-dzienniku.</p>
+                                            </div>
+                                            <button onClick={() => copyToClipboard(librusMessage)} className="bg-slate-800 hover:bg-slate-700 border border-slate-600 px-4 py-2 rounded-lg text-xs font-bold text-white transition-colors flex items-center gap-2 btn-bounce">
+                                                <i className="ph-bold ph-copy"></i> Skopiuj
+                                            </button>
+                                        </div>
+                                        
+                                        {!librusMessage ? (
+                                            <div className="flex-1 flex flex-col items-center justify-center text-slate-500 border-2 border-dashed border-slate-700/50 rounded-xl p-10">
+                                                <i className="ph-duotone ph-paper-plane-tilt text-6xl mb-4"></i>
+                                                <p>Kliknij "Wygeneruj Pakiet Organizatora", aby AI napisało wiadomość.</p>
+                                            </div>
+                                        ) : (
+                                            <textarea 
+                                                value={librusMessage} 
+                                                onChange={e => setLibrusMessage(e.target.value)}
+                                                className="w-full flex-1 min-h-[400px] bg-slate-900 border border-slate-700 rounded-xl p-6 text-slate-200 text-sm leading-relaxed outline-none focus:border-indigo-500 custom-scrollbar resize-none"
+                                            ></textarea>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* WIDOK 2: ZGODY DO DRUKU */}
+                                <div className={`${activeTab === 'consent' ? 'block' : 'hidden'} animate-[reveal_0.2s_ease-out] print:block w-full h-full flex flex-col`}>
+                                    <div className="flex justify-between items-center mb-6 print-hidden">
+                                        <div>
+                                            <h3 className="text-xl font-bold text-white">Oświadczenia do druku</h3>
+                                            <p className="text-slate-400 text-xs">Dwie zgody na jednej kartce (oszczędność papieru).</p>
+                                        </div>
+                                        <button onClick={() => window.print()} className="bg-amber-600 hover:bg-amber-500 text-white px-6 py-2 rounded-lg text-xs font-bold transition-all shadow-lg flex items-center gap-2 btn-bounce uppercase tracking-wider">
+                                            <i className="ph-bold ph-printer text-lg"></i> Drukuj PDF
+                                        </button>
+                                    </div>
+
+                                    {/* Widok do druku (i podglądu na stronie) */}
+                                    <div className="bg-white rounded-xl p-4 md:p-8 flex-1 print:p-0">
+                                        <div className="h-full print-only-wrapper relative">
+                                            <ConsentTemplate />
+                                            
+                                            <div className="scissors-line my-8 print:my-4 border-b-2 border-dashed border-slate-400 w-full relative">
+                                                <div className="absolute right-10 -top-3 bg-white px-2 text-slate-400 text-xl"><i className="ph-fill ph-scissors"></i></div>
+                                            </div>
+                                            
+                                            <ConsentTemplate />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* WIDOK 3: GRA TERENOWA */}
+                                {activeTab === 'game' && (
+                                    <div className="animate-[reveal_0.2s_ease-out] print-hidden flex flex-col h-full">
+                                        <div className="flex justify-between items-center mb-6">
+                                            <div>
+                                                <h3 className="text-xl font-bold text-white">Zadanie Terenowe</h3>
+                                                <p className="text-slate-400 text-xs">Kreatywne misje dla uczniów wygenerowane przez AI.</p>
+                                            </div>
+                                            <button onClick={() => copyToClipboard(fieldGame)} className="bg-slate-800 hover:bg-slate-700 border border-slate-600 px-4 py-2 rounded-lg text-xs font-bold text-white transition-colors flex items-center gap-2 btn-bounce">
+                                                <i className="ph-bold ph-copy"></i> Skopiuj
+                                            </button>
+                                        </div>
+                                        
+                                        {!fieldGame ? (
+                                            <div className="flex-1 flex flex-col items-center justify-center text-slate-500 border-2 border-dashed border-slate-700/50 rounded-xl p-10">
+                                                <i className="ph-duotone ph-compass text-6xl mb-4"></i>
+                                                <p>Kliknij "Wygeneruj Pakiet", aby AI wymyśliło zagadki do {dest || 'wybranego miejsca'}.</p>
+                                            </div>
+                                        ) : (
+                                            <div className="bg-slate-900 border border-slate-700 rounded-xl p-6 flex-1 overflow-y-auto custom-scrollbar relative group">
+                                                <i className="ph-fill ph-quotes text-4xl text-slate-800 absolute top-4 left-4 pointer-events-none"></i>
+                                                <textarea 
+                                                    value={fieldGame} 
+                                                    onChange={e => setFieldGame(e.target.value)}
+                                                    className="w-full h-full min-h-[350px] bg-transparent text-slate-200 text-sm leading-relaxed outline-none resize-none font-medium z-10 relative"
+                                                ></textarea>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                            </div>
+                        </div>
+                    </main>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<EduWycieczkaApp />);
+    </script>
+</body>
+</html>
