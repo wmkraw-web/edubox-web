@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="pl" translate="no" class="notranslate">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduFiszki AI - Generator Kart i Memory</title>
+    
+    <!-- Biblioteki -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    
+    <!-- Ikony Phosphor -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+    <style>
+        body { 
+            font-family: 'Plus Jakarta Sans', sans-serif; 
+            background-color: #020617; 
+            color: #f8fafc; 
+            overflow-x: hidden;
+            min-height: 100vh;
+        }
+        
+        .glass-panel { 
+            background: rgba(30, 41, 59, 0.4); 
+            backdrop-filter: blur(16px); 
+            -webkit-backdrop-filter: blur(16px); 
+            border: 1px solid rgba(255, 255, 255, 0.05); 
+        }
+
+        .glass-nav { 
+            background: rgba(2, 6, 23, 0.8); 
+            backdrop-filter: blur(20px); 
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05); 
+        }
+
+        .btn-bounce:active { transform: scale(0.95); transition: transform 0.1s; }
+
+        .hero-glow {
+            position: fixed;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 1000px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(168, 85, 247, 0.15) 0%, rgba(2, 6, 23, 0) 60%);
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #0f172a; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+
+        .loader {
+            border: 3px solid rgba(255,255,255,0.1);
+            border-left-color: #d946ef; /* fuchsia-500 */
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* Magia Wydruku */
+        @media print {
+            @page { margin: 1cm; size: A4 portrait; }
+            body, html { background: white !important; color: black !important; margin: 0; padding: 0; }
+            .print-hidden { display: none !important; }
+            .glass-panel { background: none; border: none; filter: none; padding: 0; margin: 0; box-shadow: none; }
+            
+            /* Zapobieganie ucinaniu kart w połowie strony */
+            .print-break-inside-avoid { page-break-inside: avoid; }
+            
+            /* Domyślne kolory kartki do druku czarno-białego */
+            .print-card { 
+                border: 2px solid #333 !important; 
+                background: white !important; 
+                color: black !important;
+            }
+            .print-dashed { border-style: dashed !important; }
+            .print-page-break { page-break-before: always; }
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        const BUY_COFFEE_LINK = "https://buycoffee.to/magiccolor";
+
+        function EduFiszkiApp() {
+            // --- STATE APLIKACJI ---
+            const [inputText, setInputText] = useState('');
+            const [pairsCount, setPairsCount] = useState(8);
+            const [printMode, setPrintMode] = useState('fiszki'); // fiszki | memory
+            
+            // --- PREMIUM & FREEMIUM ---
+            const [isPremium, setIsPremium] = useState(() => localStorage.getItem('edubox_premium') === 'true');
+            const [freeUses, setFreeUses] = useState(() => {
+                const stored = localStorage.getItem('edufiszki_free_uses');
+                return stored !== null ? parseInt(stored, 10) : 2;
+            });
+            const [accessCode, setAccessCode] = useState('');
+            
+            const [aiCards, setAiCards] = useState([]); // Przechowuje wygenerowane obiekty {term, def}
+            const [isGenerating, setIsGenerating] = useState(false);
+            const [toastMessage, setToastMessage] = useState('');
+
+            const showToast = (msg) => {
+                setToastMessage(msg);
+                setTimeout(() => setToastMessage(''), 3000);
+            };
+
+            const handleVerifyCode = () => {
+                if (accessCode.toUpperCase() === 'KAWA2024') { 
+                    setIsPremium(true); 
+                    localStorage.setItem('edubox_premium', 'true');
+                    setAccessCode(''); 
+                    showToast("🎉 Moduł w pełni odblokowany!"); 
+                } else { 
+                    showToast("❌ Nieprawidłowy kod!"); 
+                }
+            };
+
+            const generateCards = async () => {
+                if (!inputText.trim()) {
+                    showToast("⚠️ Wklej tekst źródłowy (notatkę, temat), z którego mam wyciągnąć pojęcia.");
+                    return;
+                }
+
+                if (!isPremium && freeUses <= 0) {
+                    showToast("☕ Brak darmowych prób! Wpisz kod Premium.");
+                    return;
+                }
+
+                setIsGenerating(true);
+                setAiCards([]);
+
+                // Zmuszamy AI do zwrócenia CZYSTEGO JSONa
+                const systemPrompt = `Jesteś ekspertem metodycznym. Przeanalizuj podany tekst źródłowy ucznia/nauczyciela. 
+ZADANIE: Wyodrębnij dokładnie ${pairsCount} najważniejszych pojęć (słów kluczowych) oraz sformułuj do nich krótkie, jednoznaczne definicje.
+
+WYMÓG KRYTYCZNY: Musisz zwrócić odpowiedź TYLKO i WYŁĄCZNIE jako czystą tablicę JSON, bez żadnego tekstu przed i po, bez znaczników markdown. 
+Format musi wyglądać dokładnie tak:
+[
+  {"term": "Słowo 1", "def": "Definicja słowa 1"},
+  {"term": "Słowo 2", "def": "Definicja słowa 2"}
+]`;
+
+                const finalPrompt = `${systemPrompt}\n\nTEKST ŹRÓDŁOWY:\n${inputText}`;
+
+                try {
+                    const response = await fetch('/api/gemini', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ prompt: finalPrompt })
+                    });
+                    
+                    const data = await response.json();
+                    let text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                    
+                    if (!text) throw new Error("Pusta odpowiedź z API");
+
+                    // Czyszczenie formatowania markdown (np. usunięcie ```json)
+                    text = text.replace(/```json/g, '').replace(/```/g, '').trim();
+
+                    try {
+                        const parsedData = JSON.parse(text);
+                        if (Array.isArray(parsedData) && parsedData.length > 0) {
+                            setAiCards(parsedData);
+                            showToast("✨ Karty zostały wygenerowane!");
+
+                            if (!isPremium) {
+                                const newUses = freeUses - 1;
+                                setFreeUses(newUses);
+                                localStorage.setItem('edufiszki_free_uses', newUses.toString());
+                            }
+                        } else {
+                            throw new Error("Niepoprawny format danych");
+                        }
+                    } catch (parseError) {
+                        console.error("Błąd parsowania JSON:", text);
+                        showToast("🚨 AI nie zwróciło poprawnego formatu. Spróbuj kliknąć jeszcze raz.");
+                    }
+                    
+                } catch (error) {
+                    console.error("API Error:", error);
+                    showToast("🚨 Wystąpił błąd komunikacji z serwerem.");
+                } finally {
+                    setIsGenerating(false);
+                }
+            };
+
+            // RENDEROWANIE DO DRUKU - WIDOK 1 (FISZKI SKŁADANE)
+            const renderFiszkiPrint = () => {
+                return (
+                    <div className="hidden print:block w-full">
+                        <div className="text-center mb-6">
+                            <h2 className="text-2xl font-bold uppercase tracking-widest">Fiszki Edukacyjne</h2>
+                            <p className="text-sm text-gray-500">Wytnij wzdłuż poziomych linii. Zegnij w połowie pionowej przerywanej linii i sklej.</p>
+                        </div>
+                        <div className="flex flex-col border-2 border-black border-b-0">
+                            {aiCards.map((card, idx) => (
+                                <div key={idx} className="flex w-full min-h-[4cm] print-break-inside-avoid border-b-2 border-black">
+                                    {/* Lewa strona (Hasło) */}
+                                    <div className="w-1/2 flex items-center justify-center p-6 border-r-2 border-dashed border-gray-400">
+                                        <h3 className="text-3xl font-black text-center">{card.term}</h3>
+                                    </div>
+                                    {/* Prawa strona (Definicja) */}
+                                    <div className="w-1/2 flex items-center justify-center p-6 bg-gray-50">
+                                        <p className="text-lg text-center leading-relaxed font-medium">{card.def}</p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                );
+            };
+
+            // RENDEROWANIE DO DRUKU - WIDOK 2 (GRA MEMORY)
+            const renderMemoryPrint = () => {
+                return (
+                    <div className="hidden print:block w-full">
+                        {/* STRONA 1: HASŁA */}
+                        <div className="text-center mb-6">
+                            <h2 className="text-2xl font-bold uppercase tracking-widest">Gra Memory - Arkusz 1 (Hasła)</h2>
+                            <p className="text-sm text-gray-500">Wydrukuj, a następnie potnij wzdłuż linii.</p>
+                        </div>
+                        <div className="grid grid-cols-2 gap-0 border-l-2 border-t-2 border-black">
+                            {aiCards.map((card, idx) => (
+                                <div key={`term-${idx}`} className="flex items-center justify-center p-6 h-[5cm] print-break-inside-avoid border-r-2 border-b-2 border-black print-dashed">
+                                    <h3 className="text-2xl font-black text-center">{card.term}</h3>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Wymuszenie nowej strony */}
+                        <div className="print-page-break"></div>
+
+                        {/* STRONA 2: DEFINICJE */}
+                        <div className="text-center mb-6 mt-8">
+                            <h2 className="text-2xl font-bold uppercase tracking-widest">Gra Memory - Arkusz 2 (Definicje)</h2>
+                            <p className="text-sm text-gray-500">Polecamy wydrukować ten arkusz na innym kolorze papieru!</p>
+                        </div>
+                        <div className="grid grid-cols-2 gap-0 border-l-2 border-t-2 border-black">
+                            {aiCards.map((card, idx) => (
+                                <div key={`def-${idx}`} className="flex items-center justify-center p-6 h-[5cm] print-break-inside-avoid border-r-2 border-b-2 border-black print-dashed bg-gray-100">
+                                    <p className="text-xl text-center leading-relaxed font-medium">{card.def}</p>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                );
+            };
+
+            return (
+                <div className="min-h-screen relative flex flex-col pb-10">
+                    <div className="hero-glow print-hidden"></div>
+
+                    {/* Toast */}
+                    <div className={`fixed top-24 left-1/2 -translate-x-1/2 z-[200] bg-emerald-600 text-white px-6 py-3 rounded-full font-bold shadow-[0_10px_40px_rgba(16,185,129,0.5)] transition-all duration-300 flex items-center gap-2 print-hidden ${toastMessage ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-10 pointer-events-none'}`}>
+                        {toastMessage}
+                    </div>
+
+                    {/* Nawigacja */}
+                    <nav className="w-full z-[100] glass-nav print-hidden sticky top-0">
+                        <div className="max-w-[90rem] mx-auto px-6 h-20 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 bg-fuchsia-600 rounded-xl flex items-center justify-center shadow-[0_0_15px_rgba(217,70,239,0.5)]">
+                                    <i className="ph-bold ph-cards text-white text-xl"></i>
+                                </div>
+                                <span className="text-xl font-extrabold tracking-tight text-white hidden sm:block">EduFiszki <span className="text-fuchsia-400">AI</span></span>
+                            </div>
+                            <div className="flex items-center gap-4">
+                                {!isPremium && (
+                                    <div className="hidden md:flex items-center gap-2 bg-slate-900 p-1.5 rounded-xl border border-slate-700">
+                                        <input value={accessCode} onChange={e => setAccessCode(e.target.value)} placeholder="Kod Premium..." className="px-3 py-1.5 bg-transparent text-sm w-32 outline-none font-medium text-white placeholder-slate-500"/>
+                                        <button onClick={handleVerifyCode} className="p-2 text-white rounded-lg bg-fuchsia-600 hover:bg-fuchsia-500 transition-colors shadow-md btn-bounce"><i className="ph-bold ph-key"></i></button>
+                                    </div>
+                                )}
+                                <a href={BUY_COFFEE_LINK} target="_blank" className="flex items-center gap-2 bg-slate-800 border border-slate-700 text-amber-400 px-5 py-2.5 rounded-full hover:bg-slate-700 transition-all shadow-lg btn-bounce text-xs font-bold uppercase tracking-wider">
+                                    <i className="ph-fill ph-coffee text-base"></i> Postaw Kawę
+                                </a>
+                            </div>
+                        </div>
+                    </nav>
+
+                    <main className="flex-grow max-w-[90rem] w-full mx-auto px-4 sm:px-6 py-8 relative z-10 flex flex-col xl:flex-row gap-8 items-start">
+                        
+                        {/* ================================== */}
+                        {/* LEWA KOLUMNA: Kreator (UI)         */}
+                        {/* ================================== */}
+                        <div className="w-full xl:w-4/12 flex flex-col gap-6 print-hidden">
+                            
+                            <div className="glass-panel rounded-[2rem] p-6 md:p-8 border-t-4 border-fuchsia-500">
+                                <h2 className="text-2xl font-black text-white mb-2">Kreator Kart</h2>
+                                <p className="text-slate-400 text-sm mb-8 leading-relaxed">Wklej ścianę tekstu lub notatkę ucznia. Sztuczna Inteligencja sama wyodrębni najważniejsze hasła i ułoży je w siatkę do druku.</p>
+
+                                {/* Wybór ilości */}
+                                <div className="mb-6">
+                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-widest block mb-2">Ile haseł wyciągnąć?</label>
+                                    <select value={pairsCount} onChange={e => setPairsCount(parseInt(e.target.value))} className="w-full bg-slate-900 border border-slate-700 text-white rounded-xl px-4 py-3 focus:outline-none focus:border-fuchsia-500 text-sm transition-colors cursor-pointer">
+                                        <option value="6">6 haseł (12 kart memory)</option>
+                                        <option value="8">8 haseł (16 kart memory)</option>
+                                        <option value="12">12 haseł (24 karty memory)</option>
+                                        <option value="16">16 haseł (Trudne)</option>
+                                    </select>
+                                </div>
+
+                                {/* Tekst Źródłowy */}
+                                <div className="mb-8">
+                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-widest block mb-3 flex items-center justify-between">
+                                        <span>Tekst źródłowy / Temat</span>
+                                        <button onClick={() => setInputText('')} className="text-slate-500 hover:text-white"><i className="ph-bold ph-eraser"></i> Wyczyść</button>
+                                    </label>
+                                    <textarea 
+                                        value={inputText}
+                                        onChange={e => setInputText(e.target.value)}
+                                        placeholder="Wklej notatkę z historii, fragment podręcznika od biologii lub po prostu wpisz 'Zwierzęta po angielsku', a system sam dobierze słówka..."
+                                        className="w-full bg-slate-900 border border-slate-700 text-white rounded-xl px-4 py-3 h-48 focus:outline-none focus:border-fuchsia-500 transition-colors text-sm custom-scrollbar resize-none"
+                                    />
+                                </div>
+
+                                {/* Przycisk Generowania */}
+                                <button 
+                                    onClick={generateCards}
+                                    disabled={isGenerating || !inputText.trim() || (!isPremium && freeUses <= 0)}
+                                    className="w-full bg-fuchsia-600 hover:bg-fuchsia-500 disabled:opacity-50 text-white py-4 rounded-xl font-bold shadow-[0_10px_30px_-10px_rgba(217,70,239,0.5)] transition-all btn-bounce uppercase tracking-widest flex items-center justify-center gap-3 text-sm"
+                                >
+                                    {isGenerating ? <div className="loader"></div> : (
+                                        <>
+                                            <i className="ph-bold ph-magic-wand text-xl"></i> 
+                                            {(!isPremium && freeUses <= 0) ? 'Brak darmowych prób' : 'Generuj Arkusze'} 
+                                            {!isPremium && freeUses > 0 && <span className="bg-fuchsia-800 px-2 py-0.5 rounded-full text-[10px] ml-1 shadow-inner border border-fuchsia-400/30">Darmowe: {freeUses}</span>}
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+
+                            {/* BLOKADA FREEMIUM */}
+                            {!isPremium && freeUses <= 0 && (
+                                <div className="glass-panel p-6 rounded-[2rem] border border-amber-500/30 text-center space-y-4 animate-[reveal_0.3s_ease-out]">
+                                    <div className="mx-auto w-12 h-12 bg-amber-900/30 rounded-full flex items-center justify-center text-amber-400">
+                                        <i className="ph-bold ph-coffee text-2xl"></i>
+                                    </div>
+                                    <h3 className="font-bold text-white text-sm uppercase tracking-widest">Koniec darmowych prób</h3>
+                                    <p className="text-xs text-slate-400 leading-relaxed">
+                                        Aby dalej korzystać z zaawansowanych funkcji wydobywania tekstu z AI, wesprzyj projekt kawą i wpisz kod premium!
+                                    </p>
+                                    <div className="flex flex-col items-center justify-center gap-3 mt-4 pt-4 border-t border-slate-700/50">
+                                        <input 
+                                            value={accessCode} 
+                                            onChange={e => setAccessCode(e.target.value)} 
+                                            placeholder="Kod Premium..." 
+                                            className="px-4 py-3 bg-slate-800 border border-slate-700 text-sm outline-none font-medium text-white placeholder-slate-500 rounded-xl focus:border-amber-500 transition-colors w-full text-center"
+                                        />
+                                        <button 
+                                            onClick={handleVerifyCode} 
+                                            className="px-6 py-3 w-full text-white rounded-xl bg-amber-600 hover:bg-amber-500 font-bold transition-colors shadow-lg btn-bounce flex items-center justify-center gap-2 text-sm"
+                                        >
+                                            Odblokuj <i className="ph-bold ph-unlock"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* ================================== */}
+                        {/* PRAWA KOLUMNA: Podgląd i Wydruk    */}
+                        {/* ================================== */}
+                        <div className="w-full xl:w-8/12 flex flex-col h-full print:w-full print:m-0">
+                            
+                            {/* Zakładki Wyboru Formatu Druku */}
+                            <div className="glass-panel p-2 rounded-2xl flex gap-1 bg-slate-900/60 mb-6 w-full print-hidden">
+                                <button onClick={() => setPrintMode('fiszki')} className={`flex-1 py-3 px-4 rounded-xl flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-widest transition-all ${printMode === 'fiszki' ? 'bg-fuchsia-600 text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}>
+                                    <i className="ph-bold ph-book-open text-lg"></i> Fiszki (Zginane)
+                                </button>
+                                <button onClick={() => setPrintMode('memory')} className={`flex-1 py-3 px-4 rounded-xl flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-widest transition-all ${printMode === 'memory' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}>
+                                    <i className="ph-bold ph-squares-four text-lg"></i> Gra Memory (Rozdzielne)
+                                </button>
+                            </div>
+
+                            <div className="glass-panel rounded-[2rem] p-6 md:p-10 flex-grow relative overflow-hidden print:p-0 print:border-none print:bg-transparent print:backdrop-filter-none">
+                                
+                                <div className="flex justify-between items-end mb-8 print-hidden border-b border-slate-700/50 pb-4">
+                                    <div>
+                                        <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                                            <i className="ph-fill ph-printer text-fuchsia-400"></i> Gotowe do druku
+                                        </h3>
+                                        <p className="text-xs text-slate-400 mt-1">Po kliknięciu "Drukuj" ukryjemy interfejs i dostosujemy siatkę do formatu A4 czarno-białego.</p>
+                                    </div>
+                                    
+                                    {aiCards.length > 0 && (
+                                        <div className="flex gap-2">
+                                            <button onClick={() => window.print()} className="bg-fuchsia-600 hover:bg-fuchsia-500 px-6 py-2 rounded-lg text-xs font-bold text-white transition-colors shadow-[0_0_15px_rgba(217,70,239,0.4)] flex items-center gap-2 btn-bounce uppercase tracking-wider">
+                                                <i className="ph-bold ph-printer text-lg"></i> Drukuj PDF
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {aiCards.length === 0 ? (
+                                    <div className="flex-1 min-h-[400px] flex flex-col items-center justify-center text-slate-500 border-2 border-dashed border-slate-700/50 rounded-2xl p-10 print-hidden">
+                                        <i className="ph-duotone ph-cards text-7xl mb-4 text-slate-700"></i>
+                                        <p className="text-center font-medium">Brak wygenerowanych kart.<br/>Wklej tekst i kliknij Generuj po lewej stronie.</p>
+                                    </div>
+                                ) : (
+                                    <div className="print:hidden w-full space-y-4">
+                                        {/* Podgląd na ekranie (Ciemny motyw) */}
+                                        {printMode === 'fiszki' ? (
+                                            <div className="grid grid-cols-1 gap-3">
+                                                {aiCards.map((c, i) => (
+                                                    <div key={i} className="flex bg-slate-900 border border-slate-700 rounded-xl overflow-hidden shadow-inner">
+                                                        <div className="w-1/3 bg-slate-800/50 p-4 border-r border-dashed border-slate-600 flex items-center justify-center">
+                                                            <span className="font-black text-fuchsia-400 text-center">{c.term}</span>
+                                                        </div>
+                                                        <div className="w-2/3 p-4 flex items-center text-sm text-slate-300">
+                                                            {c.def}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                                {aiCards.map((c, i) => (
+                                                    <div key={`term-${i}`} className="aspect-square bg-slate-800 border border-slate-600 rounded-xl flex items-center justify-center p-3 text-center shadow-inner">
+                                                        <span className="font-black text-white">{c.term}</span>
+                                                    </div>
+                                                ))}
+                                                {aiCards.map((c, i) => (
+                                                    <div key={`def-${i}`} className="aspect-square bg-slate-900 border border-slate-700 rounded-xl flex items-center justify-center p-4 text-center shadow-inner">
+                                                        <span className="text-xs text-slate-300 font-medium leading-relaxed">{c.def}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* ELEMENTY TYLKO DO DRUKU */}
+                                {aiCards.length > 0 && printMode === 'fiszki' && renderFiszkiPrint()}
+                                {aiCards.length > 0 && printMode === 'memory' && renderMemoryPrint()}
+
+                            </div>
+                        </div>
+
+                    </main>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<EduFiszkiApp />);
+    </script>
+</body>
+</html>
