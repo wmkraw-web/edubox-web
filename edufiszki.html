@@ -4,23 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EduFiszki AI - Generator Kart i Memory</title>
-    <!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-3RQ9R0N0K8"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-
-  gtag('config', 'G-3RQ9R0N0K8');
-</script>
-
     
+    <!-- Biblioteki -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     
+    <!-- Ikony Phosphor -->
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
 
     <style>
@@ -83,7 +75,6 @@
             /* Zapobieganie ucinaniu kart w połowie strony */
             .print-break-inside-avoid { page-break-inside: avoid; }
             
-            /* Domyślne kolory kartki do druku czarno-białego */
             .print-card { 
                 border: 2px solid #333 !important; 
                 background: white !important; 
@@ -138,7 +129,7 @@
 
             const generateCards = async () => {
                 if (!inputText.trim()) {
-                    showToast("⚠️ Wklej tekst źródłowy (notatkę, temat), z którego mam wyciągnąć pojęcia.");
+                    showToast("⚠️ Wklej tekst źródłowy lub podaj temat fiszek.");
                     return;
                 }
 
@@ -150,18 +141,23 @@
                 setIsGenerating(true);
                 setAiCards([]);
 
-                // Zmuszamy AI do zwrócenia CZYSTEGO JSONa
-                const systemPrompt = `Jesteś ekspertem metodycznym. Przeanalizuj podany tekst źródłowy ucznia/nauczyciela. 
-ZADANIE: Wyodrębnij dokładnie ${pairsCount} najważniejszych pojęć (słów kluczowych) oraz sformułuj do nich krótkie, jednoznaczne definicje.
+                // NOWY SPRYTNY PROMPT DLA AI
+                const systemPrompt = `Jesteś wybitnym ekspertem edukacyjnym i lingwistą. 
+ZADANIE: Wygeneruj DOKŁADNIE ${pairsCount} par edukacyjnych (hasło i definicja).
 
-WYMÓG KRYTYCZNY: Musisz zwrócić odpowiedź TYLKO i WYŁĄCZNIE jako czystą tablicę JSON, bez żadnego tekstu przed i po, bez znaczników markdown. 
-Format musi wyglądać dokładnie tak:
+ZASADY:
+1. Jeśli użytkownik wkleił DŁUGI TEKST (notatkę), wyciągnij z niego najważniejsze pojęcia i napisz do nich definicje.
+2. Jeśli użytkownik wpisał KRÓTKIE HASŁO (np. "zwierzęta po angielsku", "ułamki", "stolica Polski"), potraktuj to jako TEMAT. Samodzielnie wymyśl ${pairsCount} haseł z tego tematu.
+3. UWAGA JĘZYKOWA: Jeśli temat sugeruje naukę języka obcego (np. "po angielsku", "niemiecki"), w polu "term" wpisz słówko w języku obcym, a w "def" polskie tłumaczenie.
+
+WYMÓG KRYTYCZNY: Musisz zwrócić odpowiedź TYLKO i WYŁĄCZNIE jako czystą tablicę JSON. Bez tekstu przed i po.
+Format musi wyglądać tak:
 [
-  {"term": "Słowo 1", "def": "Definicja słowa 1"},
-  {"term": "Słowo 2", "def": "Definicja słowa 2"}
+  {"term": "Słowo/Hasło", "def": "Definicja/Tłumaczenie"},
+  {"term": "Słowo 2", "def": "Definicja 2"}
 ]`;
 
-                const finalPrompt = `${systemPrompt}\n\nTEKST ŹRÓDŁOWY:\n${inputText}`;
+                const finalPrompt = `${systemPrompt}\n\nWPIS OD NAUCZYCIELA:\n${inputText}`;
 
                 try {
                     const response = await fetch('/api/gemini', {
@@ -175,8 +171,13 @@ Format musi wyglądać dokładnie tak:
                     
                     if (!text) throw new Error("Pusta odpowiedź z API");
 
-                    // Czyszczenie formatowania markdown (np. usunięcie ```json)
-                    text = text.replace(/```json/g, '').replace(/```/g, '').trim();
+                    // Sprytne wydobywanie JSONa, gdyby AI dodało "Oto twój json:"
+                    const jsonMatch = text.match(/\[[\s\S]*\]/);
+                    if (jsonMatch) {
+                        text = jsonMatch[0];
+                    } else {
+                        text = text.replace(/```json/g, '').replace(/```/g, '').trim();
+                    }
 
                     try {
                         const parsedData = JSON.parse(text);
@@ -308,11 +309,11 @@ Format musi wyglądać dokładnie tak:
                             
                             <div className="glass-panel rounded-[2rem] p-6 md:p-8 border-t-4 border-fuchsia-500">
                                 <h2 className="text-2xl font-black text-white mb-2">Kreator Kart</h2>
-                                <p className="text-slate-400 text-sm mb-8 leading-relaxed">Wklej ścianę tekstu lub notatkę ucznia. Sztuczna Inteligencja sama wyodrębni najważniejsze hasła i ułoży je w siatkę do druku.</p>
+                                <p className="text-slate-400 text-sm mb-8 leading-relaxed">Wklej ścianę tekstu (notatkę) ALBO wpisz krótki temat (np. "zwierzęta po angielsku"). AI samo wygeneruje odpowiednie słówka i tłumaczenia.</p>
 
                                 {/* Wybór ilości */}
                                 <div className="mb-6">
-                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-widest block mb-2">Ile haseł wyciągnąć?</label>
+                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-widest block mb-2">Ile haseł wyciągnąć/wymyslić?</label>
                                     <select value={pairsCount} onChange={e => setPairsCount(parseInt(e.target.value))} className="w-full bg-slate-900 border border-slate-700 text-white rounded-xl px-4 py-3 focus:outline-none focus:border-fuchsia-500 text-sm transition-colors cursor-pointer">
                                         <option value="6">6 haseł (12 kart memory)</option>
                                         <option value="8">8 haseł (16 kart memory)</option>
@@ -330,7 +331,7 @@ Format musi wyglądać dokładnie tak:
                                     <textarea 
                                         value={inputText}
                                         onChange={e => setInputText(e.target.value)}
-                                        placeholder="Wklej notatkę z historii, fragment podręcznika od biologii lub po prostu wpisz 'Zwierzęta po angielsku', a system sam dobierze słówka..."
+                                        placeholder="Wklej notatkę z historii, fragment podręcznika, LUB wpisz 'Zwierzęta po angielsku'..."
                                         className="w-full bg-slate-900 border border-slate-700 text-white rounded-xl px-4 py-3 h-48 focus:outline-none focus:border-fuchsia-500 transition-colors text-sm custom-scrollbar resize-none"
                                     />
                                 </div>
@@ -416,7 +417,7 @@ Format musi wyglądać dokładnie tak:
                                 {aiCards.length === 0 ? (
                                     <div className="flex-1 min-h-[400px] flex flex-col items-center justify-center text-slate-500 border-2 border-dashed border-slate-700/50 rounded-2xl p-10 print-hidden">
                                         <i className="ph-duotone ph-cards text-7xl mb-4 text-slate-700"></i>
-                                        <p className="text-center font-medium">Brak wygenerowanych kart.<br/>Wklej tekst i kliknij Generuj po lewej stronie.</p>
+                                        <p className="text-center font-medium">Brak wygenerowanych kart.<br/>Wklej tekst lub wpisz temat i kliknij Generuj po lewej stronie.</p>
                                     </div>
                                 ) : (
                                     <div className="print:hidden w-full space-y-4">
@@ -468,13 +469,3 @@ Format musi wyglądać dokładnie tak:
     </script>
 </body>
 </html>
-```
-
-***
-
-### Integracja z Portfolio (`index.html`)
-
-Aby dodać **EduFiszki** do strony głównej, nie musisz kopiować i wklejać 600 linijek całego pliku `index.html`. Wystarczy, że w swoim obecnym pliku `index.html` znajdziesz sekcję **V. Pomoce Wizualne i Gry** i wkleisz tę jedną linijkę do kodu (dokładnie tak, jak dodawaliśmy poprzednie aplikacje):
-
-```javascript
-{ title: 'EduFiszki i Memory AI', desc: 'Wklej notatkę lub tekst, a sztuczna inteligencja wyciągnie słowa kluczowe i utworzy dwustronne fiszki gotowe do druku w PDF.', url: 'edufiszki.html', badge: 'HIT!', badgeColor: 'bg-fuchsia-600', icon: 'LayoutGrid', color: 'text-fuchsia-400' },
