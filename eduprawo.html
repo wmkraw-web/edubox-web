@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="pl" translate="no" class="notranslate">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduPrawo AI - Asystent Prawny Nauczyciela</title>
+    
+    <!-- Biblioteki -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    
+    <!-- Ikony Phosphor -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+    <style>
+        body { 
+            font-family: 'Plus Jakarta Sans', sans-serif; 
+            background-color: #020617; 
+            color: #f8fafc; 
+            overflow-x: hidden;
+            min-height: 100vh;
+        }
+        
+        .glass-panel { 
+            background: rgba(30, 41, 59, 0.4); 
+            backdrop-filter: blur(16px); 
+            -webkit-backdrop-filter: blur(16px); 
+            border: 1px solid rgba(255, 255, 255, 0.05); 
+        }
+
+        .glass-nav { 
+            background: rgba(2, 6, 23, 0.8); 
+            backdrop-filter: blur(20px); 
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05); 
+        }
+
+        .btn-bounce:active { transform: scale(0.95); transition: transform 0.1s; }
+
+        .hero-glow {
+            position: fixed;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 1000px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(59, 130, 246, 0.1) 0%, rgba(220, 38, 38, 0.05) 50%, rgba(2, 6, 23, 0) 70%);
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #0f172a; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+
+        .loader {
+            border: 3px solid rgba(255,255,255,0.1);
+            border-left-color: #ef4444; /* red-500 */
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* Formatowanie Markdown z AI */
+        .ai-content h3 { font-size: 1.25rem; font-weight: 800; color: #f8fafc; margin-top: 1.5rem; margin-bottom: 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 0.5rem; }
+        .ai-content p { margin-bottom: 1rem; line-height: 1.6; }
+        .ai-content ul { list-style-type: disc; margin-left: 1.5rem; margin-bottom: 1rem; color: #cbd5e1; }
+        .ai-content strong { color: #f8fafc; font-weight: 700; }
+        .ai-content blockquote { border-left: 4px solid #ef4444; padding-left: 1rem; color: #94a3b8; font-style: italic; background: rgba(239, 68, 68, 0.05); padding: 1rem; border-radius: 0.5rem; margin-bottom: 1rem; }
+        .ai-content a { color: #60a5fa; text-decoration: underline; }
+
+        @media print {
+            body { background: white; color: black; font-size: 12pt; }
+            .print-hidden { display: none !important; }
+            .glass-panel { background: none; border: none; filter: none; padding: 0; margin: 0; }
+            .ai-content h3 { color: black; border-bottom: 1px solid #ccc; }
+            .ai-content strong { color: black; }
+            .ai-content blockquote { border-left: 4px solid #666; color: #333; background: #f9f9f9; }
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        const BUY_COFFEE_LINK = "https://buycoffee.to/magiccolor";
+        const CURRENT_LAW_DATE = "22 Maja 2026 r.";
+
+        const CATEGORIES = [
+            { id: 'karta', name: 'Karta Nauczyciela', icon: 'ph-chalkboard-teacher', desc: 'Pensum, zastępstwa, urlopy, awans.' },
+            { id: 'ustawa', name: 'Prawo Oświatowe', icon: 'ph-scales', desc: 'Statut, ocenianie, prawa ucznia, kuratorium.' },
+            { id: 'wycieczki', name: 'BHP i Wycieczki', icon: 'ph-bus', desc: 'Odpowiedzialność, zgody, wypadki w szkole.' },
+            { id: 'rodo', name: 'RODO i Dokumenty', icon: 'ph-shield-check', desc: 'E-dziennik, wizerunek ucznia, tajemnica rady.' },
+            { id: 'inne', name: 'Inne / Prawo Pracy', icon: 'ph-briefcase', desc: 'Zwolnienia lekarskie, mobbing, umowy.' }
+        ];
+
+        function EduPrawoApp() {
+            // State
+            const [query, setQuery] = useState('');
+            const [category, setCategory] = useState('karta');
+            const [mode, setMode] = useState('porada'); // porada | pismo
+            
+            const [aiResponse, setAiResponse] = useState('');
+            const [isGenerating, setIsGenerating] = useState(false);
+            const [toastMessage, setToastMessage] = useState('');
+
+            const showToast = (msg) => {
+                setToastMessage(msg);
+                setTimeout(() => setToastMessage(''), 3000);
+            };
+
+            const copyToClipboard = () => {
+                // Kopiowanie samego tekstu bez znaczników HTML
+                const tempDiv = document.createElement("div");
+                tempDiv.innerHTML = formatAIResponse(aiResponse);
+                navigator.clipboard.writeText(tempDiv.innerText || tempDiv.textContent);
+                showToast("✅ Skopiowano do schowka!");
+            };
+
+            const generateLegalAdvice = async () => {
+                if (!query.trim()) {
+                    showToast("⚠️ Opisz najpierw swój problem prawny.");
+                    return;
+                }
+                
+                setIsGenerating(true);
+                setAiResponse('');
+
+                const selectedCategoryName = CATEGORIES.find(c => c.id === category)?.name || 'Ogólne prawo oświatowe';
+
+                // --- POTĘŻNY PROMPT PRAWNICZY ---
+                let systemPrompt = `Jesteś ekspertem i prawnikiem specjalizującym się w Polskim Prawie Oświatowym. 
+Aktualny stan prawny: ${CURRENT_LAW_DATE}.
+Użytkownik pyta w kontekście kategorii: ${selectedCategoryName}.
+
+Gdy podajesz akty prawne, bądź precyzyjny (np. "Karta Nauczyciela art. 42 ust. 2", "Rozporządzenie MEN z dnia... w sprawie..."). Do najważniejszej ustawy podaj wzór linku do bazy ISAP (np. https://isap.sejm.gov.pl/isap.nsf/DocDetails.xsp?id=...).`;
+
+                if (mode === 'porada') {
+                    systemPrompt += `
+ZADANIE: Udziel rzetelnej, zrozumiałej porady prawnej.
+Twój format odpowiedzi MUSI zawierać te nagłówki (użyj znaczników Markdown ###):
+### 1. Podstawa Prawna (Dz.U.)
+Wymień konkretne artykuły i ustawy.
+### 2. Wyjaśnienie "Po ludzku"
+Zinterpretuj przepisy w prostym języku dla nauczyciela.
+### 3. Rekomendacja Działania
+Co nauczyciel powinien teraz zrobić krok po kroku.
+### 4. Linki do ustaw (ISAP)
+Wklej hiperłącza (jako tekst).`;
+                } else if (mode === 'pismo') {
+                    systemPrompt += `
+ZADANIE: Użytkownik ma problem prawny, ale potrzebuje GOTOWEGO PISMA URZĘDOWEGO (np. wniosek, odwołanie, skarga, wezwanie).
+Napisz kompletny, profesjonalny wzór dokumentu gotowy do wypełnienia i wydruku przez nauczyciela.
+W nagłówku pisma powołaj się na konkretne artykuły prawa oświatowego/Karty Nauczyciela, które uzasadniają to pismo. Używaj wykropkowań (....) na dane.`;
+                }
+
+                const finalPrompt = `${systemPrompt}\n\nProblem/Pytanie Nauczyciela:\n"${query}"`;
+
+                try {
+                    // Połączenie z ukrytym backendem Vercel
+                    const response = await fetch('/api/gemini', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ prompt: finalPrompt })
+                    });
+                    
+                    const data = await response.json();
+                    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                    
+                    if (!text) throw new Error("Pusta odpowiedź z API");
+                    setAiResponse(text);
+                    
+                } catch (error) {
+                    console.error("API Error:", error);
+                    setAiResponse("🚨 Wystąpił błąd komunikacji z serwerem prawa. Upewnij się, że masz połączenie z internetem i spróbuj ponownie.");
+                } finally {
+                    setIsGenerating(false);
+                }
+            };
+
+            // Bardzo prosty parser Markdown do HTML (bold, h3, listy)
+            const formatAIResponse = (text) => {
+                if (!text) return "";
+                let formatted = text
+                    .replace(/### (.*?)\n/g, '<h3>$1</h3>')
+                    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                    .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                    .replace(/> (.*?)\n/g, '<blockquote>$1</blockquote>')
+                    .replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank">$1</a>');
+                
+                // Formaty list (prosty sposób)
+                formatted = formatted.replace(/- (.*?)\n/g, '<ul><li>$1</li></ul>');
+                formatted = formatted.replace(/<\/ul>\n<ul>/g, ''); // Złącz listy
+
+                // Nowe linie
+                formatted = formatted.replace(/\n/g, '<br/>');
+                return formatted;
+            };
+
+            return (
+                <div className="min-h-screen relative flex flex-col pb-10">
+                    <div className="hero-glow print-hidden"></div>
+
+                    {/* Toast */}
+                    <div className={`fixed top-24 left-1/2 -translate-x-1/2 z-[200] bg-emerald-600 text-white px-6 py-3 rounded-full font-bold shadow-[0_10px_40px_rgba(16,185,129,0.5)] transition-all duration-300 flex items-center gap-2 print-hidden ${toastMessage ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-10 pointer-events-none'}`}>
+                        {toastMessage}
+                    </div>
+
+                    {/* Nawigacja */}
+                    <nav className="w-full z-[100] glass-nav print-hidden sticky top-0">
+                        <div className="max-w-[90rem] mx-auto px-6 h-20 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 bg-red-600 rounded-xl flex items-center justify-center shadow-[0_0_15px_rgba(220,38,38,0.5)]">
+                                    <i className="ph-bold ph-scales text-white text-xl"></i>
+                                </div>
+                                <span className="text-xl font-extrabold tracking-tight text-white hidden sm:block">EduPrawo <span className="text-red-500">AI</span></span>
+                            </div>
+                            <div className="flex items-center gap-4">
+                                <div className="hidden md:flex items-center gap-2 bg-red-900/30 border border-red-500/30 px-4 py-2 rounded-full">
+                                    <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+                                    <span className="text-[10px] text-red-200 font-bold tracking-widest uppercase">Baza MEN zaktualizowana</span>
+                                </div>
+                                <a href={BUY_COFFEE_LINK} target="_blank" className="flex items-center gap-2 bg-slate-800 border border-slate-700 text-amber-400 px-5 py-2.5 rounded-full hover:bg-slate-700 transition-all shadow-lg btn-bounce text-xs font-bold uppercase tracking-wider">
+                                    <i className="ph-fill ph-coffee text-base"></i> Postaw Kawę
+                                </a>
+                            </div>
+                        </div>
+                    </nav>
+
+                    {/* Baner informacyjny */}
+                    <div className="bg-red-600 text-white py-2 print-hidden">
+                        <div className="max-w-[90rem] mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-2">
+                            <div className="text-xs font-bold uppercase tracking-widest flex items-center gap-2">
+                                <i className="ph-bold ph-calendar-check text-lg"></i> Stan prawny Dziennika Ustaw zrewidowano: {CURRENT_LAW_DATE}
+                            </div>
+                            <div className="text-[10px] opacity-80 text-center sm:text-right">
+                                Moduł pełni funkcję asystenta informacyjnego. Ostateczna interpretacja prawna należy do organów nadzoru i dyrekcji.
+                            </div>
+                        </div>
+                    </div>
+
+                    <main className="flex-grow max-w-[90rem] w-full mx-auto px-4 sm:px-6 py-8 relative z-10 flex flex-col xl:flex-row gap-8 items-start">
+                        
+                        {/* ================================== */}
+                        {/* LEWA KOLUMNA: Kreator Zapytania    */}
+                        {/* ================================== */}
+                        <div className="w-full xl:w-5/12 flex flex-col gap-6 print-hidden">
+                            
+                            <div className="glass-panel rounded-[2rem] p-6 md:p-8">
+                                <h2 className="text-2xl font-black text-white mb-2">Konsultacja Prawna</h2>
+                                <p className="text-slate-400 text-sm mb-8 leading-relaxed">Opisz swój problem językiem potocznym, a system odszuka odpowiednie paragrafy w prawie oświatowym.</p>
+
+                                {/* Tematyka */}
+                                <div className="mb-6">
+                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-widest block mb-3">Zakres prawa (Dla lepszego wyszukiwania)</label>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                        {CATEGORIES.map(c => (
+                                            <button 
+                                                key={c.id}
+                                                onClick={() => setCategory(c.id)}
+                                                className={`p-3 rounded-xl border flex flex-col items-start text-left transition-all ${category === c.id ? 'bg-red-900/20 border-red-500 shadow-[0_0_15px_rgba(220,38,38,0.2)]' : 'bg-slate-900/50 border-slate-700/50 hover:bg-slate-800'}`}
+                                            >
+                                                <div className={`flex items-center gap-2 font-bold text-sm mb-1 ${category === c.id ? 'text-white' : 'text-slate-300'}`}>
+                                                    <i className={`${c.icon} text-lg ${category === c.id ? 'text-red-400' : 'text-slate-500'}`}></i> {c.name}
+                                                </div>
+                                                <div className="text-[10px] text-slate-500 leading-tight">{c.desc}</div>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Pytanie */}
+                                <div className="mb-6">
+                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-widest block mb-3">Opisz sytuację lub wpisz pytanie</label>
+                                    <textarea 
+                                        value={query}
+                                        onChange={e => setQuery(e.target.value)}
+                                        placeholder="Np. Czy dyrektor może zmusić mnie do wzięcia darmowego zastępstwa za chorą koleżankę, jeśli uczę w klasach 1-3? Co mówi Karta Nauczyciela?"
+                                        className="w-full h-32 bg-slate-900 border border-slate-700 text-white rounded-xl p-4 focus:outline-none focus:border-red-500 transition-colors custom-scrollbar text-sm leading-relaxed resize-none"
+                                    ></textarea>
+                                </div>
+
+                                {/* Tryb Generowania */}
+                                <div className="mb-8">
+                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-widest block mb-3">Czego potrzebujesz?</label>
+                                    <div className="flex bg-slate-900 p-1.5 rounded-xl border border-slate-700">
+                                        <button onClick={() => setMode('porada')} className={`flex-1 py-3 text-xs font-bold rounded-lg flex items-center justify-center gap-2 transition-all ${mode === 'porada' ? 'bg-slate-700 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}>
+                                            <i className="ph-bold ph-book-open"></i> Wyjaśnienie & Paragrafy
+                                        </button>
+                                        <button onClick={() => setMode('pismo')} className={`flex-1 py-3 text-xs font-bold rounded-lg flex items-center justify-center gap-2 transition-all ${mode === 'pismo' ? 'bg-red-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}>
+                                            <i className="ph-bold ph-file-text"></i> Wygeneruj Wniosek/Pismo
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Przycisk Głęwny */}
+                                <button 
+                                    onClick={generateLegalAdvice}
+                                    disabled={isGenerating || !query.trim()}
+                                    className="w-full bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white py-4 rounded-xl font-bold shadow-[0_10px_30px_-10px_rgba(220,38,38,0.5)] transition-all btn-bounce uppercase tracking-widest flex items-center justify-center gap-3 text-sm"
+                                >
+                                    {isGenerating ? <div className="loader"></div> : <><i className="ph-bold ph-magnifying-glass text-xl"></i> Przeszukaj Dzienniki Ustaw</>}
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* ================================== */}
+                        {/* PRAWA KOLUMNA: Odpowiedź (Wyrok AI)*/}
+                        {/* ================================== */}
+                        <div className="w-full xl:w-7/12 flex flex-col h-full print:w-full print:m-0">
+                            
+                            <div className="glass-panel rounded-[2rem] p-6 md:p-10 flex-grow relative overflow-hidden print:p-0 print:border-none print:bg-transparent print:backdrop-filter-none">
+                                
+                                <div className="flex justify-between items-center mb-8 print-hidden border-b border-slate-700/50 pb-4">
+                                    <div>
+                                        <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                                            {mode === 'porada' ? <><i className="ph-fill ph-files text-red-500"></i> Wynik Wyszukiwania</> : <><i className="ph-fill ph-file-text text-red-500"></i> Gotowe Pismo Urzędowe</>}
+                                        </h3>
+                                    </div>
+                                    {aiResponse && (
+                                        <div className="flex gap-2">
+                                            <button onClick={copyToClipboard} className="bg-slate-800 hover:bg-slate-700 border border-slate-600 px-4 py-2 rounded-lg text-xs font-bold text-white transition-colors flex items-center gap-2 btn-bounce">
+                                                <i className="ph-bold ph-copy"></i> Kopiuj
+                                            </button>
+                                            <button onClick={() => window.print()} className="bg-slate-800 hover:bg-slate-700 border border-slate-600 px-4 py-2 rounded-lg text-xs font-bold text-white transition-colors flex items-center gap-2 btn-bounce">
+                                                <i className="ph-bold ph-printer"></i> Drukuj
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {!aiResponse ? (
+                                    <div className="flex-1 h-[400px] flex flex-col items-center justify-center text-slate-500 border-2 border-dashed border-slate-700/50 rounded-2xl p-10 print-hidden">
+                                        <i className="ph-duotone ph-scales text-7xl mb-4 text-slate-700"></i>
+                                        <p className="text-center font-medium">System czeka na zapytanie.<br/>Wpisz problem z lewej strony i kliknij "Przeszukaj".</p>
+                                    </div>
+                                ) : (
+                                    <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 md:p-8 shadow-inner relative group print:bg-transparent print:border-none print:p-0 print:shadow-none">
+                                        {/* Znak wodny tła */}
+                                        <i className="ph-fill ph-scales text-9xl text-slate-800/50 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none print-hidden"></i>
+                                        
+                                        {/* Treść z AI */}
+                                        <div 
+                                            className="ai-content relative z-10 text-slate-300 text-sm leading-relaxed"
+                                            dangerouslySetInnerHTML={{ __html: formatAIResponse(aiResponse) }}
+                                        ></div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                    </main>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<EduPrawoApp />);
+    </script>
+</body>
+</html>
