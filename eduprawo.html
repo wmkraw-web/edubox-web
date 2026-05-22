@@ -106,6 +106,10 @@
             const [category, setCategory] = useState('karta');
             const [mode, setMode] = useState('porada'); // porada | pismo
             
+            // Premium State
+            const [isPremium, setIsPremium] = useState(false);
+            const [accessCode, setAccessCode] = useState('');
+
             const [aiResponse, setAiResponse] = useState('');
             const [isGenerating, setIsGenerating] = useState(false);
             const [toastMessage, setToastMessage] = useState('');
@@ -115,8 +119,17 @@
                 setTimeout(() => setToastMessage(''), 3000);
             };
 
+            const handleVerifyCode = () => {
+                if (accessCode.toUpperCase() === 'KAWA2024') { 
+                    setIsPremium(true); 
+                    setAccessCode(''); 
+                    showToast("🎉 Asystent Prawny odblokowany!"); 
+                } else { 
+                    showToast("❌ Nieprawidłowy kod!"); 
+                }
+            };
+
             const copyToClipboard = () => {
-                // Kopiowanie samego tekstu bez znaczników HTML
                 const tempDiv = document.createElement("div");
                 tempDiv.innerHTML = formatAIResponse(aiResponse);
                 navigator.clipboard.writeText(tempDiv.innerText || tempDiv.textContent);
@@ -134,36 +147,36 @@
 
                 const selectedCategoryName = CATEGORIES.find(c => c.id === category)?.name || 'Ogólne prawo oświatowe';
 
-                // --- POTĘŻNY PROMPT PRAWNICZY ---
-                let systemPrompt = `Jesteś ekspertem i prawnikiem specjalizującym się w Polskim Prawie Oświatowym. 
+                // --- TWARDY PROMPT ZABEZPIECZAJĄCY PRZED HALUCYNACJAMI ---
+                let systemPrompt = `Jesteś wybitnym polskim prawnikiem oświatowym i ekspertem z zakresu Prawa Oświatowego, Karty Nauczyciela oraz rozporządzeń MEN.
 Aktualny stan prawny: ${CURRENT_LAW_DATE}.
 Użytkownik pyta w kontekście kategorii: ${selectedCategoryName}.
 
-Gdy podajesz akty prawne, bądź precyzyjny (np. "Karta Nauczyciela art. 42 ust. 2", "Rozporządzenie MEN z dnia... w sprawie..."). Do najważniejszej ustawy podaj wzór linku do bazy ISAP (np. https://isap.sejm.gov.pl/isap.nsf/DocDetails.xsp?id=...).`;
+BARDZO WAŻNE ZASADY (KRYTYCZNE!):
+1. ZABRANIAM CI GENEROWANIA LINKÓW DO BAZY ISAP (typu isap.sejm.gov.pl/...id=WDU...). Systemy AI mają tendencję do zmyślania tych numerów, co prowadzi do błędów 404. Zamiast tego podaj PEŁNĄ I DOKŁADNĄ NAZWĘ aktu prawnego (np. "Rozporządzenie Ministra Edukacji Narodowej z dnia 28 lutego 2019 r. w sprawie szczegółowej organizacji publicznych szkół i przedszkoli"). Poleć użytkownikowi wyszukanie tej nazwy w Google.
+2. Bądź niesamowicie precyzyjny w liczbach i wartościach, np. limitach dzieci. W przypadku oddziałów integracyjnych i specjalnych pamiętaj o twardych liczbach z Rozporządzenia (np. autyzm/sprzężone: do 4-5 dzieci; upośledzenie umiarkowane/znaczne: do 6-8 dzieci). Zawsze weryfikuj fakty z Polskim prawem oświatowym zanim odpowiesz.`;
 
                 if (mode === 'porada') {
                     systemPrompt += `
 ZADANIE: Udziel rzetelnej, zrozumiałej porady prawnej.
 Twój format odpowiedzi MUSI zawierać te nagłówki (użyj znaczników Markdown ###):
-### 1. Podstawa Prawna (Dz.U.)
-Wymień konkretne artykuły i ustawy.
+### 1. Podstawa Prawna (Nazwy Ustaw/Rozporządzeń)
+Wymień dokładne nazwy aktów i konkretne artykuły/paragrafy.
 ### 2. Wyjaśnienie "Po ludzku"
-Zinterpretuj przepisy w prostym języku dla nauczyciela.
+Zinterpretuj przepisy w prostym języku dla nauczyciela/pedagoga.
 ### 3. Rekomendacja Działania
-Co nauczyciel powinien teraz zrobić krok po kroku.
-### 4. Linki do ustaw (ISAP)
-Wklej hiperłącza (jako tekst).`;
+Co nauczyciel powinien teraz zrobić krok po kroku.`;
                 } else if (mode === 'pismo') {
                     systemPrompt += `
-ZADANIE: Użytkownik ma problem prawny, ale potrzebuje GOTOWEGO PISMA URZĘDOWEGO (np. wniosek, odwołanie, skarga, wezwanie).
-Napisz kompletny, profesjonalny wzór dokumentu gotowy do wypełnienia i wydruku przez nauczyciela.
-W nagłówku pisma powołaj się na konkretne artykuły prawa oświatowego/Karty Nauczyciela, które uzasadniają to pismo. Używaj wykropkowań (....) na dane.`;
+ZADANIE: Użytkownik ma problem prawny i potrzebuje GOTOWEGO PISMA URZĘDOWEGO (np. wniosek do dyrektora, odwołanie, skarga).
+Napisz kompletny, oficjalny i profesjonalny wzór dokumentu gotowy do wypełnienia i wydruku przez nauczyciela.
+W nagłówku pisma powołaj się na konkretne artykuły i nazwy rozporządzeń. Używaj wykropkowań (....) w miejscach na dane osobiste.`;
                 }
 
                 const finalPrompt = `${systemPrompt}\n\nProblem/Pytanie Nauczyciela:\n"${query}"`;
 
                 try {
-                    // Połączenie z ukrytym backendem Vercel
+                    // Połączenie z ukrytym backendem Vercel (Oczekujemy, że podpięte jest OpenAI gpt-4o-mini)
                     const response = await fetch('/api/gemini', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -178,13 +191,12 @@ W nagłówku pisma powołaj się na konkretne artykuły prawa oświatowego/Karty
                     
                 } catch (error) {
                     console.error("API Error:", error);
-                    setAiResponse("🚨 Wystąpił błąd komunikacji z serwerem prawa. Upewnij się, że masz połączenie z internetem i spróbuj ponownie.");
+                    setAiResponse("🚨 Wystąpił błąd komunikacji z serwerem. Upewnij się, że Twój serwer prawidłowo łączy się z API modelu.");
                 } finally {
                     setIsGenerating(false);
                 }
             };
 
-            // Bardzo prosty parser Markdown do HTML (bold, h3, listy)
             const formatAIResponse = (text) => {
                 if (!text) return "";
                 let formatted = text
@@ -194,11 +206,8 @@ W nagłówku pisma powołaj się na konkretne artykuły prawa oświatowego/Karty
                     .replace(/> (.*?)\n/g, '<blockquote>$1</blockquote>')
                     .replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank">$1</a>');
                 
-                // Formaty list (prosty sposób)
                 formatted = formatted.replace(/- (.*?)\n/g, '<ul><li>$1</li></ul>');
-                formatted = formatted.replace(/<\/ul>\n<ul>/g, ''); // Złącz listy
-
-                // Nowe linie
+                formatted = formatted.replace(/<\/ul>\n<ul>/g, ''); 
                 formatted = formatted.replace(/\n/g, '<br/>');
                 return formatted;
             };
@@ -226,6 +235,12 @@ W nagłówku pisma powołaj się na konkretne artykuły prawa oświatowego/Karty
                                     <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
                                     <span className="text-[10px] text-red-200 font-bold tracking-widest uppercase">Baza MEN zaktualizowana</span>
                                 </div>
+                                {!isPremium && (
+                                    <div className="hidden md:flex items-center gap-2 bg-slate-900 p-1.5 rounded-xl border border-slate-700">
+                                        <input value={accessCode} onChange={e => setAccessCode(e.target.value)} placeholder="Kod Premium..." className="px-3 py-1.5 bg-transparent text-sm w-32 outline-none font-medium text-white placeholder-slate-500"/>
+                                        <button onClick={handleVerifyCode} className="p-2 text-white rounded-lg bg-red-600 hover:bg-red-500 transition-colors shadow-md btn-bounce"><i className="ph-bold ph-key"></i></button>
+                                    </div>
+                                )}
                                 <a href={BUY_COFFEE_LINK} target="_blank" className="flex items-center gap-2 bg-slate-800 border border-slate-700 text-amber-400 px-5 py-2.5 rounded-full hover:bg-slate-700 transition-all shadow-lg btn-bounce text-xs font-bold uppercase tracking-wider">
                                     <i className="ph-fill ph-coffee text-base"></i> Postaw Kawę
                                 </a>
@@ -256,57 +271,86 @@ W nagłówku pisma powołaj się na konkretne artykuły prawa oświatowego/Karty
                                 <h2 className="text-2xl font-black text-white mb-2">Konsultacja Prawna</h2>
                                 <p className="text-slate-400 text-sm mb-8 leading-relaxed">Opisz swój problem językiem potocznym, a system odszuka odpowiednie paragrafy w prawie oświatowym.</p>
 
-                                {/* Tematyka */}
-                                <div className="mb-6">
-                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-widest block mb-3">Zakres prawa (Dla lepszego wyszukiwania)</label>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                        {CATEGORIES.map(c => (
+                                {!isPremium ? (
+                                    <div className="bg-slate-900/80 p-8 rounded-2xl border border-red-500/30 text-center space-y-4 mb-4">
+                                        <div className="mx-auto w-16 h-16 bg-red-900/30 rounded-full flex items-center justify-center text-red-400">
+                                            <i className="ph-bold ph-lock-key text-2xl"></i>
+                                        </div>
+                                        <h3 className="font-bold text-white text-sm uppercase tracking-widest">Asystent Płatny (Premium)</h3>
+                                        <p className="text-xs text-slate-400 leading-relaxed">
+                                            Interpretacja zawiłych aktów prawnych i generowanie pism urzędowych wymaga potężnych modeli AI. <br/>
+                                            Wpisz kod autoryzacyjny, aby odblokować dostęp.
+                                        </p>
+                                        <div className="flex items-center justify-center gap-2 mt-4 pt-4 border-t border-slate-700/50">
+                                            <input 
+                                                value={accessCode} 
+                                                onChange={e => setAccessCode(e.target.value)} 
+                                                placeholder="Kod Premium..." 
+                                                className="px-4 py-3 bg-slate-800 border border-slate-700 text-sm outline-none font-medium text-white placeholder-slate-500 rounded-xl focus:border-red-500 transition-colors w-40 text-center"
+                                            />
                                             <button 
-                                                key={c.id}
-                                                onClick={() => setCategory(c.id)}
-                                                className={`p-3 rounded-xl border flex flex-col items-start text-left transition-all ${category === c.id ? 'bg-red-900/20 border-red-500 shadow-[0_0_15px_rgba(220,38,38,0.2)]' : 'bg-slate-900/50 border-slate-700/50 hover:bg-slate-800'}`}
+                                                onClick={handleVerifyCode} 
+                                                className="px-6 py-3 text-white rounded-xl bg-red-600 hover:bg-red-500 font-bold transition-colors shadow-lg btn-bounce flex items-center gap-2"
                                             >
-                                                <div className={`flex items-center gap-2 font-bold text-sm mb-1 ${category === c.id ? 'text-white' : 'text-slate-300'}`}>
-                                                    <i className={`${c.icon} text-lg ${category === c.id ? 'text-red-400' : 'text-slate-500'}`}></i> {c.name}
-                                                </div>
-                                                <div className="text-[10px] text-slate-500 leading-tight">{c.desc}</div>
+                                                Odblokuj <i className="ph-bold ph-unlock"></i>
                                             </button>
-                                        ))}
+                                        </div>
                                     </div>
-                                </div>
+                                ) : (
+                                    <div className="animate-[reveal_0.3s_ease-out]">
+                                        {/* Tematyka */}
+                                        <div className="mb-6">
+                                            <label className="text-xs font-bold text-slate-400 uppercase tracking-widest block mb-3">Zakres prawa (Dla lepszego wyszukiwania)</label>
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                                {CATEGORIES.map(c => (
+                                                    <button 
+                                                        key={c.id}
+                                                        onClick={() => setCategory(c.id)}
+                                                        className={`p-3 rounded-xl border flex flex-col items-start text-left transition-all ${category === c.id ? 'bg-red-900/20 border-red-500 shadow-[0_0_15px_rgba(220,38,38,0.2)]' : 'bg-slate-900/50 border-slate-700/50 hover:bg-slate-800'}`}
+                                                    >
+                                                        <div className={`flex items-center gap-2 font-bold text-sm mb-1 ${category === c.id ? 'text-white' : 'text-slate-300'}`}>
+                                                            <i className={`${c.icon} text-lg ${category === c.id ? 'text-red-400' : 'text-slate-500'}`}></i> {c.name}
+                                                        </div>
+                                                        <div className="text-[10px] text-slate-500 leading-tight">{c.desc}</div>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
 
-                                {/* Pytanie */}
-                                <div className="mb-6">
-                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-widest block mb-3">Opisz sytuację lub wpisz pytanie</label>
-                                    <textarea 
-                                        value={query}
-                                        onChange={e => setQuery(e.target.value)}
-                                        placeholder="Np. Czy dyrektor może zmusić mnie do wzięcia darmowego zastępstwa za chorą koleżankę, jeśli uczę w klasach 1-3? Co mówi Karta Nauczyciela?"
-                                        className="w-full h-32 bg-slate-900 border border-slate-700 text-white rounded-xl p-4 focus:outline-none focus:border-red-500 transition-colors custom-scrollbar text-sm leading-relaxed resize-none"
-                                    ></textarea>
-                                </div>
+                                        {/* Pytanie */}
+                                        <div className="mb-6">
+                                            <label className="text-xs font-bold text-slate-400 uppercase tracking-widest block mb-3">Opisz sytuację lub wpisz pytanie</label>
+                                            <textarea 
+                                                value={query}
+                                                onChange={e => setQuery(e.target.value)}
+                                                placeholder="Np. Ilu maksymalnie uczniów może uczyć się w oddziale przedszkola dla dzieci z autyzmem?"
+                                                className="w-full h-32 bg-slate-900 border border-slate-700 text-white rounded-xl p-4 focus:outline-none focus:border-red-500 transition-colors custom-scrollbar text-sm leading-relaxed resize-none"
+                                            ></textarea>
+                                        </div>
 
-                                {/* Tryb Generowania */}
-                                <div className="mb-8">
-                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-widest block mb-3">Czego potrzebujesz?</label>
-                                    <div className="flex bg-slate-900 p-1.5 rounded-xl border border-slate-700">
-                                        <button onClick={() => setMode('porada')} className={`flex-1 py-3 text-xs font-bold rounded-lg flex items-center justify-center gap-2 transition-all ${mode === 'porada' ? 'bg-slate-700 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}>
-                                            <i className="ph-bold ph-book-open"></i> Wyjaśnienie & Paragrafy
-                                        </button>
-                                        <button onClick={() => setMode('pismo')} className={`flex-1 py-3 text-xs font-bold rounded-lg flex items-center justify-center gap-2 transition-all ${mode === 'pismo' ? 'bg-red-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}>
-                                            <i className="ph-bold ph-file-text"></i> Wygeneruj Wniosek/Pismo
+                                        {/* Tryb Generowania */}
+                                        <div className="mb-8">
+                                            <label className="text-xs font-bold text-slate-400 uppercase tracking-widest block mb-3">Czego potrzebujesz?</label>
+                                            <div className="flex bg-slate-900 p-1.5 rounded-xl border border-slate-700">
+                                                <button onClick={() => setMode('porada')} className={`flex-1 py-3 text-xs font-bold rounded-lg flex items-center justify-center gap-2 transition-all ${mode === 'porada' ? 'bg-slate-700 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}>
+                                                    <i className="ph-bold ph-book-open"></i> Wyjaśnienie & Paragrafy
+                                                </button>
+                                                <button onClick={() => setMode('pismo')} className={`flex-1 py-3 text-xs font-bold rounded-lg flex items-center justify-center gap-2 transition-all ${mode === 'pismo' ? 'bg-red-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}>
+                                                    <i className="ph-bold ph-file-text"></i> Wygeneruj Wniosek/Pismo
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        {/* Przycisk Główny */}
+                                        <button 
+                                            onClick={generateLegalAdvice}
+                                            disabled={isGenerating || !query.trim()}
+                                            className="w-full bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white py-4 rounded-xl font-bold shadow-[0_10px_30px_-10px_rgba(220,38,38,0.5)] transition-all btn-bounce uppercase tracking-widest flex items-center justify-center gap-3 text-sm"
+                                        >
+                                            {isGenerating ? <div className="loader"></div> : <><i className="ph-bold ph-magnifying-glass text-xl"></i> Przeszukaj Dzienniki Ustaw</>}
                                         </button>
                                     </div>
-                                </div>
-
-                                {/* Przycisk Głęwny */}
-                                <button 
-                                    onClick={generateLegalAdvice}
-                                    disabled={isGenerating || !query.trim()}
-                                    className="w-full bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white py-4 rounded-xl font-bold shadow-[0_10px_30px_-10px_rgba(220,38,38,0.5)] transition-all btn-bounce uppercase tracking-widest flex items-center justify-center gap-3 text-sm"
-                                >
-                                    {isGenerating ? <div className="loader"></div> : <><i className="ph-bold ph-magnifying-glass text-xl"></i> Przeszukaj Dzienniki Ustaw</>}
-                                </button>
+                                )}
                             </div>
                         </div>
 
@@ -336,7 +380,7 @@ W nagłówku pisma powołaj się na konkretne artykuły prawa oświatowego/Karty
                                 </div>
 
                                 {!aiResponse ? (
-                                    <div className="flex-1 h-[400px] flex flex-col items-center justify-center text-slate-500 border-2 border-dashed border-slate-700/50 rounded-2xl p-10 print-hidden">
+                                    <div className="flex-1 min-h-[400px] flex flex-col items-center justify-center text-slate-500 border-2 border-dashed border-slate-700/50 rounded-2xl p-10 print-hidden">
                                         <i className="ph-duotone ph-scales text-7xl mb-4 text-slate-700"></i>
                                         <p className="text-center font-medium">System czeka na zapytanie.<br/>Wpisz problem z lewej strony i kliknij "Przeszukaj".</p>
                                     </div>
