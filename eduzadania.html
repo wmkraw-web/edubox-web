@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="pl" translate="no" class="notranslate">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduZadania AI - Spersonalizowana Matematyka</title>
+    
+    <!-- Biblioteki -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    
+    <!-- Ikony Phosphor -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+    <style>
+        body { 
+            font-family: 'Plus Jakarta Sans', sans-serif; 
+            background-color: #020617; 
+            color: #f8fafc; 
+            overflow-x: hidden;
+            min-height: 100vh;
+        }
+        
+        .glass-panel { 
+            background: rgba(30, 41, 59, 0.4); 
+            backdrop-filter: blur(16px); 
+            -webkit-backdrop-filter: blur(16px); 
+            border: 1px solid rgba(255, 255, 255, 0.05); 
+        }
+
+        .glass-nav { 
+            background: rgba(2, 6, 23, 0.8); 
+            backdrop-filter: blur(20px); 
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05); 
+        }
+
+        .btn-bounce:active { transform: scale(0.95); transition: transform 0.1s; }
+
+        .hero-glow {
+            position: fixed;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 1000px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(14, 165, 233, 0.15) 0%, rgba(2, 6, 23, 0) 60%);
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #0f172a; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+
+        .loader {
+            border: 3px solid rgba(255,255,255,0.1);
+            border-left-color: #0ea5e9; /* sky-500 */
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* Formatowanie Markdown z AI (Karta Pracy) */
+        .ai-content h3 { font-size: 1.25rem; font-weight: 800; color: #f8fafc; margin-top: 1.5rem; margin-bottom: 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.05em; }
+        .ai-content p { margin-bottom: 1rem; line-height: 1.6; }
+        .ai-content strong { color: #38bdf8; font-weight: 800; }
+        
+        .ai-content ol { list-style-type: decimal; margin-left: 1.5rem; margin-bottom: 1rem; }
+        .ai-content ul { list-style-type: disc; margin-left: 1.5rem; margin-bottom: 1rem; }
+        .ai-content li { margin-bottom: 0.75rem; padding-left: 0.5rem; }
+
+        /* Formatowanie do druku */
+        @media print {
+            body { background: white; color: black; font-size: 12pt; }
+            .print-hidden { display: none !important; }
+            .glass-panel { background: none; border: none; filter: none; padding: 0; margin: 0; box-shadow: none; }
+            .ai-content h3 { color: black; border-bottom: 2px solid #ccc; margin-top: 2rem; }
+            .ai-content strong { color: black; }
+            
+            /* Zostawianie miejsca na obliczenia dla ucznia */
+            .ai-content li { margin-bottom: 4cm; } /* Dużo miejsca między zadaniami */
+            
+            /* Ukrywanie klucza odpowiedzi w zależności od wyboru */
+            .hide-key-on-print .teacher-key { display: none !important; }
+            .teacher-key li { margin-bottom: 0.5cm; } /* Mniej miejsca w kluczu */
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState } = React;
+
+        const BUY_COFFEE_LINK = "https://buycoffee.to/magiccolor";
+
+        // Baza popularnych motywów
+        const THEMES = [
+            { id: 'minecraft', name: 'Minecraft', icon: 'ph-cube' },
+            { id: 'brawlstars', name: 'Brawl Stars', icon: 'ph-star' },
+            { id: 'harrypotter', name: 'Harry Potter', icon: 'ph-magic-wand' },
+            { id: 'pilka', name: 'Piłka Nożna', icon: 'ph-soccer-ball' },
+            { id: 'wednesday', name: 'Wednesday', icon: 'ph-ghost' },
+            { id: 'zwierzeta', name: 'Zwierzęta', icon: 'ph-paw-print' }
+        ];
+
+        function EduZadaniaApp() {
+            // --- STATE APLIKACJI ---
+            const [topic, setTopic] = useState('');
+            const [ageGroup, setAgeGroup] = useState('Klasy 4-6');
+            const [theme, setTheme] = useState('minecraft');
+            const [customTheme, setCustomTheme] = useState('');
+            const [difficulty, setDifficulty] = useState('Średni');
+            
+            const [aiResponse, setAiResponse] = useState('');
+            const [isGenerating, setIsGenerating] = useState(false);
+            const [toastMessage, setToastMessage] = useState('');
+            const [printWithKey, setPrintWithKey] = useState(false);
+
+            const showToast = (msg) => {
+                setToastMessage(msg);
+                setTimeout(() => setToastMessage(''), 3000);
+            };
+
+            const copyToClipboard = () => {
+                const tempDiv = document.createElement("div");
+                tempDiv.innerHTML = formatAIResponse(aiResponse);
+                navigator.clipboard.writeText(tempDiv.innerText || tempDiv.textContent);
+                showToast("✅ Skopiowano do schowka!");
+            };
+
+            const generateTasks = async () => {
+                if (!topic.trim()) {
+                    showToast("⚠️ Wpisz zagadnienie matematyczne (np. Ułamki).");
+                    return;
+                }
+
+                setIsGenerating(true);
+                setAiResponse('');
+
+                const finalTheme = theme === 'inne' ? customTheme : THEMES.find(t => t.id === theme)?.name;
+
+                // --- PROMPT DLA AI ---
+                const systemPrompt = `Jesteś wybitnym nauczycielem matematyki, który potrafi zaciekawić każdego ucznia poprzez grywalizację. Twoim zadaniem jest ułożenie świetnej karty pracy.
+
+DANE OD NAUCZYCIELA:
+- Temat matematyczny: ${topic}
+- Poziom edukacyjny: ${ageGroup}
+- Zainteresowania uczniów / Motyw przewodni: ${finalTheme}
+- Poziom trudności: ${difficulty}
+
+WYMAGANIA:
+1. Ułóż dokładnie 5 zadań tekstowych ćwiczących podany temat.
+2. Zadania MUSZĄ ściśle dotyczyć wybranego motywu (używaj imion postaci, przedmiotów, nazw z podanego świata/zainteresowań). Dzieci mają czuć, że to zadanie z ich ulubionego uniwersum!
+3. Formatuj liczby i ważne dane matematyczne używając pogrubienia (np. **15**, **3/4**).
+4. Musisz użyć poniższego schematu odpowiedzi z separatorami.
+
+FORMAT ODPOWIEDZI (Używaj Markdown):
+### ZADANIA DLA UCZNIA
+(Wypisz tutaj 5 zadań w formie listy numerowanej 1. 2. 3. 4. 5.)
+
+---KEY---
+### KLUCZ ODPOWIEDZI
+(Tutaj podaj krótkie rozwiązanie i wynik do każdego z zadań 1-5).`;
+
+                try {
+                    // Połączenie z ukrytym backendem Vercel
+                    const response = await fetch('/api/gemini', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ prompt: systemPrompt })
+                    });
+                    
+                    const data = await response.json();
+                    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                    
+                    if (!text) throw new Error("Pusta odpowiedź z API");
+                    setAiResponse(text);
+                    showToast("✨ Wygenerowano zadania!");
+                    
+                } catch (error) {
+                    console.error("API Error:", error);
+                    setAiResponse("🚨 Wystąpił błąd komunikacji z serwerem. Upewnij się, że masz połączenie z internetem i plik backendu działa.");
+                } finally {
+                    setIsGenerating(false);
+                }
+            };
+
+            // Parser z podziałem na część dla ucznia i klucz
+            const formatAIResponse = (text) => {
+                if (!text) return { student: "", teacher: "" };
+                
+                // Rozdziel zadania od klucza
+                const parts = text.split('---KEY---');
+                let studentPart = parts[0] || text;
+                let teacherPart = parts[1] || "";
+
+                const formatText = (t) => {
+                    let formatted = t
+                        .replace(/### (.*?)\n/g, '<h3>$1</h3>')
+                        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                        .replace(/\*(.*?)\*/g, '<em>$1</em>');
+                    
+                    // Naprawianie list numerowanych na ładny HTML
+                    formatted = formatted.replace(/(\d+)\. (.*?)\n/g, '<li>$2</li>');
+                    
+                    // Otaczanie <li> znacznikami <ol>
+                    if (formatted.includes('<li>')) {
+                        formatted = '<ol>' + formatted + '</ol>';
+                    }
+
+                    formatted = formatted.replace(/\n/g, '<br/>');
+                    return formatted;
+                };
+
+                return {
+                    student: formatText(studentPart),
+                    teacher: formatText(teacherPart)
+                };
+            };
+
+            const parsedContent = formatAIResponse(aiResponse);
+
+            return (
+                <div className="min-h-screen relative flex flex-col pb-10">
+                    <div className="hero-glow print-hidden"></div>
+
+                    {/* Toast */}
+                    <div className={`fixed top-24 left-1/2 -translate-x-1/2 z-[200] bg-emerald-600 text-white px-6 py-3 rounded-full font-bold shadow-[0_10px_40px_rgba(16,185,129,0.5)] transition-all duration-300 flex items-center gap-2 print-hidden ${toastMessage ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-10 pointer-events-none'}`}>
+                        {toastMessage}
+                    </div>
+
+                    {/* Nawigacja */}
+                    <nav className="w-full z-[100] glass-nav print-hidden sticky top-0">
+                        <div className="max-w-[90rem] mx-auto px-6 h-20 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 bg-sky-500 rounded-xl flex items-center justify-center shadow-[0_0_15px_rgba(14,165,233,0.5)]">
+                                    <i className="ph-bold ph-math-operations text-white text-xl"></i>
+                                </div>
+                                <span className="text-xl font-extrabold tracking-tight text-white hidden sm:block">EduZadania <span className="text-sky-400">AI</span></span>
+                            </div>
+                            <div className="flex items-center gap-4">
+                                <div className="text-xs font-black text-slate-400 uppercase tracking-widest hidden md:block">
+                                    Generator Matematyczny
+                                </div>
+                                <a href={BUY_COFFEE_LINK} target="_blank" className="flex items-center gap-2 bg-slate-800 border border-slate-700 text-amber-400 px-5 py-2.5 rounded-full hover:bg-slate-700 transition-all shadow-lg btn-bounce text-xs font-bold uppercase tracking-wider">
+                                    <i className="ph-fill ph-coffee text-base"></i> Postaw Kawę
+                                </a>
+                            </div>
+                        </div>
+                    </nav>
+
+                    <main className="flex-grow max-w-[90rem] w-full mx-auto px-4 sm:px-6 py-8 relative z-10 flex flex-col xl:flex-row gap-8 items-start">
+                        
+                        {/* ================================== */}
+                        {/* LEWA KOLUMNA: Kreator Zadania      */}
+                        {/* ================================== */}
+                        <div className="w-full xl:w-4/12 flex flex-col gap-6 print-hidden">
+                            
+                            <div className="glass-panel rounded-[2rem] p-6 md:p-8 border-t-4 border-sky-500">
+                                <h2 className="text-2xl font-black text-white mb-2">Kreator Zadań</h2>
+                                <p className="text-slate-400 text-sm mb-8 leading-relaxed">Przestań używać nudnych zadań z podręcznika. Wymień temat i zainteresowania uczniów, a AI ułoży wciągającą kartę pracy.</p>
+
+                                {/* 1. Klasa i Trudność */}
+                                <div className="grid grid-cols-2 gap-4 mb-6">
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-400 uppercase tracking-widest block mb-2">Wiek / Klasa</label>
+                                        <select value={ageGroup} onChange={e => setAgeGroup(e.target.value)} className="w-full bg-slate-900 border border-slate-700 text-white rounded-xl px-4 py-3 focus:outline-none focus:border-sky-500 text-sm transition-colors cursor-pointer">
+                                            <option value="Klasy 1-3">Klasy 1-3</option>
+                                            <option value="Klasy 4-6">Klasy 4-6</option>
+                                            <option value="Klasy 7-8">Klasy 7-8</option>
+                                            <option value="Szkoła Średnia">Szkoła Średnia</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-400 uppercase tracking-widest block mb-2">Trudność</label>
+                                        <select value={difficulty} onChange={e => setDifficulty(e.target.value)} className="w-full bg-slate-900 border border-slate-700 text-white rounded-xl px-4 py-3 focus:outline-none focus:border-sky-500 text-sm transition-colors cursor-pointer">
+                                            <option value="Bardzo łatwy">Bardzo łatwy</option>
+                                            <option value="Średni">Średni</option>
+                                            <option value="Trudny (Wyzwanie)">Trudny (Wyzwanie)</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                {/* 2. Temat Matematyczny */}
+                                <div className="mb-6">
+                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-widest block mb-3">Zagadnienie matematyczne</label>
+                                    <input 
+                                        type="text"
+                                        value={topic}
+                                        onChange={e => setTopic(e.target.value)}
+                                        placeholder="Np. Ułamki zwykłe, Obliczanie pola trójkąta..."
+                                        className="w-full bg-slate-900 border border-slate-700 text-white rounded-xl px-4 py-3 focus:outline-none focus:border-sky-500 transition-colors text-sm"
+                                    />
+                                </div>
+
+                                {/* 3. Motyw (Grywalizacja) */}
+                                <div className="mb-8">
+                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-widest block mb-3">Motyw przewodni (Zainteresowania)</label>
+                                    <div className="grid grid-cols-2 gap-2 mb-3">
+                                        {THEMES.map(t => (
+                                            <button 
+                                                key={t.id}
+                                                onClick={() => setTheme(t.id)}
+                                                className={`p-2.5 rounded-xl border flex items-center gap-2 text-sm transition-all ${theme === t.id ? 'bg-sky-500/20 border-sky-500 text-white shadow-[0_0_15px_rgba(14,165,233,0.2)]' : 'bg-slate-900/50 border-slate-700/50 text-slate-400 hover:bg-slate-800'}`}
+                                            >
+                                                <i className={`${t.icon} text-lg ${theme === t.id ? 'text-sky-400' : 'text-slate-500'}`}></i> {t.name}
+                                            </button>
+                                        ))}
+                                        <button 
+                                            onClick={() => setTheme('inne')}
+                                            className={`p-2.5 rounded-xl border flex items-center gap-2 text-sm transition-all ${theme === 'inne' ? 'bg-sky-500/20 border-sky-500 text-white' : 'bg-slate-900/50 border-slate-700/50 text-slate-400 hover:bg-slate-800'}`}
+                                        >
+                                            <i className={`ph-bold ph-dots-three text-lg ${theme === 'inne' ? 'text-sky-400' : 'text-slate-500'}`}></i> Własny
+                                        </button>
+                                    </div>
+                                    {theme === 'inne' && (
+                                        <input 
+                                            type="text"
+                                            value={customTheme}
+                                            onChange={e => setCustomTheme(e.target.value)}
+                                            placeholder="Wpisz np. Koci domek Gabi, Marvel..."
+                                            className="w-full bg-slate-800 border border-slate-600 text-white rounded-xl px-4 py-3 focus:outline-none focus:border-sky-500 transition-colors text-sm animate-[reveal_0.2s_ease-out]"
+                                        />
+                                    )}
+                                </div>
+
+                                {/* Przycisk Główny */}
+                                <button 
+                                    onClick={generateTasks}
+                                    disabled={isGenerating || !topic.trim()}
+                                    className="w-full bg-sky-500 hover:bg-sky-400 disabled:opacity-50 text-white py-4 rounded-xl font-bold shadow-[0_10px_30px_-10px_rgba(14,165,233,0.5)] transition-all btn-bounce uppercase tracking-widest flex items-center justify-center gap-3 text-sm"
+                                >
+                                    {isGenerating ? <div className="loader"></div> : <><i className="ph-bold ph-magic-wand text-xl"></i> Generuj Kartę Pracy</>}
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* ================================== */}
+                        {/* PRAWA KOLUMNA: Podgląd i Wydruk    */}
+                        {/* ================================== */}
+                        <div className="w-full xl:w-8/12 flex flex-col h-full print:w-full print:m-0">
+                            
+                            <div className="glass-panel rounded-[2rem] p-6 md:p-10 flex-grow relative overflow-hidden print:p-0 print:border-none print:bg-transparent print:backdrop-filter-none">
+                                
+                                <div className="flex justify-between items-end mb-8 print-hidden border-b border-slate-700/50 pb-4">
+                                    <div>
+                                        <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                                            <i className="ph-fill ph-file-text text-sky-400"></i> Gotowa Karta Pracy
+                                        </h3>
+                                        <p className="text-xs text-slate-400 mt-1">Przy drukowaniu system sam zostawi ogromne przerwy na obliczenia ucznia!</p>
+                                    </div>
+                                    
+                                    {aiResponse && (
+                                        <div className="flex flex-col gap-2 items-end">
+                                            <label className="flex items-center gap-2 text-xs font-bold text-slate-300 cursor-pointer hover:text-white transition-colors">
+                                                <div className={`w-10 h-5 rounded-full p-1 transition-colors ${printWithKey ? 'bg-sky-500' : 'bg-slate-700'}`}>
+                                                    <div className={`w-3 h-3 bg-white rounded-full transition-transform ${printWithKey ? 'translate-x-5' : ''}`}></div>
+                                                </div>
+                                                Drukuj z kluczem odp.
+                                            </label>
+                                            <div className="flex gap-2 mt-1">
+                                                <button onClick={copyToClipboard} className="bg-slate-800 hover:bg-slate-700 border border-slate-600 px-4 py-2 rounded-lg text-xs font-bold text-white transition-colors flex items-center gap-2 btn-bounce">
+                                                    <i className="ph-bold ph-copy"></i> Kopiuj
+                                                </button>
+                                                <button onClick={() => window.print()} className="bg-sky-600 hover:bg-sky-500 px-6 py-2 rounded-lg text-xs font-bold text-white transition-colors shadow-lg flex items-center gap-2 btn-bounce uppercase tracking-wider">
+                                                    <i className="ph-bold ph-printer text-lg"></i> Drukuj
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {!aiResponse ? (
+                                    <div className="flex-1 min-h-[400px] flex flex-col items-center justify-center text-slate-500 border-2 border-dashed border-slate-700/50 rounded-2xl p-10 print-hidden">
+                                        <i className="ph-duotone ph-math-operations text-7xl mb-4 text-slate-700"></i>
+                                        <p className="text-center font-medium">Uczniowie uwielbiają zadania z ich ulubionych gier i bajek!<br/>Wybierz motyw z lewej strony i kliknij Generuj.</p>
+                                    </div>
+                                ) : (
+                                    <div className={`bg-slate-900 border border-slate-700 rounded-2xl p-6 md:p-8 shadow-inner relative print:bg-transparent print:border-none print:p-0 print:shadow-none ${!printWithKey ? 'hide-key-on-print' : ''}`}>
+                                        
+                                        {/* Nagłówek dla ucznia na wydruku */}
+                                        <div className="hidden print:flex justify-between items-end border-b-2 border-black pb-2 mb-6">
+                                            <div>
+                                                <div className="font-bold text-xs uppercase tracking-widest text-gray-500 mb-1">Imię i nazwisko</div>
+                                                <div className="text-lg">...................................................................</div>
+                                            </div>
+                                            <div className="text-right">
+                                                <div className="font-bold text-xs uppercase tracking-widest text-gray-500 mb-1">Klasa / Data</div>
+                                                <div className="text-lg">...................... / ......................</div>
+                                            </div>
+                                        </div>
+
+                                        {/* Tytuł Karty */}
+                                        <h2 className="hidden print:block text-2xl font-bold text-center mb-10 mt-6 uppercase tracking-wider">
+                                            Karta Pracy: {topic}
+                                        </h2>
+
+                                        {/* Treść: Zadania */}
+                                        <div 
+                                            className="ai-content text-slate-300 text-sm md:text-base leading-relaxed print:text-black"
+                                            dangerouslySetInnerHTML={{ __html: parsedContent.student }}
+                                        ></div>
+
+                                        {/* Treść: Klucz nauczyciela */}
+                                        {parsedContent.teacher && (
+                                            <div className="teacher-key mt-12 pt-6 border-t border-slate-700/50 print:border-black print:mt-24">
+                                                <div 
+                                                    className="ai-content text-emerald-400 text-sm print:text-gray-600"
+                                                    dangerouslySetInnerHTML={{ __html: parsedContent.teacher }}
+                                                ></div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                    </main>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<EduZadaniaApp />);
+    </script>
+</body>
+</html>
