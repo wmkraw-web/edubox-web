@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="pl" translate="no" class="notranslate">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduGrupy - Koło Fortuny i Menedżer Klasy</title>
+    
+    <!-- Biblioteki -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    
+    <!-- Ikony Phosphor i Confetti -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <style>
+        body { 
+            font-family: 'Plus Jakarta Sans', sans-serif; 
+            background-color: #020617; 
+            color: #f8fafc; 
+            overflow-x: hidden;
+            min-height: 100vh;
+        }
+        
+        .glass-panel { 
+            background: rgba(30, 41, 59, 0.4); 
+            backdrop-filter: blur(16px); 
+            -webkit-backdrop-filter: blur(16px); 
+            border: 1px solid rgba(255, 255, 255, 0.05); 
+        }
+
+        .glass-nav { 
+            background: rgba(2, 6, 23, 0.8); 
+            backdrop-filter: blur(20px); 
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05); 
+        }
+
+        .btn-bounce:active { transform: scale(0.95); transition: transform 0.1s; }
+
+        .hero-glow {
+            position: fixed;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 1000px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(236, 72, 153, 0.15) 0%, rgba(245, 158, 11, 0.05) 50%, rgba(2, 6, 23, 0) 70%);
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #0f172a; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+
+        /* Magiczne animacje wjazdu dla grup */
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .anim-fade-up { animation: fadeUp 0.4s ease-out forwards; }
+        
+        /* Strzałka koła fortuny */
+        .wheel-indicator {
+            clip-path: polygon(100% 0, 0 50%, 100% 100%);
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        const BUY_COFFEE_LINK = "https://buycoffee.to/magiccolor";
+        
+        // Paleta żywych kolorów dla koła fortuny
+        const WHEEL_COLORS = ['#ef4444', '#f97316', '#f59e0b', '#84cc16', '#10b981', '#06b6d4', '#3b82f6', '#8b5cf6', '#d946ef', '#f43f5e'];
+
+        function EduGrupyApp() {
+            // --- STATE (PAMIĘĆ) KLASY ---
+            const [students, setStudents] = useState([]);
+            const [bulkText, setBulkText] = useState("");
+            
+            // Wczytywanie z localStorage na starcie
+            useEffect(() => {
+                const saved = localStorage.getItem('edugrupy_lista');
+                if (saved) {
+                    try { setStudents(JSON.parse(saved)); } catch(e) {}
+                } else {
+                    // Domyślna lista pokazowa
+                    setStudents(["Anna", "Bartek", "Celina", "Damian", "Ewa", "Filip", "Gosia", "Hubert"]);
+                }
+            }, []);
+
+            // Zapisywanie do localStorage przy każdej zmianie
+            useEffect(() => {
+                if (students.length > 0) {
+                    localStorage.setItem('edugrupy_lista', JSON.stringify(students));
+                }
+            }, [students]);
+
+            // --- STATE APLIKACJI ---
+            const [activeTab, setActiveTab] = useState('wheel'); // wheel | groups
+            const [toastMessage, setToastMessage] = useState('');
+
+            // --- STATE KOŁA FORTUNY ---
+            const [isSpinning, setIsSpinning] = useState(false);
+            const [rotation, setRotation] = useState(0);
+            const [winner, setWinner] = useState(null);
+            
+            // --- STATE PODZIAŁU NA GRUPY ---
+            const [numGroups, setNumGroups] = useState(3);
+            const [groups, setGroups] = useState([]);
+
+            const showToast = (msg) => {
+                setToastMessage(msg);
+                setTimeout(() => setToastMessage(''), 3000);
+            };
+
+            const playTadaSound = () => {
+                try {
+                    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(400, ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(800, ctx.currentTime + 0.2);
+                    gain.gain.setValueAtTime(0.1, ctx.currentTime);
+                    osc.start();
+                    gain.gain.exponentialRampToValueAtTime(0.00001, ctx.currentTime + 0.8);
+                    osc.stop(ctx.currentTime + 0.8);
+                } catch(e) {}
+            };
+
+            // --- ZARZĄDZANIE LISTĄ ---
+            const addStudent = (e) => {
+                e.preventDefault();
+                const name = e.target.studentName.value.trim();
+                if (name && !students.includes(name)) {
+                    setStudents([...students, name]);
+                    e.target.studentName.value = '';
+                } else if (students.includes(name)) {
+                    showToast("⚠️ Ten uczeń już jest na liście!");
+                }
+            };
+
+            const removeStudent = (nameToRemove) => {
+                setStudents(students.filter(name => name !== nameToRemove));
+                setWinner(null);
+                setGroups([]);
+            };
+
+            const handleBulkAdd = () => {
+                if (!bulkText.trim()) return;
+                const newNames = bulkText.split('\n')
+                                         .map(n => n.trim())
+                                         .filter(n => n.length > 0 && !students.includes(n));
+                if (newNames.length > 0) {
+                    setStudents([...students, ...newNames]);
+                    setBulkText("");
+                    showToast(`✅ Dodano ${newNames.length} uczniów!`);
+                }
+            };
+
+            const clearList = () => {
+                if (window.confirm("Czy na pewno chcesz usunąć całą listę klasy?")) {
+                    setStudents([]);
+                    setWinner(null);
+                    setGroups([]);
+                    localStorage.removeItem('edugrupy_lista');
+                }
+            };
+
+            // --- LOGIKA KOŁA FORTUNY ---
+            const spinWheel = () => {
+                if (students.length === 0 || isSpinning) return;
+                
+                setWinner(null);
+                setIsSpinning(true);
+                
+                // Kręcimy minimum 5 pełnych obrotów + losowy kąt
+                const spinSpins = 5 * 360; 
+                const randomDegree = Math.floor(Math.random() * 360);
+                const totalRotation = rotation + spinSpins + randomDegree;
+                
+                setRotation(totalRotation);
+
+                // Obliczanie zwycięzcy po zatrzymaniu
+                setTimeout(() => {
+                    setIsSpinning(false);
+                    // Strzałka jest po prawej stronie (0 stopni). Koło kręci się w prawo (zgodnie ze wskazówkami zegara).
+                    // Więc wygrywa kawałek, który na końcu znajduje się przy kącie 0 (lub 360).
+                    const actualRotation = totalRotation % 360;
+                    const sliceAngle = 360 / students.length;
+                    
+                    // Wzorzec obliczania: koło kręci się w dół. Wygrany index liczymy od tyłu koła
+                    const winningIndex = Math.floor((360 - actualRotation + (sliceAngle / 2)) % 360 / sliceAngle);
+                    
+                    setWinner(students[winningIndex]);
+                    playTadaSound();
+                    
+                    // Odpalenie konfetti!
+                    if (window.confetti) {
+                        window.confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 }, zIndex: 300 });
+                    }
+                }, 4000); // 4 sekundy animacji
+            };
+
+            // Rysowanie wycinków (Slice'ów) dla SVG
+            const getCoordinatesForPercent = (percent) => {
+                const x = Math.cos(2 * Math.PI * percent) * 100;
+                const y = Math.sin(2 * Math.PI * percent) * 100;
+                return [x, y];
+            };
+
+            // --- LOGIKA PODZIAŁU NA GRUPY ---
+            const divideClass = () => {
+                if (students.length === 0) return;
+                
+                setGroups([]); // Reset by odpalić animację
+                
+                setTimeout(() => {
+                    // Algorytm Fisher-Yates do tasowania
+                    const shuffled = [...students];
+                    for (let i = shuffled.length - 1; i > 0; i--) {
+                        const j = Math.floor(Math.random() * (i + 1));
+                        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+                    }
+
+                    // Rozdział do grup
+                    const newGroups = Array.from({ length: numGroups }, () => []);
+                    shuffled.forEach((student, index) => {
+                        newGroups[index % numGroups].push(student);
+                    });
+
+                    setGroups(newGroups);
+                }, 100);
+            };
+
+            return (
+                <div className="min-h-screen relative flex flex-col pb-10">
+                    <div className="hero-glow"></div>
+
+                    {/* Toast */}
+                    <div className={`fixed top-24 left-1/2 -translate-x-1/2 z-[200] bg-emerald-600 text-white px-6 py-3 rounded-full font-bold shadow-[0_10px_40px_rgba(16,185,129,0.5)] transition-all duration-300 flex items-center gap-2 ${toastMessage ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-10 pointer-events-none'}`}>
+                        {toastMessage}
+                    </div>
+
+                    {/* Nawigacja */}
+                    <nav className="w-full z-[100] glass-nav sticky top-0">
+                        <div className="max-w-[90rem] mx-auto px-6 h-20 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 bg-gradient-to-br from-pink-500 to-rose-600 rounded-xl flex items-center justify-center shadow-[0_0_15px_rgba(236,72,153,0.5)]">
+                                    <i className="ph-bold ph-users-three text-white text-xl"></i>
+                                </div>
+                                <span className="text-xl font-extrabold tracking-tight text-white hidden sm:block">EduGrupy</span>
+                            </div>
+                            <div className="flex items-center gap-4">
+                                <div className="hidden md:flex items-center gap-2 bg-slate-900 border border-slate-700 px-4 py-2 rounded-full">
+                                    <i className="ph-bold ph-hard-drives text-slate-400"></i>
+                                    <span className="text-[10px] text-slate-300 font-bold tracking-widest uppercase">Zapis lokalny (Offline)</span>
+                                </div>
+                                <a href={BUY_COFFEE_LINK} target="_blank" className="flex items-center gap-2 bg-slate-800 border border-slate-700 text-amber-400 px-5 py-2.5 rounded-full hover:bg-slate-700 transition-all shadow-lg btn-bounce text-xs font-bold uppercase tracking-wider">
+                                    <i className="ph-fill ph-coffee text-base"></i> Postaw Kawę
+                                </a>
+                            </div>
+                        </div>
+                    </nav>
+
+                    <main className="flex-grow max-w-[90rem] w-full mx-auto px-4 sm:px-6 py-8 relative z-10 flex flex-col xl:flex-row gap-8 items-start">
+                        
+                        {/* ================================== */}
+                        {/* LEWA KOLUMNA: Menedżer Listy Klasy */}
+                        {/* ================================== */}
+                        <div className="w-full xl:w-3/12 flex flex-col gap-6 shrink-0">
+                            
+                            <div className="glass-panel rounded-[2rem] p-6 border-t-4 border-pink-500 flex flex-col h-[800px]">
+                                <div className="flex justify-between items-center mb-6">
+                                    <h2 className="text-xl font-black text-white flex items-center gap-2">
+                                        <i className="ph-bold ph-list-numbers text-pink-400"></i> Lista Klasy
+                                    </h2>
+                                    <div className="bg-slate-800 text-slate-300 text-xs px-3 py-1 rounded-full font-bold border border-slate-700">
+                                        {students.length}
+                                    </div>
+                                </div>
+
+                                {/* Formularz dodawania pjedynczego */}
+                                <form onSubmit={addStudent} className="flex gap-2 mb-4">
+                                    <input 
+                                        name="studentName"
+                                        type="text" 
+                                        placeholder="Imię ucznia..." 
+                                        autoComplete="off"
+                                        className="flex-grow bg-slate-900 border border-slate-700 text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-pink-500 transition-colors"
+                                    />
+                                    <button type="submit" className="bg-pink-600 hover:bg-pink-500 text-white w-10 h-10 rounded-xl font-bold flex items-center justify-center transition-colors btn-bounce shrink-0 shadow-md">
+                                        <i className="ph-bold ph-plus"></i>
+                                    </button>
+                                </form>
+
+                                {/* Lista uczniów */}
+                                <div className="flex-grow overflow-y-auto custom-scrollbar pr-2 space-y-2 mb-4 bg-slate-900/30 p-2 rounded-xl border border-slate-800/50">
+                                    {students.length === 0 ? (
+                                        <div className="text-center text-slate-500 text-xs py-8">
+                                            Brak uczniów. Dodaj ich powyżej lub wklej listę poniżej.
+                                        </div>
+                                    ) : (
+                                        students.map((student, idx) => (
+                                            <div key={idx} className="flex justify-between items-center bg-slate-800 border border-slate-700 px-3 py-2 rounded-lg group hover:border-slate-500 transition-colors">
+                                                <span className="text-slate-200 text-sm font-medium truncate">{student}</span>
+                                                <button onClick={() => removeStudent(student)} className="text-slate-500 hover:text-red-400 p-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <i className="ph-bold ph-trash"></i>
+                                                </button>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+
+                                {/* Dodawanie masowe */}
+                                <div className="pt-4 border-t border-slate-700/50">
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2">Szybkie wklejanie (z Excela/Worda)</label>
+                                    <textarea 
+                                        value={bulkText}
+                                        onChange={e => setBulkText(e.target.value)}
+                                        placeholder="Wklej listę imion (każde w nowej linii)..."
+                                        className="w-full h-20 bg-slate-900 border border-slate-700 text-slate-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-pink-500 transition-colors resize-none custom-scrollbar mb-2"
+                                    ></textarea>
+                                    <div className="flex gap-2">
+                                        <button onClick={handleBulkAdd} className="flex-1 bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold py-2 rounded-lg border border-slate-600 transition-colors btn-bounce">
+                                            Dodaj Masowo
+                                        </button>
+                                        <button onClick={clearList} className="bg-red-900/30 hover:bg-red-900/50 text-red-400 text-xs font-bold py-2 px-3 rounded-lg border border-red-500/30 transition-colors btn-bounce" title="Wyczyść listę">
+                                            <i className="ph-bold ph-trash text-base"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* ================================== */}
+                        {/* PRAWA KOLUMNA: Aplikacje           */}
+                        {/* ================================== */}
+                        <div className="w-full xl:w-9/12 flex flex-col h-full">
+                            
+                            {/* Zakładki */}
+                            <div className="glass-panel p-2 rounded-2xl flex gap-1 bg-slate-900/60 mb-6 max-w-md mx-auto w-full">
+                                <button onClick={() => setActiveTab('wheel')} className={`flex-1 py-3 px-4 rounded-xl flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-widest transition-all ${activeTab === 'wheel' ? 'bg-pink-600 text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}>
+                                    <i className="ph-bold ph-aperture text-lg"></i> Koło Fortuny
+                                </button>
+                                <button onClick={() => setActiveTab('groups')} className={`flex-1 py-3 px-4 rounded-xl flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-widest transition-all ${activeTab === 'groups' ? 'bg-amber-600 text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}>
+                                    <i className="ph-bold ph-squares-four text-lg"></i> Podział Grup
+                                </button>
+                            </div>
+
+                            <div className="glass-panel rounded-[2rem] p-6 md:p-10 flex-grow relative overflow-hidden min-h-[600px] flex flex-col items-center justify-center">
+                                
+                                {/* ----------------------------- */}
+                                {/* WIDOK 1: KOŁO FORTUNY         */}
+                                {/* ----------------------------- */}
+                                {activeTab === 'wheel' && (
+                                    <div className="w-full flex flex-col items-center animate-[reveal_0.3s_ease-out]">
+                                        
+                                        {winner && !isSpinning && (
+                                            <div className="absolute top-10 left-1/2 -translate-x-1/2 z-50 bg-emerald-500 text-white px-8 py-4 rounded-2xl font-black text-3xl shadow-[0_15px_50px_rgba(16,185,129,0.5)] border-2 border-white/20 anim-fade-up whitespace-nowrap">
+                                                🎉 Wygrywa: {winner}!
+                                            </div>
+                                        )}
+
+                                        {students.length < 2 ? (
+                                            <div className="text-center text-slate-500 max-w-sm">
+                                                <i className="ph-duotone ph-aperture text-7xl mb-4 text-slate-700"></i>
+                                                <h3 className="text-xl font-bold text-white mb-2">Koło jest puste</h3>
+                                                <p>Dodaj co najmniej 2 uczniów na listę po lewej stronie, aby rozpocząć losowanie.</p>
+                                            </div>
+                                        ) : (
+                                            <div className="relative w-[320px] h-[320px] md:w-[450px] md:h-[450px] flex items-center justify-center mb-8">
+                                                
+                                                {/* Strzałka (Indykator) - Prawa strona */}
+                                                <div className="absolute -right-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-white wheel-indicator z-20 drop-shadow-xl filter"></div>
+
+                                                {/* Środek Koła i Przycisk SPIN */}
+                                                <button 
+                                                    onClick={spinWheel}
+                                                    disabled={isSpinning}
+                                                    className="absolute z-20 w-24 h-24 md:w-32 md:h-32 bg-slate-900 rounded-full border-4 border-white/10 shadow-[0_0_30px_rgba(0,0,0,0.8)] flex flex-col items-center justify-center text-white font-black hover:bg-slate-800 transition-colors disabled:opacity-80 group active:scale-95"
+                                                >
+                                                    <span className="text-lg md:text-2xl tracking-widest text-pink-400 group-hover:text-pink-300">SPIN</span>
+                                                    <i className="ph-bold ph-hand-tap text-slate-500 mt-1"></i>
+                                                </button>
+
+                                                {/* Kółko SVG */}
+                                                <div className="w-full h-full rounded-full overflow-hidden shadow-[0_0_50px_rgba(236,72,153,0.3)] border-8 border-slate-800"
+                                                     style={{ transform: `rotate(${rotation}deg)`, transition: isSpinning ? 'transform 4s cubic-bezier(0.1, 0.9, 0.2, 1)' : 'none' }}>
+                                                    <svg viewBox="-100 -100 200 200" className="w-full h-full transform -rotate-90">
+                                                        {students.map((student, index) => {
+                                                            const percent = 1 / students.length;
+                                                            const startPercent = index * percent;
+                                                            const endPercent = startPercent + percent;
+                                                            
+                                                            const [startX, startY] = getCoordinatesForPercent(startPercent);
+                                                            const [endX, endY] = getCoordinatesForPercent(endPercent);
+                                                            
+                                                            const largeArcFlag = percent > 0.5 ? 1 : 0;
+                                                            const pathData = [
+                                                                `M 0 0`,
+                                                                `L ${startX} ${startY}`,
+                                                                `A 100 100 0 ${largeArcFlag} 1 ${endX} ${endY}`,
+                                                                `Z`
+                                                            ].join(' ');
+
+                                                            // Kąt tekstu: środek kawałka
+                                                            const textPercent = startPercent + (percent / 2);
+                                                            // Przesunięcie tekstu bliżej krawędzi (promień 70)
+                                                            const textX = Math.cos(2 * Math.PI * textPercent) * 65;
+                                                            const textY = Math.sin(2 * Math.PI * textPercent) * 65;
+                                                            // Obrót tekstu tak, by był czytelny wzdłuż promienia
+                                                            const textRotation = (textPercent * 360);
+
+                                                            return (
+                                                                <g key={index}>
+                                                                    <path d={pathData} fill={WHEEL_COLORS[index % WHEEL_COLORS.length]} stroke="rgba(0,0,0,0.1)" strokeWidth="0.5" />
+                                                                    {/* Trik dla SVG: Tekst musi być obrócony po umiejscowieniu */}
+                                                                    <text 
+                                                                        x={textX} y={textY} 
+                                                                        fill="white" 
+                                                                        fontSize={students.length > 20 ? "5" : students.length > 12 ? "7" : "10"} 
+                                                                        fontWeight="bold" 
+                                                                        textAnchor="middle" 
+                                                                        alignmentBaseline="middle"
+                                                                        transform={`rotate(${textRotation}, ${textX}, ${textY})`}
+                                                                        className="drop-shadow-md"
+                                                                    >
+                                                                        {student.length > 12 ? student.substring(0, 10) + '.' : student}
+                                                                    </text>
+                                                                </g>
+                                                            );
+                                                        })}
+                                                    </svg>
+                                                </div>
+                                            </div>
+                                        )}
+                                        {students.length >= 2 && !isSpinning && !winner && (
+                                            <p className="text-slate-400 text-sm font-medium">Zakręć kołem, aby wylosować szczęśliwca!</p>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* ----------------------------- */}
+                                {/* WIDOK 2: PODZIAŁ NA GRUPY     */}
+                                {/* ----------------------------- */}
+                                {activeTab === 'groups' && (
+                                    <div className="w-full flex flex-col h-full animate-[reveal_0.3s_ease-out]">
+                                        
+                                        <div className="bg-slate-900/80 border border-slate-700 rounded-2xl p-6 mb-8 w-full max-w-2xl mx-auto text-center shadow-lg">
+                                            <label className="text-xs font-bold text-amber-400 uppercase tracking-widest block mb-4">Na ile grup dzielimy klasę?</label>
+                                            <div className="flex items-center justify-center gap-6 mb-6">
+                                                <button onClick={() => setNumGroups(Math.max(2, numGroups - 1))} className="w-12 h-12 rounded-full bg-slate-800 text-white font-bold text-xl hover:bg-slate-700 transition-colors">-</button>
+                                                <div className="text-5xl font-black text-white w-16 tabular-nums">{numGroups}</div>
+                                                <button onClick={() => setNumGroups(Math.min(10, numGroups + 1))} className="w-12 h-12 rounded-full bg-slate-800 text-white font-bold text-xl hover:bg-slate-700 transition-colors">+</button>
+                                            </div>
+                                            <button 
+                                                onClick={divideClass}
+                                                disabled={students.length < numGroups}
+                                                className="bg-amber-600 hover:bg-amber-500 text-white disabled:opacity-50 px-10 py-4 rounded-xl font-bold shadow-[0_10px_30px_-10px_rgba(245,158,11,0.5)] transition-all btn-bounce uppercase tracking-widest text-sm w-full sm:w-auto"
+                                            >
+                                                <i className="ph-bold ph-shuffle mr-2 text-lg"></i> Przydziel Magicznie
+                                            </button>
+                                            {students.length < numGroups && (
+                                                <p className="text-red-400 text-xs mt-3">Masz mniej uczniów na liście niż żądanych grup!</p>
+                                            )}
+                                        </div>
+
+                                        {groups.length > 0 && (
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 w-full content-start">
+                                                {groups.map((grp, i) => (
+                                                    <div key={i} className="bg-slate-800 border-t-4 rounded-xl overflow-hidden shadow-lg anim-fade-up" style={{ borderColor: WHEEL_COLORS[i % WHEEL_COLORS.length], animationDelay: `${i * 0.1}s` }}>
+                                                        <div className="bg-slate-900/50 p-3 text-center border-b border-slate-700">
+                                                            <h3 className="text-white font-black uppercase tracking-wider text-sm">Grupa {i + 1}</h3>
+                                                        </div>
+                                                        <div className="p-4 space-y-2">
+                                                            {grp.map((student, j) => (
+                                                                <div key={j} className="bg-slate-700/50 px-3 py-2 rounded-lg text-slate-200 text-sm font-medium border border-slate-600/50">
+                                                                    {student}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+
+                                    </div>
+                                )}
+
+                            </div>
+                        </div>
+
+                    </main>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<EduGrupyApp />);
+    </script>
+</body>
+</html>
