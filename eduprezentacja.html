@@ -89,14 +89,14 @@
             const [slideCount, setSlideCount] = useState(6);
             const [theme, setTheme] = useState('modern');
             const [includeQuiz, setIncludeQuiz] = useState(true);
-            const [contentStyle, setContentStyle] = useState('bullets'); // NOWOŚĆ: Rodzaj treści (bullets / descriptive)
+            const [contentStyle, setContentStyle] = useState('bullets'); // Rodzaj treści (bullets / descriptive)
 
             // Generated Content
             const [slides, setSlides] = useState([]);
             const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
             const [isFullscreen, setIsFullscreen] = useState(false);
             const [loadingProgress, setLoadingProgress] = useState(0);
-            const [isRegeneratingImage, setIsRegeneratingImage] = useState(null); // Trzyma ID odświeżanego slajdu
+            const [isRegeneratingImage, setIsRegeneratingImage] = useState(null);
             
             const presentationRef = useRef(null);
             const fileInputRef = useRef(null);
@@ -130,18 +130,18 @@
 
                 setStep('generating_text');
                 
-                // Instrukcja stylizacji dla AI
+                // Silniejsza instrukcja dla GPT co do różnicy między hasłami a opisem
                 let formatInstruction = contentStyle === 'bullets' 
-                    ? 'Użyj krótkich, zwięzłych haseł w punktach (max 5-8 słów na punkt).' 
-                    : 'Użyj dłuższego, opisowego tekstu. Zbuduj 2-3 pełne, wyczerpujące zdania w każdym punkcie.';
+                    ? 'Pole "bullets" MUSI zawierać 3-5 bardzo krótkich haseł (równoważniki zdań, max 6 słów każde).' 
+                    : 'Pole "bullets" MUSI zawierać 2-3 długie, wyczerpujące akapity tekstu (pełne, złożone zdania, wyglądające jak ciągły tekst czytany z książki).';
 
                 const systemPrompt = `Jesteś ekspertem ds. edukacji. Tworzysz konspekty prezentacji. Zwróć WYŁĄCZNIE poprawny JSON o poniższej strukturze:
                 {
                     "slides": [
                         {
                             "title": "Tytuł slajdu (max 5 słów)",
-                            "bullets": ["Treść 1", "Treść 2", "Treść 3"],
-                            "imagePrompt": "Szczegółowy opis zdjęcia w j. angielskim. Format poziomy. WAŻNE: Postacie muszą być rasy białej (Caucasian, European, Polish). Całkowity zakaz dodawania tekstu na obrazku (NO TEXT, no letters, no watermark). Zadbaj o poprawną anatomię.",
+                            "bullets": ["Treść 1", "Treść 2"],
+                            "imagePrompt": "Szczegółowy opis zdjęcia w j. angielskim dla AI. Format poziomy. WAŻNE: Całkowity zakaz dodawania tekstu na obrazku (NO TEXT). Jeśli są postacie, niech zachowają naturalny, europejski wygląd.",
                             "notes": "Notatki dla nauczyciela, co ma opowiedzieć do tego slajdu."
                         }
                     ]
@@ -183,6 +183,16 @@
                 }
             };
 
+            // Pomocnicza funkcja do tworzenia promptu dla obrazków (przywraca ładniejszy, bardziej artystyczny styl)
+            const getFinalImagePrompt = (basePrompt, currentTheme) => {
+                let styleMod = currentTheme === 'chalkboard' 
+                    ? 'hand drawn chalk illustration, simple, artistic' 
+                    : (currentTheme === 'space' ? 'cinematic sci-fi concept art, breathtaking' : 'modern colorful flat vector illustration, beautiful, vibrant');
+                
+                // Mniej restrykcji = ładniejsze obrazki. Skupiamy się tylko na braku tekstu.
+                return `${basePrompt}, STYLE: ${styleMod}. High quality masterpiece, 16:9. ABSOLUTELY NO TEXT, no words, no letters.`;
+            };
+
             // ETAP 2: Generowanie Obrazków (Sekwencyjnie /api/generate)
             const generateImages = async () => {
                 setStep('generating_images');
@@ -191,13 +201,10 @@
                 for (let i = 0; i < updatedSlides.length; i++) {
                     setLoadingProgress(Math.round(((i) / updatedSlides.length) * 100));
                     
-                    if (updatedSlides[i].imageUrl) continue; // Skip if user uploaded custom image
+                    if (updatedSlides[i].imageUrl) continue; 
 
                     try {
-                        let styleMod = theme === 'chalkboard' ? 'hand drawn chalk illustration, simple' : (theme === 'space' ? 'cinematic sci-fi concept art' : 'modern flat vector illustration, colorful');
-                        
-                        // Zabezpieczenie promptu
-                        const finalPrompt = `${updatedSlides[i].imagePrompt}. STYLE: ${styleMod}. High quality, 16:9 aspect ratio. NO TEXT, no words, no letters, no watermarks, blank background elements. Caucasian people, Polish, European, perfect human anatomy, flawless faces, exactly 5 fingers.`;
+                        const finalPrompt = getFinalImagePrompt(updatedSlides[i].imagePrompt, theme);
 
                         const response = await fetch('/api/generate', {
                             method: 'POST',
@@ -232,8 +239,7 @@
             const regenerateSingleImage = async (index) => {
                 setIsRegeneratingImage(index);
                 try {
-                    let styleMod = theme === 'chalkboard' ? 'hand drawn chalk illustration, simple' : (theme === 'space' ? 'cinematic sci-fi concept art' : 'modern flat vector illustration, colorful');
-                    const finalPrompt = `${slides[index].imagePrompt}. STYLE: ${styleMod}. High quality, 16:9 aspect ratio. NO TEXT, no words, no letters, no watermarks. Caucasian people, Polish, European, perfect human anatomy, flawless faces.`;
+                    const finalPrompt = getFinalImagePrompt(slides[index].imagePrompt, theme);
 
                     const response = await fetch('/api/generate', {
                         method: 'POST',
@@ -310,7 +316,18 @@
 
                     let isEven = idx % 2 === 0;
 
-                    let bulletText = slide.bullets.map(b => ({ text: b, options: { bullet: contentStyle === 'bullets', color: colorHex, fontSize: contentStyle === 'bullets' ? 24 : 18, breakLine: true } }));
+                    // PptxGenJS - jeśli styl to "descriptive", wyłączamy bullet point i dodajemy odstęp
+                    let bulletText = slide.bullets.map(b => ({ 
+                        text: b, 
+                        options: { 
+                            bullet: contentStyle === 'bullets', 
+                            color: colorHex, 
+                            fontSize: contentStyle === 'bullets' ? 24 : 18, 
+                            breakLine: true,
+                            paraSpaceAfter: contentStyle === 'descriptive' ? 10 : 0
+                        } 
+                    }));
+
                     slideObj.addText(bulletText, {
                         x: isEven ? 0.5 : 5.5, y: 1.8, w: "45%", h: 4.5, align: 'left', valign: 'top'
                     });
@@ -343,11 +360,10 @@
             useEffect(() => {
                 const handleFullscreenChange = () => { setIsFullscreen(!!document.fullscreenElement); };
                 const handleKeyDown = (e) => {
-                    // Klawiatura działa teraz ZAWSZE w trybie 'final' (Podgląd i Fullscreen)
                     if (step !== 'final') return;
                     
                     if (e.key === 'ArrowRight' || e.key === 'Space') {
-                        if (e.key === 'Space') e.preventDefault(); // Zapobiega przewijaniu strony
+                        if (e.key === 'Space') e.preventDefault(); 
                         setCurrentSlideIndex(prev => Math.min(prev + 1, slides.length - 1));
                     } else if (e.key === 'ArrowLeft') {
                         setCurrentSlideIndex(prev => Math.max(prev - 1, 0));
@@ -377,7 +393,7 @@
                     };
                     case 'modern': default: return { 
                         bg: 'bg-gradient-to-br from-slate-50 to-slate-200', 
-                        text: 'text-slate-900', // Twarde wymuszenie ciemnego tekstu
+                        text: 'text-slate-900', 
                         title: 'text-blue-800 border-b-4 border-blue-500' 
                     };
                 }
@@ -449,7 +465,7 @@
                                             </label>
                                             <label className="flex-1 flex items-center gap-3 bg-slate-900/80 p-4 border border-slate-700 rounded-xl cursor-pointer hover:border-blue-500 transition-colors">
                                                 <input type="radio" name="contentStyle" value="descriptive" checked={contentStyle === 'descriptive'} onChange={() => setContentStyle('descriptive')} className="w-4 h-4 accent-blue-500" />
-                                                <span className="text-sm font-bold text-white">Opisowy (Pełne zdania)</span>
+                                                <span className="text-sm font-bold text-white">Opisowy (Pełne akapity)</span>
                                             </label>
                                         </div>
                                     </div>
@@ -565,7 +581,7 @@
                                             <div className="relative z-10 w-full mt-auto pt-4 flex gap-2 justify-center flex-wrap">
                                                 <button onClick={() => {setActiveUploadIndex(idx); fileInputRef.current.click();}} className="bg-slate-800 border border-slate-600 hover:bg-slate-700 text-xs font-bold px-4 py-2 rounded-lg transition-colors flex items-center gap-1 shadow-md"><i className="ph-bold ph-upload-simple"></i> Własne zdjęcie</button>
                                                 
-                                                {/* NOWOŚĆ: Powtórna generacja */}
+                                                {/* Powtórna generacja */}
                                                 <button 
                                                     onClick={() => regenerateSingleImage(idx)} 
                                                     disabled={isRegeneratingImage === idx}
@@ -628,18 +644,27 @@
                             {/* Główny obszar roboczy - podgląd slajdu */}
                             <div className="flex-1 p-8 flex flex-col items-center justify-center bg-black/50 relative">
                                 
-                                {/* Ekran Slajdu (Miniatura) z Gwarancją Widoczności Tekstu */}
                                 <div className={`w-full max-w-[1280px] aspect-video relative rounded-xl overflow-hidden shadow-2xl flex ${tc.bg} ${tc.text}`}>
                                     <div className={`flex-1 p-10 lg:p-16 flex flex-col justify-center z-10 relative ${isEven ? 'order-1' : 'order-2'}`}>
                                         <h2 className={`text-3xl lg:text-5xl font-black mb-8 pb-4 ${tc.title}`}>{currentSlide.title}</h2>
-                                        <ul className="space-y-4 lg:space-y-6">
-                                            {currentSlide.bullets.map((b, i) => (
-                                                <li key={i} className={`text-xl lg:text-2xl flex items-start gap-4 ${contentStyle === 'descriptive' ? 'text-lg lg:text-xl leading-relaxed' : ''}`}>
-                                                    <span className="text-blue-500 mt-1">●</span>
-                                                    <span>{b}</span>
-                                                </li>
-                                            ))}
-                                        </ul>
+                                        
+                                        {/* Wybór stylu renderowania tekstu */}
+                                        {contentStyle === 'descriptive' ? (
+                                            <div className="space-y-6">
+                                                {currentSlide.bullets.map((b, i) => (
+                                                    <p key={i} className="text-lg lg:text-xl leading-relaxed text-justify opacity-90">{b}</p>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <ul className="space-y-4 lg:space-y-6">
+                                                {currentSlide.bullets.map((b, i) => (
+                                                    <li key={i} className="text-xl lg:text-2xl flex items-start gap-4">
+                                                        <span className="text-blue-500 mt-1">●</span>
+                                                        <span>{b}</span>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        )}
                                     </div>
                                     <div className={`flex-1 relative ${isEven ? 'order-2' : 'order-1'}`}>
                                         {currentSlide.imageUrl ? (
@@ -647,12 +672,11 @@
                                         ) : (
                                             <div className="absolute inset-0 bg-slate-800 flex items-center justify-center text-slate-500">Brak obrazu</div>
                                         )}
-                                        {/* Gradient overlay to blend image edge (używamy klas Tailwind, więc gradient dziedziczy z bg) */}
                                         <div className={`absolute inset-y-0 w-32 ${isEven ? 'left-0 bg-gradient-to-r' : 'right-0 bg-gradient-to-l'} from-inherit to-transparent opacity-50`}></div>
                                     </div>
                                 </div>
 
-                                {/* Kontrolki Slajdów (Teraz z wysokim z-index, zawsze na wierzchu) */}
+                                {/* Kontrolki Slajdów na podglądzie */}
                                 <div className="absolute bottom-8 left-1/2 -translate-x-1/2 bg-slate-900 border border-slate-700 rounded-full flex items-center p-2 shadow-[0_0_30px_rgba(0,0,0,0.8)] gap-4 z-[500]">
                                     <button onClick={() => setCurrentSlideIndex(p => Math.max(p - 1, 0))} disabled={currentSlideIndex === 0} className="w-12 h-12 rounded-full bg-slate-800 text-white flex items-center justify-center hover:bg-blue-600 disabled:opacity-30 transition-colors cursor-pointer"><i className="ph-bold ph-caret-left text-xl"></i></button>
                                     <span className="font-bold text-slate-300 min-w-[80px] text-center text-sm">Slajd {currentSlideIndex + 1} z {slides.length}</span>
@@ -667,20 +691,29 @@
                                 <div className={`slide-container flex ${tc.bg} ${tc.text}`}>
                                     <div className={`flex-1 p-16 xl:p-24 flex flex-col justify-center z-10 relative ${isEven ? 'order-1' : 'order-2'}`}>
                                         <h2 className={`text-6xl xl:text-7xl font-black mb-12 pb-6 leading-tight ${tc.title}`}>{currentSlide.title}</h2>
-                                        <ul className="space-y-8 xl:space-y-10">
-                                            {currentSlide.bullets.map((b, i) => (
-                                                <li key={i} className={`text-3xl xl:text-4xl flex items-start gap-6 leading-relaxed ${contentStyle === 'descriptive' ? 'text-2xl xl:text-3xl' : ''}`}>
-                                                    <span className="text-blue-500 mt-2">●</span>
-                                                    <span>{b}</span>
-                                                </li>
-                                            ))}
-                                        </ul>
+                                        
+                                        {/* Pełny ekran - Renderowanie w zależności od formatu */}
+                                        {contentStyle === 'descriptive' ? (
+                                            <div className="space-y-8 xl:space-y-10">
+                                                {currentSlide.bullets.map((b, i) => (
+                                                    <p key={i} className="text-2xl xl:text-3xl leading-relaxed text-justify opacity-90">{b}</p>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <ul className="space-y-8 xl:space-y-10">
+                                                {currentSlide.bullets.map((b, i) => (
+                                                    <li key={i} className="text-3xl xl:text-4xl flex items-start gap-6 leading-relaxed">
+                                                        <span className="text-blue-500 mt-2">●</span>
+                                                        <span>{b}</span>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        )}
                                     </div>
                                     <div className={`flex-1 relative ${isEven ? 'order-2' : 'order-1'}`}>
                                         {currentSlide.imageUrl && <img src={currentSlide.imageUrl} className="absolute inset-0 w-full h-full object-cover" />}
                                     </div>
                                     
-                                    {/* Subtelne wskazówki sterowania na pełnym ekranie */}
                                     <div className="absolute bottom-4 right-6 text-slate-500/50 text-xs font-bold uppercase flex gap-4">
                                         <span>Slajd {currentSlideIndex + 1}/{slides.length}</span>
                                         <span>Użyj strzałek <i className="ph-bold ph-arrows-left-right"></i> lub Spacji</span>
