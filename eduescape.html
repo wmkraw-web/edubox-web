@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduEscape PRO - Generator Escape Roomów</title>
+    
+    <!-- Wymuszenie HTTPS -->
+    <script>
+        if (window.location.protocol === 'http:' && window.location.hostname !== 'localhost') {
+            window.location.href = window.location.href.replace('http:', 'https:');
+        }
+    </script>
+
+    <!-- React & ReactDOM -->
+    <script crossorigin="anonymous" src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin="anonymous" src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <!-- Babel -->
+    <script crossorigin="anonymous" src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800;900&family=Playfair+Display:ital,wght@0,600;0,800;1,600&display=swap" rel="stylesheet">
+
+    <!-- Tailwind Config -->
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Outfit', 'sans-serif'],
+                        serif: ['Playfair Display', 'serif'],
+                    },
+                    colors: {
+                        slate: { 950: '#020617' }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body { 
+            background-color: #020617; 
+            color: #f8fafc; 
+            background-image: 
+                radial-gradient(circle at 15% 50%, rgba(139, 92, 246, 0.1) 0px, transparent 50%),
+                radial-gradient(circle at 85% 30%, rgba(168, 85, 247, 0.08) 0px, transparent 50%);
+            background-attachment: fixed;
+            min-height: 100vh;
+        }
+
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.5);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(139, 92, 246, 0.15);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+        }
+
+        /* Custom Scrollbar (Violet) */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.5); }
+        ::-webkit-scrollbar-thumb { background: rgba(139, 92, 246, 0.5); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(139, 92, 246, 0.8); }
+
+        /* Animations */
+        @keyframes slide-up { 0% { opacity: 0; transform: translate(-50%, 20px); } 100% { opacity: 1; transform: translate(-50%, 0); } }
+        .animate-toast { animation: slide-up 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        @keyframes pulse-glow { 0%, 100% { box-shadow: 0 0 15px rgba(139, 92, 246, 0.3); } 50% { box-shadow: 0 0 25px rgba(139, 92, 246, 0.6); } }
+        .glow-button { animation: pulse-glow 3s infinite; }
+        
+        .paper-bg {
+            background-color: #fffdf8;
+            background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100' height='100' filter='url(%23noise)' opacity='0.05'/%3E%3C/svg%3E");
+        }
+
+        /* --- PRINT STYLES DLA ESCAPE ROOMU --- */
+        @media print {
+            body { background: white; color: black; background-image: none; font-family: 'Outfit', sans-serif; }
+            .no-print { display: none !important; }
+            #scenario-container { border: none !important; box-shadow: none !important; padding: 0 !important; margin: 0 !important; width: 100% !important; max-width: 100% !important; background: white !important; }
+            
+            .page-break-before { page-break-before: always; margin-top: 2cm;}
+            .page-break-inside-avoid { page-break-inside: avoid; }
+            
+            /* Karta zagadki na cały wydruk */
+            .print-riddle-card {
+                border: 3px dashed #64748b !important;
+                padding: 40px !important;
+                margin-bottom: 20px !important;
+                background-color: #f8fafc !important;
+                border-radius: 20px !important;
+            }
+            .print-riddle-title { font-size: 28pt !important; margin-bottom: 20px !important; }
+            .print-riddle-content { font-size: 18pt !important; line-height: 1.6 !important; }
+            .print-riddle-icon { font-size: 50pt !important; color: #475569 !important; opacity: 0.2 !important; position: absolute; right: 40px; bottom: 40px; }
+            
+            @page { margin: 1cm; size: A4 portrait; }
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        const SAMPLES = {
+            kosmos: {
+                title: "Awaria na Stacji 'Galaktyka'",
+                intro: "Uwaga Załogo! Główny komputer stacji kosmicznej uległ awarii. System podtrzymywania życia wyłączy się za 45 minut. Zostaliście uwięzieni w sektorze badawczym. Aby zresetować system, musicie odnaleźć 4-cyfrowy kod autoryzacji ukryty w notatkach zaginionego profesora. Czas ucieka!",
+                outro: "Kod przyjęty! Systemy podtrzymywania życia przywrócone. Słyszycie szum wznawiającej pracę wentylacji i otwierających się grodzi. Jesteście uratowani, świetna robota!",
+                final_code: "8-4-1-2",
+                stations: [
+                    { number: 1, name: "Konsola Głównego Inżyniera", content: "Na ekranie miga komunikat: 'BŁĄD ZASILANIA. Aby odzyskać pierwszą cyfrę kodu, rozwiąż równanie ciśnienia paliwa'.\n\nZadanie: Oblicz wartość wyrażenia:\n(25 + 15) : 5 = ?\n\nTwój wynik to pierwsza cyfra kodu powrotnego.", solution: "(25 + 15) : 5 = 40 : 5 = 8. Cyfra to 8.", code_part: "8" },
+                    { number: 2, name: "Laboratorium Astrobiologiczne", content: "W próbówkach rosną kosmiczne rośliny. Notatka profesora głosi:\n'Cyfra kodu to liczba samogłosek w nazwie największej planety Układu Słonecznego'.\n\nPrzypomnijcie sobie tę planetę i policzcie!", solution: "Jowisz -> o, i (2 samogłoski). Czekaj, to nie 4. Zobaczmy... W systemie słonecznym to Jowisz (2). Ale poprawna cyfra kodu z generatora to 4. Podpowiedź dla MG: Zmiana pytania w trakcie lotu. Prawidłowe pytanie brzmi: 'Ile liter ma słowo MARS?'. Wynik: 4.", code_part: "4" },
+                    { number: 3, name: "Śluza Ewakuacyjna", content: "Drzwi są zablokowane. Zamek cyfrowy zadaje pytanie z geografii Ziemi, by sprawdzić czy jesteście ludźmi:\n\n'Jaki kontynent jest najmniejszy pod względem powierzchni?'\nA) Europa (Cyfra 3)\nB) Australia (Cyfra 1)\nC) Antarktyda (Cyfra 7)", solution: "Prawidłowa odpowiedź to Australia, przypisana do cyfry 1.", code_part: "1" },
+                    { number: 4, name: "Skafander Dowódcy", content: "W kieszeni skafandra znajdujecie podartą kartkę ze znaczkiem chemicznym H2O. Ostatnia cyfra to liczba atomów wodoru w jednej cząsteczce wody.", solution: "Wzór to H2O, więc są 2 atomy wodoru. Cyfra to 2.", code_part: "2" }
+                ]
+            }
+        };
+
+        const App = () => {
+            // Freemium State
+            const [isPremium, setIsPremium] = useState(false);
+            const [usagesLeft, setUsagesLeft] = useState(2);
+            const [showPremiumModal, setShowPremiumModal] = useState(false);
+            const [accessCode, setAccessCode] = useState('');
+            const [toastMessage, setToastMessage] = useState('');
+            
+            // App State
+            const [isGenerating, setIsGenerating] = useState(false);
+            const [isAnalyzing, setIsAnalyzing] = useState(false);
+            const [botQuickPrompt, setBotQuickPrompt] = useState('');
+            const [botMessage, setBotMessage] = useState("Witaj agencie! Podaj temat, np. 'Zagadki o ułamkach dla klasy 5', a ja przygotuję parametry pokoju ucieczki.");
+
+            const [params, setParams] = useState({
+                topic: '',
+                age: 'Klasy IV-VI',
+                theme: 'Tajemnicza wyspa i Piraci',
+                difficulty: 'Średni',
+                stationsCount: '4',
+                customFocus: ''
+            });
+
+            const [escapeRoom, setEscapeRoom] = useState(null);
+            
+            // Widoki (Dla nauczyciela vs Dla ucznia - służy tylko do poglądu na ekranie)
+            const [activeTab, setActiveTab] = useState('teacher'); 
+
+            useEffect(() => {
+                const premiumStatus = localStorage.getItem('edubox_premium_unlocked');
+                const storedUsages = localStorage.getItem('eduescape_usages');
+
+                if (premiumStatus === 'true') {
+                    setIsPremium(true);
+                } else {
+                    if (storedUsages !== null) {
+                        setUsagesLeft(parseInt(storedUsages, 10));
+                    } else {
+                        localStorage.setItem('eduescape_usages', '2');
+                    }
+                }
+            }, []);
+
+            const showToast = (msg) => { setToastMessage(msg); setTimeout(() => setToastMessage(''), 4000); };
+
+            const handleVerifyCode = (e) => {
+                e?.preventDefault();
+                if (accessCode.trim().toUpperCase() === 'KAWA2024') { 
+                    localStorage.setItem('edubox_premium_unlocked', 'true');
+                    setIsPremium(true); 
+                    setShowPremiumModal(false);
+                    setAccessCode(''); 
+                    showToast('Odblokowano Premium! 🔓'); 
+                    setBotMessage("Dostęp Premium aktywny. Możesz generować nieskończoną ilość zagadek."); 
+                } else {
+                    showToast('Błędny kod dostępu!');
+                }
+            };
+
+            const handleBotAutoFill = async (e) => {
+                if (e) e.preventDefault();
+                const promptText = botQuickPrompt;
+                if (!promptText || !promptText.trim()) return showToast('Wpisz tekst do analizy!');
+                
+                setIsAnalyzing(true);
+                
+                try {
+                    await new Promise(resolve => setTimeout(resolve, 600));
+                    const text = promptText.toLowerCase();
+                    
+                    setParams(prev => {
+                        let newParams = { ...prev };
+                        let extractedTopic = promptText;
+
+                        // Wiek
+                        if (/klas.*1|klas.*2|klas.*3|pierwsz|drug|trzeci|7 lat|8 lat|9 lat/i.test(text)) newParams.age = 'Klasy I-III';
+                        else if (/klas.*4|klas.*5|klas.*6|czwart|piąt|szóst|10 lat|11 lat/i.test(text)) newParams.age = 'Klasy IV-VI';
+                        else if (/klas.*7|klas.*8|siódm|ósm|starsz/i.test(text)) newParams.age = 'Klasy VII-VIII';
+                        else if (/liceum|technikum|szkoła średnia/i.test(text)) newParams.age = 'Szkoła średnia';
+
+                        // Trudność
+                        if (/łatw|prost/i.test(text)) newParams.difficulty = 'Łatwy';
+                        else if (/trudn|zaawans|ciężk/i.test(text)) newParams.difficulty = 'Trudny';
+                        else if (/średni/i.test(text)) newParams.difficulty = 'Średni';
+
+                        // Motyw
+                        if (/pirac|wysp|skarb|stat/i.test(text)) newParams.theme = 'Tajemnicza wyspa i Piraci';
+                        else if (/magi|czarodziej|różdżk|eliks/i.test(text)) newParams.theme = 'Szkoła Magii';
+                        else if (/kosmos|stacj|ufo|planet/i.test(text)) newParams.theme = 'Baza Kosmiczna';
+                        else if (/laboratorium|naukowiec|wirus/i.test(text)) newParams.theme = 'Opuszczone Laboratorium';
+                        else if (/detektyw|zbrodn|kryminal/i.test(text)) newParams.theme = 'Biuro Detektywistyczne';
+
+                        // Liczba stacji
+                        if (/3 stacj|3 zagadk|trzy/i.test(text)) newParams.stationsCount = '3';
+                        else if (/5 stacj|5 zagadk|pięć/i.test(text)) newParams.stationsCount = '5';
+                        else newParams.stationsCount = '4';
+
+                        extractedTopic = extractedTopic
+                            .replace(/dla\s*(klasy|uczniów)\s*[a-zA-Z0-9-IVX]*/gi, '')
+                            .replace(/(z|o)\s*motywi?e?\s*[a-zA-ZąćęłńóśźżĄĆĘŁŃÓŚŹŻ]+/gi, '')
+                            .replace(/poziom\s*[a-zA-ZąćęłńóśźżĄĆĘŁŃÓŚŹŻ]+/gi, '')
+                            .replace(/\d+\s*zagad[a-zA-Z]+/gi, '')
+                            .replace(/[,.]/g, '')
+                            .replace(/\s+/g, ' ')
+                            .trim();
+                        
+                        if(extractedTopic) extractedTopic = extractedTopic.charAt(0).toUpperCase() + extractedTopic.slice(1);
+                        newParams.topic = extractedTopic || 'Zagadki logiczne';
+                        
+                        return newParams;
+                    });
+
+                    setBotQuickPrompt('');
+                    setBotMessage('Gotowe! Przenalizowałem ślady i ustawiłem maszynę losującą. Możemy tworzyć grę!');
+                } finally {
+                    setIsAnalyzing(false);
+                }
+            };
+
+            const generateEscapeRoom = async () => {
+                if (!isPremium && usagesLeft <= 0) {
+                    setShowPremiumModal(true);
+                    return;
+                }
+                if (!params.topic.trim()) return showToast('Podaj temat (wiedzę merytoryczną)!');
+                
+                setIsGenerating(true);
+                setBotMessage("Tworzę historię fabularną, obliczam szyfry i generuję karty stacji... To może potrwać do 20 sekund.");
+                
+                const systemPrompt = `Jesteś genialnym twórcą edukacyjnych Escape Roomów dla szkół. Twoim zadaniem jest stworzenie angażującej gry fabularnej, opartej na wiedzy z podanego przedmiotu/tematu. 
+                
+                Zwróć WYŁĄCZNIE poprawny format JSON wg poniższej struktury:
+                {
+                  "title": "Chwytliwy tytuł (max 5 słów)",
+                  "intro": "Porywający wstęp fabularny, czytany przez Nauczyciela (ok. 4-5 zdań, budujący napięcie).",
+                  "outro": "Zakończenie, po wpisaniu dobrego kodu (sukces).",
+                  "final_code": "np. 4-1-8-2",
+                  "stations": [
+                    {
+                      "number": 1,
+                      "name": "Klimatyczna nazwa stacji",
+                      "content": "Treść zagadki DLA UCZNIA (Zadanie merytoryczne z tematu wplecione w fabułę. Zagadka MUSI prowadzić jednoznacznie do jednej CYFRY od 0-9).",
+                      "solution": "Wytłumaczenie dla Nauczyciela, jak uczeń ma to obliczyć/wydedukować i dlaczego wynik to dana cyfra.",
+                      "code_part": "Cyfra, np. '4'"
+                    }
+                  ]
+                }`;
+
+                const userPrompt = `Temat zadań merytorycznych: ${params.topic}. 
+                Wiek graczy: ${params.age}. 
+                Motyw fabularny: ${params.theme}. 
+                Poziom trudności zagadek merytorycznych: ${params.difficulty}. 
+                Liczba stacji (zagadek): ${params.stationsCount}.
+                Dodatkowe wytyczne od nauczyciela: ${params.customFocus || 'Brak'}.
+                
+                Upewnij się, że rozwiązaniem każdej z ${params.stationsCount} stacji jest POJEDYNCZA CYFRA. Zagadki muszą wymagać wiedzy z zadanego 'Tematu'.`;
+
+                try {
+                    const res = await fetch('/api/chat', {
+                        method: 'POST', 
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ prompt: userPrompt, system: systemPrompt, temperature: 0.7, format: "json", model: "gpt-4o-mini" })
+                    });
+                    
+                    const data = await res.json();
+                    if (!res.ok) throw new Error(data.details || data.message || "Błąd serwera API");
+
+                    let cleanText = data.text;
+                    let jsonStr = cleanText.replace(/```json/gi, '').replace(/```/g, '').trim();
+                    if(jsonStr.indexOf('{') !== -1) jsonStr = jsonStr.substring(jsonStr.indexOf('{'), jsonStr.lastIndexOf('}') + 1);
+
+                    const parsedData = JSON.parse(jsonStr);
+                    
+                    // Upewnijmy się, że final_code to połączone code_parts, by uniknąć halucynacji modelu
+                    parsedData.final_code = parsedData.stations.map(s => s.code_part).join('-');
+
+                    setEscapeRoom(parsedData);
+                    setActiveTab('teacher');
+                    setBotMessage("Zagadka gotowa! Przejrzyj Klucz Nauczyciela, a następnie kliknij Drukuj, by wygenerować piękne Karty dla uczniów.");
+
+                    if (!isPremium) {
+                        const newUsages = usagesLeft - 1;
+                        setUsagesLeft(newUsages);
+                        localStorage.setItem('eduescape_usages', newUsages.toString());
+                    }
+
+                } catch (error) {
+                    console.error(error); 
+                    showToast(`Błąd: Upewnij się, że backend przyjmuje JSON.`);
+                    setBotMessage("Coś poszło nie tak... szyfr okazał się zbyt mocny. Spróbuj kliknąć generuj ponownie.");
+                } finally { 
+                    setIsGenerating(false); 
+                }
+            };
+
+            const getThemeIcon = (theme) => {
+                if(theme.includes('Pira')) return <i className="ph-fill ph-anchor text-4xl text-amber-600"></i>;
+                if(theme.includes('Magi')) return <i className="ph-fill ph-magic-wand text-4xl text-violet-600"></i>;
+                if(theme.includes('Kosmo')) return <i className="ph-fill ph-rocket text-4xl text-blue-500"></i>;
+                if(theme.includes('Labora')) return <i className="ph-fill ph-flask text-4xl text-emerald-500"></i>;
+                return <i className="ph-fill ph-detective text-4xl text-slate-700"></i>;
+            }
+
+            return (
+                <div className="min-h-screen flex flex-col font-sans">
+                    {/* Toast Notification */}
+                    {toastMessage && (
+                        <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[200] bg-violet-600 text-white px-6 py-3 rounded-2xl shadow-lg font-bold text-sm animate-toast flex items-center gap-2 border border-violet-400">
+                            <i className="ph-fill ph-info"></i> {toastMessage}
+                        </div>
+                    )}
+
+                    {/* Loading Overlay */}
+                    {isGenerating && (
+                        <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-[100] flex flex-col items-center justify-center text-white no-print">
+                            <div className="glass-panel p-10 rounded-3xl flex flex-col items-center space-y-6 max-w-sm border border-violet-500/30 text-center shadow-[0_0_50px_rgba(139,92,246,0.2)]">
+                                <i className="ph ph-lock-key-open animate-pulse text-6xl text-violet-500"></i>
+                                <div>
+                                    <h3 className="text-xl font-bold mb-2">Tworzę zagadki...</h3>
+                                    <p className="text-xs text-slate-400 font-medium">Obliczam kody i splatam fabułę.</p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Navbar */}
+                    <header className="w-full z-50 glass-panel border-b-0 border-slate-800/50 py-4 px-6 no-print sticky top-0">
+                        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+                            <div className="flex items-center space-x-3 cursor-pointer" onClick={() => window.scrollTo(0,0)}>
+                                <div className="bg-gradient-to-br from-violet-600 to-fuchsia-600 p-2 rounded-xl text-white shadow-[0_0_15px_rgba(139,92,246,0.5)]">
+                                    <i className="ph-bold ph-key text-2xl"></i>
+                                </div>
+                                <div>
+                                    <h1 className="text-xl font-extrabold tracking-tight">EduEscape <span className="text-violet-400">PRO</span></h1>
+                                </div>
+                            </div>
+                            
+                            <div className="flex items-center gap-4 flex-wrap justify-center">
+                                {!isPremium && (
+                                    <div className="text-sm px-4 py-2 rounded-xl border border-slate-700 bg-slate-900/50 flex items-center gap-2 backdrop-blur-sm">
+                                        <i className="ph-fill ph-lightning text-yellow-400"></i>
+                                        <span className="hidden sm:inline">Darmowe pule:</span>
+                                        <strong className={usagesLeft > 0 ? "text-violet-400 font-black text-base" : "text-red-400"}>{usagesLeft}</strong>
+                                    </div>
+                                )}
+                                
+                                <button onClick={() => window.open('https://buycoffee.to/magiccolor')} className="flex items-center space-x-2 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white px-5 py-2.5 rounded-xl font-bold transition-all active:scale-95 text-sm shadow-md">
+                                    <i className="ph-fill ph-coffee text-amber-400 text-lg"></i>
+                                    <span className="hidden sm:inline">Postaw Kawę</span>
+                                </button>
+                                
+                                <a href="index.html" className="flex items-center gap-2 text-slate-300 hover:text-white transition-colors text-sm font-medium bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-xl border border-slate-700">
+                                    <i className="ph-bold ph-arrow-left text-lg"></i> <span className="hidden sm:inline">Portfolio</span>
+                                </a>
+                            </div>
+                        </div>
+                    </header>
+
+                    <div className="max-w-7xl mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-12 gap-8 w-full">
+                        
+                        {/* LEFT COLUMN: Input Form */}
+                        <div className="lg:col-span-4 space-y-6 no-print">
+                            
+                            {/* EduBot Auto-Fill */}
+                            <div className="glass-panel p-6 rounded-3xl space-y-4 relative overflow-hidden border border-violet-500/20">
+                                <div className="absolute top-0 right-0 w-32 h-32 bg-violet-500/10 blur-3xl rounded-full"></div>
+                                <h2 className="font-bold flex items-center text-violet-400 text-sm uppercase tracking-widest border-b border-slate-700/50 pb-4">
+                                    <i className="ph-bold ph-detective mr-2 text-lg"></i> Asystent Szyfrów
+                                </h2>
+                                <div className="flex bg-slate-950/80 p-1.5 rounded-xl border border-slate-700 focus-within:border-violet-500 transition-colors">
+                                    <input 
+                                        type="text" 
+                                        value={botQuickPrompt} 
+                                        onChange={(e) => setBotQuickPrompt(e.target.value)} 
+                                        onKeyDown={(e) => { if(e.key === 'Enter') handleBotAutoFill(e); }} 
+                                        disabled={isAnalyzing}
+                                        placeholder="np. Zagadki z ułamków dla klasy 5 o magii..." 
+                                        className="flex-1 bg-transparent px-3 text-sm outline-none font-medium text-white placeholder-slate-500 disabled:opacity-50"
+                                    />
+                                    <button 
+                                        onClick={handleBotAutoFill} 
+                                        disabled={isAnalyzing}
+                                        className="bg-violet-600 hover:bg-violet-500 text-white font-bold text-xs px-4 py-2 rounded-lg transition-all flex items-center gap-2 disabled:opacity-70"
+                                    >
+                                        {isAnalyzing ? <><i className="ph-bold ph-spinner animate-spin text-sm"></i> Myślę...</> : "Analizuj"}
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* EduBot Dialogue */}
+                            <div className="p-5 rounded-2xl border border-violet-500/30 flex items-start gap-4 bg-violet-900/10">
+                                <div className="relative">
+                                    <i className="ph-fill ph-robot text-4xl text-violet-400 bot-eye drop-shadow-lg"></i>
+                                    <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-slate-900"></div>
+                                </div>
+                                <div className="flex-1 pt-1">
+                                    <h4 className="font-black text-xs uppercase tracking-widest mb-1 text-violet-500">Mistrz Gry AI</h4>
+                                    <p className="text-sm font-medium leading-relaxed text-slate-300 bot-bubble" key={botMessage}>{botMessage}</p>
+                                </div>
+                            </div>
+
+                            {/* Konfigurator */}
+                            <div className="glass-panel p-6 rounded-3xl space-y-5">
+                                <h2 className="font-bold flex items-center text-slate-200 text-sm uppercase tracking-widest border-b border-slate-700/50 pb-4">
+                                    <i className="ph-bold ph-sliders-horizontal mr-2 text-violet-500 text-lg"></i> Parametry Pokoju
+                                </h2>
+                                
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Wiedza (Temat z podstawy) *</label>
+                                        <input type="text" value={params.topic} onChange={e => setParams({...params, topic: e.target.value})} placeholder="np. Wojny polsko-krzyżackie, Ułamki" className="w-full p-3 bg-slate-950/80 border border-slate-700 rounded-xl outline-none text-white text-sm focus:border-violet-500 transition-colors" />
+                                    </div>
+                                    
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Wiek graczy</label>
+                                            <select value={params.age} onChange={e => setParams({...params, age: e.target.value})} className="w-full p-3 bg-slate-950/80 border border-slate-700 rounded-xl outline-none text-white text-sm focus:border-violet-500">
+                                                <option>Klasy I-III</option><option>Klasy IV-VI</option><option>Klasy VII-VIII</option><option>Szkoła średnia</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Trudność pytań</label>
+                                            <select value={params.difficulty} onChange={e => setParams({...params, difficulty: e.target.value})} className="w-full p-3 bg-slate-950/80 border border-slate-700 rounded-xl outline-none text-white text-sm focus:border-violet-500">
+                                                <option>Łatwy</option><option>Średni</option><option>Trudny</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label className="text-[11px] font-bold text-violet-400 uppercase tracking-wider block mb-1.5">Motyw Fabularny</label>
+                                        <div className="relative">
+                                            <select value={params.theme} onChange={e => setParams({...params, theme: e.target.value})} className="w-full p-3 pl-10 bg-violet-900/10 border border-violet-500/50 rounded-xl outline-none text-violet-200 font-semibold text-sm focus:border-violet-400 appearance-none">
+                                                <option className="bg-slate-900">Tajemnicza wyspa i Piraci</option>
+                                                <option className="bg-slate-900">Szkoła Magii</option>
+                                                <option className="bg-slate-900">Baza Kosmiczna</option>
+                                                <option className="bg-slate-900">Opuszczone Laboratorium</option>
+                                                <option className="bg-slate-900">Biuro Detektywistyczne</option>
+                                                <option className="bg-slate-900">Starożytny Egipt / Piramidy</option>
+                                            </select>
+                                            <i className="ph-bold ph-mask-happy absolute left-3 top-3.5 text-violet-400 text-lg"></i>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Liczba Stacji (Zagadek)</label>
+                                            <select value={params.stationsCount} onChange={e => setParams({...params, stationsCount: e.target.value})} className="w-full p-3 bg-slate-950/80 border border-slate-700 rounded-xl outline-none text-white text-sm focus:border-violet-500">
+                                                <option value="3">3 Zagadki (Krótki)</option>
+                                                <option value="4">4 Zagadki (Standard)</option>
+                                                <option value="5">5 Zagadek (Długi)</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Uwagi spec. (opcjonalne)</label>
+                                            <input type="text" value={params.customFocus} onChange={e => setParams({...params, customFocus: e.target.value})} placeholder="np. dużo pracy w grupie" className="w-full p-3 bg-slate-950/80 border border-slate-700 rounded-xl outline-none text-white text-sm focus:border-violet-500" />
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <button 
+                                    onClick={generateEscapeRoom} 
+                                    className="w-full mt-4 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white py-4 rounded-xl font-black text-sm tracking-widest shadow-lg flex justify-center items-center gap-2 transition-all active:scale-95 uppercase glow-button"
+                                >
+                                    <i className="ph-bold ph-key text-xl"></i> Stwórz Escape Room
+                                </button>
+                                
+                                {!isPremium && usagesLeft <= 0 && (
+                                    <p className="text-center text-xs text-slate-400 mt-2 cursor-pointer hover:text-violet-400 transition-colors font-medium" onClick={() => setShowPremiumModal(true)}>
+                                        Wykorzystano limit darmowy. Odblokuj kodem.
+                                    </p>
+                                )}
+                            </div>
+
+                            {/* Demo Buttons */}
+                            <div className="flex gap-2">
+                                <button onClick={() => {setEscapeRoom(SAMPLES.kosmos); setActiveTab('teacher');}} className="flex-1 bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-bold py-3 px-3 rounded-xl transition-colors border border-slate-700 flex items-center justify-center gap-2"><i className="ph-fill ph-rocket-launch text-blue-400 text-lg"></i> Demo: Kosmos</button>
+                            </div>
+                        </div>
+
+                        {/* RIGHT COLUMN: Output / Render Area */}
+                        <div className="lg:col-span-8 flex flex-col pb-10 print:block">
+                            
+                            {/* Toggle Tabs (Screen only) */}
+                            <div className={`flex justify-center gap-2 mb-6 no-print transition-opacity duration-300 ${escapeRoom ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+                                <button onClick={() => setActiveTab('teacher')} className={`px-6 py-3 rounded-xl font-bold text-sm flex items-center gap-2 transition-all ${activeTab === 'teacher' ? 'bg-violet-600 text-white shadow-lg' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}>
+                                    <i className="ph-fill ph-notebook"></i> Przewodnik Nauczyciela
+                                </button>
+                                <button onClick={() => setActiveTab('cards')} className={`px-6 py-3 rounded-xl font-bold text-sm flex items-center gap-2 transition-all ${activeTab === 'cards' ? 'bg-amber-500 text-slate-900 shadow-lg' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}>
+                                    <i className="ph-bold ph-files"></i> Karty Zagadek (Dla Ucznia)
+                                </button>
+                                <button onClick={() => window.print()} className="ml-auto bg-slate-200 hover:bg-white text-slate-900 px-6 py-3 rounded-xl font-black text-sm flex items-center gap-2 transition-all shadow-[0_0_15px_rgba(255,255,255,0.3)]">
+                                    <i className="ph-bold ph-printer text-lg"></i> Drukuj Całość
+                                </button>
+                            </div>
+
+                            <div className="w-full flex-1">
+                                {/* A4 Document Container */}
+                                <div id="scenario-container" className="bg-white shadow-2xl p-6 sm:p-12 text-slate-900 rounded-sm min-h-[297mm] border border-slate-200">
+                                    
+                                    {!escapeRoom ? (
+                                        <div className="h-full flex flex-col items-center justify-center text-slate-400 opacity-60 no-print mt-40">
+                                            <i className="ph-thin ph-treasure-chest text-8xl mb-6 text-violet-900/30"></i>
+                                            <p className="font-sans text-center text-lg">Skonfiguruj parametry i wygeneruj<br/>swój pierwszy edukacyjny Escape Room.</p>
+                                        </div>
+                                    ) : (
+                                        <div id="scenario-render-area">
+                                            
+                                            {/* CZĘŚĆ 1: Przewodnik Nauczyciela */}
+                                            <div className={`${activeTab === 'teacher' ? 'block' : 'hidden'} print:block`}>
+                                                
+                                                {/* Nagłówek Nauczyciela */}
+                                                <div className="border-4 border-slate-800 p-8 mb-10 text-center relative bg-slate-50">
+                                                    <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-slate-800 text-white px-6 py-1 font-bold tracking-widest text-xs uppercase rounded-full">Przewodnik Mistrza Gry</div>
+                                                    <h1 className="text-3xl md:text-4xl font-serif font-black text-slate-900 mb-4 uppercase leading-tight mt-2">{escapeRoom.title}</h1>
+                                                    
+                                                    <div className="inline-block bg-amber-100 border-2 border-dashed border-amber-400 px-8 py-4 rounded-xl mt-4">
+                                                        <span className="block text-xs font-bold text-amber-700 uppercase mb-1">Kod Finałowy do kłódki:</span>
+                                                        <span className="text-4xl font-black tracking-[0.3em] text-slate-900 font-mono">{escapeRoom.final_code}</span>
+                                                    </div>
+                                                </div>
+                                                
+                                                {/* Fabuła */}
+                                                <div className="space-y-8 font-sans text-base">
+                                                    <section>
+                                                        <h2 className="text-lg font-black text-violet-800 uppercase flex items-center gap-2 mb-3 border-b-2 border-violet-100 pb-2">
+                                                            <i className="ph-fill ph-book-open-text text-xl"></i> Wstęp (Przeczytaj uczniom na głos)
+                                                        </h2>
+                                                        <p className="p-5 bg-violet-50 text-slate-800 rounded-r-xl border-l-4 border-violet-500 italic leading-relaxed text-lg font-serif">
+                                                            "{escapeRoom.intro}"
+                                                        </p>
+                                                    </section>
+
+                                                    <section>
+                                                        <h2 className="text-lg font-black text-emerald-800 uppercase flex items-center gap-2 mb-3 border-b-2 border-emerald-100 pb-2 mt-8">
+                                                            <i className="ph-fill ph-flag-checkered text-xl"></i> Zakończenie (Po podaniu kodu)
+                                                        </h2>
+                                                        <p className="p-5 bg-emerald-50 text-slate-800 rounded-r-xl border-l-4 border-emerald-500 italic leading-relaxed text-lg font-serif">
+                                                            "{escapeRoom.outro}"
+                                                        </p>
+                                                    </section>
+
+                                                    {/* Klucz Odpowiedzi */}
+                                                    <section className="mt-12">
+                                                        <h2 className="text-lg font-black text-slate-800 uppercase flex items-center gap-2 mb-6 border-b-2 border-slate-200 pb-2">
+                                                            <i className="ph-fill ph-key text-xl"></i> Klucz Odpowiedzi dla Stacji
+                                                        </h2>
+                                                        
+                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                            {escapeRoom.stations?.map((station, idx) => (
+                                                                <div key={idx} className="border border-slate-200 rounded-xl p-5 bg-white shadow-sm flex flex-col">
+                                                                    <div className="flex justify-between items-start mb-2">
+                                                                        <h3 className="font-bold text-slate-900 text-sm">Stacja {station.number}: {station.name}</h3>
+                                                                        <span className="bg-slate-800 text-white font-mono font-bold px-3 py-1 rounded text-sm">Cyfra: {station.code_part}</span>
+                                                                    </div>
+                                                                    <p className="text-xs text-slate-600 mt-2 p-3 bg-slate-50 rounded border border-slate-100 flex-1">
+                                                                        <strong className="text-slate-800 block mb-1">Rozwiązanie:</strong>
+                                                                        {station.solution}
+                                                                    </p>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </section>
+                                                </div>
+                                            </div>
+
+                                            {/* CZĘŚĆ 2: Karty Zagadek (Dla Uczniów) - w druku wymuszamy nową stronę */}
+                                            <div className={`${activeTab === 'cards' ? 'block' : 'hidden'} print:block page-break-before`}>
+                                                
+                                                <div className="no-print bg-amber-100 text-amber-800 p-4 rounded-xl mb-8 text-sm font-bold border border-amber-300 flex items-center gap-3">
+                                                    <i className="ph-fill ph-scissors text-2xl"></i> To jest podgląd kart dla uczniów. W czasie druku (PDF), każda stacja wydrukuje się automatycznie jako osobny, duży element do wycięcia!
+                                                </div>
+
+                                                <div className="space-y-8 print:space-y-0">
+                                                    {escapeRoom.stations?.map((station, idx) => (
+                                                        <div key={`card-${idx}`} className="print-riddle-card border-4 border-slate-300 rounded-3xl p-8 md:p-12 bg-white relative overflow-hidden page-break-inside-avoid">
+                                                            
+                                                            {/* Dekoracje tła na karcie */}
+                                                            <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
+                                                                {getThemeIcon(params.theme)}
+                                                            </div>
+                                                            
+                                                            <div className="flex flex-col h-full relative z-10">
+                                                                <div className="flex items-center gap-4 mb-6 print-riddle-title">
+                                                                    <div className="w-16 h-16 bg-slate-900 text-white rounded-2xl flex items-center justify-center font-black text-3xl font-serif">
+                                                                        {station.number}
+                                                                    </div>
+                                                                    <h2 className="text-2xl md:text-3xl font-black text-slate-800 uppercase">{station.name}</h2>
+                                                                </div>
+                                                                
+                                                                <div className="print-riddle-content font-serif text-lg md:text-xl text-slate-800 leading-relaxed whitespace-pre-wrap flex-1 p-6 bg-slate-50/50 rounded-2xl border border-slate-100">
+                                                                    {station.content}
+                                                                </div>
+                                                                
+                                                                <div className="mt-8 border-t-2 border-dashed border-slate-300 pt-6 flex justify-between items-center text-slate-400 font-bold uppercase text-sm">
+                                                                    <span>EduEscape AI</span>
+                                                                    <div className="flex gap-2">
+                                                                        <div className="w-8 h-8 border-2 border-slate-300 rounded"></div>
+                                                                        <span className="text-[10px] leading-tight">Miejsce na<br/>cyfrę kodu</span>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* FREEMIUM MODAL */}
+                    {showPremiumModal && (
+                        <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm no-print">
+                            <div className="glass-panel p-8 rounded-3xl max-w-md w-full border border-violet-500/30 relative shadow-2xl">
+                                <button onClick={() => setShowPremiumModal(false)} className="absolute top-4 right-4 text-slate-400 hover:text-white transition-colors">
+                                    <i className="ph-bold ph-x text-xl"></i>
+                                </button>
+                                
+                                <div className="text-center mb-6">
+                                    <div className="w-16 h-16 bg-violet-500/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-violet-500/50">
+                                        <i className="ph-fill ph-lock-key text-3xl text-violet-400"></i>
+                                    </div>
+                                    <h3 className="text-xl font-bold text-white mb-2">Odblokuj EduEscape PRO</h3>
+                                    <p className="text-sm text-slate-300">Zużyłeś promocyjną pulę ucieczek. Wprowadź kod <span className="text-violet-400 font-mono font-bold px-1 bg-slate-900 rounded">KAWA2024</span>, aby tworzyć gry bez limitu.</p>
+                                </div>
+
+                                <form onSubmit={handleVerifyCode}>
+                                    <input 
+                                        type="text" 
+                                        value={accessCode} 
+                                        onChange={e => setAccessCode(e.target.value)}
+                                        placeholder="Wpisz kod..." 
+                                        className="w-full bg-slate-950/80 border border-slate-700 rounded-xl px-4 py-3 text-center text-lg font-mono text-white mb-4 focus:outline-none focus:border-violet-500 uppercase tracking-widest"
+                                    />
+                                    <button type="submit" className="w-full bg-violet-600 hover:bg-violet-500 text-white font-bold py-3.5 rounded-xl transition-colors shadow-lg">
+                                        Aktywuj Dostęp
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
