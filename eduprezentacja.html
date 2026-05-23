@@ -4,16 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EduPrezentacja PRO - EduBox AI</title>
-    <!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-3RQ9R0N0K8"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-
-  gtag('config', 'G-3RQ9R0N0K8');
-</script>
-
     
     <!-- Wymuszenie HTTPS -->
     <script>
@@ -76,21 +66,6 @@
             aspect-ratio: 16/9; background: white; position: relative; overflow: hidden;
             box-shadow: 0 0 50px rgba(0,0,0,0.5); display: flex;
         }
-        
-        .slide-transition-enter { opacity: 0; transform: scale(0.98); }
-        .slide-transition-enter-active { opacity: 1; transform: scale(1); transition: opacity 400ms, transform 400ms; }
-        .slide-transition-exit { opacity: 1; }
-        .slide-transition-exit-active { opacity: 0; transition: opacity 400ms; }
-
-        /* Themes CSS */
-        .theme-modern .slide-bg { background: linear-gradient(135deg, #f8fafc, #e2e8f0); color: #0f172a; }
-        .theme-modern .slide-title { color: #1e40af; border-bottom: 4px solid #3b82f6; }
-        
-        .theme-chalkboard .slide-bg { background: #1a472a; color: #f8fafc; font-family: 'Comic Sans MS', cursive, sans-serif; }
-        .theme-chalkboard .slide-title { color: #fde047; border-bottom: 2px dashed #f8fafc; }
-
-        .theme-space .slide-bg { background: radial-gradient(circle at center, #1e1b4b, #020617); color: #f8fafc; }
-        .theme-space .slide-title { color: #a78bfa; text-shadow: 0 0 10px rgba(167,139,250,0.5); }
     </style>
 </head>
 <body>
@@ -114,12 +89,14 @@
             const [slideCount, setSlideCount] = useState(6);
             const [theme, setTheme] = useState('modern');
             const [includeQuiz, setIncludeQuiz] = useState(true);
+            const [contentStyle, setContentStyle] = useState('bullets'); // NOWOŚĆ: Rodzaj treści (bullets / descriptive)
 
             // Generated Content
             const [slides, setSlides] = useState([]);
             const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
             const [isFullscreen, setIsFullscreen] = useState(false);
             const [loadingProgress, setLoadingProgress] = useState(0);
+            const [isRegeneratingImage, setIsRegeneratingImage] = useState(null); // Trzyma ID odświeżanego slajdu
             
             const presentationRef = useRef(null);
             const fileInputRef = useRef(null);
@@ -153,23 +130,29 @@
 
                 setStep('generating_text');
                 
+                // Instrukcja stylizacji dla AI
+                let formatInstruction = contentStyle === 'bullets' 
+                    ? 'Użyj krótkich, zwięzłych haseł w punktach (max 5-8 słów na punkt).' 
+                    : 'Użyj dłuższego, opisowego tekstu. Zbuduj 2-3 pełne, wyczerpujące zdania w każdym punkcie.';
+
                 const systemPrompt = `Jesteś ekspertem ds. edukacji. Tworzysz konspekty prezentacji. Zwróć WYŁĄCZNIE poprawny JSON o poniższej strukturze:
                 {
                     "slides": [
                         {
                             "title": "Tytuł slajdu (max 5 słów)",
-                            "bullets": ["Punkt 1", "Punkt 2", "Punkt 3"],
-                            "imagePrompt": "Szczegółowy opis zdjęcia w j. angielskim, idealny dla generatora AI. Bez tekstu na obrazku. Format poziomy.",
+                            "bullets": ["Treść 1", "Treść 2", "Treść 3"],
+                            "imagePrompt": "Szczegółowy opis zdjęcia w j. angielskim. Format poziomy. WAŻNE: Postacie muszą być rasy białej (Caucasian, European, Polish). Całkowity zakaz dodawania tekstu na obrazku (NO TEXT, no letters, no watermark). Zadbaj o poprawną anatomię.",
                             "notes": "Notatki dla nauczyciela, co ma opowiedzieć do tego slajdu."
                         }
                     ]
                 }
                 Uwaga: 
-                1. Pierwszy slajd to zawsze Slajd Tytułowy (z 1 punktem podtytułu).
-                ${includeQuiz ? `2. Ostatni slajd to Quiz/Zagadka z 3 opcjami (A, B, C) i podaną w bullets poprawną odpowiedzią.` : ''}
+                1. Pierwszy slajd to zawsze Slajd Tytułowy.
+                2. ${formatInstruction}
+                ${includeQuiz ? `3. Ostatni slajd to Quiz/Zagadka z 3 opcjami (A, B, C) i podaną w bullets poprawną odpowiedzią.` : ''}
                 Wygeneruj dokładnie ${slideCount} slajdów.`;
 
-                const userPrompt = `Temat: ${topic}. Grupa docelowa: ${audience}. Dostosuj język i stopień skomplikowania (bullets i notatki).`;
+                const userPrompt = `Temat: ${topic}. Grupa docelowa: ${audience}. Dostosuj język i stopień skomplikowania do tej grupy wiekowej.`;
 
                 try {
                     const res = await fetch('/api/chat', {
@@ -185,7 +168,6 @@
                     if(jsonStr.indexOf('{') !== -1) jsonStr = jsonStr.substring(jsonStr.indexOf('{'), jsonStr.lastIndexOf('}') + 1);
                     
                     let parsed = JSON.parse(jsonStr);
-                    // Add local fields
                     parsed.slides = parsed.slides.map((s, i) => ({ ...s, id: i, imageUrl: null }));
                     
                     setSlides(parsed.slides);
@@ -214,11 +196,14 @@
                     try {
                         let styleMod = theme === 'chalkboard' ? 'hand drawn chalk illustration, simple' : (theme === 'space' ? 'cinematic sci-fi concept art' : 'modern flat vector illustration, colorful');
                         
+                        // Zabezpieczenie promptu
+                        const finalPrompt = `${updatedSlides[i].imagePrompt}. STYLE: ${styleMod}. High quality, 16:9 aspect ratio. NO TEXT, no words, no letters, no watermarks, blank background elements. Caucasian people, Polish, European, perfect human anatomy, flawless faces, exactly 5 fingers.`;
+
                         const response = await fetch('/api/generate', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ 
-                                prompt: `${updatedSlides[i].imagePrompt}. STYLE: ${styleMod}. High quality, 16:9 aspect ratio, no text.`,
+                                prompt: finalPrompt,
                                 aspect_ratio: '16:9',
                                 width: 1024,
                                 height: 576
@@ -233,7 +218,7 @@
                                     imgUrl = `data:image/png;base64,${imgUrl}`;
                                 }
                                 updatedSlides[i].imageUrl = imgUrl;
-                                setSlides([...updatedSlides]); // Trigger re-render per image
+                                setSlides([...updatedSlides]); 
                             }
                         }
                     } catch (err) { console.error(`Błąd przy obrazku ${i}:`, err); }
@@ -243,7 +228,48 @@
                 setTimeout(() => setStep('final'), 500);
             };
 
-            // CUSTOM UPLOAD W TRAKCIE REVIEW
+            // ETAP EKSTRA: Regeneracja pojedynczego obrazka z AI
+            const regenerateSingleImage = async (index) => {
+                setIsRegeneratingImage(index);
+                try {
+                    let styleMod = theme === 'chalkboard' ? 'hand drawn chalk illustration, simple' : (theme === 'space' ? 'cinematic sci-fi concept art' : 'modern flat vector illustration, colorful');
+                    const finalPrompt = `${slides[index].imagePrompt}. STYLE: ${styleMod}. High quality, 16:9 aspect ratio. NO TEXT, no words, no letters, no watermarks. Caucasian people, Polish, European, perfect human anatomy, flawless faces.`;
+
+                    const response = await fetch('/api/generate', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                            prompt: finalPrompt,
+                            aspect_ratio: '16:9',
+                            width: 1024,
+                            height: 576
+                        })
+                    });
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        let imgUrl = data.imageUrl || data.image_url || data.url || (data.data && data.data[0]?.url) || data.image;
+                        if (imgUrl) {
+                            if (imgUrl.length > 1000 && !imgUrl.startsWith('http') && !imgUrl.startsWith('data:')) {
+                                imgUrl = `data:image/png;base64,${imgUrl}`;
+                            }
+                            const newSlides = [...slides];
+                            newSlides[index].imageUrl = imgUrl;
+                            setSlides(newSlides);
+                            showToast("🎨 Grafika pomyślnie zmieniona!");
+                        }
+                    } else {
+                        showToast("Błąd pobierania nowej grafiki z serwera.");
+                    }
+                } catch (err) {
+                    console.error("Błąd regeneracji:", err);
+                    showToast("Wystąpił błąd przy odświeżaniu obrazu.");
+                } finally {
+                    setIsRegeneratingImage(null);
+                }
+            };
+
+            // CUSTOM UPLOAD
             const handleFileUpload = (e) => {
                 const file = e.target.files[0];
                 if (!file || activeUploadIndex === null) return;
@@ -258,44 +284,39 @@
                 e.target.value = null;
             };
 
-            // PPTX EXPORT (PptxGenJS)
+            // PPTX EXPORT
             const exportToPPTX = async () => {
                 showToast("Przygotowuję plik PowerPoint...");
                 
-                // Initialize PptxGenJS
                 let pres = new PptxGenJS();
                 pres.layout = 'LAYOUT_16x9';
 
-                // Setup Themes
+                // Kolory zależne od motywu
                 let bgHex = 'FFFFFF'; let colorHex = '000000';
                 if (theme === 'chalkboard') { bgHex = '1a472a'; colorHex = 'FFFFFF'; }
                 if (theme === 'space') { bgHex = '020617'; colorHex = 'FFFFFF'; }
+                if (theme === 'modern') { bgHex = 'F8FAFC'; colorHex = '0F172A'; }
 
                 slides.forEach((slide, idx) => {
                     let slideObj = pres.addSlide();
                     slideObj.background = { fill: bgHex };
                     slideObj.addNotes(slide.notes || "Brak notatek.");
 
-                    // Title
                     slideObj.addText(slide.title, { 
                         x: 0.5, y: 0.5, w: "90%", h: 1.0, 
                         fontSize: 36, color: colorHex, bold: true,
                         border: { type: 'bottom', color: '3b82f6', pt: 2 }
                     });
 
-                    // Layout: Text Left, Image Right (or vice versa for variety)
                     let isEven = idx % 2 === 0;
 
-                    // Bullets
-                    let bulletText = slide.bullets.map(b => ({ text: b, options: { bullet: true, color: colorHex, fontSize: 24, breakLine: true } }));
+                    let bulletText = slide.bullets.map(b => ({ text: b, options: { bullet: contentStyle === 'bullets', color: colorHex, fontSize: contentStyle === 'bullets' ? 24 : 18, breakLine: true } }));
                     slideObj.addText(bulletText, {
                         x: isEven ? 0.5 : 5.5, y: 1.8, w: "45%", h: 4.5, align: 'left', valign: 'top'
                     });
 
-                    // Image
                     if (slide.imageUrl) {
                         try {
-                            // PptxGenJS accepts data/base64 strings directly in `data` prop, or URLs in `path`
                             if (slide.imageUrl.startsWith('data:')) {
                                 slideObj.addImage({ data: slide.imageUrl, x: isEven ? 5.5 : 0.5, y: 1.8, w: "40%", h: "60%", sizing: { type: 'contain' } });
                             } else {
@@ -308,7 +329,7 @@
                 pres.writeFile({ fileName: `EduPrezentacja_${topic.replace(/\s+/g, '_')}.pptx` });
             };
 
-            // FULLSCREEN KONTROLA
+            // FULLSCREEN & KEYBOARD
             const toggleFullscreen = () => {
                 if (!document.fullscreenElement) {
                     presentationRef.current?.requestFullscreen().catch(err => showToast("Błąd pełnego ekranu."));
@@ -322,8 +343,11 @@
             useEffect(() => {
                 const handleFullscreenChange = () => { setIsFullscreen(!!document.fullscreenElement); };
                 const handleKeyDown = (e) => {
-                    if (!isFullscreen) return;
+                    // Klawiatura działa teraz ZAWSZE w trybie 'final' (Podgląd i Fullscreen)
+                    if (step !== 'final') return;
+                    
                     if (e.key === 'ArrowRight' || e.key === 'Space') {
+                        if (e.key === 'Space') e.preventDefault(); // Zapobiega przewijaniu strony
                         setCurrentSlideIndex(prev => Math.min(prev + 1, slides.length - 1));
                     } else if (e.key === 'ArrowLeft') {
                         setCurrentSlideIndex(prev => Math.max(prev - 1, 0));
@@ -335,14 +359,34 @@
                     document.removeEventListener('fullscreenchange', handleFullscreenChange);
                     window.removeEventListener('keydown', handleKeyDown);
                 };
-            }, [isFullscreen, slides.length]);
+            }, [step, slides.length]);
 
+
+            // === DEFINICJE MOTYWÓW CSS W REACT ===
+            const getThemeClasses = (t) => {
+                switch(t) {
+                    case 'chalkboard': return { 
+                        bg: 'bg-[#1a472a]', 
+                        text: 'text-slate-50', 
+                        title: 'text-yellow-400 border-b-2 border-dashed border-white font-[Comic_Sans_MS]' 
+                    };
+                    case 'space': return { 
+                        bg: 'bg-slate-950 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-indigo-950 to-slate-950', 
+                        text: 'text-slate-50', 
+                        title: 'text-purple-400 border-b border-purple-500/30' 
+                    };
+                    case 'modern': default: return { 
+                        bg: 'bg-gradient-to-br from-slate-50 to-slate-200', 
+                        text: 'text-slate-900', // Twarde wymuszenie ciemnego tekstu
+                        title: 'text-blue-800 border-b-4 border-blue-500' 
+                    };
+                }
+            };
 
             // RENDER: Formularz Konfiguracji
             if (step === 'config') {
                 return (
                     <div className="min-h-screen flex flex-col font-sans relative">
-                        {/* Wymagane style i nawigacja współdzielone */}
                         <div className={`fixed top-24 left-1/2 -translate-x-1/2 z-[300] bg-emerald-600 text-white px-6 py-3 rounded-full font-bold shadow-[0_10px_40px_rgba(16,185,129,0.5)] transition-all duration-300 ${toastMessage ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-10 pointer-events-none'}`}>
                             {toastMessage}
                         </div>
@@ -392,6 +436,21 @@
                                                 <option value={6}>6 Slajdów (Optymalna)</option>
                                                 <option value={10}>10 Slajdów (Długa)</option>
                                             </select>
+                                        </div>
+                                    </div>
+                                    
+                                    {/* NOWOŚĆ: Rodzaj Treści */}
+                                    <div className="pt-4 border-t border-slate-700/50">
+                                        <label className="text-xs font-bold text-slate-400 uppercase tracking-widest block mb-3">Styl Treści</label>
+                                        <div className="flex gap-4">
+                                            <label className="flex-1 flex items-center gap-3 bg-slate-900/80 p-4 border border-slate-700 rounded-xl cursor-pointer hover:border-blue-500 transition-colors">
+                                                <input type="radio" name="contentStyle" value="bullets" checked={contentStyle === 'bullets'} onChange={() => setContentStyle('bullets')} className="w-4 h-4 accent-blue-500" />
+                                                <span className="text-sm font-bold text-white">Hasła (Wypunktowanie)</span>
+                                            </label>
+                                            <label className="flex-1 flex items-center gap-3 bg-slate-900/80 p-4 border border-slate-700 rounded-xl cursor-pointer hover:border-blue-500 transition-colors">
+                                                <input type="radio" name="contentStyle" value="descriptive" checked={contentStyle === 'descriptive'} onChange={() => setContentStyle('descriptive')} className="w-4 h-4 accent-blue-500" />
+                                                <span className="text-sm font-bold text-white">Opisowy (Pełne zdania)</span>
+                                            </label>
                                         </div>
                                     </div>
 
@@ -463,6 +522,9 @@
             if (step === 'review') {
                 return (
                     <div className="min-h-screen flex flex-col font-sans pt-20">
+                        <div className={`fixed top-24 left-1/2 -translate-x-1/2 z-[300] bg-emerald-600 text-white px-6 py-3 rounded-full font-bold shadow-[0_10px_40px_rgba(16,185,129,0.5)] transition-all duration-300 ${toastMessage ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-10 pointer-events-none'}`}>
+                            {toastMessage}
+                        </div>
                         <nav className="fixed top-0 w-full z-[100] glass-nav h-20 flex items-center px-6 border-b border-blue-500/30">
                             <h1 className="text-xl font-bold text-white"><span className="text-blue-400">1. Krok:</span> Korekta Tekstu</h1>
                             <button onClick={generateImages} className="ml-auto bg-blue-600 hover:bg-blue-500 text-white px-6 py-2.5 rounded-xl font-bold flex items-center gap-2 shadow-lg transition-transform active:scale-95">
@@ -490,11 +552,27 @@
                                             {slide.imageUrl ? (
                                                 <img src={slide.imageUrl} className="absolute inset-0 w-full h-full object-cover opacity-60" />
                                             ) : (
-                                                <div className="text-slate-500 mb-3"><i className="ph-fill ph-image text-5xl"></i><p className="text-[10px] mt-2 font-mono break-words">{slide.imagePrompt}</p></div>
+                                                <div className="text-slate-500 mb-3">
+                                                    {isRegeneratingImage === idx ? (
+                                                        <i className="ph-bold ph-spinner animate-spin text-5xl text-purple-500"></i>
+                                                    ) : (
+                                                        <i className="ph-fill ph-image text-5xl"></i>
+                                                    )}
+                                                    <p className="text-[10px] mt-2 font-mono break-words">{isRegeneratingImage === idx ? 'Maluję nową wersję...' : slide.imagePrompt}</p>
+                                                </div>
                                             )}
                                             
-                                            <div className="relative z-10 w-full mt-auto pt-4 flex gap-2 justify-center">
+                                            <div className="relative z-10 w-full mt-auto pt-4 flex gap-2 justify-center flex-wrap">
                                                 <button onClick={() => {setActiveUploadIndex(idx); fileInputRef.current.click();}} className="bg-slate-800 border border-slate-600 hover:bg-slate-700 text-xs font-bold px-4 py-2 rounded-lg transition-colors flex items-center gap-1 shadow-md"><i className="ph-bold ph-upload-simple"></i> Własne zdjęcie</button>
+                                                
+                                                {/* NOWOŚĆ: Powtórna generacja */}
+                                                <button 
+                                                    onClick={() => regenerateSingleImage(idx)} 
+                                                    disabled={isRegeneratingImage === idx}
+                                                    className="bg-purple-900/50 border border-purple-500/50 hover:bg-purple-800/80 text-purple-200 text-xs font-bold px-4 py-2 rounded-lg transition-colors flex items-center gap-1 shadow-md disabled:opacity-50"
+                                                >
+                                                    <i className="ph-bold ph-arrows-clockwise"></i> Powtórz AI
+                                                </button>
                                             </div>
                                         </div>
                                     </div>
@@ -510,12 +588,13 @@
             if (step === 'final') {
                 const currentSlide = slides[currentSlideIndex];
                 const isEven = currentSlideIndex % 2 === 0;
+                const tc = getThemeClasses(theme); // Dynamiczne klasy Tailwind
 
                 return (
-                    <div className="min-h-screen flex flex-col bg-slate-950">
+                    <div className="min-h-screen flex flex-col bg-slate-950 relative">
                         {toastMessage && <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[9999] bg-emerald-600 text-white px-6 py-3 rounded-full font-bold shadow-lg">{toastMessage}</div>}
                         
-                        <nav className="glass-nav h-16 flex items-center justify-between px-6 border-b border-slate-800">
+                        <nav className="glass-nav h-16 flex items-center justify-between px-6 border-b border-slate-800 print-hidden">
                             <h1 className="text-lg font-bold text-white"><i className="ph-fill ph-check-circle text-emerald-400"></i> Gotowe!</h1>
                             <div className="flex gap-3">
                                 <button onClick={toggleFullscreen} className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 transition-colors">
@@ -547,15 +626,15 @@
                             </div>
 
                             {/* Główny obszar roboczy - podgląd slajdu */}
-                            <div className="flex-1 p-8 flex items-center justify-center bg-black/50 relative">
+                            <div className="flex-1 p-8 flex flex-col items-center justify-center bg-black/50 relative">
                                 
-                                {/* Ekran Slajdu (Miniatura) */}
-                                <div className={`theme-${theme} w-full max-w-[1280px] aspect-video relative rounded-lg overflow-hidden shadow-2xl slide-bg flex`}>
+                                {/* Ekran Slajdu (Miniatura) z Gwarancją Widoczności Tekstu */}
+                                <div className={`w-full max-w-[1280px] aspect-video relative rounded-xl overflow-hidden shadow-2xl flex ${tc.bg} ${tc.text}`}>
                                     <div className={`flex-1 p-10 lg:p-16 flex flex-col justify-center z-10 relative ${isEven ? 'order-1' : 'order-2'}`}>
-                                        <h2 className="text-3xl lg:text-5xl font-black mb-8 slide-title pb-4">{currentSlide.title}</h2>
+                                        <h2 className={`text-3xl lg:text-5xl font-black mb-8 pb-4 ${tc.title}`}>{currentSlide.title}</h2>
                                         <ul className="space-y-4 lg:space-y-6">
                                             {currentSlide.bullets.map((b, i) => (
-                                                <li key={i} className="text-xl lg:text-2xl flex items-start gap-4">
+                                                <li key={i} className={`text-xl lg:text-2xl flex items-start gap-4 ${contentStyle === 'descriptive' ? 'text-lg lg:text-xl leading-relaxed' : ''}`}>
                                                     <span className="text-blue-500 mt-1">●</span>
                                                     <span>{b}</span>
                                                 </li>
@@ -568,16 +647,16 @@
                                         ) : (
                                             <div className="absolute inset-0 bg-slate-800 flex items-center justify-center text-slate-500">Brak obrazu</div>
                                         )}
-                                        {/* Gradient overlay to blend image edge */}
-                                        <div className={`absolute inset-y-0 w-32 ${isEven ? 'left-0 bg-gradient-to-r' : 'right-0 bg-gradient-to-l'} from-inherit to-transparent`}></div>
+                                        {/* Gradient overlay to blend image edge (używamy klas Tailwind, więc gradient dziedziczy z bg) */}
+                                        <div className={`absolute inset-y-0 w-32 ${isEven ? 'left-0 bg-gradient-to-r' : 'right-0 bg-gradient-to-l'} from-inherit to-transparent opacity-50`}></div>
                                     </div>
                                 </div>
 
-                                {/* Kontrolki Slajdów */}
-                                <div className="absolute bottom-8 left-1/2 -translate-x-1/2 bg-slate-900 border border-slate-700 rounded-full flex items-center p-2 shadow-2xl gap-4">
-                                    <button onClick={() => setCurrentSlideIndex(p => Math.max(p - 1, 0))} disabled={currentSlideIndex === 0} className="w-10 h-10 rounded-full bg-slate-800 text-white flex items-center justify-center hover:bg-blue-600 disabled:opacity-30 transition-colors"><i className="ph-bold ph-caret-left"></i></button>
-                                    <span className="font-bold text-slate-400 min-w-[80px] text-center">{currentSlideIndex + 1} / {slides.length}</span>
-                                    <button onClick={() => setCurrentSlideIndex(p => Math.min(p + 1, slides.length - 1))} disabled={currentSlideIndex === slides.length - 1} className="w-10 h-10 rounded-full bg-slate-800 text-white flex items-center justify-center hover:bg-blue-600 disabled:opacity-30 transition-colors"><i className="ph-bold ph-caret-right"></i></button>
+                                {/* Kontrolki Slajdów (Teraz z wysokim z-index, zawsze na wierzchu) */}
+                                <div className="absolute bottom-8 left-1/2 -translate-x-1/2 bg-slate-900 border border-slate-700 rounded-full flex items-center p-2 shadow-[0_0_30px_rgba(0,0,0,0.8)] gap-4 z-[500]">
+                                    <button onClick={() => setCurrentSlideIndex(p => Math.max(p - 1, 0))} disabled={currentSlideIndex === 0} className="w-12 h-12 rounded-full bg-slate-800 text-white flex items-center justify-center hover:bg-blue-600 disabled:opacity-30 transition-colors cursor-pointer"><i className="ph-bold ph-caret-left text-xl"></i></button>
+                                    <span className="font-bold text-slate-300 min-w-[80px] text-center text-sm">Slajd {currentSlideIndex + 1} z {slides.length}</span>
+                                    <button onClick={() => setCurrentSlideIndex(p => Math.min(p + 1, slides.length - 1))} disabled={currentSlideIndex === slides.length - 1} className="w-12 h-12 rounded-full bg-slate-800 text-white flex items-center justify-center hover:bg-blue-600 disabled:opacity-30 transition-colors cursor-pointer"><i className="ph-bold ph-caret-right text-xl"></i></button>
                                 </div>
                             </div>
                         </div>
@@ -585,12 +664,12 @@
                         {/* FULLSCREEN RENDERER */}
                         <div ref={presentationRef} className={isFullscreen ? 'presentation-mode' : 'hidden'}>
                             {isFullscreen && (
-                                <div className={`theme-${theme} slide-container slide-bg`}>
+                                <div className={`slide-container flex ${tc.bg} ${tc.text}`}>
                                     <div className={`flex-1 p-16 xl:p-24 flex flex-col justify-center z-10 relative ${isEven ? 'order-1' : 'order-2'}`}>
-                                        <h2 className="text-6xl xl:text-7xl font-black mb-12 slide-title pb-6 leading-tight">{currentSlide.title}</h2>
+                                        <h2 className={`text-6xl xl:text-7xl font-black mb-12 pb-6 leading-tight ${tc.title}`}>{currentSlide.title}</h2>
                                         <ul className="space-y-8 xl:space-y-10">
                                             {currentSlide.bullets.map((b, i) => (
-                                                <li key={i} className="text-3xl xl:text-4xl flex items-start gap-6 leading-relaxed">
+                                                <li key={i} className={`text-3xl xl:text-4xl flex items-start gap-6 leading-relaxed ${contentStyle === 'descriptive' ? 'text-2xl xl:text-3xl' : ''}`}>
                                                     <span className="text-blue-500 mt-2">●</span>
                                                     <span>{b}</span>
                                                 </li>
@@ -604,7 +683,7 @@
                                     {/* Subtelne wskazówki sterowania na pełnym ekranie */}
                                     <div className="absolute bottom-4 right-6 text-slate-500/50 text-xs font-bold uppercase flex gap-4">
                                         <span>Slajd {currentSlideIndex + 1}/{slides.length}</span>
-                                        <span>Użyj strzałek <i className="ph-bold ph-arrows-left-right"></i></span>
+                                        <span>Użyj strzałek <i className="ph-bold ph-arrows-left-right"></i> lub Spacji</span>
                                         <span>ESC aby wyjść</span>
                                     </div>
                                 </div>
