@@ -5,12 +5,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EduScenariusz PRO - EduBox AI</title>
     
-    <!-- React & ReactDOM -->
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <!-- Wymuszenie HTTPS dla bezpieczeństwa (likwiduje komunikat "Niebezpieczna") -->
+    <script>
+        if (window.location.protocol === 'http:' && window.location.hostname !== 'localhost') {
+            window.location.href = window.location.href.replace('http:', 'https:');
+        }
+    </script>
+
+    <!-- React & ReactDOM (z dodanym anonymous dla bezpieczeństwa CORS) -->
+    <script crossorigin="anonymous" src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin="anonymous" src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     
     <!-- Babel -->
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script crossorigin="anonymous" src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -118,6 +125,7 @@
             
             // App State
             const [isGenerating, setIsGenerating] = useState(false);
+            const [isAnalyzing, setIsAnalyzing] = useState(false);
             const [botQuickPrompt, setBotQuickPrompt] = useState('');
             const [botMessage, setBotMessage] = useState("Cześć! Napisz mi jedno zdanie, np. 'Lekcja o dinozaurach dla 6 latków na 30 minut', a ja sam ustawię odpowiednie parametry!");
 
@@ -169,47 +177,56 @@
                 if(e) e.preventDefault();
                 if(!botQuickPrompt.trim()) return;
                 
-                const text = botQuickPrompt.toLowerCase();
-                let newParams = { ...params };
-                let extractedTopic = botQuickPrompt;
-
-                // Ulepszona logika NLP
-                if (text.match(/3.*lat|4.*lat|3-4/)) newParams.age = '3-4 latki';
-                else if (text.match(/5.*lat|6.*lat|5-6/)) newParams.age = '5-6 latki';
-                else if (text.match(/klas.*1|klas.*2|klas.*3|klas.*i|klas.*ii|pierwsz|drug|trzeci/)) newParams.age = 'Klasy I-III';
-                else if (text.match(/klas.*4|klas.*5|klas.*6|klas.*7|klas.*8|starsz|czwart|piąt/)) newParams.age = 'Klasy IV-VIII';
-
-                if (text.match(/15|20/)) newParams.duration = '15-20 min';
-                else if (text.match(/30|40/)) newParams.duration = '30-40 min';
-                else if (text.match(/90|półtorej|dwie/)) newParams.duration = '90 min';
-                else if (text.match(/45|50/)) newParams.duration = '45-50 min';
-
-                if (text.match(/ruch|zabaw|aktyw|gr/)) newParams.methods = 'Aktywizująca i ruchowa';
-                else if (text.match(/pokaz|ogląd|obraz|film|prezenta/)) newParams.methods = 'Pokazowa / Obrazowa';
-                else if (text.match(/projekt|badacz/)) newParams.methods = 'Metoda projektowa';
-                else if (text.match(/praktycz|doświadcz|eksperymen/)) newParams.methods = 'Praktyczne działanie';
-                else if (text.match(/opowiad|czyt|wykład/)) newParams.methods = 'Podająca (opowiadanie)';
-
-                if (text.match(/autyzm|asperger|spektrum/)) newParams.needs = 'Spektrum autyzmu';
-                else if (text.match(/adhd|nadpobudli/)) newParams.needs = 'ADHD (Nadpobudliwość)';
-
-                extractedTopic = extractedTopic.replace(/dla\s*\d+\s*lat[a-ząćęłńóśźż]*/gi, '')
-                                               .replace(/dla\s*(dzieci|klas[y|a]?|uczniów)\s*[a-z0-9-IVX]*/gi, '')
-                                               .replace(/(przez\s*|na\s*)?\d+\s*min[a-ząćęłńóśźż]*/gi, '')
-                                               .replace(/metod[a-ząćęłńóśźż]*\s*[a-ząćęłńóśźż]+/gi, '')
-                                               .replace(/[,.]/g, '')
-                                               .replace(/\s+/g, ' ')
-                                               .trim();
+                setIsAnalyzing(true);
                 
-                if(extractedTopic) {
-                    extractedTopic = extractedTopic.charAt(0).toUpperCase() + extractedTopic.slice(1);
-                }
+                // Symulacja myślenia AI dla lepszego wrażenia UX (700ms)
+                setTimeout(() => {
+                    const text = botQuickPrompt.toLowerCase();
+                    let newParams = { ...params };
+                    let extractedTopic = botQuickPrompt;
 
-                newParams.topic = extractedTopic || 'Zajęcia ogólne';
+                    // Elastyczna logika rozpoznawania NLP
+                    if (/3.*lat|4.*lat|3-4/i.test(text)) newParams.age = '3-4 latki';
+                    else if (/5.*lat|6.*lat|5-6/i.test(text)) newParams.age = '5-6 latki';
+                    else if (/klas.*1|klas.*2|klas.*3|klas.*i|pierwsz|drug|trzeci/i.test(text)) newParams.age = 'Klasy I-III';
+                    else if (/klas.*4|klas.*5|klas.*6|klas.*7|klas.*8|czwart|piąt|szóst|starsz/i.test(text)) newParams.age = 'Klasy IV-VIII';
 
-                setParams(newParams);
-                setBotQuickPrompt('');
-                setBotMessage('Bum! 💥 Zrozumiałem Twój tekst i perfekcyjnie poustawiałem parametry. Możesz generować!');
+                    if (/15|20/.test(text)) newParams.duration = '15-20 min';
+                    else if (/30|40/.test(text)) newParams.duration = '30-40 min';
+                    else if (/90|półtorej|dwie/.test(text)) newParams.duration = '90 min';
+                    else if (/45|50/.test(text)) newParams.duration = '45-50 min';
+
+                    if (/ruch|zabaw|aktyw|gr/i.test(text)) newParams.methods = 'Aktywizująca i ruchowa';
+                    else if (/pokaz|ogląd|obraz|film|prezenta/i.test(text)) newParams.methods = 'Pokazowa / Obrazowa';
+                    else if (/projekt|badacz/i.test(text)) newParams.methods = 'Metoda projektowa';
+                    else if (/praktycz|doświadcz|eksperymen/i.test(text)) newParams.methods = 'Praktyczne działanie';
+                    else if (/opowiad|czyt|wykład/i.test(text)) newParams.methods = 'Podająca (opowiadanie)';
+
+                    if (/autyzm|asperger|spektrum/i.test(text)) newParams.needs = 'Spektrum autyzmu';
+                    else if (/adhd|nadpobudli/i.test(text)) newParams.needs = 'ADHD (Nadpobudliwość)';
+
+                    // Czyszczenie tematu z parametrów
+                    extractedTopic = extractedTopic
+                        .replace(/dla\s*\d+\s*lat[a-ząćęłńóśźż]*/gi, '')
+                        .replace(/dla\s*(dzieci|klas[y|a]?|uczniów)\s*[a-z0-9-IVX]*/gi, '')
+                        .replace(/(przez\s*|na\s*)?\d+\s*min[a-ząćęłńóśźż]*/gi, '')
+                        .replace(/metod[a-ząćęłńóśźż]*\s*[a-ząćęłńóśźż]+/gi, '')
+                        .replace(/[,.]/g, '')
+                        .replace(/\s+/g, ' ')
+                        .trim();
+                    
+                    if(extractedTopic) {
+                        // Zaczynamy wielką literą
+                        extractedTopic = extractedTopic.charAt(0).toUpperCase() + extractedTopic.slice(1);
+                    }
+
+                    newParams.topic = extractedTopic || 'Zajęcia ogólne';
+
+                    setParams(newParams);
+                    setIsAnalyzing(false);
+                    setBotQuickPrompt('');
+                    setBotMessage('Bum! 💥 Przeanalizowałem Twój tekst i perfekcyjnie poustawiałem suwaki w konfiguratorze. Zobacz poniżej!');
+                }, 700);
             };
 
             const generateScenario = async () => {
@@ -247,7 +264,6 @@
                 const userPrompt = `Temat: ${params.topic}. Grupa: ${params.age}. Czas: ${params.duration}. Metoda: ${params.methods}. Potrzeby SPE: ${params.needs || 'Brak'}. Cel dodatkowy: ${params.customGoal || 'Brak'}. Zbuduj profesjonalny scenariusz.`;
 
                 try {
-                    // UWAGA: Zakładam że w Vercel macie /api/chat wspierające format: "json"
                     const res = await fetch('/api/chat', {
                         method: 'POST', 
                         headers: { 'Content-Type': 'application/json' },
@@ -258,14 +274,12 @@
                     if (!res.ok) throw new Error(data.details || data.message || "Błąd z serwera");
 
                     let cleanText = data.text;
-                    // Prosty parser na wypadek gdyby model zwrócił markdown ```json ... ```
                     let jsonStr = cleanText.replace(/```json/gi, '').replace(/```/g, '').trim();
                     if(jsonStr.indexOf('{') !== -1) jsonStr = jsonStr.substring(jsonStr.indexOf('{'), jsonStr.lastIndexOf('}') + 1);
 
                     setScenario(JSON.parse(jsonStr));
                     setBotMessage("Gotowe! Masz przed sobą genialny scenariusz. Kliknij pobierz do Worda, by go zapisać!");
 
-                    // Odejmij próbę po sukcesie
                     if (!isPremium) {
                         const newUsages = usagesLeft - 1;
                         setUsagesLeft(newUsages);
@@ -305,7 +319,7 @@
                     {/* Loading Overlay */}
                     {isGenerating && (
                         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-[100] flex flex-col items-center justify-center text-white no-print">
-                            <div className="glass-panel p-10 rounded-3xl flex flex-col items-center space-y-6 max-w-sm">
+                            <div className="glass-panel p-10 rounded-3xl flex flex-col items-center space-y-6 max-w-sm border border-emerald-500/20">
                                 <i className="ph ph-spinner-gap animate-spin text-5xl text-emerald-500"></i>
                                 <div className="text-center">
                                     <h3 className="text-xl font-bold mb-2">AI układa metodykę...</h3>
@@ -327,15 +341,23 @@
                                 </div>
                             </div>
                             
-                            <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-4 flex-wrap justify-center">
                                 {!isPremium && (
                                     <div className="text-sm px-4 py-2 rounded-xl border border-slate-700 bg-slate-900 flex items-center gap-2">
                                         <i className="ph-fill ph-lightning text-yellow-400"></i>
-                                        <span>Darmowe próby: <strong className={usagesLeft > 0 ? "text-emerald-400" : "text-red-400"}>{usagesLeft}</strong></span>
+                                        <span className="hidden sm:inline">Darmowe próby:</span>
+                                        <strong className={usagesLeft > 0 ? "text-emerald-400" : "text-red-400"}>{usagesLeft}</strong>
                                     </div>
                                 )}
+                                
+                                {/* RESTORED: Postaw Kawę */}
+                                <button onClick={() => window.open('https://buycoffee.to/magiccolor')} className="flex items-center space-x-2 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white px-5 py-2.5 rounded-xl font-bold transition-all active:scale-95 text-sm shadow-md">
+                                    <i className="ph-fill ph-coffee text-amber-400 text-lg"></i>
+                                    <span className="hidden sm:inline">Postaw Kawę</span>
+                                </button>
+                                
                                 <a href="index.html" className="flex items-center gap-2 text-slate-300 hover:text-white transition-colors text-sm font-medium bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-xl border border-slate-700">
-                                    <i className="ph-bold ph-arrow-left"></i> Portfolio
+                                    <i className="ph-bold ph-arrow-left text-lg"></i> <span className="hidden sm:inline">Portfolio</span>
                                 </a>
                             </div>
                         </div>
@@ -347,7 +369,7 @@
                         <div className="lg:col-span-4 space-y-6 no-print">
                             
                             {/* EduBot Auto-Fill */}
-                            <div className="glass-panel p-6 rounded-2xl space-y-4 relative overflow-hidden">
+                            <div className="glass-panel p-6 rounded-2xl space-y-4 relative overflow-hidden border border-emerald-500/20">
                                 <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 blur-3xl rounded-full"></div>
                                 <h2 className="font-bold flex items-center text-emerald-400 text-sm uppercase tracking-widest border-b border-slate-700/50 pb-4">
                                     <i className="ph-bold ph-magic-wand mr-2 text-lg"></i> Auto-Wypełnianie
@@ -358,10 +380,17 @@
                                         value={botQuickPrompt} 
                                         onChange={(e) => setBotQuickPrompt(e.target.value)} 
                                         onKeyDown={(e) => { if(e.key === 'Enter') handleBotAutoFill(e); }} 
-                                        placeholder="np. Lekcja o ułamkach na 45 min..." 
-                                        className="flex-1 bg-transparent px-3 text-sm outline-none font-medium text-white placeholder-slate-500"
+                                        disabled={isAnalyzing}
+                                        placeholder="np. Lekcja o dinozaurach dla 5 lat..." 
+                                        className="flex-1 bg-transparent px-3 text-sm outline-none font-medium text-white placeholder-slate-500 disabled:opacity-50"
                                     />
-                                    <button onClick={handleBotAutoFill} className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-4 py-2 rounded-lg transition-colors">Analizuj</button>
+                                    <button 
+                                        onClick={handleBotAutoFill} 
+                                        disabled={isAnalyzing}
+                                        className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-4 py-2 rounded-lg transition-all flex items-center gap-2 disabled:opacity-70"
+                                    >
+                                        {isAnalyzing ? <><i className="ph-bold ph-spinner animate-spin text-sm"></i> Myślę...</> : "Analizuj"}
+                                    </button>
                                 </div>
                             </div>
 
