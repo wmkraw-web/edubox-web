@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="pl" translate="no" class="notranslate">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduPrezentacja PRO - EduBox AI</title>
+    
+    <!-- Wymuszenie HTTPS -->
+    <script>
+        if (window.location.protocol === 'http:' && window.location.hostname !== 'localhost') {
+            window.location.href = window.location.href.replace('http:', 'https:');
+        }
+    </script>
+
+    <!-- React & ReactDOM -->
+    <script crossorigin="anonymous" src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin="anonymous" src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script crossorigin="anonymous" src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+    <!-- PptxGenJS (Biblioteka do generowania PowerPointa w locie) -->
+    <script src="https://cdn.jsdelivr.net/gh/gitbrent/pptxgenjs@3.12.0/libs/jszip.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/gitbrent/pptxgenjs@3.12.0/dist/pptxgen.min.js"></script>
+
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['"Plus Jakarta Sans"', 'sans-serif'] },
+                    colors: { slate: { 950: '#020617' } }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body { 
+            background-color: #020617; 
+            color: #f8fafc; 
+            background-image: radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.15) 0px, transparent 50%), radial-gradient(at 100% 100%, rgba(139, 92, 246, 0.1) 0px, transparent 50%);
+            background-attachment: fixed; min-height: 100vh; overflow-x: hidden;
+        }
+
+        .glass-panel { background: rgba(30, 41, 59, 0.4); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.05); }
+        .glass-nav { background: rgba(2, 6, 23, 0.85); backdrop-filter: blur(24px); border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
+        
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.5); }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(59, 130, 246, 0.5); border-radius: 4px; }
+
+        /* Fullscreen Presentation Styles */
+        .presentation-mode {
+            position: fixed; inset: 0; z-index: 9999; background: #000;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .slide-container {
+            width: 100%; height: 100%; max-width: 1920px; max-height: 1080px;
+            aspect-ratio: 16/9; background: white; position: relative; overflow: hidden;
+            box-shadow: 0 0 50px rgba(0,0,0,0.5); display: flex;
+        }
+        
+        .slide-transition-enter { opacity: 0; transform: scale(0.98); }
+        .slide-transition-enter-active { opacity: 1; transform: scale(1); transition: opacity 400ms, transform 400ms; }
+        .slide-transition-exit { opacity: 1; }
+        .slide-transition-exit-active { opacity: 0; transition: opacity 400ms; }
+
+        /* Themes CSS */
+        .theme-modern .slide-bg { background: linear-gradient(135deg, #f8fafc, #e2e8f0); color: #0f172a; }
+        .theme-modern .slide-title { color: #1e40af; border-bottom: 4px solid #3b82f6; }
+        
+        .theme-chalkboard .slide-bg { background: #1a472a; color: #f8fafc; font-family: 'Comic Sans MS', cursive, sans-serif; }
+        .theme-chalkboard .slide-title { color: #fde047; border-bottom: 2px dashed #f8fafc; }
+
+        .theme-space .slide-bg { background: radial-gradient(circle at center, #1e1b4b, #020617); color: #f8fafc; }
+        .theme-space .slide-title { color: #a78bfa; text-shadow: 0 0 10px rgba(167,139,250,0.5); }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        function App() {
+            // App State
+            const [isPremium, setIsPremium] = useState(false);
+            const [usagesLeft, setUsagesLeft] = useState(2);
+            const [showPremiumModal, setShowPremiumModal] = useState(false);
+            const [accessCode, setAccessCode] = useState('');
+            const [toastMessage, setToastMessage] = useState('');
+
+            // Presentation Config State
+            const [step, setStep] = useState('config'); // config, generating_text, review, generating_images, final
+            const [topic, setTopic] = useState('');
+            const [audience, setAudience] = useState('Klasy 4-8');
+            const [slideCount, setSlideCount] = useState(6);
+            const [theme, setTheme] = useState('modern');
+            const [includeQuiz, setIncludeQuiz] = useState(true);
+
+            // Generated Content
+            const [slides, setSlides] = useState([]);
+            const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
+            const [isFullscreen, setIsFullscreen] = useState(false);
+            const [loadingProgress, setLoadingProgress] = useState(0);
+            
+            const presentationRef = useRef(null);
+            const fileInputRef = useRef(null);
+            const [activeUploadIndex, setActiveUploadIndex] = useState(null);
+
+            useEffect(() => {
+                const premiumStatus = localStorage.getItem('edubox_premium_unlocked');
+                const storedUsages = localStorage.getItem('eduprezentacja_usages');
+                if (premiumStatus === 'true') setIsPremium(true);
+                else {
+                    if (storedUsages !== null) setUsagesLeft(parseInt(storedUsages, 10));
+                    else localStorage.setItem('eduprezentacja_usages', '2');
+                }
+            }, []);
+
+            const showToast = (msg) => { setToastMessage(msg); setTimeout(() => setToastMessage(''), 4000); };
+
+            const handleVerifyCode = (e) => {
+                e?.preventDefault();
+                if (accessCode.trim().toUpperCase() === 'KAWA2024') { 
+                    localStorage.setItem('edubox_premium_unlocked', 'true');
+                    setIsPremium(true); setShowPremiumModal(false); setAccessCode(''); 
+                    showToast('Odblokowano Premium! 🌟'); 
+                } else { showToast('Błędny kod dostępu!'); }
+            };
+
+            // ETAP 1: Generowanie Tekstu i Promptów (JSON)
+            const generateTextOutline = async () => {
+                if (!isPremium && usagesLeft <= 0) return setShowPremiumModal(true);
+                if (!topic.trim()) return showToast('Wpisz temat prezentacji!');
+
+                setStep('generating_text');
+                
+                const systemPrompt = `Jesteś ekspertem ds. edukacji. Tworzysz konspekty prezentacji. Zwróć WYŁĄCZNIE poprawny JSON o poniższej strukturze:
+                {
+                    "slides": [
+                        {
+                            "title": "Tytuł slajdu (max 5 słów)",
+                            "bullets": ["Punkt 1", "Punkt 2", "Punkt 3"],
+                            "imagePrompt": "Szczegółowy opis zdjęcia w j. angielskim, idealny dla generatora AI. Bez tekstu na obrazku. Format poziomy.",
+                            "notes": "Notatki dla nauczyciela, co ma opowiedzieć do tego slajdu."
+                        }
+                    ]
+                }
+                Uwaga: 
+                1. Pierwszy slajd to zawsze Slajd Tytułowy (z 1 punktem podtytułu).
+                ${includeQuiz ? `2. Ostatni slajd to Quiz/Zagadka z 3 opcjami (A, B, C) i podaną w bullets poprawną odpowiedzią.` : ''}
+                Wygeneruj dokładnie ${slideCount} slajdów.`;
+
+                const userPrompt = `Temat: ${topic}. Grupa docelowa: ${audience}. Dostosuj język i stopień skomplikowania (bullets i notatki).`;
+
+                try {
+                    const res = await fetch('/api/chat', {
+                        method: 'POST', 
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ prompt: userPrompt, system: systemPrompt, format: "json", temperature: 0.7, model: "gpt-4o-mini" })
+                    });
+                    
+                    const data = await res.json();
+                    if (!res.ok) throw new Error("Błąd API");
+
+                    let jsonStr = data.text.replace(/```json/gi, '').replace(/```/g, '').trim();
+                    if(jsonStr.indexOf('{') !== -1) jsonStr = jsonStr.substring(jsonStr.indexOf('{'), jsonStr.lastIndexOf('}') + 1);
+                    
+                    let parsed = JSON.parse(jsonStr);
+                    // Add local fields
+                    parsed.slides = parsed.slides.map((s, i) => ({ ...s, id: i, imageUrl: null }));
+                    
+                    setSlides(parsed.slides);
+                    setStep('review');
+
+                    if (!isPremium) {
+                        const newUsages = usagesLeft - 1;
+                        setUsagesLeft(newUsages);
+                        localStorage.setItem('eduprezentacja_usages', newUsages.toString());
+                    }
+                } catch (error) {
+                    console.error(error); showToast('Błąd generowania tekstu. Spróbuj ponownie.'); setStep('config');
+                }
+            };
+
+            // ETAP 2: Generowanie Obrazków (Sekwencyjnie /api/generate)
+            const generateImages = async () => {
+                setStep('generating_images');
+                let updatedSlides = [...slides];
+
+                for (let i = 0; i < updatedSlides.length; i++) {
+                    setLoadingProgress(Math.round(((i) / updatedSlides.length) * 100));
+                    
+                    if (updatedSlides[i].imageUrl) continue; // Skip if user uploaded custom image
+
+                    try {
+                        let styleMod = theme === 'chalkboard' ? 'hand drawn chalk illustration, simple' : (theme === 'space' ? 'cinematic sci-fi concept art' : 'modern flat vector illustration, colorful');
+                        
+                        const response = await fetch('/api/generate', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ 
+                                prompt: `${updatedSlides[i].imagePrompt}. STYLE: ${styleMod}. High quality, 16:9 aspect ratio, no text.`,
+                                aspect_ratio: '16:9',
+                                width: 1024,
+                                height: 576
+                            })
+                        });
+                        
+                        if (response.ok) {
+                            const data = await response.json();
+                            let imgUrl = data.imageUrl || data.image_url || data.url || (data.data && data.data[0]?.url) || data.image;
+                            if (imgUrl) {
+                                if (imgUrl.length > 1000 && !imgUrl.startsWith('http') && !imgUrl.startsWith('data:')) {
+                                    imgUrl = `data:image/png;base64,${imgUrl}`;
+                                }
+                                updatedSlides[i].imageUrl = imgUrl;
+                                setSlides([...updatedSlides]); // Trigger re-render per image
+                            }
+                        }
+                    } catch (err) { console.error(`Błąd przy obrazku ${i}:`, err); }
+                }
+                
+                setLoadingProgress(100);
+                setTimeout(() => setStep('final'), 500);
+            };
+
+            // CUSTOM UPLOAD W TRAKCIE REVIEW
+            const handleFileUpload = (e) => {
+                const file = e.target.files[0];
+                if (!file || activeUploadIndex === null) return;
+                
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const newSlides = [...slides];
+                    newSlides[activeUploadIndex].imageUrl = event.target.result;
+                    setSlides(newSlides);
+                };
+                reader.readAsDataURL(file);
+                e.target.value = null;
+            };
+
+            // PPTX EXPORT (PptxGenJS)
+            const exportToPPTX = async () => {
+                showToast("Przygotowuję plik PowerPoint...");
+                
+                // Initialize PptxGenJS
+                let pres = new PptxGenJS();
+                pres.layout = 'LAYOUT_16x9';
+
+                // Setup Themes
+                let bgHex = 'FFFFFF'; let colorHex = '000000';
+                if (theme === 'chalkboard') { bgHex = '1a472a'; colorHex = 'FFFFFF'; }
+                if (theme === 'space') { bgHex = '020617'; colorHex = 'FFFFFF'; }
+
+                slides.forEach((slide, idx) => {
+                    let slideObj = pres.addSlide();
+                    slideObj.background = { fill: bgHex };
+                    slideObj.addNotes(slide.notes || "Brak notatek.");
+
+                    // Title
+                    slideObj.addText(slide.title, { 
+                        x: 0.5, y: 0.5, w: "90%", h: 1.0, 
+                        fontSize: 36, color: colorHex, bold: true,
+                        border: { type: 'bottom', color: '3b82f6', pt: 2 }
+                    });
+
+                    // Layout: Text Left, Image Right (or vice versa for variety)
+                    let isEven = idx % 2 === 0;
+
+                    // Bullets
+                    let bulletText = slide.bullets.map(b => ({ text: b, options: { bullet: true, color: colorHex, fontSize: 24, breakLine: true } }));
+                    slideObj.addText(bulletText, {
+                        x: isEven ? 0.5 : 5.5, y: 1.8, w: "45%", h: 4.5, align: 'left', valign: 'top'
+                    });
+
+                    // Image
+                    if (slide.imageUrl) {
+                        try {
+                            // PptxGenJS accepts data/base64 strings directly in `data` prop, or URLs in `path`
+                            if (slide.imageUrl.startsWith('data:')) {
+                                slideObj.addImage({ data: slide.imageUrl, x: isEven ? 5.5 : 0.5, y: 1.8, w: "40%", h: "60%", sizing: { type: 'contain' } });
+                            } else {
+                                slideObj.addImage({ path: slide.imageUrl, x: isEven ? 5.5 : 0.5, y: 1.8, w: "40%", h: "60%", sizing: { type: 'contain' } });
+                            }
+                        } catch(e) { console.error("Błąd osadzania obrazka", e); }
+                    }
+                });
+
+                pres.writeFile({ fileName: `EduPrezentacja_${topic.replace(/\s+/g, '_')}.pptx` });
+            };
+
+            // FULLSCREEN KONTROLA
+            const toggleFullscreen = () => {
+                if (!document.fullscreenElement) {
+                    presentationRef.current?.requestFullscreen().catch(err => showToast("Błąd pełnego ekranu."));
+                    setIsFullscreen(true);
+                } else {
+                    document.exitFullscreen();
+                    setIsFullscreen(false);
+                }
+            };
+
+            useEffect(() => {
+                const handleFullscreenChange = () => { setIsFullscreen(!!document.fullscreenElement); };
+                const handleKeyDown = (e) => {
+                    if (!isFullscreen) return;
+                    if (e.key === 'ArrowRight' || e.key === 'Space') {
+                        setCurrentSlideIndex(prev => Math.min(prev + 1, slides.length - 1));
+                    } else if (e.key === 'ArrowLeft') {
+                        setCurrentSlideIndex(prev => Math.max(prev - 1, 0));
+                    }
+                };
+                document.addEventListener('fullscreenchange', handleFullscreenChange);
+                window.addEventListener('keydown', handleKeyDown);
+                return () => {
+                    document.removeEventListener('fullscreenchange', handleFullscreenChange);
+                    window.removeEventListener('keydown', handleKeyDown);
+                };
+            }, [isFullscreen, slides.length]);
+
+
+            // RENDER: Formularz Konfiguracji
+            if (step === 'config') {
+                return (
+                    <div className="min-h-screen flex flex-col font-sans relative">
+                        {/* Wymagane style i nawigacja współdzielone */}
+                        <div className={`fixed top-24 left-1/2 -translate-x-1/2 z-[300] bg-emerald-600 text-white px-6 py-3 rounded-full font-bold shadow-[0_10px_40px_rgba(16,185,129,0.5)] transition-all duration-300 ${toastMessage ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-10 pointer-events-none'}`}>
+                            {toastMessage}
+                        </div>
+
+                        <nav className="fixed top-0 w-full z-[100] glass-nav h-20">
+                            <div className="max-w-7xl mx-auto px-6 h-full flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg"><i className="ph-bold ph-presentation-chart text-white text-xl"></i></div>
+                                    <span className="text-xl font-extrabold tracking-tight text-white">Edu<span className="text-blue-400">Prezentacja</span></span>
+                                </div>
+                                <div className="flex items-center gap-4">
+                                    {!isPremium && (
+                                        <div className="text-sm px-4 py-2 rounded-xl border border-slate-700 bg-slate-900 flex items-center gap-2">
+                                            <i className="ph-fill ph-lightning text-yellow-400"></i>
+                                            <span className="hidden sm:inline">Darmowe pule:</span><strong className="text-blue-400">{usagesLeft}</strong>
+                                        </div>
+                                    )}
+                                    <a href="index.html" className="flex items-center gap-2 text-slate-300 hover:text-white transition-colors text-sm font-bold bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-xl border border-slate-700"><i className="ph-bold ph-arrow-left"></i> Portfolio</a>
+                                </div>
+                            </div>
+                        </nav>
+
+                        <div className="max-w-3xl mx-auto px-4 pt-32 pb-24 flex-grow w-full relative z-10">
+                            <div className="text-center mb-10">
+                                <h1 className="text-4xl md:text-5xl font-black mb-4">Inteligentne <span className="text-blue-400">Prezentacje</span></h1>
+                                <p className="text-slate-400 text-lg">Podaj temat, a AI wygeneruje plan, treści, notatki oraz panoramiczne ilustracje do każdego slajdu.</p>
+                            </div>
+
+                            <div className="glass-panel p-8 rounded-[2rem] shadow-2xl">
+                                <div className="space-y-6">
+                                    <div>
+                                        <label className="text-xs font-bold text-blue-400 uppercase tracking-widest block mb-2">Temat główny prezentacji *</label>
+                                        <input type="text" value={topic} onChange={e => setTopic(e.target.value)} placeholder="np. Jak zwierzęta przygotowują się do zimy..." className="w-full p-4 bg-slate-900/80 border border-slate-700 rounded-xl text-lg font-medium outline-none text-white focus:border-blue-500 transition-colors" />
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div>
+                                            <label className="text-xs font-bold text-slate-400 uppercase tracking-widest block mb-2">Dla kogo?</label>
+                                            <select value={audience} onChange={e => setAudience(e.target.value)} className="w-full p-4 bg-slate-900/80 border border-slate-700 rounded-xl outline-none text-white focus:border-blue-500 transition-colors">
+                                                <option>Przedszkole</option><option>Klasy 1-3</option><option>Klasy 4-8</option><option>Szkoła średnia</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="text-xs font-bold text-slate-400 uppercase tracking-widest block mb-2">Liczba slajdów</label>
+                                            <select value={slideCount} onChange={e => setSlideCount(Number(e.target.value))} className="w-full p-4 bg-slate-900/80 border border-slate-700 rounded-xl outline-none text-white focus:border-blue-500 transition-colors">
+                                                <option value={4}>4 Slajdy (Szybka)</option>
+                                                <option value={6}>6 Slajdów (Optymalna)</option>
+                                                <option value={10}>10 Slajdów (Długa)</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div className="pt-4 border-t border-slate-700/50">
+                                        <label className="text-xs font-bold text-slate-400 uppercase tracking-widest block mb-3">Motyw Wizualny</label>
+                                        <div className="grid grid-cols-3 gap-3">
+                                            <button onClick={() => setTheme('modern')} className={`p-4 rounded-xl border-2 flex flex-col items-center gap-2 transition-all ${theme === 'modern' ? 'border-blue-500 bg-blue-900/20' : 'border-slate-700 bg-slate-900 hover:border-slate-500'}`}>
+                                                <div className="w-full h-8 bg-slate-100 rounded"></div><span className="text-xs font-bold text-white">Nowoczesny</span>
+                                            </button>
+                                            <button onClick={() => setTheme('chalkboard')} className={`p-4 rounded-xl border-2 flex flex-col items-center gap-2 transition-all ${theme === 'chalkboard' ? 'border-emerald-500 bg-emerald-900/20' : 'border-slate-700 bg-slate-900 hover:border-slate-500'}`}>
+                                                <div className="w-full h-8 bg-emerald-900 rounded"></div><span className="text-xs font-bold text-white">Kreda / Tablica</span>
+                                            </button>
+                                            <button onClick={() => setTheme('space')} className={`p-4 rounded-xl border-2 flex flex-col items-center gap-2 transition-all ${theme === 'space' ? 'border-purple-500 bg-purple-900/20' : 'border-slate-700 bg-slate-900 hover:border-slate-500'}`}>
+                                                <div className="w-full h-8 bg-slate-950 rounded border border-slate-800"></div><span className="text-xs font-bold text-white">Kosmos / Ciemny</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="flex items-center gap-3 pt-4 border-t border-slate-700/50">
+                                        <input type="checkbox" id="quiz" checked={includeQuiz} onChange={e => setIncludeQuiz(e.target.checked)} className="w-5 h-5 accent-blue-500 rounded" />
+                                        <label htmlFor="quiz" className="text-sm font-bold text-slate-300">Dodaj krótki Quiz na ostatnim slajdzie</label>
+                                    </div>
+
+                                    <button onClick={generateTextOutline} className="w-full mt-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white py-5 rounded-xl font-black text-lg shadow-lg flex justify-center items-center gap-2 transition-transform active:scale-95">
+                                        <i className="ph-bold ph-magic-wand"></i> Stwórz Plan Prezentacji
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Paywall Overlay */}
+                        {showPremiumModal && (
+                            <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+                                <div className="glass-panel p-8 rounded-3xl max-w-md w-full border border-blue-500/30 text-center">
+                                    <h3 className="text-2xl font-bold text-white mb-2">Konto Premium</h3>
+                                    <p className="text-sm text-slate-300 mb-6">Wykorzystałeś darmowe próby. Wpisz kod KAWA2024, aby generować prezentacje bez limitu.</p>
+                                    <input type="text" value={accessCode} onChange={e => setAccessCode(e.target.value)} placeholder="Wpisz kod..." className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-center text-lg font-mono text-white mb-4 outline-none focus:border-blue-500" />
+                                    <button onClick={handleVerifyCode} className="w-full bg-blue-600 text-white font-bold py-3.5 rounded-xl">Aktywuj</button>
+                                    <button onClick={() => setShowPremiumModal(false)} className="mt-4 text-xs text-slate-500">Zamknij</button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                );
+            }
+
+            // RENDER: Loading Overlays
+            if (step === 'generating_text') return (
+                <div className="min-h-screen flex items-center justify-center flex-col text-center px-4">
+                    <i className="ph ph-spinner-gap animate-spin text-7xl text-blue-500 mb-6"></i>
+                    <h2 className="text-2xl font-bold mb-2">Piszę scenariusz prezentacji...</h2>
+                    <p className="text-slate-400">Analizuję temat, dobieram słownictwo do wieku.</p>
+                </div>
+            );
+
+            if (step === 'generating_images') return (
+                <div className="min-h-screen flex items-center justify-center flex-col text-center px-4">
+                    <i className="ph-fill ph-palette animate-bounce text-7xl text-purple-500 mb-6"></i>
+                    <h2 className="text-2xl font-bold mb-2">Maluję obrazy do slajdów...</h2>
+                    <p className="text-slate-400 mb-8">AI wchodzi na najwyższe obroty twórcze.</p>
+                    <div className="w-full max-w-md h-3 bg-slate-800 rounded-full overflow-hidden border border-slate-700">
+                        <div className="h-full bg-gradient-to-r from-blue-500 to-purple-500 transition-all duration-300" style={{ width: `${loadingProgress}%` }}></div>
+                    </div>
+                    <p className="mt-2 text-xs font-bold text-slate-500">{loadingProgress}%</p>
+                </div>
+            );
+
+            // RENDER: Krok Korekty Tekstu
+            if (step === 'review') {
+                return (
+                    <div className="min-h-screen flex flex-col font-sans pt-20">
+                        <nav className="fixed top-0 w-full z-[100] glass-nav h-20 flex items-center px-6 border-b border-blue-500/30">
+                            <h1 className="text-xl font-bold text-white"><span className="text-blue-400">1. Krok:</span> Korekta Tekstu</h1>
+                            <button onClick={generateImages} className="ml-auto bg-blue-600 hover:bg-blue-500 text-white px-6 py-2.5 rounded-xl font-bold flex items-center gap-2 shadow-lg transition-transform active:scale-95">
+                                Akceptuję, generuj obrazy! <i className="ph-bold ph-arrow-right"></i>
+                            </button>
+                        </nav>
+                        <div className="max-w-5xl mx-auto px-4 py-10 w-full space-y-8">
+                            <p className="text-slate-400 text-center text-sm bg-slate-900 p-4 rounded-xl border border-slate-800">
+                                Przejrzyj plan zaproponowany przez AI. Możesz ręcznie edytować teksty, dodać własne notatki lub podmienić grafikę AI na własne zdjęcie z dysku.
+                            </p>
+                            
+                            {slides.map((slide, idx) => (
+                                <div key={idx} className="glass-panel rounded-2xl p-6 relative">
+                                    <div className="absolute top-0 left-0 bg-blue-600 text-white font-black px-4 py-1 rounded-br-xl rounded-tl-2xl text-xs">SLAJD {idx + 1}</div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+                                        <div className="space-y-4">
+                                            <input type="text" value={slide.title} onChange={e => {let s = [...slides]; s[idx].title = e.target.value; setSlides(s);}} className="w-full bg-slate-900 border border-slate-700 text-white text-lg font-bold rounded-lg p-3 outline-none focus:border-blue-500" />
+                                            <textarea rows="4" value={slide.bullets.join('\n')} onChange={e => {let s = [...slides]; s[idx].bullets = e.target.value.split('\n'); setSlides(s);}} className="w-full bg-slate-900 border border-slate-700 text-slate-300 text-sm rounded-lg p-3 outline-none focus:border-blue-500" />
+                                            <div className="bg-emerald-900/10 border border-emerald-500/20 p-3 rounded-lg">
+                                                <div className="text-[10px] text-emerald-400 font-bold uppercase mb-1">Sekretne Notatki Nauczyciela</div>
+                                                <textarea rows="2" value={slide.notes} onChange={e => {let s = [...slides]; s[idx].notes = e.target.value; setSlides(s);}} className="w-full bg-transparent text-slate-300 text-xs outline-none" />
+                                            </div>
+                                        </div>
+                                        <div className="bg-slate-900 border border-slate-700 rounded-xl p-4 flex flex-col items-center justify-center text-center relative overflow-hidden">
+                                            {slide.imageUrl ? (
+                                                <img src={slide.imageUrl} className="absolute inset-0 w-full h-full object-cover opacity-60" />
+                                            ) : (
+                                                <div className="text-slate-500 mb-3"><i className="ph-fill ph-image text-5xl"></i><p className="text-[10px] mt-2 font-mono break-words">{slide.imagePrompt}</p></div>
+                                            )}
+                                            
+                                            <div className="relative z-10 w-full mt-auto pt-4 flex gap-2 justify-center">
+                                                <button onClick={() => {setActiveUploadIndex(idx); fileInputRef.current.click();}} className="bg-slate-800 border border-slate-600 hover:bg-slate-700 text-xs font-bold px-4 py-2 rounded-lg transition-colors flex items-center gap-1 shadow-md"><i className="ph-bold ph-upload-simple"></i> Własne zdjęcie</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                        <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept="image/*" className="hidden" />
+                    </div>
+                );
+            }
+
+            // RENDER: Finalny Widok i Prezentacja
+            if (step === 'final') {
+                const currentSlide = slides[currentSlideIndex];
+                const isEven = currentSlideIndex % 2 === 0;
+
+                return (
+                    <div className="min-h-screen flex flex-col bg-slate-950">
+                        {toastMessage && <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[9999] bg-emerald-600 text-white px-6 py-3 rounded-full font-bold shadow-lg">{toastMessage}</div>}
+                        
+                        <nav className="glass-nav h-16 flex items-center justify-between px-6 border-b border-slate-800">
+                            <h1 className="text-lg font-bold text-white"><i className="ph-fill ph-check-circle text-emerald-400"></i> Gotowe!</h1>
+                            <div className="flex gap-3">
+                                <button onClick={toggleFullscreen} className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 transition-colors">
+                                    <i className="ph-bold ph-presentation-chart"></i> Tryb Kina
+                                </button>
+                                <button onClick={exportToPPTX} className="bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 transition-colors">
+                                    <i className="ph-bold ph-file-ppt"></i> Pobierz .PPTX
+                                </button>
+                                <button onClick={() => setStep('config')} className="text-slate-400 hover:text-white px-3 text-sm">Zacznij od nowa</button>
+                            </div>
+                        </nav>
+
+                        <div className="flex-1 flex overflow-hidden">
+                            {/* Panel Boczny - Notatki Nauczyciela */}
+                            <div className="w-80 bg-slate-900 border-r border-slate-800 p-6 overflow-y-auto hidden md:block">
+                                <h3 className="font-bold text-blue-400 uppercase tracking-widest text-xs mb-4">Sekretne Notatki</h3>
+                                <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-inner min-h-[200px] text-sm text-slate-300 leading-relaxed whitespace-pre-wrap">
+                                    {currentSlide.notes || "Brak notatek do tego slajdu."}
+                                </div>
+                                
+                                <h3 className="font-bold text-slate-500 uppercase tracking-widest text-xs mt-8 mb-4">Lista Slajdów</h3>
+                                <div className="space-y-2">
+                                    {slides.map((s, idx) => (
+                                        <div key={idx} onClick={() => setCurrentSlideIndex(idx)} className={`p-3 rounded-lg cursor-pointer text-xs font-bold border transition-colors ${currentSlideIndex === idx ? 'bg-blue-600/20 border-blue-500 text-blue-400' : 'bg-slate-950 border-slate-800 text-slate-500 hover:border-slate-600'}`}>
+                                            {idx + 1}. {s.title}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Główny obszar roboczy - podgląd slajdu */}
+                            <div className="flex-1 p-8 flex items-center justify-center bg-black/50 relative">
+                                
+                                {/* Ekran Slajdu (Miniatura) */}
+                                <div className={`theme-${theme} w-full max-w-[1280px] aspect-video relative rounded-lg overflow-hidden shadow-2xl slide-bg flex`}>
+                                    <div className={`flex-1 p-10 lg:p-16 flex flex-col justify-center z-10 relative ${isEven ? 'order-1' : 'order-2'}`}>
+                                        <h2 className="text-3xl lg:text-5xl font-black mb-8 slide-title pb-4">{currentSlide.title}</h2>
+                                        <ul className="space-y-4 lg:space-y-6">
+                                            {currentSlide.bullets.map((b, i) => (
+                                                <li key={i} className="text-xl lg:text-2xl flex items-start gap-4">
+                                                    <span className="text-blue-500 mt-1">●</span>
+                                                    <span>{b}</span>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                    <div className={`flex-1 relative ${isEven ? 'order-2' : 'order-1'}`}>
+                                        {currentSlide.imageUrl ? (
+                                            <img src={currentSlide.imageUrl} className="absolute inset-0 w-full h-full object-cover" />
+                                        ) : (
+                                            <div className="absolute inset-0 bg-slate-800 flex items-center justify-center text-slate-500">Brak obrazu</div>
+                                        )}
+                                        {/* Gradient overlay to blend image edge */}
+                                        <div className={`absolute inset-y-0 w-32 ${isEven ? 'left-0 bg-gradient-to-r' : 'right-0 bg-gradient-to-l'} from-inherit to-transparent`}></div>
+                                    </div>
+                                </div>
+
+                                {/* Kontrolki Slajdów */}
+                                <div className="absolute bottom-8 left-1/2 -translate-x-1/2 bg-slate-900 border border-slate-700 rounded-full flex items-center p-2 shadow-2xl gap-4">
+                                    <button onClick={() => setCurrentSlideIndex(p => Math.max(p - 1, 0))} disabled={currentSlideIndex === 0} className="w-10 h-10 rounded-full bg-slate-800 text-white flex items-center justify-center hover:bg-blue-600 disabled:opacity-30 transition-colors"><i className="ph-bold ph-caret-left"></i></button>
+                                    <span className="font-bold text-slate-400 min-w-[80px] text-center">{currentSlideIndex + 1} / {slides.length}</span>
+                                    <button onClick={() => setCurrentSlideIndex(p => Math.min(p + 1, slides.length - 1))} disabled={currentSlideIndex === slides.length - 1} className="w-10 h-10 rounded-full bg-slate-800 text-white flex items-center justify-center hover:bg-blue-600 disabled:opacity-30 transition-colors"><i className="ph-bold ph-caret-right"></i></button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* FULLSCREEN RENDERER */}
+                        <div ref={presentationRef} className={isFullscreen ? 'presentation-mode' : 'hidden'}>
+                            {isFullscreen && (
+                                <div className={`theme-${theme} slide-container slide-bg`}>
+                                    <div className={`flex-1 p-16 xl:p-24 flex flex-col justify-center z-10 relative ${isEven ? 'order-1' : 'order-2'}`}>
+                                        <h2 className="text-6xl xl:text-7xl font-black mb-12 slide-title pb-6 leading-tight">{currentSlide.title}</h2>
+                                        <ul className="space-y-8 xl:space-y-10">
+                                            {currentSlide.bullets.map((b, i) => (
+                                                <li key={i} className="text-3xl xl:text-4xl flex items-start gap-6 leading-relaxed">
+                                                    <span className="text-blue-500 mt-2">●</span>
+                                                    <span>{b}</span>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                    <div className={`flex-1 relative ${isEven ? 'order-2' : 'order-1'}`}>
+                                        {currentSlide.imageUrl && <img src={currentSlide.imageUrl} className="absolute inset-0 w-full h-full object-cover" />}
+                                    </div>
+                                    
+                                    {/* Subtelne wskazówki sterowania na pełnym ekranie */}
+                                    <div className="absolute bottom-4 right-6 text-slate-500/50 text-xs font-bold uppercase flex gap-4">
+                                        <span>Slajd {currentSlideIndex + 1}/{slides.length}</span>
+                                        <span>Użyj strzałek <i className="ph-bold ph-arrows-left-right"></i></span>
+                                        <span>ESC aby wyjść</span>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                );
+            }
+
+            return null; // fallback
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
