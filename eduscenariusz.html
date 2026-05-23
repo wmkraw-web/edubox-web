@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EduScenariusz AI - Generator Konspektów Lekcji</title>
+    <title>EduScenariusz PRO - EduBox AI</title>
     
     <!-- React & ReactDOM -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -18,16 +18,21 @@
     <!-- Phosphor Icons -->
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
 
-    <!-- Tailwind Config for Dark Mode & Accents -->
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Lora:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+
+    <!-- Tailwind Config -->
     <script>
         tailwind.config = {
             darkMode: 'class',
             theme: {
                 extend: {
+                    fontFamily: {
+                        sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+                        serif: ['Lora', 'serif'],
+                    },
                     colors: {
-                        slate: {
-                            950: '#020617',
-                        }
+                        slate: { 950: '#020617' }
                     }
                 }
             }
@@ -35,17 +40,16 @@
     </script>
 
     <style>
-        body {
-            background-color: #020617; /* slate-950 */
-            color: #f8fafc;
+        body { 
+            background-color: #020617; 
+            color: #f8fafc; 
             background-image: 
-                radial-gradient(at 0% 0%, rgba(139, 92, 246, 0.15) 0px, transparent 50%),
-                radial-gradient(at 100% 100%, rgba(16, 185, 129, 0.1) 0px, transparent 50%);
+                radial-gradient(at 0% 0%, rgba(16, 185, 129, 0.15) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(20, 184, 166, 0.1) 0px, transparent 50%);
             background-attachment: fixed;
             min-height: 100vh;
         }
 
-        /* Glassmorphism utilities */
         .glass-panel {
             background: rgba(30, 41, 59, 0.4);
             backdrop-filter: blur(16px);
@@ -57,37 +61,28 @@
         /* Custom Scrollbar */
         ::-webkit-scrollbar { width: 8px; }
         ::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.5); }
-        ::-webkit-scrollbar-thumb { background: rgba(71, 85, 105, 0.8); border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: rgba(100, 116, 139, 1); }
+        ::-webkit-scrollbar-thumb { background: rgba(16, 185, 129, 0.5); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(16, 185, 129, 0.8); }
 
-        /* Output Formatting */
-        .ai-output h3 { font-size: 1.25rem; font-weight: 600; color: #a78bfa; margin-top: 1.5rem; margin-bottom: 0.5rem; }
-        .ai-output p { margin-bottom: 0.75rem; line-height: 1.6; }
-        .ai-output ul { list-style-type: disc; padding-left: 1.5rem; margin-bottom: 1rem; }
-        .ai-output li { margin-bottom: 0.25rem; }
-        .ai-output strong { color: #f8fafc; }
+        .scenario-page { 
+            color: #1e293b; 
+        }
+
+        /* Animations */
+        @keyframes slide-up { 0% { opacity: 0; transform: translate(-50%, 20px); } 100% { opacity: 1; transform: translate(-50%, 0); } }
+        .animate-toast { animation: slide-up 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        @keyframes pop { 0% { transform: scale(0.9); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+        .bot-bubble { animation: pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+        @keyframes blink { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(0.1); } }
+        .bot-eye { animation: blink 4s infinite; transform-origin: center; }
 
         /* --- PRINT STYLES --- */
         @media print {
-            body {
-                background: white;
-                color: black;
-                background-image: none;
-            }
-            .no-print {
-                display: none !important;
-            }
-            .print-area {
-                width: 100%;
-                margin: 0;
-                padding: 0;
-                box-shadow: none;
-                border: none;
-                background: white;
-            }
-            .ai-output h3 { color: black; border-bottom: 1px solid #ccc; padding-bottom: 4px; }
-            .ai-output strong { color: black; }
-            @page { margin: 2cm; }
+            body { background: white; color: black; background-image: none; }
+            .no-print { display: none !important; }
+            #scenario-container { border: none !important; box-shadow: none !important; padding: 0 !important; margin: 0 !important; width: 100% !important; max-width: 100% !important; background: white !important; }
+            .page-break-inside-avoid { page-break-inside: avoid; }
+            @page { margin: 1.5cm; }
         }
     </style>
 </head>
@@ -95,31 +90,48 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useRef } = React;
+        const { useState, useEffect } = React;
+
+        const SAMPLES = {
+            wiosna: { title: "Wiosna budzi się do życia", duration: "45-50 minut", group: "5-6 latki", methods: "Aktywizująca i ruchowa", main_goal: "Rozwijanie wrażliwości na zmiany w przyrodzie oraz integracja grupy.", custom_goal: "Kształtowanie umiejętności uważnej obserwacji otoczenia.", phases: [ { step_name: "1. Powitanie i krąg poranny", time: "5-6 min", details: "Nauczyciel: 'Dzień dobry, moje małe ptaszki! Czy widzieliście dziś słońce?'\nUczniowie: Dzieci siadają w kręgu na dywanie i odpowiadają na powitanie." }, { step_name: "2. Burza mózgów", time: "10 min", details: "Nauczyciel: Rozkłada na dywanie ilustracje wiosennych kwiatów. 'Po czym poznajemy wiosnę?'\nUczniowie: Wskazują kwiaty i wymyślają skojarzenia." } ], materials: ["Kredki", "Szary papier", "Ilustracje kwiatów", "Głośnik bluetooth"], integration: "Język, Przyroda, Muzyka", weather_alternative: "Jeśli pada deszcz, zamiast spaceru robimy wiosenny kącik sensoryczny w sali z zebranych wcześniej liści i mchu.", adjustments: "Dla Jasia (Spektrum autyzmu): Zapewnienie słuchawek wyciszających podczas głośniejszej piosenki powitalnej. Wcześniejsze uprzedzenie o zmianie aktywności." }
+        };
+
+        const BotHelperAvatar = () => (
+            <svg viewBox="0 0 100 100" className="w-14 h-14 drop-shadow-md flex-shrink-0" xmlns="http://www.w3.org/2000/svg">
+                <path d="M50 30 V15" stroke="#94a3b8" strokeWidth="4" strokeLinecap="round"/>
+                <circle cx="50" cy="12" r="5" fill="#10b981"/>
+                <rect x="25" y="30" width="50" height="40" rx="12" fill="#047857"/>
+                <rect x="32" y="38" width="36" height="22" rx="6" fill="#ffffff"/>
+                <circle cx="40" cy="49" r="3.5" fill="#047857" className="bot-eye"/>
+                <circle cx="60" cy="49" r="3.5" fill="#047857" className="bot-eye"/>
+                <path d="M 45 56 Q 50 60 55 56" stroke="#047857" strokeWidth="2.5" fill="none" strokeLinecap="round"/>
+            </svg>
+        );
 
         const App = () => {
-            // State
-            const [subject, setSubject] = useState('');
-            const [topic, setTopic] = useState('');
-            const [gradeLevel, setGradeLevel] = useState('');
-            const [duration, setDuration] = useState('45');
-            const [methods, setMethods] = useState({
-                gamification: false,
-                spe: false,
-                project: false
-            });
-            const [objectives, setObjectives] = useState('');
-            
-            const [generatedPlan, setGeneratedPlan] = useState('');
-            const [isLoading, setIsLoading] = useState(false);
-            const [error, setError] = useState('');
-
             // Freemium State
             const [isPremium, setIsPremium] = useState(false);
             const [usagesLeft, setUsagesLeft] = useState(2);
             const [showPremiumModal, setShowPremiumModal] = useState(false);
-            const [promoCode, setPromoCode] = useState('');
-            const [promoError, setPromoError] = useState('');
+            const [accessCode, setAccessCode] = useState('');
+            const [toastMessage, setToastMessage] = useState('');
+            
+            // App State
+            const [isGenerating, setIsGenerating] = useState(false);
+            const [botQuickPrompt, setBotQuickPrompt] = useState('');
+            const [botMessage, setBotMessage] = useState("Cześć! Napisz mi jedno zdanie, np. 'Lekcja o dinozaurach dla 6 latków na 30 minut', a ja sam ustawię odpowiednie parametry!");
+
+            const [params, setParams] = useState({
+                topic: '',
+                age: '5-6 latki',
+                duration: '45-50 min',
+                methods: 'Aktywizująca i ruchowa',
+                needs: '',
+                formatType: 'detailed',
+                customGoal: ''
+            });
+
+            const [scenario, setScenario] = useState(null);
 
             // Load Freemium status on mount
             useEffect(() => {
@@ -137,306 +149,408 @@
                 }
             }, []);
 
-            const handlePromoSubmit = (e) => {
-                e.preventDefault();
-                if (promoCode.trim().toUpperCase() === 'KAWA2024') {
+            const showToast = (msg) => { setToastMessage(msg); setTimeout(() => setToastMessage(''), 4000); };
+
+            const handleVerifyCode = (e) => {
+                e?.preventDefault();
+                if (accessCode.trim().toUpperCase() === 'KAWA2024') { 
                     localStorage.setItem('edubox_premium_unlocked', 'true');
-                    setIsPremium(true);
+                    setIsPremium(true); 
                     setShowPremiumModal(false);
-                    setPromoError('');
+                    setAccessCode(''); 
+                    showToast('Odblokowano Premium! 🌟'); 
+                    setBotMessage("Świetnie! Dzięki Premium możesz generować nieograniczoną ilość epickich, wielostronicowych konspektów."); 
                 } else {
-                    setPromoError('Nieprawidłowy kod. Spróbuj ponownie.');
+                    showToast('Błędny kod dostępu!');
                 }
             };
 
-            const parseMarkdown = (text) => {
-                let html = text;
-                // Headers
-                html = html.replace(/^### (.*$)/gim, '<h3>$1</h3>');
-                html = html.replace(/^## (.*$)/gim, '<h3>$1</h3>');
-                // Bold
-                html = html.replace(/\*\*(.*?)\*\*/gim, '<strong>$1</strong>');
-                // Lists
-                html = html.replace(/^\* (.*$)/gim, '<ul><li>$1</li></ul>');
-                html = html.replace(/<\/ul>\n<ul>/gim, '\n');
-                return html;
+            const handleBotAutoFill = () => {
+                if(!botQuickPrompt.trim()) return;
+                
+                const text = botQuickPrompt.toLowerCase();
+                let newParams = { ...params };
+                let extractedTopic = botQuickPrompt;
+
+                // NLP Logic
+                if (text.includes('3 lat') || text.includes('4 lat') || text.includes('3-4')) newParams.age = '3-4 latki';
+                else if (text.includes('5 lat') || text.includes('6 lat') || text.includes('5-6')) newParams.age = '5-6 latki';
+                else if (text.includes('klasa 1') || text.includes('klasa 2') || text.includes('klasa 3') || text.includes('klas i')) newParams.age = 'Klasy I-III';
+                else if (text.includes('klasa 4') || text.includes('starsz')) newParams.age = 'Klasy IV-VIII';
+
+                if (text.includes('15') || text.includes('20')) newParams.duration = '15-20 min';
+                else if (text.includes('30') || text.includes('40')) newParams.duration = '30-40 min';
+                else if (text.includes('90') || text.includes('półtorej')) newParams.duration = '90 min';
+                else newParams.duration = '45-50 min';
+
+                if (text.includes('ruch') || text.includes('zabaw') || text.includes('aktyw')) newParams.methods = 'Aktywizująca i ruchowa';
+                else if (text.includes('pokaz') || text.includes('ogląd') || text.includes('obraz')) newParams.methods = 'Pokazowa / Obrazowa';
+                else if (text.includes('projekt') || text.includes('badacz')) newParams.methods = 'Metoda projektowa';
+                else if (text.includes('praktycz') || text.includes('doświadcz') || text.includes('eksperyment')) newParams.methods = 'Praktyczne działanie';
+                else if (text.includes('opowiad') || text.includes('czyt')) newParams.methods = 'Podająca (opowiadanie)';
+
+                if (text.includes('autyzm') || text.includes('asperger')) newParams.needs = 'Spektrum autyzmu';
+                if (text.includes('adhd') || text.includes('nadpobudli')) newParams.needs = 'ADHD (Nadpobudliwość)';
+
+                extractedTopic = extractedTopic.replace(/dla\s*\d+\s*lat[a-ząćęłńóśźż]*/gi, '')
+                                               .replace(/dla\s*(dzieci|klas|uczniów)\s*[a-z0-9-]*/gi, '')
+                                               .replace(/(przez\s*|na\s*)?\d+\s*min[a-ząćęłńóśźż]*/gi, '')
+                                               .replace(/metod[a-ząćęłńóśźż]*\s*[a-ząćęłńóśźż]+/gi, '')
+                                               .replace(/[,.]/g, '')
+                                               .replace(/\s+/g, ' ')
+                                               .trim();
+                
+                newParams.topic = extractedTopic || 'Zajęcia ogólne';
+
+                setParams(newParams);
+                setBotQuickPrompt('');
+                setBotMessage('Bum! 💥 Rozkodowałem Twój tekst i perfekcyjnie poustawiałem suwaki w konfiguratorze. Możesz generować!');
             };
 
-            const handleGenerate = async (e) => {
-                e.preventDefault();
-                
+            const generateScenario = async () => {
                 if (!isPremium && usagesLeft <= 0) {
                     setShowPremiumModal(true);
                     return;
                 }
 
-                if (!subject || !topic || !gradeLevel) {
-                    setError('Proszę wypełnić wymagane pola (Przedmiot, Temat, Klasa).');
-                    return;
-                }
+                if (!params.topic.trim()) return showToast('Wpisz najpierw temat zajęć!');
+                
+                setIsGenerating(true);
+                setBotMessage("Przeszukuję bazę metodyczną, tworzę haki na uwagę (hooks) i piszę dokładne skrypty. Chwileczkę...");
+                
+                let detailInstruction = params.formatType === 'detailed' 
+                    ? "Wymagam BARDZO ROZBUDOWANEGO konspektu. W sekcji 'phases' -> 'details' napisz dokładnie, wręcz z podziałem ról: co mówi Nauczyciel i co odpowiada Uczeń. Opisz dokładnie przebieg zabaw. Ten dokument ma być gotowcem kopiuj-wklej na zajęcia." 
+                    : "Wymagam ZWIĘZŁEGO konspektu (tylko główne, krótkie punkty). Bez długich opisów.";
 
-                setIsLoading(true);
-                setError('');
-                setGeneratedPlan('');
+                const systemPrompt = `Jesteś wybitnym polskim metodykiem edukacji. Odpowiadaj WYŁĄCZNIE w poprawnym formacie JSON.
+                ${detailInstruction}
+                Struktura JSON:
+                { 
+                    "title": "...", 
+                    "duration": "...", 
+                    "group": "...", 
+                    "methods": "...", 
+                    "main_goal": "...", 
+                    "custom_goal": "...", 
+                    "phases": [{ "step_name": "...", "time": "...", "details": "..." }], 
+                    "materials": ["..."], 
+                    "integration": "...", 
+                    "weather_alternative": "...", 
+                    "adjustments": "..." 
+                }`;
 
-                const prompt = `Jesteś doświadczonym nauczycielem metodykiem. Przygotuj profesjonalny konspekt lekcji na podstawie poniższych danych:
-- Przedmiot: ${subject}
-- Temat lekcji: ${topic}
-- Klasa: ${gradeLevel}
-- Czas trwania: ${duration} minut
-${objectives ? `- Główne cele lekcji: ${objectives}` : ''}
-${methods.gamification ? '- Uwzględnij elementy grywalizacji.' : ''}
-${methods.spe ? '- Zwróć szczególną uwagę na dostosowanie do uczniów ze Specjalnymi Potrzebami Edukacyjnymi (SPE).' : ''}
-${methods.project ? '- Oprzyj lekcję o pracę projektową/badawczą.' : ''}
-
-Struktura konspektu powinna zawierać (użyj znaczników Markdown np. ### dla nagłówków, ** dla pogrubień):
-1. Cele lekcji (ogólne i operacyjne - "uczeń potrafi...").
-2. Metody i formy pracy.
-3. Środki dydaktyczne.
-4. Przebieg lekcji (podzielony na fazę wstępną, realizacyjną i podsumowującą z orientacyjnym czasem trwania każdej z nich).
-5. Zadanie domowe (opcjonalnie).
-
-Pisz zwięźle, konkretnie, językiem profesjonalnym, gotowym do wydruku dla dyrekcji lub hospitacji.`;
+                const userPrompt = `Temat: ${params.topic}. Grupa: ${params.age}. Czas: ${params.duration}. Metoda: ${params.methods}. Potrzeby SPE: ${params.needs || 'Brak'}. Cel dodatkowy: ${params.customGoal || 'Brak'}. Zbuduj profesjonalny scenariusz.`;
 
                 try {
-                    const response = await fetch('/api/gemini', {
-                        method: 'POST',
+                    // UWAGA: Zakładam że w Vercel macie /api/chat wspierające format: "json"
+                    const res = await fetch('/api/chat', {
+                        method: 'POST', 
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ prompt })
+                        body: JSON.stringify({ prompt: userPrompt, system: systemPrompt, temperature: 0.4, format: "json", model: "gpt-4o-mini" })
                     });
+                    
+                    const data = await res.json();
+                    if (!res.ok) throw new Error(data.details || data.message || "Błąd z serwera");
 
-                    if (!response.ok) throw new Error('Błąd połączenia z serwerem AI.');
-                    
-                    const data = await response.json();
-                    
-                    if (data.response) {
-                        setGeneratedPlan(parseMarkdown(data.response));
-                        
-                        // Deduct usage
-                        if (!isPremium) {
-                            const newUsages = usagesLeft - 1;
-                            setUsagesLeft(newUsages);
-                            localStorage.setItem('eduscenariusz_usages', newUsages.toString());
-                        }
-                    } else {
-                        throw new Error('Pusta odpowiedź z serwera.');
+                    let cleanText = data.text;
+                    // Prosty parser na wypadek gdyby model zwrócił markdown ```json ... ```
+                    let jsonStr = cleanText.replace(/```json/gi, '').replace(/```/g, '').trim();
+                    if(jsonStr.indexOf('{') !== -1) jsonStr = jsonStr.substring(jsonStr.indexOf('{'), jsonStr.lastIndexOf('}') + 1);
+
+                    setScenario(JSON.parse(jsonStr));
+                    setBotMessage("Gotowe! Masz przed sobą genialny scenariusz. Kliknij pobierz do Worda, by go zapisać!");
+
+                    // Odejmij próbę po sukcesie
+                    if (!isPremium) {
+                        const newUsages = usagesLeft - 1;
+                        setUsagesLeft(newUsages);
+                        localStorage.setItem('eduscenariusz_usages', newUsages.toString());
                     }
-                } catch (err) {
-                    setError('Wystąpił błąd podczas generowania. Spróbuj ponownie później.');
-                    console.error(err);
-                } finally {
-                    setIsLoading(false);
+
+                } catch (error) {
+                    console.error(error); 
+                    showToast(`Błąd połączenia z AI. Spróbuj ponownie.`);
+                    setBotMessage("Ojej, serwer chwilowo odrzucił zapytanie. Spróbuj kliknąć wygeneruj jeszcze raz!");
+                } finally { 
+                    setIsGenerating(false); 
                 }
             };
 
-            const handlePrint = () => {
-                window.print();
+            const exportToWord = () => {
+                if(!scenario) return;
+                const content = document.getElementById('scenario-render-area').innerHTML;
+                const header = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>${scenario.title}</title><style>body {font-family: 'Times New Roman', serif; font-size: 11pt; line-height: 1.5;} h1 {font-size: 18pt; color: #047857; text-align: center; text-transform: uppercase; margin-bottom: 20px;} h2 {font-size: 14pt; border-bottom: 2px solid #10b981; padding-bottom: 5px; margin-top: 20px; color: #047857;} h3 {font-size: 12pt; color: #334155; margin-top: 15px;} b {color: #1e293b;} .box {background-color: #f8fafc; padding: 15px; border: 1px solid #cbd5e1; margin-bottom: 15px;}</style></head><body>`;
+                const footer = `</body></html>`;
+                const blob = new Blob(['\ufeff', header + content + footer], { type: 'application/msword' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = `Scenariusz_${scenario.title.replace(/\s+/g, '_')}.doc`;
+                link.click();
             };
 
             return (
-                <div className="container mx-auto px-4 py-8 max-w-7xl">
-                    {/* Header - No Print */}
-                    <header className="flex flex-col md:flex-row justify-between items-center mb-8 no-print glass-panel p-4 rounded-2xl">
-                        <div className="flex items-center gap-3 mb-4 md:mb-0">
-                            <div className="bg-fuchsia-500/20 p-2 rounded-lg text-fuchsia-400">
-                                <i className="ph ph-books text-3xl"></i>
-                            </div>
-                            <div>
-                                <h1 className="text-2xl font-bold text-slate-100 tracking-wide">EduScenariusz <span className="text-fuchsia-400">AI</span></h1>
-                                <p className="text-sm text-slate-400">Generator Konspektów Lekcji</p>
+                <div className="min-h-screen flex flex-col font-sans">
+                    {/* Toast Notification */}
+                    {toastMessage && (
+                        <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[200] bg-emerald-600 text-white px-6 py-3 rounded-2xl shadow-lg font-bold text-sm animate-toast flex items-center gap-2">
+                            <i className="ph-fill ph-info"></i> {toastMessage}
+                        </div>
+                    )}
+
+                    {/* Loading Overlay */}
+                    {isGenerating && (
+                        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-[100] flex flex-col items-center justify-center text-white no-print">
+                            <div className="glass-panel p-10 rounded-3xl flex flex-col items-center space-y-6 max-w-sm">
+                                <i className="ph ph-spinner-gap animate-spin text-5xl text-emerald-500"></i>
+                                <div className="text-center">
+                                    <h3 className="text-xl font-bold mb-2">AI układa metodykę...</h3>
+                                    <p className="text-xs text-slate-400 font-medium">To potrwa kilkanaście sekund.</p>
+                                </div>
                             </div>
                         </div>
-                        <div className="flex items-center gap-4">
-                            {!isPremium && (
-                                <div className="text-sm px-4 py-2 rounded-full border border-slate-700 bg-slate-800/50 flex items-center gap-2">
-                                    <i className="ph ph-lightning text-yellow-400"></i>
-                                    <span>Pozostało prób: <strong className={usagesLeft > 0 ? "text-white" : "text-red-400"}>{usagesLeft}</strong></span>
+                    )}
+
+                    {/* Navbar */}
+                    <header className="w-full z-50 glass-panel border-b-0 border-slate-800/50 py-4 px-6 no-print sticky top-0">
+                        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+                            <div className="flex items-center space-x-3">
+                                <div className="bg-emerald-500/20 p-2 rounded-xl text-emerald-400">
+                                    <i className="ph-fill ph-books text-2xl"></i>
                                 </div>
-                            )}
-                            <a href="index.html" className="flex items-center gap-2 text-slate-300 hover:text-white transition-colors text-sm font-medium bg-slate-800/50 px-4 py-2 rounded-xl border border-slate-700/50 hover:bg-slate-700/50">
-                                <i className="ph ph-arrow-left"></i> Wróć do Portfolio
-                            </a>
+                                <div>
+                                    <h1 className="text-xl font-extrabold tracking-tight">EduScenariusz <span className="text-emerald-500">PRO</span></h1>
+                                </div>
+                            </div>
+                            
+                            <div className="flex items-center gap-4">
+                                {!isPremium && (
+                                    <div className="text-sm px-4 py-2 rounded-xl border border-slate-700 bg-slate-900 flex items-center gap-2">
+                                        <i className="ph-fill ph-lightning text-yellow-400"></i>
+                                        <span>Darmowe próby: <strong className={usagesLeft > 0 ? "text-emerald-400" : "text-red-400"}>{usagesLeft}</strong></span>
+                                    </div>
+                                )}
+                                <a href="index.html" className="flex items-center gap-2 text-slate-300 hover:text-white transition-colors text-sm font-medium bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-xl border border-slate-700">
+                                    <i className="ph-bold ph-arrow-left"></i> Portfolio
+                                </a>
+                            </div>
                         </div>
                     </header>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                    <div className="max-w-7xl mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-12 gap-8 w-full">
                         
-                        {/* LEFT COLUMN: Input Form - No Print */}
+                        {/* LEFT COLUMN: Input Form */}
                         <div className="lg:col-span-4 space-y-6 no-print">
-                            <form onSubmit={handleGenerate} className="glass-panel p-6 rounded-2xl">
-                                <h2 className="text-lg font-semibold mb-6 flex items-center gap-2 text-slate-200">
-                                    <i className="ph ph-sliders-horizontal text-fuchsia-400"></i> Parametry lekcji
+                            
+                            {/* EduBot Auto-Fill */}
+                            <div className="glass-panel p-6 rounded-2xl space-y-4 relative overflow-hidden">
+                                <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 blur-3xl rounded-full"></div>
+                                <h2 className="font-bold flex items-center text-emerald-400 text-sm uppercase tracking-widest border-b border-slate-700/50 pb-4">
+                                    <i className="ph-bold ph-magic-wand mr-2 text-lg"></i> Auto-Wypełnianie
                                 </h2>
+                                <div className="flex bg-slate-900/80 p-1.5 rounded-xl border border-slate-700 focus-within:border-emerald-500 transition-colors">
+                                    <input 
+                                        type="text" 
+                                        value={botQuickPrompt} 
+                                        onChange={(e) => setBotQuickPrompt(e.target.value)} 
+                                        onKeyPress={(e) => e.key === 'Enter' && handleBotAutoFill()} 
+                                        placeholder="np. Lekcja o ułamkach na 45 min..." 
+                                        className="flex-1 bg-transparent px-3 text-sm outline-none font-medium text-white placeholder-slate-500"
+                                    />
+                                    <button onClick={handleBotAutoFill} className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-4 py-2 rounded-lg transition-colors">Analizuj</button>
+                                </div>
+                            </div>
 
+                            {/* EduBot Dialogue */}
+                            <div className="p-5 rounded-2xl border border-emerald-500/30 flex items-start gap-4 bg-emerald-900/10">
+                                <BotHelperAvatar />
+                                <div className="flex-1 pt-1">
+                                    <h4 className="font-black text-xs uppercase tracking-widest mb-1 text-emerald-500">EduBot Metodyk</h4>
+                                    <p className="text-sm font-medium leading-relaxed text-slate-300 bot-bubble" key={botMessage}>{botMessage}</p>
+                                </div>
+                            </div>
+
+                            {/* Konfigurator */}
+                            <div className="glass-panel p-6 rounded-2xl space-y-5">
+                                <h2 className="font-bold flex items-center text-slate-200 text-sm uppercase tracking-widest border-b border-slate-700/50 pb-4">
+                                    <i className="ph-bold ph-sliders-horizontal mr-2 text-emerald-500 text-lg"></i> Parametry Lekcji
+                                </h2>
+                                
                                 <div className="space-y-4">
                                     <div>
-                                        <label className="block text-sm font-medium text-slate-300 mb-1">Przedmiot *</label>
-                                        <input type="text" value={subject} onChange={e => setSubject(e.target.value)} placeholder="np. Historia, Język polski" className="w-full bg-slate-900/50 border border-slate-700 rounded-xl px-4 py-2.5 text-slate-100 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/50 placeholder-slate-500" required />
+                                        <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Temat zajęć *</label>
+                                        <input type="text" value={params.topic} onChange={e => setParams({...params, topic: e.target.value})} placeholder="np. Przyczyny I wojny światowej" className="w-full p-3 bg-slate-900/80 border border-slate-700 rounded-xl outline-none text-white text-sm focus:border-emerald-500 transition-colors" />
                                     </div>
                                     
-                                    <div>
-                                        <label className="block text-sm font-medium text-slate-300 mb-1">Temat lekcji *</label>
-                                        <textarea value={topic} onChange={e => setTopic(e.target.value)} rows="2" placeholder="np. Przyczyny wybuchu I wojny światowej" className="w-full bg-slate-900/50 border border-slate-700 rounded-xl px-4 py-2.5 text-slate-100 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/50 placeholder-slate-500" required></textarea>
-                                    </div>
-
-                                    <div className="grid grid-cols-2 gap-4">
+                                    <div className="grid grid-cols-2 gap-3">
                                         <div>
-                                            <label className="block text-sm font-medium text-slate-300 mb-1">Klasa *</label>
-                                            <input type="text" value={gradeLevel} onChange={e => setGradeLevel(e.target.value)} placeholder="np. 6 SP" className="w-full bg-slate-900/50 border border-slate-700 rounded-xl px-4 py-2.5 text-slate-100 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/50 placeholder-slate-500" required />
+                                            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Wiek</label>
+                                            <select value={params.age} onChange={e => setParams({...params, age: e.target.value})} className="w-full p-3 bg-slate-900/80 border border-slate-700 rounded-xl outline-none text-white text-sm focus:border-emerald-500">
+                                                <option>3-4 latki</option><option>5-6 latki</option><option>Klasy I-III</option><option>Klasy IV-VIII</option>
+                                            </select>
                                         </div>
                                         <div>
-                                            <label className="block text-sm font-medium text-slate-300 mb-1">Czas (min)</label>
-                                            <select value={duration} onChange={e => setDuration(e.target.value)} className="w-full bg-slate-900/50 border border-slate-700 rounded-xl px-4 py-2.5 text-slate-100 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/50 appearance-none">
-                                                <option value="45">45 minut</option>
-                                                <option value="90">90 minut</option>
+                                            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Czas</label>
+                                            <select value={params.duration} onChange={e => setParams({...params, duration: e.target.value})} className="w-full p-3 bg-slate-900/80 border border-slate-700 rounded-xl outline-none text-white text-sm focus:border-emerald-500">
+                                                <option>15-20 min</option><option>30-40 min</option><option>45-50 min</option><option>90 min</option>
                                             </select>
                                         </div>
                                     </div>
 
                                     <div>
-                                        <label className="block text-sm font-medium text-slate-300 mb-1">Główne cele (opcjonalnie)</label>
-                                        <textarea value={objectives} onChange={e => setObjectives(e.target.value)} rows="2" placeholder="Na czym najbardziej Ci zależy?" className="w-full bg-slate-900/50 border border-slate-700 rounded-xl px-4 py-2.5 text-slate-100 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/50 placeholder-slate-500"></textarea>
+                                        <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Metoda główna</label>
+                                        <select value={params.methods} onChange={e => setParams({...params, methods: e.target.value})} className="w-full p-3 bg-slate-900/80 border border-slate-700 rounded-xl outline-none text-white text-sm focus:border-emerald-500">
+                                            <option>Aktywizująca i ruchowa</option><option>Pokazowa / Obrazowa</option><option>Metoda projektowa</option><option>Praktyczne działanie</option><option>Podająca (opowiadanie)</option>
+                                        </select>
                                     </div>
 
-                                    <div className="pt-4 border-t border-slate-700/50">
-                                        <p className="block text-sm font-medium text-slate-300 mb-3">Opcje dodatkowe</p>
-                                        
-                                        <label className="flex items-center gap-3 mb-2 cursor-pointer group">
-                                            <div className="relative flex items-center justify-center">
-                                                <input type="checkbox" checked={methods.gamification} onChange={e => setMethods({...methods, gamification: e.target.checked})} className="peer sr-only" />
-                                                <div className="w-5 h-5 border border-slate-600 rounded bg-slate-900/50 peer-checked:bg-fuchsia-500 peer-checked:border-fuchsia-500 transition-colors"></div>
-                                                <i className="ph-bold ph-check text-white absolute opacity-0 peer-checked:opacity-100 text-xs pointer-events-none"></i>
-                                            </div>
-                                            <span className="text-sm text-slate-400 group-hover:text-slate-200 transition-colors">Włącz elementy grywalizacji</span>
-                                        </label>
-
-                                        <label className="flex items-center gap-3 mb-2 cursor-pointer group">
-                                            <div className="relative flex items-center justify-center">
-                                                <input type="checkbox" checked={methods.spe} onChange={e => setMethods({...methods, spe: e.target.checked})} className="peer sr-only" />
-                                                <div className="w-5 h-5 border border-slate-600 rounded bg-slate-900/50 peer-checked:bg-fuchsia-500 peer-checked:border-fuchsia-500 transition-colors"></div>
-                                                <i className="ph-bold ph-check text-white absolute opacity-0 peer-checked:opacity-100 text-xs pointer-events-none"></i>
-                                            </div>
-                                            <span className="text-sm text-slate-400 group-hover:text-slate-200 transition-colors">Dostosuj dla uczniów ze SPE</span>
-                                        </label>
-
-                                        <label className="flex items-center gap-3 cursor-pointer group">
-                                            <div className="relative flex items-center justify-center">
-                                                <input type="checkbox" checked={methods.project} onChange={e => setMethods({...methods, project: e.target.checked})} className="peer sr-only" />
-                                                <div className="w-5 h-5 border border-slate-600 rounded bg-slate-900/50 peer-checked:bg-fuchsia-500 peer-checked:border-fuchsia-500 transition-colors"></div>
-                                                <i className="ph-bold ph-check text-white absolute opacity-0 peer-checked:opacity-100 text-xs pointer-events-none"></i>
-                                            </div>
-                                            <span className="text-sm text-slate-400 group-hover:text-slate-200 transition-colors">Metoda projektu / badawcza</span>
-                                        </label>
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Dostosowanie (SPE) - opcjonalnie</label>
+                                        <input type="text" value={params.needs} onChange={e => setParams({...params, needs: e.target.value})} placeholder="np. dziecko ze spektrum autyzmu" className="w-full p-3 bg-slate-900/80 border border-slate-700 rounded-xl outline-none text-white text-sm focus:border-emerald-500 transition-colors" />
+                                    </div>
+                                    
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Format Generowania</label>
+                                        <select value={params.formatType} onChange={e => setParams({...params, formatType: e.target.value})} className="w-full p-3 bg-emerald-900/20 border border-emerald-500/50 rounded-xl outline-none text-emerald-300 font-bold text-sm focus:border-emerald-500">
+                                            <option value="detailed" className="bg-slate-900">📜 Epicki (Kopiuj-Wklej, szczegółowy)</option>
+                                            <option value="concise" className="bg-slate-900">📝 Zwięzły Szkic (Tylko punkty)</option>
+                                        </select>
                                     </div>
                                 </div>
-
-                                {error && <div className="mt-4 p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-sm rounded-lg flex items-start gap-2"><i className="ph ph-warning-circle text-lg mt-0.5"></i> {error}</div>}
-
+                                
                                 <button 
-                                    type="submit" 
-                                    disabled={isLoading}
-                                    className={`w-full mt-6 py-3 rounded-xl font-medium text-white shadow-lg transition-all flex items-center justify-center gap-2
-                                        ${isLoading ? 'bg-slate-700 cursor-not-allowed' : 'bg-gradient-to-r from-fuchsia-600 to-indigo-600 hover:from-fuchsia-500 hover:to-indigo-500 hover:shadow-fuchsia-500/25'}`}
+                                    onClick={generateScenario} 
+                                    className="w-full mt-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white py-3.5 rounded-xl font-bold text-sm tracking-wide shadow-lg flex justify-center items-center gap-2 transition-all active:scale-95"
                                 >
-                                    {isLoading ? (
-                                        <><i className="ph ph-spinner animate-spin text-xl"></i> Generowanie AI...</>
-                                    ) : (
-                                        <><i className="ph ph-magic-wand text-xl"></i> Generuj Scenariusz</>
-                                    )}
+                                    <i className="ph-bold ph-sparkle text-lg"></i> Generuj Konspekt
                                 </button>
                                 
                                 {!isPremium && usagesLeft <= 0 && (
-                                    <p className="text-center text-xs text-slate-500 mt-3 cursor-pointer hover:text-fuchsia-400" onClick={() => setShowPremiumModal(true)}>
-                                        Wyczerpano darmowe próby. Kliknij, aby odblokować.
+                                    <p className="text-center text-xs text-slate-400 mt-2 cursor-pointer hover:text-emerald-400 transition-colors" onClick={() => setShowPremiumModal(true)}>
+                                        Brak prób. Kliknij, aby odblokować kodem.
                                     </p>
                                 )}
-                            </form>
+                            </div>
+
+                            {/* Demo Buttons */}
+                            <div className="flex gap-2">
+                                <button onClick={() => setScenario(SAMPLES.wiosna)} className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold py-3 px-3 rounded-xl transition-colors border border-slate-700 flex items-center justify-center gap-2"><i className="ph-fill ph-flower-tulip text-pink-400"></i> Demo: Wiosna</button>
+                            </div>
                         </div>
 
-                        {/* RIGHT COLUMN: Output Area */}
-                        <div className="lg:col-span-8">
-                            <div className={`glass-panel p-8 rounded-2xl min-h-[600px] print-area ${!generatedPlan && !isLoading ? 'flex items-center justify-center' : ''}`}>
+                        {/* RIGHT COLUMN: Output / Render Area */}
+                        <div className="lg:col-span-8 flex justify-center items-start overflow-x-auto pb-10 print:block">
+                            <div className="w-full max-w-[210mm] print:max-w-full">
                                 
-                                {!generatedPlan && !isLoading && (
-                                    <div className="text-center text-slate-500 no-print flex flex-col items-center">
-                                        <div className="w-20 h-20 mb-4 rounded-full bg-slate-800/50 flex items-center justify-center border border-slate-700/50">
-                                            <i className="ph ph-file-text text-4xl text-slate-600"></i>
-                                        </div>
-                                        <p>Wypełnij formularz po lewej stronie i kliknij "Generuj",<br/>aby stworzyć profesjonalny konspekt lekcji.</p>
-                                    </div>
-                                )}
+                                {/* Export Controls */}
+                                <div className={`flex justify-end gap-3 mb-4 no-print transition-opacity duration-300 ${scenario ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+                                    <button onClick={exportToWord} className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-all text-sm shadow-lg active:scale-95">
+                                        <i className="ph-bold ph-file-doc text-lg"></i> Pobierz .docx
+                                    </button>
+                                    <button onClick={() => window.print()} className="bg-slate-700 hover:bg-slate-600 text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-all text-sm active:scale-95">
+                                        <i className="ph-bold ph-printer text-lg"></i> PDF / Drukuj
+                                    </button>
+                                </div>
 
-                                {isLoading && (
-                                    <div className="h-full flex flex-col items-center justify-center text-slate-400 space-y-4 no-print">
-                                        <div className="relative w-16 h-16">
-                                            <div className="absolute inset-0 rounded-full border-t-2 border-fuchsia-500 animate-spin"></div>
-                                            <div className="absolute inset-2 rounded-full border-r-2 border-indigo-500 animate-spin" style={{animationDirection: 'reverse'}}></div>
-                                            <i className="ph ph-brain absolute inset-0 flex items-center justify-center text-2xl text-fuchsia-400"></i>
+                                {/* A4 Document Container */}
+                                <div id="scenario-container" className="bg-white shadow-2xl p-10 md:p-14 scenario-page text-slate-900 rounded-sm min-h-[297mm] font-serif border border-slate-200">
+                                    
+                                    {!scenario ? (
+                                        <div className="h-full flex flex-col items-center justify-center text-slate-400 opacity-60 no-print mt-32">
+                                            <i className="ph-thin ph-file-dashed text-7xl mb-4"></i>
+                                            <p className="font-sans text-center">Wypełnij formularz po lewej stronie,<br/>aby wygenerować gotowy do wydruku dokument.</p>
                                         </div>
-                                        <p className="animate-pulse">Sztuczna inteligencja opracowuje metodykę...</p>
-                                    </div>
-                                )}
-
-                                {generatedPlan && !isLoading && (
-                                    <div className="w-full">
-                                        <div className="flex justify-between items-start mb-8 pb-4 border-b border-slate-700/50 no-print">
-                                            <div>
-                                                <h2 className="text-xl font-bold text-slate-100">Twój Scenariusz Lekcji</h2>
-                                                <p className="text-sm text-slate-400">Gotowy do wydruku lub skopiowania</p>
+                                    ) : (
+                                        <div id="scenario-render-area">
+                                            {/* Header */}
+                                            <div className="border-b-2 border-emerald-600 pb-6 mb-8 text-center">
+                                                <div className="text-xs font-sans font-black uppercase tracking-widest mb-2 opacity-60 text-emerald-800">Scenariusz Lekcji</div>
+                                                <h1 className="text-2xl md:text-3xl font-bold text-slate-900 mb-4 uppercase leading-tight">{scenario.title}</h1>
+                                                <div className="flex justify-center gap-8 border-t border-slate-200 pt-3 font-sans">
+                                                    <div className="text-xs font-bold text-slate-500 uppercase flex flex-col items-center"><span>Grupa:</span><span className="text-emerald-700 text-sm">{scenario.group}</span></div>
+                                                    <div className="text-xs font-bold text-slate-500 uppercase flex flex-col items-center"><span>Czas:</span><span className="text-emerald-700 text-sm">{scenario.duration}</span></div>
+                                                </div>
                                             </div>
-                                            <button onClick={handlePrint} className="bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 px-4 py-2 rounded-xl flex items-center gap-2 transition-colors">
-                                                <i className="ph ph-printer"></i> Drukuj / PDF
-                                            </button>
-                                        </div>
-                                        
-                                        {/* Printable Document Header (Only visible in output) */}
-                                        <div className="mb-6 hidden print:block text-black">
-                                            <h1 className="text-2xl font-bold text-center mb-4 uppercase tracking-wider">Konspekt Lekcji</h1>
-                                            <div className="grid grid-cols-2 gap-2 text-sm border-b border-black pb-4">
-                                                <div><strong>Przedmiot:</strong> {subject}</div>
-                                                <div><strong>Klasa:</strong> {gradeLevel}</div>
-                                                <div className="col-span-2"><strong>Temat:</strong> {topic}</div>
-                                                <div><strong>Czas trwania:</strong> {duration} min</div>
+                                            
+                                            <div className="space-y-8 text-[15px] leading-relaxed">
+                                                {/* Section 1: Goals */}
+                                                <section>
+                                                    <h2 className="text-lg font-bold font-sans text-emerald-700 uppercase border-l-4 border-emerald-500 pl-3 mb-4 bg-emerald-50/50 py-1">I. Cele i założenia</h2>
+                                                    <div className="pl-4 space-y-2">
+                                                        <div><span className="font-bold">Cel główny: </span>{scenario.main_goal}</div>
+                                                        {scenario.custom_goal && scenario.custom_goal !== 'Brak' && <div><span className="font-bold">Cel dodatkowy: </span>{scenario.custom_goal}</div>}
+                                                        <div><span className="font-bold">Metody i formy pracy: </span>{scenario.methods}</div>
+                                                    </div>
+                                                </section>
+                                                
+                                                {/* Section 2: Script */}
+                                                <section>
+                                                    <h2 className="text-lg font-bold font-sans text-emerald-700 uppercase border-l-4 border-emerald-500 pl-3 mb-6 bg-emerald-50/50 py-1">II. Przebieg zajęć</h2>
+                                                    <div className="space-y-5">
+                                                        {scenario.phases?.map((phase, idx) => (
+                                                            <div key={idx} className="page-break-inside-avoid">
+                                                                <div className="flex items-baseline gap-2 mb-2">
+                                                                    <h3 className="font-bold text-slate-900 font-sans">{phase.step_name}</h3>
+                                                                    <span className="text-[11px] font-sans font-bold text-white bg-slate-700 px-2 py-0.5 rounded-md">~{phase.time}</span>
+                                                                </div>
+                                                                <div className="pl-4 border-l-2 border-slate-200 whitespace-pre-wrap text-slate-800">
+                                                                    {phase.details}
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </section>
+
+                                                {/* Section 3: Additions */}
+                                                {(scenario.materials?.length > 0 || scenario.integration || scenario.weather_alternative || scenario.adjustments) && (
+                                                    <section className="mt-10 border-t border-slate-300 pt-6 page-break-inside-avoid font-sans text-sm">
+                                                        <h2 className="text-base font-bold text-slate-800 uppercase mb-4">Informacje Dodatkowe</h2>
+                                                        <div className="space-y-2 bg-slate-50 p-4 rounded-lg border border-slate-200">
+                                                            {scenario.materials?.length > 0 && <div><span className="font-bold text-slate-700">Materiały: </span> {Array.isArray(scenario.materials) ? scenario.materials.join(', ') : scenario.materials}</div>}
+                                                            {scenario.integration && scenario.integration !== 'Brak' && <div><span className="font-bold text-slate-700">Korelacja: </span> {scenario.integration}</div>}
+                                                            {scenario.weather_alternative && scenario.weather_alternative !== 'Brak' && <div><span className="font-bold text-slate-700">Alternatywa: </span> {scenario.weather_alternative}</div>}
+                                                        </div>
+
+                                                        {scenario.adjustments && scenario.adjustments !== "Brak" && (
+                                                            <div className="bg-yellow-50 rounded-lg p-4 border border-yellow-200 mt-4">
+                                                                <h3 className="text-xs font-bold text-yellow-800 uppercase mb-1">Dostosowanie (SPE)</h3>
+                                                                <p className="text-yellow-900">{scenario.adjustments}</p>
+                                                            </div>
+                                                        )}
+                                                    </section>
+                                                )}
                                             </div>
                                         </div>
-
-                                        {/* Rendered Markdown output */}
-                                        <div 
-                                            className="ai-output text-slate-300 print:text-black text-justify"
-                                            dangerouslySetInnerHTML={{ __html: generatedPlan }}
-                                        />
-                                    </div>
-                                )}
+                                    )}
+                                </div>
                             </div>
                         </div>
                     </div>
 
                     {/* FREEMIUM MODAL */}
                     {showPremiumModal && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm no-print">
-                            <div className="glass-panel p-8 rounded-2xl max-w-md w-full border border-fuchsia-500/30 relative">
-                                <button onClick={() => setShowPremiumModal(false)} className="absolute top-4 right-4 text-slate-400 hover:text-white">
-                                    <i className="ph ph-x text-xl"></i>
+                        <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm no-print">
+                            <div className="glass-panel p-8 rounded-3xl max-w-md w-full border border-emerald-500/30 relative shadow-2xl">
+                                <button onClick={() => setShowPremiumModal(false)} className="absolute top-4 right-4 text-slate-400 hover:text-white transition-colors">
+                                    <i className="ph-bold ph-x text-xl"></i>
                                 </button>
                                 
                                 <div className="text-center mb-6">
-                                    <div className="w-16 h-16 bg-fuchsia-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                                        <i className="ph ph-lock-key text-3xl text-fuchsia-400"></i>
+                                    <div className="w-16 h-16 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-emerald-500/50">
+                                        <i className="ph-fill ph-lock-key text-3xl text-emerald-400"></i>
                                     </div>
-                                    <h3 className="text-xl font-bold text-white mb-2">Odblokuj Pełen Dostęp</h3>
-                                    <p className="text-sm text-slate-300">Wyczerpałeś darmowe próby generowania scenariuszy. Wprowadź kod dostępu <span className="text-fuchsia-400 font-mono font-bold">KAWA2024</span>, aby używać bez limitu.</p>
+                                    <h3 className="text-xl font-bold text-white mb-2">Odblokuj EduScenariusz PRO</h3>
+                                    <p className="text-sm text-slate-300">Wyczerpałeś darmowe pakiety startowe. Wprowadź kod <span className="text-emerald-400 font-mono font-bold px-1 bg-slate-800 rounded">KAWA2024</span>, aby generować pliki do Worda bez limitu.</p>
                                 </div>
 
-                                <form onSubmit={handlePromoSubmit}>
+                                <form onSubmit={handleVerifyCode}>
                                     <input 
                                         type="text" 
-                                        value={promoCode} 
-                                        onChange={e => setPromoCode(e.target.value)}
+                                        value={accessCode} 
+                                        onChange={e => setAccessCode(e.target.value)}
                                         placeholder="Wpisz kod tutaj..." 
-                                        className="w-full bg-slate-900/80 border border-slate-700 rounded-xl px-4 py-3 text-center text-lg font-mono text-white mb-4 focus:outline-none focus:border-fuchsia-500 uppercase tracking-widest"
+                                        className="w-full bg-slate-900/80 border border-slate-700 rounded-xl px-4 py-3 text-center text-lg font-mono text-white mb-4 focus:outline-none focus:border-emerald-500 uppercase tracking-widest"
                                     />
-                                    {promoError && <p className="text-red-400 text-sm text-center mb-4">{promoError}</p>}
-                                    <button type="submit" className="w-full bg-fuchsia-600 hover:bg-fuchsia-500 text-white font-medium py-3 rounded-xl transition-colors">
+                                    <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3.5 rounded-xl transition-colors shadow-lg">
                                         Aktywuj Dostęp
                                     </button>
                                 </form>
