@@ -1,17 +1,26 @@
 export default async function handler(req, res) {
-  // Akceptujemy tylko zapytania POST
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Metoda niedozwolona' });
   }
 
-  const { prompt } = req.body;
+  // Odczytujemy prompt ORAZ wybrany format z frontendu
+  const { prompt, aspect_ratio } = req.body;
 
   if (!prompt) {
     return res.status(400).json({ message: 'Brak polecenia (promptu)' });
   }
 
+  // Mapujemy Twoje opcje z frontendu na formaty akceptowane przez Fal.ai (Flux)
+  // Dostępne w Fal/Flux: "square_hd", "16:9", "4:3", "3:2", "2:3", "9:16"
+  let falAspectRatio = "square_hd"; // Domyślnie
+  
+  if (aspect_ratio === '3:4') {
+    falAspectRatio = "3:4"; // Pionowy plakat
+  } else if (aspect_ratio === '4:3') {
+    falAspectRatio = "4:3"; // Poziomy
+  }
+
   try {
-    // Łączymy się z szybkim serwerem Fal.ai (model Schnell)
     const response = await fetch('https://fal.run/fal-ai/flux/schnell', {
       method: 'POST',
       headers: {
@@ -20,7 +29,7 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         prompt: prompt,
-        image_size: "square_hd",
+        image_size: falAspectRatio, // Teraz to będzie dynamiczne!
         num_inference_steps: 4, 
         num_images: 1,
         enable_safety_checker: true
