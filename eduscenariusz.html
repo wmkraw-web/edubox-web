@@ -165,46 +165,51 @@
                 }
             };
 
-            const handleBotAutoFill = () => {
+            const handleBotAutoFill = (e) => {
+                if(e) e.preventDefault();
                 if(!botQuickPrompt.trim()) return;
                 
                 const text = botQuickPrompt.toLowerCase();
                 let newParams = { ...params };
                 let extractedTopic = botQuickPrompt;
 
-                // NLP Logic
-                if (text.includes('3 lat') || text.includes('4 lat') || text.includes('3-4')) newParams.age = '3-4 latki';
-                else if (text.includes('5 lat') || text.includes('6 lat') || text.includes('5-6')) newParams.age = '5-6 latki';
-                else if (text.includes('klasa 1') || text.includes('klasa 2') || text.includes('klasa 3') || text.includes('klas i')) newParams.age = 'Klasy I-III';
-                else if (text.includes('klasa 4') || text.includes('starsz')) newParams.age = 'Klasy IV-VIII';
+                // Ulepszona logika NLP
+                if (text.match(/3.*lat|4.*lat|3-4/)) newParams.age = '3-4 latki';
+                else if (text.match(/5.*lat|6.*lat|5-6/)) newParams.age = '5-6 latki';
+                else if (text.match(/klas.*1|klas.*2|klas.*3|klas.*i|klas.*ii|pierwsz|drug|trzeci/)) newParams.age = 'Klasy I-III';
+                else if (text.match(/klas.*4|klas.*5|klas.*6|klas.*7|klas.*8|starsz|czwart|piąt/)) newParams.age = 'Klasy IV-VIII';
 
-                if (text.includes('15') || text.includes('20')) newParams.duration = '15-20 min';
-                else if (text.includes('30') || text.includes('40')) newParams.duration = '30-40 min';
-                else if (text.includes('90') || text.includes('półtorej')) newParams.duration = '90 min';
-                else newParams.duration = '45-50 min';
+                if (text.match(/15|20/)) newParams.duration = '15-20 min';
+                else if (text.match(/30|40/)) newParams.duration = '30-40 min';
+                else if (text.match(/90|półtorej|dwie/)) newParams.duration = '90 min';
+                else if (text.match(/45|50/)) newParams.duration = '45-50 min';
 
-                if (text.includes('ruch') || text.includes('zabaw') || text.includes('aktyw')) newParams.methods = 'Aktywizująca i ruchowa';
-                else if (text.includes('pokaz') || text.includes('ogląd') || text.includes('obraz')) newParams.methods = 'Pokazowa / Obrazowa';
-                else if (text.includes('projekt') || text.includes('badacz')) newParams.methods = 'Metoda projektowa';
-                else if (text.includes('praktycz') || text.includes('doświadcz') || text.includes('eksperyment')) newParams.methods = 'Praktyczne działanie';
-                else if (text.includes('opowiad') || text.includes('czyt')) newParams.methods = 'Podająca (opowiadanie)';
+                if (text.match(/ruch|zabaw|aktyw|gr/)) newParams.methods = 'Aktywizująca i ruchowa';
+                else if (text.match(/pokaz|ogląd|obraz|film|prezenta/)) newParams.methods = 'Pokazowa / Obrazowa';
+                else if (text.match(/projekt|badacz/)) newParams.methods = 'Metoda projektowa';
+                else if (text.match(/praktycz|doświadcz|eksperymen/)) newParams.methods = 'Praktyczne działanie';
+                else if (text.match(/opowiad|czyt|wykład/)) newParams.methods = 'Podająca (opowiadanie)';
 
-                if (text.includes('autyzm') || text.includes('asperger')) newParams.needs = 'Spektrum autyzmu';
-                if (text.includes('adhd') || text.includes('nadpobudli')) newParams.needs = 'ADHD (Nadpobudliwość)';
+                if (text.match(/autyzm|asperger|spektrum/)) newParams.needs = 'Spektrum autyzmu';
+                else if (text.match(/adhd|nadpobudli/)) newParams.needs = 'ADHD (Nadpobudliwość)';
 
                 extractedTopic = extractedTopic.replace(/dla\s*\d+\s*lat[a-ząćęłńóśźż]*/gi, '')
-                                               .replace(/dla\s*(dzieci|klas|uczniów)\s*[a-z0-9-]*/gi, '')
+                                               .replace(/dla\s*(dzieci|klas[y|a]?|uczniów)\s*[a-z0-9-IVX]*/gi, '')
                                                .replace(/(przez\s*|na\s*)?\d+\s*min[a-ząćęłńóśźż]*/gi, '')
                                                .replace(/metod[a-ząćęłńóśźż]*\s*[a-ząćęłńóśźż]+/gi, '')
                                                .replace(/[,.]/g, '')
                                                .replace(/\s+/g, ' ')
                                                .trim();
                 
+                if(extractedTopic) {
+                    extractedTopic = extractedTopic.charAt(0).toUpperCase() + extractedTopic.slice(1);
+                }
+
                 newParams.topic = extractedTopic || 'Zajęcia ogólne';
 
                 setParams(newParams);
                 setBotQuickPrompt('');
-                setBotMessage('Bum! 💥 Rozkodowałem Twój tekst i perfekcyjnie poustawiałem suwaki w konfiguratorze. Możesz generować!');
+                setBotMessage('Bum! 💥 Zrozumiałem Twój tekst i perfekcyjnie poustawiałem parametry. Możesz generować!');
             };
 
             const generateScenario = async () => {
@@ -352,7 +357,7 @@
                                         type="text" 
                                         value={botQuickPrompt} 
                                         onChange={(e) => setBotQuickPrompt(e.target.value)} 
-                                        onKeyPress={(e) => e.key === 'Enter' && handleBotAutoFill()} 
+                                        onKeyDown={(e) => { if(e.key === 'Enter') handleBotAutoFill(e); }} 
                                         placeholder="np. Lekcja o ułamkach na 45 min..." 
                                         className="flex-1 bg-transparent px-3 text-sm outline-none font-medium text-white placeholder-slate-500"
                                     />
@@ -385,13 +390,19 @@
                                         <div>
                                             <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Wiek</label>
                                             <select value={params.age} onChange={e => setParams({...params, age: e.target.value})} className="w-full p-3 bg-slate-900/80 border border-slate-700 rounded-xl outline-none text-white text-sm focus:border-emerald-500">
-                                                <option>3-4 latki</option><option>5-6 latki</option><option>Klasy I-III</option><option>Klasy IV-VIII</option>
+                                                <option value="3-4 latki">3-4 latki</option>
+                                                <option value="5-6 latki">5-6 latki</option>
+                                                <option value="Klasy I-III">Klasy I-III</option>
+                                                <option value="Klasy IV-VIII">Klasy IV-VIII</option>
                                             </select>
                                         </div>
                                         <div>
                                             <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Czas</label>
                                             <select value={params.duration} onChange={e => setParams({...params, duration: e.target.value})} className="w-full p-3 bg-slate-900/80 border border-slate-700 rounded-xl outline-none text-white text-sm focus:border-emerald-500">
-                                                <option>15-20 min</option><option>30-40 min</option><option>45-50 min</option><option>90 min</option>
+                                                <option value="15-20 min">15-20 min</option>
+                                                <option value="30-40 min">30-40 min</option>
+                                                <option value="45-50 min">45-50 min</option>
+                                                <option value="90 min">90 min</option>
                                             </select>
                                         </div>
                                     </div>
@@ -399,7 +410,11 @@
                                     <div>
                                         <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Metoda główna</label>
                                         <select value={params.methods} onChange={e => setParams({...params, methods: e.target.value})} className="w-full p-3 bg-slate-900/80 border border-slate-700 rounded-xl outline-none text-white text-sm focus:border-emerald-500">
-                                            <option>Aktywizująca i ruchowa</option><option>Pokazowa / Obrazowa</option><option>Metoda projektowa</option><option>Praktyczne działanie</option><option>Podająca (opowiadanie)</option>
+                                            <option value="Aktywizująca i ruchowa">Aktywizująca i ruchowa</option>
+                                            <option value="Pokazowa / Obrazowa">Pokazowa / Obrazowa</option>
+                                            <option value="Metoda projektowa">Metoda projektowa</option>
+                                            <option value="Praktyczne działanie">Praktyczne działanie</option>
+                                            <option value="Podająca (opowiadanie)">Podająca (opowiadanie)</option>
                                         </select>
                                     </div>
 
