@@ -105,7 +105,7 @@
             
             const [promptInput, setPromptInput] = useState('');
             const [styleOption, setStyleOption] = useState('3d'); 
-            const [orientationOption, setOrientationOption] = useState('3:4');
+            const [orientationOption, setOrientationOption] = useState('3:4'); // Proporcje
             
             const [generatedImage, setGeneratedImage] = useState(null);
             const [isGenerating, setIsGenerating] = useState(false);
@@ -119,42 +119,7 @@
                 setFreeTries(savedTries);
             }, []);
 
-            const fetchWithRetry = async (url, options, retries = 2, delay = 1000) => {
-                for (let i = 0; i < retries; i++) {
-                    try {
-                        const response = await fetch(url, options);
-                        if (!response.ok) {
-                            const errData = await response.json().catch(() => ({}));
-                            throw new Error(errData.error || errData.message || `Status API: ${response.status}`);
-                        }
-                        return await response.json();
-                    } catch (e) {
-                        if (i === retries - 1) throw e;
-                        await new Promise(res => setTimeout(res, delay));
-                    }
-                }
-            };
-
-            const secureApiCall = async (payload) => {
-                // =========================================================================
-                // UWAGA! TUTAJ WPISZ ADRES SWOJEGO BACKENDU (API) DLA OBRAZÓW NA VERCELU!
-                // Sprawdź w swoim pliku 'edugenerator.html' gdzie uderzasz do Fal.ai / Stability.
-                // np. '/api/fal', '/api/stability', '/api/image'
-                // =========================================================================
-                const API_ENDPOINT = '/api/image'; 
-
-                return await fetchWithRetry(API_ENDPOINT, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    // Wysyłamy bardzo uproszczony obiekt, z którym poradzi sobie większość API
-                    body: JSON.stringify({ 
-                        prompt: payload.prompt,
-                        negative_prompt: payload.negative_prompt,
-                        aspect_ratio: payload.aspect_ratio
-                    })
-                });
-            };
-
+            // GŁÓWNA FUNKCJA GENERUJĄCA
             const generatePoster = async () => {
                 if (!isAuthenticated && freeTries >= FREE_TRIES_LIMIT) {
                     setShowPaywall(true); return;
@@ -168,9 +133,15 @@
                 setGeneratedImage(null);
 
                 try {
-                    let styleModifier = "";
+                    // Tłumaczenie na angielski dla lepszych wyników (szczególnie anatomii)
+                    let translatedPrompt = promptInput;
+                    try {
+                        const res = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=pl&tl=en&dt=t&q=${encodeURIComponent(promptInput)}`);
+                        if (res.ok) { const data = await res.json(); translatedPrompt = data[0][0][0]; }
+                    } catch(e) { console.log("Tłumaczenie nie powiodło się, używam oryginału."); }
 
-                    // Wzmocnione prompty pozytywne o poprawność anatomiczną
+                    // Modyfikatory stylu
+                    let styleModifier = "";
                     if (styleOption === 'akwarela') {
                         styleModifier = "stunning watercolor painting, luminous soft vibrant colors, flawless expressive faces, anatomically correct, perfect hands, highly detailed characters, award-winning storybook illustration, 8k resolution, crisp details";
                     } else if (styleOption === '3d') {
@@ -179,39 +150,35 @@
                         styleModifier = "modern flat vector art, bold vibrant colors, beautiful flawless stylized characters, perfect proportions, minimalist illustration, crisp clean lines, highly detailed";
                     }
 
-                    const hiddenInstruction = `A breathtaking, purely visual artwork. MAIN SUBJECT: ${promptInput}. ${styleModifier}. Masterpiece, highly detailed, perfect composition, clear focus on the beautiful flawless characters, anatomically correct.`;
-                    
-                    // Wzmocniony Negative Prompt
-                    const negativePrompt = "text, words, letters, alphabet, numbers, writing, signature, watermark, typography, font, title, heading, label, graphic design layout, poster layout, greeting card, book cover, ugly, bad anatomy, bad hands, missing fingers, extra fingers, mutated hands, poorly drawn hands, poorly drawn face, mutation, deformed, blurry, bad proportions, extra limbs, cloned face, disfigured, gross proportions, malformed limbs, missing arms, missing legs, extra arms, extra legs, fused fingers, too many fingers, long neck, cross-eyed, backward head, twisted body";
+                    const fullPrompt = `A breathtaking, purely visual artwork. MAIN SUBJECT: ${translatedPrompt}. ${styleModifier}. Masterpiece, highly detailed, perfect composition, clear focus on the beautiful flawless characters, anatomically correct.`;
 
+                    // Bezpośrednie wywołanie Imagen 4.0 z kluczem wstrzykiwanym przez środowisko
+                    const apiKey = ""; 
+                    const url = `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${apiKey}`;
+                    
                     const payload = {
-                        prompt: hiddenInstruction, 
-                        negative_prompt: negativePrompt, 
-                        aspect_ratio: orientationOption // Wysyłamy proporcje z przełącznika ("3:4", "4:3", "1:1")
+                        instances: { prompt: fullPrompt },
+                        parameters: { 
+                            sampleCount: 1,
+                            aspectRatio: orientationOption // Ustawienie wybranych proporcji
+                        }
                     };
 
-                    const data = await secureApiCall(payload);
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
                     
-                    // INTELIGENTNY PARSER WYNIKÓW API (Obsługuje Fal.ai, Stability AI oraz OpenAI DALL-E)
-                    let finalImage = null;
-                    
-                    if (data.image_url) {
-                        // Zazwyczaj format Fal.ai
-                        finalImage = data.image_url;
-                    } else if (data.url) {
-                        finalImage = data.url;
-                    } else if (data.data && data.data[0] && data.data[0].url) {
-                        // Format OpenAI DALL-E 3
-                        finalImage = data.data[0].url;
-                    } else if (data.artifacts && data.artifacts[0] && data.artifacts[0].base64) {
-                        // Format Stability AI
-                        finalImage = `data:image/png;base64,${data.artifacts[0].base64}`;
-                    } else if (data.image) {
-                        finalImage = data.image.startsWith('data:') ? data.image : `data:image/png;base64,${data.image}`;
+                    if (!response.ok) {
+                        throw new Error(`Błąd serwera obrazów: ${response.status}`);
                     }
                     
-                    if (finalImage) {
-                        setGeneratedImage(finalImage);
+                    const data = await response.json();
+                    
+                    if (data.predictions && data.predictions[0] && data.predictions[0].bytesBase64Encoded) {
+                        const base64Image = `data:image/png;base64,${data.predictions[0].bytesBase64Encoded}`;
+                        setGeneratedImage(base64Image);
                         
                         if (!isAuthenticated) {
                             const newTries = freeTries + 1;
@@ -220,11 +187,11 @@
                         }
                         setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
                     } else {
-                        throw new Error("Pusta odpowiedź API. Twój backend nie zwrócił URL ani kodu Base64 obrazu.");
+                        throw new Error("Pusta odpowiedź z API Imagen.");
                     }
                 } catch (err) {
-                    console.error("Szczegóły błędu:", err);
-                    setError(`Błąd API: ${err.message || 'Wystąpił problem z backendem'}. Upewnij się, że używasz poprawnego adresu do API z obrazami w kodzie.`);
+                    console.error("Błąd generacji:", err);
+                    setError('Wystąpił problem z połączeniem lub serwer jest przeciążony. Spróbuj ponownie.');
                 } finally {
                     setIsGenerating(false);
                 }
@@ -242,12 +209,10 @@
 
             const handleDownload = () => {
                 if (generatedImage) {
-                    // Sprawdzamy czy obrazek to blob/base64, czy zewnętrzny URL.
-                    // Dla zewnętrznych URL pobieranie przez element <a> może otworzyć nową kartę.
                     const a = document.createElement('a');
                     a.href = generatedImage;
                     a.download = `EduPlakat_${new Date().getTime()}.png`;
-                    a.target = '_blank'; // Zabezpieczenie dla URLi
+                    a.target = '_blank';
                     document.body.appendChild(a);
                     a.click();
                     document.body.removeChild(a);
@@ -370,7 +335,7 @@
                                     Twórz piękne <span className="text-gradient">plakaty szkolne.</span>
                                 </h1>
                                 <p className="text-slate-400 text-lg">
-                                    Opisz krótko jaką grafikę potrzebujesz, a my wygenerujemy puste tło plakatowe, na którym samodzielnie dodasz napisy (np. w Canvie).
+                                    Opisz krótko jaką grafikę potrzebujesz, a my wygenerujemy tło plakatowe wysokiej jakości, na którym samodzielnie dodasz napisy.
                                 </p>
                             </div>
 
@@ -429,7 +394,7 @@
                                         value={promptInput}
                                         onChange={(e) => setPromptInput(e.target.value)}
                                         onKeyPress={(e) => { if(e.key === 'Enter') generatePoster(); }}
-                                        placeholder="Np. Mama przytulająca dzieci w wiosennym ogrodzie..."
+                                        placeholder="Np. Nauczyciel i uczniowie w sali lekcyjnej..."
                                         className="w-full bg-slate-900/80 border border-slate-600 text-white rounded-2xl px-6 py-5 focus:ring-2 focus:ring-purple-500 outline-none text-lg pr-16 shadow-inner"
                                     />
                                     <span className="absolute right-5 top-1/2 -translate-y-1/2 text-2xl">✨</span>
@@ -472,7 +437,7 @@
                                         <h3 className="text-xl font-bold text-white text-center sm:text-left">Twój Gotowy Plakat</h3>
                                         <div className="flex gap-3 w-full sm:w-auto flex-col sm:flex-row">
                                             <button onClick={handleDownload} className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-3 rounded-xl font-bold flex items-center gap-2 transition-all btn-bounce shadow-lg justify-center">
-                                                📥 Pobierz (do Canvy)
+                                                📥 Pobierz
                                             </button>
                                             <button onClick={handlePrint} className="bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-3 rounded-xl font-bold flex items-center gap-2 transition-all btn-bounce shadow-lg justify-center">
                                                 🖨️ Drukuj na całą stronę
