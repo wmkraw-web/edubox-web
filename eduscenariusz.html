@@ -173,60 +173,76 @@
                 }
             };
 
-            const handleBotAutoFill = (e) => {
-                if(e) e.preventDefault();
-                if(!botQuickPrompt.trim()) return;
+            const handleBotAutoFill = async (e) => {
+                if (e) e.preventDefault();
+                
+                // Zapisujemy wartość natychmiast na sztywno, aby uniknąć ucieczki stanu
+                const promptText = botQuickPrompt;
+                
+                if (!promptText || !promptText.trim()) {
+                    showToast('Wpisz najpierw tekst do analizy!');
+                    return;
+                }
                 
                 setIsAnalyzing(true);
                 
-                // Symulacja myślenia AI dla lepszego wrażenia UX (700ms)
-                setTimeout(() => {
-                    const text = botQuickPrompt.toLowerCase();
-                    let newParams = { ...params };
-                    let extractedTopic = botQuickPrompt;
+                try {
+                    // Bezpieczne, asynchroniczne opóźnienie UX (zamiast awaryjnego setTimeout)
+                    await new Promise(resolve => setTimeout(resolve, 600));
 
-                    // Elastyczna logika rozpoznawania NLP
-                    if (/3.*lat|4.*lat|3-4/i.test(text)) newParams.age = '3-4 latki';
-                    else if (/5.*lat|6.*lat|5-6/i.test(text)) newParams.age = '5-6 latki';
-                    else if (/klas.*1|klas.*2|klas.*3|klas.*i|pierwsz|drug|trzeci/i.test(text)) newParams.age = 'Klasy I-III';
-                    else if (/klas.*4|klas.*5|klas.*6|klas.*7|klas.*8|czwart|piąt|szóst|starsz/i.test(text)) newParams.age = 'Klasy IV-VIII';
-
-                    if (/15|20/.test(text)) newParams.duration = '15-20 min';
-                    else if (/30|40/.test(text)) newParams.duration = '30-40 min';
-                    else if (/90|półtorej|dwie/.test(text)) newParams.duration = '90 min';
-                    else if (/45|50/.test(text)) newParams.duration = '45-50 min';
-
-                    if (/ruch|zabaw|aktyw|gr/i.test(text)) newParams.methods = 'Aktywizująca i ruchowa';
-                    else if (/pokaz|ogląd|obraz|film|prezenta/i.test(text)) newParams.methods = 'Pokazowa / Obrazowa';
-                    else if (/projekt|badacz/i.test(text)) newParams.methods = 'Metoda projektowa';
-                    else if (/praktycz|doświadcz|eksperymen/i.test(text)) newParams.methods = 'Praktyczne działanie';
-                    else if (/opowiad|czyt|wykład/i.test(text)) newParams.methods = 'Podająca (opowiadanie)';
-
-                    if (/autyzm|asperger|spektrum/i.test(text)) newParams.needs = 'Spektrum autyzmu';
-                    else if (/adhd|nadpobudli/i.test(text)) newParams.needs = 'ADHD (Nadpobudliwość)';
-
-                    // Czyszczenie tematu z parametrów
-                    extractedTopic = extractedTopic
-                        .replace(/dla\s*\d+\s*lat[a-ząćęłńóśźż]*/gi, '')
-                        .replace(/dla\s*(dzieci|klas[y|a]?|uczniów)\s*[a-z0-9-IVX]*/gi, '')
-                        .replace(/(przez\s*|na\s*)?\d+\s*min[a-ząćęłńóśźż]*/gi, '')
-                        .replace(/metod[a-ząćęłńóśźż]*\s*[a-ząćęłńóśźż]+/gi, '')
-                        .replace(/[,.]/g, '')
-                        .replace(/\s+/g, ' ')
-                        .trim();
+                    const text = promptText.toLowerCase();
                     
-                    if(extractedTopic) {
-                        // Zaczynamy wielką literą
-                        extractedTopic = extractedTopic.charAt(0).toUpperCase() + extractedTopic.slice(1);
-                    }
+                    // Używamy bezpiecznej, funkcyjnej aktualizacji stanu (prev)
+                    setParams(prev => {
+                        let newParams = { ...prev };
+                        let extractedTopic = promptText;
 
-                    newParams.topic = extractedTopic || 'Zajęcia ogólne';
+                        // Elastyczna logika rozpoznawania NLP
+                        if (/3.*lat|4.*lat|3-4/i.test(text)) newParams.age = '3-4 latki';
+                        else if (/5.*lat|6.*lat|5-6/i.test(text)) newParams.age = '5-6 latki';
+                        else if (/klas.*1|klas.*2|klas.*3|klas.*i|pierwsz|drug|trzeci/i.test(text)) newParams.age = 'Klasy I-III';
+                        else if (/klas.*4|klas.*5|klas.*6|klas.*7|klas.*8|czwart|piąt|szóst|starsz/i.test(text)) newParams.age = 'Klasy IV-VIII';
 
-                    setParams(newParams);
-                    setIsAnalyzing(false);
+                        if (/15|20/.test(text)) newParams.duration = '15-20 min';
+                        else if (/30|40/.test(text)) newParams.duration = '30-40 min';
+                        else if (/90|półtorej|dwie/.test(text)) newParams.duration = '90 min';
+                        else if (/45|50/.test(text)) newParams.duration = '45-50 min';
+
+                        if (/ruch|zabaw|aktyw|gr/i.test(text)) newParams.methods = 'Aktywizująca i ruchowa';
+                        else if (/pokaz|ogląd|obraz|film|prezenta/i.test(text)) newParams.methods = 'Pokazowa / Obrazowa';
+                        else if (/projekt|badacz/i.test(text)) newParams.methods = 'Metoda projektowa';
+                        else if (/praktycz|doświadcz|eksperymen/i.test(text)) newParams.methods = 'Praktyczne działanie';
+                        else if (/opowiad|czyt|wykład/i.test(text)) newParams.methods = 'Podająca (opowiadanie)';
+
+                        if (/autyzm|asperger|spektrum/i.test(text)) newParams.needs = 'Spektrum autyzmu';
+                        else if (/adhd|nadpobudli/i.test(text)) newParams.needs = 'ADHD (Nadpobudliwość)';
+
+                        // Czyszczenie tematu z parametrów (wzmocnione regexy z dużymi polskimi znakami)
+                        extractedTopic = extractedTopic
+                            .replace(/dla\s*\d+\s*lat[a-zA-ZąćęłńóśźżĄĆĘŁŃÓŚŹŻ]*/gi, '')
+                            .replace(/dla\s*(dzieci|klas[y|a]?|uczniów)\s*[a-zA-Z0-9-IVX]*/gi, '')
+                            .replace(/(przez\s*|na\s*)?\d+\s*min[a-zA-ZąćęłńóśźżĄĆĘŁŃÓŚŹŻ]*/gi, '')
+                            .replace(/metod[a-zA-ZąćęłńóśźżĄĆĘŁŃÓŚŹŻ]*\s*[a-zA-ZąćęłńóśźżĄĆĘŁŃÓŚŹŻ]+/gi, '')
+                            .replace(/[,.]/g, '')
+                            .replace(/\s+/g, ' ')
+                            .trim();
+                        
+                        if(extractedTopic) {
+                            extractedTopic = extractedTopic.charAt(0).toUpperCase() + extractedTopic.slice(1);
+                        }
+
+                        newParams.topic = extractedTopic || 'Zajęcia ogólne';
+                        return newParams;
+                    });
+
                     setBotQuickPrompt('');
                     setBotMessage('Bum! 💥 Przeanalizowałem Twój tekst i perfekcyjnie poustawiałem suwaki w konfiguratorze. Zobacz poniżej!');
-                }, 700);
+                } catch (error) {
+                    console.error('Błąd podczas analizy NLP:', error);
+                    showToast('Wystąpił błąd analizy!');
+                } finally {
+                    setIsAnalyzing(false);
+                }
             };
 
             const generateScenario = async () => {
