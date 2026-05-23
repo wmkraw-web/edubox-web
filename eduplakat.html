@@ -119,7 +119,7 @@
                 setFreeTries(savedTries);
             }, []);
 
-            // GŁÓWNA FUNKCJA GENERUJĄCA
+            // GŁÓWNA FUNKCJA GENERUJĄCA - PODPIĘTA POD TWÓJ VERCEL BACKEND
             const generatePoster = async () => {
                 if (!isAuthenticated && freeTries >= FREE_TRIES_LIMIT) {
                     setShowPaywall(true); return;
@@ -133,14 +133,14 @@
                 setGeneratedImage(null);
 
                 try {
-                    // Tłumaczenie na angielski dla lepszych wyników (szczególnie anatomii)
+                    // Tłumaczenie w locie dla lepszej skuteczności AI (zwłaszcza anatomii)
                     let translatedPrompt = promptInput;
                     try {
                         const res = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=pl&tl=en&dt=t&q=${encodeURIComponent(promptInput)}`);
                         if (res.ok) { const data = await res.json(); translatedPrompt = data[0][0][0]; }
                     } catch(e) { console.log("Tłumaczenie nie powiodło się, używam oryginału."); }
 
-                    // Modyfikatory stylu
+                    // Modyfikatory stylu wymuszające poprawność na modelu
                     let styleModifier = "";
                     if (styleOption === 'akwarela') {
                         styleModifier = "stunning watercolor painting, luminous soft vibrant colors, flawless expressive faces, anatomically correct, perfect hands, highly detailed characters, award-winning storybook illustration, 8k resolution, crisp details";
@@ -150,35 +150,41 @@
                         styleModifier = "modern flat vector art, bold vibrant colors, beautiful flawless stylized characters, perfect proportions, minimalist illustration, crisp clean lines, highly detailed";
                     }
 
-                    const fullPrompt = `A breathtaking, purely visual artwork. MAIN SUBJECT: ${translatedPrompt}. ${styleModifier}. Masterpiece, highly detailed, perfect composition, clear focus on the beautiful flawless characters, anatomically correct.`;
+                    // Informacja o orientacji bezpośrednio w prompcie, gdyby backend nie obsługiwał parametru aspect_ratio
+                    let orientationText = orientationOption === '3:4' ? 'Vertical portrait poster format.' : (orientationOption === '4:3' ? 'Horizontal landscape format.' : 'Square format.');
 
-                    // Bezpośrednie wywołanie Imagen 4.0 z kluczem wstrzykiwanym przez środowisko
-                    const apiKey = ""; 
-                    const url = `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${apiKey}`;
-                    
-                    const payload = {
-                        instances: { prompt: fullPrompt },
-                        parameters: { 
-                            sampleCount: 1,
-                            aspectRatio: orientationOption // Ustawienie wybranych proporcji
-                        }
-                    };
+                    const fullPrompt = `A breathtaking artwork. MAIN SUBJECT: ${translatedPrompt}. STYLE: ${styleModifier}. ${orientationText} Masterpiece, highly detailed, perfect composition, clear focus on the beautiful flawless characters, anatomically correct.`;
 
-                    const response = await fetch(url, {
+                    // =========================================================
+                    // POŁĄCZENIE Z TWOIM BACKENDEM VERCEL (Tym z EduGeneratora)
+                    // =========================================================
+                    const response = await fetch('/api/generate', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
+                        body: JSON.stringify({ 
+                            prompt: fullPrompt,
+                            aspect_ratio: orientationOption, // Przekazujemy też opcjonalnie
+                            style_preset: styleOption
+                        })
                     });
                     
                     if (!response.ok) {
-                        throw new Error(`Błąd serwera obrazów: ${response.status}`);
+                        const errData = await response.json().catch(() => ({}));
+                        throw new Error(errData.error || errData.message || `Błąd serwera (Status: ${response.status})`);
                     }
                     
                     const data = await response.json();
                     
-                    if (data.predictions && data.predictions[0] && data.predictions[0].bytesBase64Encoded) {
-                        const base64Image = `data:image/png;base64,${data.predictions[0].bytesBase64Encoded}`;
-                        setGeneratedImage(base64Image);
+                    // Bezpieczny parser obsługujący różnorodne backendy (DALL-E, Fal.ai, Leonardo)
+                    let finalImage = data.imageUrl || data.image_url || data.url || (data.data && data.data[0] && data.data[0].url) || data.image;
+                    
+                    if (finalImage) {
+                        // Sprawdzamy czy to base64 bez nagłówka
+                        if (finalImage.length > 1000 && !finalImage.startsWith('http') && !finalImage.startsWith('data:')) {
+                            finalImage = `data:image/png;base64,${finalImage}`;
+                        }
+                        
+                        setGeneratedImage(finalImage);
                         
                         if (!isAuthenticated) {
                             const newTries = freeTries + 1;
@@ -187,11 +193,11 @@
                         }
                         setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
                     } else {
-                        throw new Error("Pusta odpowiedź z API Imagen.");
+                        throw new Error("Pusta odpowiedź z API. Twój backend na Vercelu nie zwrócił prawidłowego linku do obrazu.");
                     }
                 } catch (err) {
                     console.error("Błąd generacji:", err);
-                    setError('Wystąpił problem z połączeniem lub serwer jest przeciążony. Spróbuj ponownie.');
+                    setError(`Wystąpił problem z backendem: ${err.message}. Spróbuj ponownie.`);
                 } finally {
                     setIsGenerating(false);
                 }
@@ -394,7 +400,7 @@
                                         value={promptInput}
                                         onChange={(e) => setPromptInput(e.target.value)}
                                         onKeyPress={(e) => { if(e.key === 'Enter') generatePoster(); }}
-                                        placeholder="Np. Nauczyciel i uczniowie w sali lekcyjnej..."
+                                        placeholder="Np. Mama przytulająca dzieci w wiosennym ogrodzie..."
                                         className="w-full bg-slate-900/80 border border-slate-600 text-white rounded-2xl px-6 py-5 focus:ring-2 focus:ring-purple-500 outline-none text-lg pr-16 shadow-inner"
                                     />
                                     <span className="absolute right-5 top-1/2 -translate-y-1/2 text-2xl">✨</span>
