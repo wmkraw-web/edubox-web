@@ -4,43 +4,62 @@ export default async function handler(req, res) {
     return res.status(405).json({ message: 'Metoda niedozwolona' });
   }
 
-  // Odczytujemy prompt i wymiary (size) wysyłane z Twoich aplikacji
-  const { prompt, size } = req.body;
+  // Odczytujemy prompt i wybrane proporcje z frontendu
+  const { prompt, aspect_ratio } = req.body;
 
   if (!prompt) {
     return res.status(400).json({ message: 'Brak polecenia (promptu)' });
   }
 
-  const imageSize = size || "1024x1024";
+  // Mapowanie formatów z EduPlakatu i EduPrezentacji na język zrozumiały dla modelu Flux
+  let falImageSize = "square_hd"; // Domyślnie kwadrat
+  
+  if (aspect_ratio === '3:4') {
+    falImageSize = "3:4";   // EduPlakat Pionowy
+  } else if (aspect_ratio === '4:3') {
+    falImageSize = "4:3";   // EduPlakat Poziomy
+  } else if (aspect_ratio === '16:9') {
+    falImageSize = "16:9";  // EduPrezentacja (Slajdy panoramiczne)
+  } else if (aspect_ratio === '1:1') {
+    falImageSize = "1:1";   // Kwadrat
+  }
 
   try {
-    const response = await fetch('https://api.openai.com/v1/images/generations', {
+    // Łączymy się z superszybkim serwerem Fal.ai (model Flux Schnell)
+    const response = await fetch('https://fal.run/fal-ai/flux/schnell', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+        'Authorization': `Key ${process.env.FAL_KEY}`, // Używamy Twojego klucza Fal
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: "dall-e-3", 
         prompt: prompt,
-        n: 1,
-        size: imageSize,
-        quality: "standard" 
+        image_size: falImageSize, // Przekazujemy dynamiczne proporcje
+        num_inference_steps: 4,   // 4 kroki to standard dla superszybkiego modelu Schnell
+        num_images: 1,
+        enable_safety_checker: true
       })
     });
 
+    // Najpierw sprawdzamy błędy
     if (!response.ok) {
-      // Pobieramy DOKŁADNY obiekt błędu od OpenAI
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error?.message || "Odrzucono zapytanie przez serwery OpenAI.");
+      throw new Error(errorData.detail || errorData.message || "Odrzucono zapytanie przez Fal.ai");
     }
 
     const data = await response.json();
-    res.status(200).json({ imageUrl: data.data[0].url });
+    
+    // Zwracamy adres URL wygenerowanego obrazka do frontendu
+    // Fal.ai umieszcza go w tablicy images[0].url
+    if (data.images && data.images.length > 0) {
+        res.status(200).json({ imageUrl: data.images[0].url });
+    } else {
+        throw new Error("Pusta odpowiedź - nie wygenerowano obrazka.");
+    }
 
   } catch (error) {
-    console.error("Szczegóły błędu OpenAI:", error);
-    // KLUCZOWA ZMIANA: Wysyłamy dokładną treść błędu z powrotem do Twojej przeglądarki!
-    res.status(500).json({ message: `Błąd OpenAI: ${error.message}` });
+    console.error("Szczegóły błędu Fal.ai:", error);
+    // Wysyłamy dokładną treść błędu z powrotem do przeglądarki
+    res.status(500).json({ message: `Błąd serwera: ${error.message}` });
   }
 }
