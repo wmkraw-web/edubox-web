@@ -3,17 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>EduKomiks AI v5 - System Spójności</title>
-    <!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-3RQ9R0N0K8"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-
-  gtag('config', 'G-3RQ9R0N0K8');
-</script>
-
+    <title>EduKomiks AI v6 - Premium Edition</title>
     
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
@@ -23,24 +13,20 @@
     <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Comic+Neue:wght@700;900&family=Outfit:wght@400;700;900&display=swap" rel="stylesheet">
 
     <style>
-        body { background-color: #020617; color: #f8fafc; font-family: 'Outfit', sans-serif; overflow-x: hidden; }
+        body { background-color: #020617; color: #f8fafc; font-family: 'Outfit', sans-serif; min-height: 100vh; }
         .halftone-bg { background-image: radial-gradient(#334155 2px, transparent 2px); background-size: 15px 15px; }
         .comic-panel { border: 6px solid black; box-shadow: 10px 10px 0px 0px rgba(0,0,0,1); overflow: hidden; background: white; position: relative; }
-        .narration-bar { background: #fef08a; color: black; border-bottom: 4px solid black; padding: 10px; font-weight: 900; font-size: 0.9rem; line-height: 1.2; z-index: 40; position: relative; }
+        .narration-bar { background: #fef08a; color: black; border-bottom: 4px solid black; padding: 12px; font-weight: 900; font-size: 0.95rem; z-index: 40; position: relative; }
+        .shadow-solid { box-shadow: 8px 8px 0px 0px rgba(0,0,0,1); }
         .comic-bubble { 
             background: white; border: 4px solid black; border-radius: 20px; 
-            padding: 10px 15px; color: black; font-family: 'Comic Neue', cursive; 
-            font-weight: 900; text-align: center; position: absolute; bottom: 15%; 
+            padding: 12px 18px; color: black; font-family: 'Comic Neue', cursive; 
+            font-weight: 900; text-align: center; position: absolute; bottom: 12%; 
             left: 50%; transform: translateX(-50%); width: 85%; z-index: 50;
-            box-shadow: 4px 4px 0px rgba(0,0,0,0.15);
         }
         .bubble-tail { 
             position: absolute; bottom: -15px; left: 50%; transform: translateX(-50%);
             width: 20px; height: 20px; background: white; clip-path: polygon(0 0, 100% 0, 50% 100%); z-index: 51;
-        }
-        .bubble-tail-border {
-            position: absolute; bottom: -21px; left: 50%; transform: translateX(-50%);
-            width: 28px; height: 26px; background: black; clip-path: polygon(0 0, 100% 0, 50% 100%); z-index: 49;
         }
         @media print { .no-print { display: none !important; } .print-area { width: 100% !important; background: white !important; } }
     </style>
@@ -49,142 +35,163 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState } = React;
+        const { useState, useEffect } = React;
 
         function App() {
             const [topic, setTopic] = useState('');
             const [step, setStep] = useState('config');
             const [comic, setComic] = useState(null);
             const [status, setStatus] = useState('');
+            const [usages, setUsages] = useState(2);
+            const [isPremium, setIsPremium] = useState(false);
+            const [code, setCode] = useState('');
+            const [showPaywall, setShowPaywall] = useState(false);
+
+            useEffect(() => {
+                const storedUsages = localStorage.getItem('edu_usages');
+                const premium = localStorage.getItem('edu_premium');
+                if (storedUsages) setUsages(parseInt(storedUsages));
+                if (premium === 'true') setIsPremium(true);
+            }, []);
+
+            const checkPremium = () => {
+                if (code.toUpperCase() === 'KAWA2024') {
+                    setIsPremium(true);
+                    localStorage.setItem('edu_premium', 'true');
+                    setShowPaywall(false);
+                    alert('Odblokowano wersję Premium! 🌟');
+                } else {
+                    alert('Błędny kod!');
+                }
+            };
 
             const generate = async () => {
+                if (!isPremium && usages <= 0) {
+                    setShowPaywall(true);
+                    return;
+                }
                 if (!topic.trim()) return;
+
                 setStep('generating');
-                setStatus('Tworzę paszport bohatera i scenariusz...');
+                setStatus('Stabilizuję wygląd bohatera...');
                 
                 try {
-                    // System Prompt v5 - TOTAL LOCK na płeć i wygląd
-                    const sys = `Jesteś scenarzystą komiksu. 
-                    1. Wykryj imię i płeć bohatera z tematu: "${topic}". 
-                    2. Stwórz "Visual Anchor": stały opis (np. "A 7-year-old boy, freckles, spiky blonde hair, wearing a bright RED hoodie and black shorts").
-                    3. Stwórz 4 panele. W każdym panelu postać MUSI coś robić rękami (interakcja, gestykulacja).
-                    4. W KAŻDYM imagePrompt zacznij od "Visual Anchor" i opisu akcji.
-                    5. ZACHOWAJ TĘ SAMĄ PŁEĆ PRZEZ CAŁY KOMIKS.
-                    
-                    Zwróć JSON:
-                    {
-                        "heroName": "Imię",
-                        "title": "Tytuł",
-                        "panels": [
-                            {"narration": "Obowiązkowy opis sytuacji", "dialogue": "Dialog", "imagePrompt": "Visual Anchor + action description + background"}
-                        ]
-                    }`;
+                    const sys = `Jesteś ilustratorem. 1. Wykryj imię/płeć z: "${topic}". 
+                    2. Stwórz STAŁY opis (np. "A girl with blonde kucyki, yellow t-shirt").
+                    3. W KAŻDYM panelu używaj tego samego opisu. 
+                    4. Jeśli jest woda/wąż: "holding a water hose in hands, water coming from hose nozzle".
+                    5. ZACHOWAJ SPÓJNOŚĆ POSTACI.
+                    Zwróć JSON: {"title": "...", "panels": [{"narration": "...", "dialogue": "...", "imagePrompt": "Detailed description in English"}]}`;
 
                     const res = await fetch('/api/chat', {
                         method: 'POST', 
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ prompt: topic, system: sys, format: "json", model: "gpt-4o-mini" })
+                        body: JSON.stringify({ prompt: topic, system: sys, format: "json" })
                     });
                     
                     const data = await res.json();
                     let obj = JSON.parse(data.text.match(/\{[\s\S]*\}/)[0]);
 
-                    // Siłowe naprawianie imienia, jeśli AI użyło domyślnego
-                    const userTypedName = topic.split(' ')[0]; 
-                    if(userTypedName.length > 2) obj.heroName = userTypedName;
-
-                    for (let i = 0; i < obj.panels.length; i++) {
-                        setStatus(`Rysuję kadr ${i+1}/4: Sprawdzam czy ${obj.heroName} ma odpowiednie ubranie...`);
-                        
-                        const finalPrompt = `${obj.panels[i].imagePrompt}. High-quality 2D digital art, clean bold outlines, vibrant flat colors, expressive body language, hands visible and active. NO MIRRORS, NO DEFORMATIONS. consistent style.`;
-
+                    for (let i = 0; i < 4; i++) {
+                        setStatus(`Rysuję kadr ${i+1}/4 (Wysoka jakość 3D)...`);
                         const imgRes = await fetch('/api/generate', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ 
-                                prompt: finalPrompt,
-                                negative_prompt: "hands in pockets, standing still, robot-like, girl if hero is boy, boy if hero is girl, blurry, deformed, text, messy, reflection",
+                                prompt: `${obj.panels[i].imagePrompt}. Cute 3D Disney Pixar style, flawless skin, detailed hair, high quality render, consistent character. NO WATER FROM MOUTH, NO DEFORMATIONS.`,
+                                negative_prompt: "water from mouth, liquid from face, extra limbs, blurry, two girls, ugly, mirror",
                                 aspect_ratio: '1:1'
                             })
                         });
-                        
                         const imgData = await imgRes.json();
-                        obj.panels[i].url = imgData.imageUrl || imgData.url || (imgData.data && imgData.data[0]?.url);
+                        obj.panels[i].url = imgData.imageUrl || imgData.url;
+                    }
+
+                    if (!isPremium) {
+                        const newUsages = usages - 1;
+                        setUsages(newUsages);
+                        localStorage.setItem('edu_usages', newUsages.toString());
                     }
 
                     setComic(obj);
                     setStep('review');
                 } catch (e) {
-                    alert('Błąd spójności. Spróbuj jeszcze raz.');
+                    alert('Błąd generatora.');
                     setStep('config');
                 }
             };
 
             if (step === 'config') return (
                 <div className="min-h-screen flex items-center justify-center p-4 halftone-bg">
-                    <div className="bg-white p-10 rounded-[40px] border-[8px] border-black shadow-[15px_15px_0px_0px_rgba(0,0,0,1)] w-full max-w-xl text-black">
-                        <div className="bg-red-500 text-white font-bangers text-2xl py-1 px-4 inline-block mb-4 border-4 border-black -rotate-2">NOWOŚĆ: V5 SPÓJNOŚĆ</div>
-                        <h1 className="text-6xl font-bangers mb-6 tracking-tighter">KREATOR KOMIKSU</h1>
-                        <p className="font-bold text-lg mb-4 italic">Wpisz imię i co robi bohater:</p>
+                    <div className="bg-white p-8 md:p-12 rounded-[40px] border-[8px] border-black shadow-solid w-full max-w-2xl text-black">
+                        <div className="flex justify-between items-start mb-6">
+                            <h1 className="text-5xl font-bangers tracking-tight">EDUKOMIKS <span className="text-red-500">PRO</span></h1>
+                            {!isPremium && <div className="bg-amber-100 border-2 border-black px-3 py-1 font-bold text-sm rounded-lg">Próby: {usages}/2</div>}
+                        </div>
+                        
                         <textarea 
                             value={topic} onChange={e => setTopic(e.target.value)} 
-                            placeholder="np. Kaziu segreguje śmieci i uśmiecha się do pani..."
-                            className="w-full p-5 border-4 border-black rounded-2xl font-bold text-xl mb-6 h-32 focus:ring-4 ring-yellow-400 outline-none"
+                            placeholder="np. Emilka kąpie psa Maxa w ogrodzie..."
+                            className="w-full p-6 border-4 border-black rounded-3xl font-bold text-xl mb-6 h-40 outline-none focus:ring-4 ring-yellow-400"
                         />
-                        <button onClick={generate} className="w-full bg-yellow-400 hover:bg-amber-400 py-6 rounded-2xl font-bangers text-4xl border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] transition-all active:translate-y-2 active:shadow-none uppercase">
-                            Generuj Przygodę!
+
+                        <button onClick={generate} className="w-full bg-yellow-400 hover:bg-amber-400 py-6 rounded-3xl font-bangers text-4xl border-4 border-black shadow-solid transition-all active:translate-y-2 uppercase mb-6">
+                            RYSUJ PRZYGODĘ!
                         </button>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 no-print">
+                            <a href="https://buycoffee.to/magiccolor" target="_blank" className="flex items-center justify-center gap-2 bg-white border-4 border-black p-4 rounded-2xl font-black hover:bg-gray-50">
+                                ☕ Postaw Kawę
+                            </a>
+                            <div className="flex gap-2">
+                                <input type="text" placeholder="Kod..." value={code} onChange={e => setCode(e.target.value)} className="w-full border-4 border-black rounded-2xl p-2 font-bold text-center uppercase" />
+                                <button onClick={checkPremium} className="bg-black text-white px-4 rounded-2xl font-bangers text-xl">OK</button>
+                            </div>
+                        </div>
                     </div>
+
+                    {showPaywall && (
+                        <div className="fixed inset-0 bg-black/90 z-[100] flex items-center justify-center p-6">
+                            <div className="bg-white p-10 border-8 border-black rounded-[40px] text-center max-w-sm">
+                                <h2 className="text-4xl font-bangers text-black mb-4">LIMIT WYCZERPANY!</h2>
+                                <p className="font-bold text-slate-600 mb-6">Podoba Ci się? Postaw kawę, aby otrzymać kod dostępu i tworzyć bez limitów!</p>
+                                <a href="https://buycoffee.to/magiccolor" target="_blank" className="block w-full bg-yellow-400 border-4 border-black py-4 rounded-2xl font-bangers text-2xl mb-4">POSTAW KAWĘ</a>
+                                <button onClick={() => setShowPaywall(false)} className="text-slate-400 font-bold uppercase text-xs">Zamknij</button>
+                            </div>
+                        </div>
+                    )}
                 </div>
             );
 
             if (step === 'generating') return (
-                <div className="min-h-screen flex flex-col items-center justify-center bg-blue-600 p-8 text-center halftone-bg">
-                    <div className="bg-white p-10 rounded-3xl border-8 border-black shadow-solid max-w-md">
-                        <div className="text-6xl animate-bounce mb-4">🎨</div>
-                        <h2 className="text-4xl font-bangers text-black mb-4">ARTYSTA RYSUJE...</h2>
-                        <p className="text-black font-black italic text-lg">{status}</p>
-                        <div className="mt-6 h-4 w-full bg-gray-200 border-4 border-black rounded-full overflow-hidden">
-                            <div className="h-full bg-red-500 animate-pulse w-full"></div>
-                        </div>
+                <div className="min-h-screen flex flex-col items-center justify-center bg-blue-500 halftone-bg p-8 text-center">
+                    <div className="bg-white p-12 rounded-[40px] border-8 border-black shadow-solid max-w-md">
+                        <i className="ph-fill ph-magic-wand text-7xl text-purple-600 animate-pulse block mb-4"></i>
+                        <h2 className="text-4xl font-bangers text-black mb-2">PRODUKCJA PREMIUM...</h2>
+                        <p className="text-black font-black italic">{status}</p>
                     </div>
                 </div>
             );
 
             if (step === 'review') return (
-                <div className="min-h-screen p-4 md:p-12 bg-slate-900">
-                    <div className="max-w-5xl mx-auto bg-white p-6 md:p-12 border-[8px] border-black rounded-xl print-area">
-                        <header className="text-center mb-12 border-b-[8px] border-black pb-8">
-                            <h1 className="text-6xl md:text-8xl font-bangers text-black leading-none">{comic.title}</h1>
-                            <div className="inline-block bg-black text-yellow-400 px-6 py-2 mt-4 font-black text-2xl skew-x-[-10deg]">
-                                BOHATER: {comic.heroName.toUpperCase()}
-                            </div>
-                        </header>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-12 bg-black p-4 md:p-8 rounded-xl">
+                <div className="min-h-screen p-4 md:p-8 bg-slate-900">
+                    <div className="max-w-5xl mx-auto bg-white p-6 md:p-12 border-[8px] border-black rounded-xl print-area text-black">
+                        <h1 className="text-6xl md:text-8xl font-bangers text-center mb-10 border-b-8 border-black pb-6">{comic.title}</h1>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-10 bg-black p-6 rounded-xl">
                             {comic.panels.map((p, i) => (
-                                <div key={i} className="comic-panel aspect-square flex flex-col group">
-                                    <div className="narration-bar">{p.narration || "Opis sytuacji..."}</div>
-                                    <div className="flex-1 relative overflow-hidden">
-                                        <img src={p.url} className="absolute inset-0 w-full h-full object-cover" alt="panel" />
-                                        {p.dialogue && (
-                                            <div className="comic-bubble">
-                                                {p.dialogue}
-                                                <div className="bubble-tail-border"></div>
-                                                <div className="bubble-tail"></div>
-                                            </div>
-                                        )}
-                                        <div className="absolute bottom-2 right-2 bg-black text-white font-bangers w-10 h-10 flex items-center justify-center rounded-full border-2 border-white z-[60]">
-                                            {i + 1}
-                                        </div>
+                                <div key={i} className="comic-panel aspect-square flex flex-col">
+                                    <div className="narration-bar">{p.narration}</div>
+                                    <div className="flex-1 relative">
+                                        <img src={p.url} className="absolute inset-0 w-full h-full object-cover" />
+                                        <div className="comic-bubble">{p.dialogue}<div className="bubble-tail"></div></div>
+                                        <div className="absolute bottom-2 right-2 bg-black text-white font-bangers w-10 h-10 flex items-center justify-center rounded-full border-2 border-white z-[60]">{i + 1}</div>
                                     </div>
                                 </div>
                             ))}
                         </div>
-
-                        <div className="mt-12 flex gap-4 no-print">
-                            <button onClick={() => window.print()} className="flex-1 bg-green-500 text-white font-bangers text-4xl py-5 rounded-2xl border-4 border-black shadow-solid hover:bg-green-400 transition-colors">DRUKUJ</button>
-                            <button onClick={() => setStep('config')} className="flex-1 bg-white text-black font-bangers text-4xl py-5 rounded-2xl border-4 border-black shadow-solid hover:bg-gray-100 transition-colors">NOWY</button>
+                        <div className="mt-10 flex gap-4 no-print">
+                            <button onClick={() => window.print()} className="flex-1 bg-green-500 text-white font-bangers text-4xl py-6 rounded-3xl border-4 border-black shadow-solid">DRUKUJ</button>
+                            <button onClick={() => setStep('config')} className="flex-1 bg-white text-black font-bangers text-4xl py-6 rounded-3xl border-4 border-black shadow-solid">NOWY</button>
                         </div>
                     </div>
                 </div>
