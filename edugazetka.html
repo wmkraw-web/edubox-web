@@ -34,7 +34,7 @@
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
 
     <!-- Fonty -->
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800;900&family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800;900&family=Fredoka:wght@400;600;700;900&display=swap" rel="stylesheet">
 
     <!-- Tailwind Config -->
     <script>
@@ -72,7 +72,7 @@
         
         .corkboard-pattern {
             background-color: #e5e7eb;
-            background-image: url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M20 20.5V18H0v-2h20v-2H0v-2h20v-2H0V8h20V6H0V4h20V2H0V0h22v20h2V0h2v20h2V0h2v20h2V0h2v20h2V0h2v20h2v2H20v-1.5zM0 20h2v20H0V20zm4 0h2v20H4V20zm4 0h2v20H8V20zm4 0h2v20h-2V20zm4 0h2v20h-2V20zm4 4h20v2H20v-2zm0 4h20v2H20v-2zm0 4h20v2H20v-2zm0 4h20v2H20v-2z' fill='%2394a3b8' fill-opacity='0.1' fill-rule='evenodd'/%3E%3C/svg%3E");
+            background-image: url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M20 20.5V18H0v-2h20v-2H0v-2h20v-2H0V8h20V6H0V4h20V2H0V0h22v20h2V0h2v20h2V0h2v20h2V0h2v20h2V0h2v20h2v2H20v-1.5zM0 20h2v20H0V20zm4 0h2v20H4V20zm4 0h2v20h-2V20zm4 0h2v20h-2V20zm4 0h2v20h-2V20zm4 4h20v2H20v-2zm0 4h20v2H20v-2zm0 4h20v2H20v-2zm0 4h20v2H20v-2z' fill='%2394a3b8' fill-opacity='0.1' fill-rule='evenodd'/%3E%3C/svg%3E");
         }
 
         .pin {
@@ -83,14 +83,17 @@
             z-index: 10;
         }
 
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+
         /* --- PRINT STYLES --- */
         @media print {
             body { background: white; color: black; background-image: none; margin: 0; padding: 0; }
             .no-print { display: none !important; }
             #render-area { width: 100% !important; background: white !important; }
             
-            /* Strona z jedną wielką literą */
-            .print-letter-page {
+            /* Strona z jedną wielką literą (A4) */
+            .print-letter-A4 {
                 width: 100%;
                 height: 280mm;
                 page-break-after: always;
@@ -101,9 +104,24 @@
                 box-sizing: border-box;
                 margin-bottom: 0;
             }
-            .print-letter { font-size: 280pt; font-family: 'Fredoka', sans-serif; font-weight: 900; color: black; }
             
-            /* Strona z plakatem informacyjnym (A4 Pion) */
+            /* Strona z dwiema literami na A4 (czyli A5) */
+            .print-letter-A5 {
+                width: 100%;
+                height: 138mm; /* Połowa strony A4 minus marginesy */
+                page-break-inside: avoid;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                border: 2px dashed #cbd5e1;
+                box-sizing: border-box;
+                margin-bottom: 4mm;
+            }
+
+            .print-text-A4 { font-size: 380pt; font-family: 'Fredoka', sans-serif; font-weight: 900; color: black; line-height: 1; }
+            .print-text-A5 { font-size: 240pt; font-family: 'Fredoka', sans-serif; font-weight: 900; color: black; line-height: 1; }
+            
+            /* Strona z plakatem informacyjnym (A4 Pion) - Zawsze A4 */
             .print-poster-page {
                 width: 100%;
                 height: 280mm;
@@ -117,7 +135,7 @@
                 margin-bottom: 0;
             }
             .print-poster-img { width: 100%; height: 60%; object-fit: cover; border-bottom: 4px solid #0f172a; }
-            .print-poster-text { height: 40%; padding: 40px; background: #f8fafc; font-size: 26pt; line-height: 1.5; font-family: 'Outfit', sans-serif; font-weight: 600; text-align: center; display: flex; align-items: center; justify-content: center;}
+            .print-poster-text { height: 40%; padding: 40px; background: #f8fafc; font-size: 24pt; line-height: 1.4; font-family: 'Outfit', sans-serif; font-weight: 600; text-align: center; display: flex; align-items: center; justify-content: center;}
             
             @page { margin: 10mm; size: A4 portrait; }
         }
@@ -146,6 +164,9 @@
             const [gazetkaData, setGazetkaData] = useState(null);
             const [loadingStatus, setLoadingStatus] = useState('');
             const [loadingProgress, setLoadingProgress] = useState(0);
+
+            // Nowe: Format Druku dla Liter (A4 lub A5)
+            const [printFormat, setPrintFormat] = useState('A4');
 
             // Regeneracja kadru
             const [regeneratingIndex, setRegeneratingIndex] = useState(null);
@@ -196,7 +217,7 @@
                     
                     Zwróć WYŁĄCZNIE poprawny JSON:
                     {
-                        "title": "BARDZO KRÓTKI I CHWYTLIWY TYTUŁ (max 2 słowa, np. 'DZIEŃ ZIEMI', 'KOSMOS', 'ZDROWE CIAŁO'). Zostanie on wydrukowany w formie wielkich liter.",
+                        "title": "CHWYTLIWY TYTUŁ (np. 'DZIEŃ RODZINY', 'KOSMOS', 'ZDROWE CIAŁO'). Zostanie on wydrukowany w formie wielkich liter.",
                         "posters": [
                             {
                                 "fact": "Ciekawostka / Edukacyjny fakt po POLSKU (2-3 zdania).",
@@ -366,7 +387,7 @@
                                 <div className="space-y-6">
                                     <div>
                                         <label className="text-xs font-bold text-teal-400 uppercase tracking-widest block mb-2">1. O czym robimy gazetkę? *</label>
-                                        <input type="text" value={topic} onChange={e => setTopic(e.target.value)} placeholder="np. Bezpieczny Internet, Dzień Ziemi, Powstanie Styczniowe..." className="w-full p-5 bg-slate-900/80 border border-slate-700 rounded-2xl text-lg font-medium outline-none text-white focus:border-teal-500 transition-colors shadow-inner" />
+                                        <input type="text" value={topic} onChange={e => setTopic(e.target.value)} placeholder="np. Bezpieczny Internet, Dzień Rodziny, Powstanie Styczniowe..." className="w-full p-5 bg-slate-900/80 border border-slate-700 rounded-2xl text-lg font-medium outline-none text-white focus:border-teal-500 transition-colors shadow-inner" />
                                     </div>
 
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -450,13 +471,20 @@
                             </div>
                         )}
                         
-                        <nav className="bg-white border-b border-slate-200 h-16 flex items-center justify-between px-6 shadow-sm no-print sticky top-0 z-50">
+                        <nav className="bg-white border-b border-slate-200 h-20 flex items-center justify-between px-6 shadow-sm no-print sticky top-0 z-50">
                             <h1 className="text-xl font-display font-bold text-slate-800 flex items-center gap-2"><i className="ph-fill ph-check-circle text-teal-500 text-2xl"></i> Gazetka Gotowa!</h1>
-                            <div className="flex gap-3">
-                                <button onClick={() => window.print()} className="bg-teal-600 hover:bg-teal-500 text-white px-5 py-2 rounded-xl font-bold flex items-center gap-2 shadow-md active:scale-95 transition-all text-sm">
-                                    <i className="ph-bold ph-printer text-lg"></i> Drukuj Gazetkę (PDF)
+                            <div className="flex items-center gap-3">
+                                
+                                {/* Wybór formatu dla liter */}
+                                <div className="hidden md:flex bg-slate-100 rounded-xl p-1 border border-slate-200 shadow-inner mr-2">
+                                    <button onClick={() => setPrintFormat('A4')} className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${printFormat === 'A4' ? 'bg-white shadow text-teal-600' : 'text-slate-500 hover:text-slate-800'}`}>A4 (1 litera / str)</button>
+                                    <button onClick={() => setPrintFormat('A5')} className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${printFormat === 'A5' ? 'bg-white shadow text-teal-600' : 'text-slate-500 hover:text-slate-800'}`}>A5 (2 litery / str)</button>
+                                </div>
+
+                                <button onClick={() => window.print()} className="bg-teal-600 hover:bg-teal-500 text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 shadow-md active:scale-95 transition-all text-sm">
+                                    <i className="ph-bold ph-printer text-lg"></i> Drukuj (PDF)
                                 </button>
-                                <button onClick={() => setStep('config')} className="bg-slate-200 hover:bg-slate-300 text-slate-700 px-4 py-2 rounded-xl font-bold shadow-sm active:scale-95 transition-all text-sm">Nowa Wystawa</button>
+                                <button onClick={() => setStep('config')} className="bg-slate-200 hover:bg-slate-300 text-slate-700 px-4 py-2.5 rounded-xl font-bold shadow-sm active:scale-95 transition-all text-sm">Nowa</button>
                             </div>
                         </nav>
 
@@ -464,7 +492,7 @@
                             
                             <div className="no-print max-w-5xl mx-auto bg-amber-100 border border-amber-300 text-amber-800 p-4 rounded-xl mb-8 text-sm font-bold flex items-start md:items-center gap-3 shadow-sm">
                                 <i className="ph-fill ph-info text-2xl shrink-0"></i> 
-                                <p>To jest podgląd wirtualnej tablicy korkowej. Po kliknięciu <strong>"Drukuj"</strong> system automatycznie rozbije ten widok na pojedyncze kartki A4. <br className="hidden md:block"/>Na pierwszych stronach wydrukują się wielkie litery tytułu, a na kolejnych 4 duże plakaty z ciekawostkami.</p>
+                                <p>To jest podgląd tablicy. W druku (PDF) pierwsza sekcja wygeneruje wielkie litery do wycięcia, a następnie 4 duże plakaty A4. <br className="hidden md:block"/><span className="text-teal-700">Wskazówka: Możesz kliknąć w opisy pod obrazkami, aby je edytować przed wydrukiem!</span></p>
                             </div>
 
                             {/* WIRTUALNA TABLICA KORKOWA (PODGLĄD) */}
@@ -475,7 +503,7 @@
                                     {gazetkaData.title.split('').map((char, idx) => {
                                         if (char === ' ') return <div key={idx} className="w-8 md:w-16"></div>;
                                         return (
-                                            <div key={idx} className="w-16 h-20 md:w-24 md:h-32 bg-white border border-slate-300 shadow-md flex items-center justify-center text-4xl md:text-6xl font-display font-black text-slate-800 relative transform rotate-1 hover:rotate-0 transition-transform">
+                                            <div key={idx} className="w-20 h-28 md:w-28 md:h-36 bg-white border border-slate-300 shadow-md flex items-center justify-center text-6xl md:text-[5.5rem] font-display font-black text-slate-800 relative transform rotate-1 hover:rotate-0 transition-transform">
                                                 <div className="pin scale-50 -top-2"></div>
                                                 {char.toUpperCase()}
                                             </div>
@@ -483,13 +511,13 @@
                                     })}
                                 </div>
 
-                                {/* TYTUŁ W DRUKU - KAŻDA LITERA NA A4 */}
+                                {/* TYTUŁ W DRUKU - z uwzględnieniem formatu A4 / A5 */}
                                 <div className="hidden print:block">
                                     {gazetkaData.title.split('').map((char, idx) => {
                                         if (char === ' ') return null;
                                         return (
-                                            <div key={`print-char-${idx}`} className="print-letter-page">
-                                                <span className="print-letter">{char.toUpperCase()}</span>
+                                            <div key={`print-char-${idx}`} className={`print-letter-${printFormat}`}>
+                                                <span className={`print-text-${printFormat}`}>{char.toUpperCase()}</span>
                                             </div>
                                         )
                                     })}
@@ -498,11 +526,11 @@
                                 {/* 2. SEKCJA PLAKATÓW */}
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 pb-12 no-print">
                                     {gazetkaData.posters.map((poster, idx) => (
-                                        <div key={idx} className="bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden relative group transform -rotate-1 hover:rotate-0 transition-transform duration-300 flex flex-col">
+                                        <div key={idx} className="bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden relative transform -rotate-1 hover:rotate-0 transition-transform duration-300 flex flex-col min-h-[500px]">
                                             <div className="pin"></div>
                                             
                                             {/* Obrazek Plakatu */}
-                                            <div className="relative aspect-square w-full bg-slate-100 border-b-4 border-slate-800">
+                                            <div className="relative aspect-square w-full bg-slate-100 border-b-4 border-slate-800 group/img">
                                                 {poster.imageUrl ? (
                                                     <img src={poster.imageUrl} className="absolute inset-0 w-full h-full object-cover" />
                                                 ) : (
@@ -513,21 +541,32 @@
                                                 <button 
                                                     onClick={() => regeneratePoster(idx)} 
                                                     disabled={regeneratingIndex !== null}
-                                                    className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-teal-500 border-2 border-white text-white px-5 py-3 rounded-xl shadow-xl font-bold flex items-center gap-2 transition-all hover:bg-teal-400 hover:scale-105 z-50 ${regeneratingIndex === idx ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                                                    className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-teal-500 border-2 border-white text-white px-5 py-3 rounded-xl shadow-xl font-bold flex items-center gap-2 transition-all hover:bg-teal-400 hover:scale-105 z-50 ${regeneratingIndex === idx ? 'opacity-100' : 'opacity-0 group-hover/img:opacity-100'}`}
                                                 >
                                                     {regeneratingIndex === idx ? <><i className="ph-bold ph-spinner animate-spin"></i> Rysuję...</> : <><i className="ph-bold ph-arrows-clockwise"></i> Zmień obrazek</>}
                                                 </button>
                                             </div>
 
-                                            {/* Tekst Plakatu */}
-                                            <div className="p-6 md:p-8 flex-1 flex items-center justify-center text-center bg-slate-50">
-                                                <p className="text-xl md:text-2xl font-semibold text-slate-800 leading-snug">{poster.fact}</p>
+                                            {/* Tekst Plakatu (Z EDYCJĄ!) */}
+                                            <div className="p-4 md:p-6 flex-1 flex flex-col items-center justify-center text-center bg-slate-50 relative group/edit">
+                                                <div className="absolute top-2 right-2 opacity-0 group-hover/edit:opacity-100 transition-opacity text-slate-400 text-xs font-bold pointer-events-none bg-white px-2 py-1 rounded shadow-sm border border-slate-200">
+                                                    <i className="ph-bold ph-pencil-simple"></i> Kliknij, aby edytować
+                                                </div>
+                                                <textarea 
+                                                    value={poster.fact}
+                                                    onChange={(e) => {
+                                                        const newData = {...gazetkaData};
+                                                        newData.posters[idx].fact = e.target.value;
+                                                        setGazetkaData(newData);
+                                                    }}
+                                                    className="w-full h-full min-h-[100px] bg-transparent resize-none outline-none text-center text-xl md:text-2xl font-semibold text-slate-800 leading-snug custom-scrollbar focus:bg-white focus:rounded-lg p-2 transition-colors"
+                                                />
                                             </div>
                                         </div>
                                     ))}
                                 </div>
 
-                                {/* PLAKATY W DRUKU - KAŻDY NA A4 */}
+                                {/* PLAKATY W DRUKU - Zawsze A4, z uwzględnieniem ewentualnej edycji */}
                                 <div className="hidden print:block">
                                     {gazetkaData.posters.map((poster, idx) => (
                                         <div key={`print-poster-${idx}`} className="print-poster-page">
