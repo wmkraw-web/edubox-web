@@ -11,17 +11,18 @@ export default async function handler(req, res) {
     return res.status(400).json({ message: 'Brak polecenia (promptu)' });
   }
 
-  // Mapowanie formatów z EduPlakatu i EduPrezentacji na język zrozumiały dla modelu Flux
+  // Fal.ai (model Flux) akceptuje tylko bardzo konkretne nazwy formatów.
+  // Tłumaczymy wartości z EduPlakatu i EduPrezentacji na język serwera:
   let falImageSize = "square_hd"; // Domyślnie kwadrat
   
   if (aspect_ratio === '3:4') {
-    falImageSize = "3:4";   // EduPlakat Pionowy
+    falImageSize = "portrait_4_3";   // Fal.ai: Pion 
   } else if (aspect_ratio === '4:3') {
-    falImageSize = "4:3";   // EduPlakat Poziomy
+    falImageSize = "landscape_4_3";  // Fal.ai: Poziom
   } else if (aspect_ratio === '16:9') {
-    falImageSize = "16:9";  // EduPrezentacja (Slajdy panoramiczne)
+    falImageSize = "landscape_16_9"; // Fal.ai: Panorama (EduPrezentacja)
   } else if (aspect_ratio === '1:1') {
-    falImageSize = "1:1";   // Kwadrat
+    falImageSize = "square_hd";      // Fal.ai: Kwadrat
   }
 
   try {
@@ -34,32 +35,43 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         prompt: prompt,
-        image_size: falImageSize, // Przekazujemy dynamiczne proporcje
-        num_inference_steps: 4,   // 4 kroki to standard dla superszybkiego modelu Schnell
+        image_size: falImageSize, // Używamy poprawnych nazw wymiarów Fal
+        num_inference_steps: 4,   // 4 kroki (standard dla szybkiego Flux)
         num_images: 1,
         enable_safety_checker: true
       })
     });
 
-    // Najpierw sprawdzamy błędy
+    // Inteligentny system wyłapywania błędów - likwiduje [object Object]
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.detail || errorData.message || "Odrzucono zapytanie przez Fal.ai");
+      let errorMessage = errorData.message || "Fal.ai odrzucił zapytanie.";
+      
+      // Rozpakowanie szczegółów błędu jeśli istnieją
+      if (errorData.detail) {
+        if (Array.isArray(errorData.detail)) {
+          errorMessage = errorData.detail.map(e => e.msg).join(', ');
+        } else if (typeof errorData.detail === 'object') {
+          errorMessage = JSON.stringify(errorData.detail);
+        } else {
+          errorMessage = errorData.detail;
+        }
+      }
+      throw new Error(errorMessage);
     }
 
     const data = await response.json();
     
     // Zwracamy adres URL wygenerowanego obrazka do frontendu
-    // Fal.ai umieszcza go w tablicy images[0].url
     if (data.images && data.images.length > 0) {
         res.status(200).json({ imageUrl: data.images[0].url });
     } else {
-        throw new Error("Pusta odpowiedź - nie wygenerowano obrazka.");
+        throw new Error("Pusta odpowiedź z Fal.ai - nie wygenerowano obrazka.");
     }
 
   } catch (error) {
-    console.error("Szczegóły błędu Fal.ai:", error);
-    // Wysyłamy dokładną treść błędu z powrotem do przeglądarki
-    res.status(500).json({ message: `Błąd serwera: ${error.message}` });
+    console.error("Szczegóły błędu:", error);
+    // Zwracamy czysty tekst, gotowy do wyświetlenia na czerwonym pasku błędów
+    res.status(500).json({ message: error.message });
   }
 }
