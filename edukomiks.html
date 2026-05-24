@@ -3,87 +3,86 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="google" content="notranslate">
-    <title>EduKomiks AI - Naprawiona Wersja</title>
-    <!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-3RQ9R0N0K8"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-
-  gtag('config', 'G-3RQ9R0N0K8');
-</script>
-
+    <title>EduKomiks AI v3 - Stabilna Wersja</title>
     
-    <!-- Biblioteki -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Comic+Neue:wght@400;700&family=Outfit:wght@400;700;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Comic+Neue:wght@700&family=Outfit:wght@400;700;900&display=swap" rel="stylesheet">
 
     <style>
-        body { background-color: #020617; color: #f8fafc; background-image: radial-gradient(circle at 10% 20%, rgba(234, 179, 8, 0.15) 0px, transparent 40%); min-height: 100vh; font-family: 'Outfit', sans-serif; }
-        .halftone-bg { background-image: radial-gradient(#334155 2px, transparent 2px); background-size: 10px 10px; }
-        .comic-border { border: 4px solid #000; }
-        .shadow-solid { box-shadow: 6px 6px 0px 0px rgba(0,0,0,1); }
-        .shadow-solid-sm { box-shadow: 3px 3px 0px 0px rgba(0,0,0,1); }
-        .bubble-tail { position: absolute; bottom: -15px; left: 50%; transform: translateX(-50%); width: 20px; height: 20px; background: white; clip-path: polygon(0 0, 100% 0, 50% 100%); z-index: 10; }
-        .bubble-tail-border { position: absolute; bottom: -21px; left: 50%; transform: translateX(-50%); width: 30px; height: 24px; background: #000; clip-path: polygon(0 0, 100% 0, 50% 100%); z-index: 9; }
-        @media print { .no-print { display: none !important; } .print-area { width: 100% !important; background: white !important; } }
+        body { background-color: #020617; color: #f8fafc; font-family: 'Outfit', sans-serif; min-height: 100vh; }
+        .halftone-bg { background-image: radial-gradient(#334155 1.5px, transparent 1.5px); background-size: 12px 12px; }
+        .shadow-solid { box-shadow: 8px 8px 0px 0px rgba(0,0,0,1); }
+        .shadow-solid-sm { box-shadow: 4px 4px 0px 0px rgba(0,0,0,1); }
+        
+        /* Poprawka dymków - teraz tekst MUSI być widoczny */
+        .comic-bubble-fixed {
+            background-color: white !important;
+            color: black !important;
+            border: 4px solid black !important;
+            border-radius: 24px;
+            padding: 12px 16px;
+            font-family: 'Comic Neue', cursive;
+            font-weight: 900;
+            text-align: center;
+            line-height: 1.2;
+            filter: drop-shadow(4px 4px 0px rgba(0,0,0,0.1));
+        }
+
+        .bubble-tail { 
+            position: absolute; bottom: -18px; left: 50%; transform: translateX(-50%);
+            width: 24px; height: 24px; background: white; 
+            clip-path: polygon(0 0, 100% 0, 50% 100%); border: none; z-index: 10;
+        }
+        .bubble-tail-border {
+            position: absolute; bottom: -25px; left: 50%; transform: translateX(-50%);
+            width: 34px; height: 30px; background: black;
+            clip-path: polygon(0 0, 100% 0, 50% 100%); z-index: 9;
+        }
+
+        @media print { .no-print { display: none !important; } .print-area { width: 100% !important; background: white !important; padding: 0 !important; } }
     </style>
 </head>
 <body>
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useRef } = React;
+        const { useState } = React;
 
         function App() {
             const [topic, setTopic] = useState('');
-            const [ageGroup, setAgeGroup] = useState('Klasy 1-3');
-            const [artStyle, setArtStyle] = useState('Klasyczny Komiks');
             const [step, setStep] = useState('config');
             const [comicData, setComicData] = useState(null);
-            const [loadingStatus, setLoadingStatus] = useState('');
-            const [loadingProgress, setLoadingProgress] = useState(0);
-
-            const translateStyle = (styleName) => {
-                switch(styleName) {
-                    case 'Klasyczny Komiks': return 'Western comic book style, clean ink lines, vibrant flat colors, high quality digital art';
-                    case 'Manga / Anime': return 'Modern anime style, sharp features, expressive eyes, cinematic lighting, high quality';
-                    case 'Bajkowe 3D': return '3D Pixar-style render, soft shadows, rounded shapes, cute aesthetic, high detail';
-                    case 'Kredki / Szkic': return 'Children book illustration, crayon and watercolor texture, soft edges, artistic';
-                    default: return 'comic illustration';
-                }
-            };
+            const [loading, setLoading] = useState(false);
+            const [progress, setProgress] = useState(0);
 
             const generateComic = async () => {
-                if (!topic.trim()) return alert('Wpisz temat!');
+                if (!topic.trim()) return;
                 setStep('generating');
-                setLoadingStatus('Układam historię i stabilizuję wygląd postaci...');
-                setLoadingProgress(10);
+                setLoading(true);
+                setProgress(10);
                 
                 try {
-                    // KLUCZOWA ZMIANA: Bardzo restrykcyjny System Prompt
-                    const systemPrompt = `Jesteś scenarzystą komiksów. Tworzysz 4-kadrową historię.
-                    ZASADY DOTYCZĄCE OBRAZÓW (imagePrompt):
-                    1. Wybierz JEDNEGO głównego bohatera (np. chłopiec o imieniu Jasiu) i opisz go szczegółowo (np. "7-year-old boy, short messy dark hair, wearing a green t-shirt").
-                    2. Używaj tego SAMEGO opisu postaci w każdym kadru, aby zachować spójność.
-                    3. Jeśli pojawia się pies, opisz go wyraźnie (np. "small golden retriever puppy") i trzymaj go z dala od twarzy człowieka w opisie, aby uniknąć błędów anatomii.
-                    4. ABSOLUTNY ZAKAZ tekstu na obrazkach.
+                    // System Prompt v3 - Bardziej rygorystyczny
+                    const systemPrompt = `Jesteś ilustratorem komiksów edukacyjnych. Twoim zadaniem jest stworzenie 4 kadrowej historii.
+                    BOHATEROWIE:
+                    - Główny bohater to Jasiu: 7-letni chłopiec, krótkie ciemne włosy, ZIELONA KOSZULKA (zawsze!).
+                    - Pies: Mały złoty szczeniak Golden Retriever.
+                    
+                    ZASADY OBRAZÓW (imagePrompt):
+                    1. Opisuj kadr bardzo prosto. NIE używaj luster ani skomplikowanych odbić.
+                    2. Zawsze pisz: "One boy (Jasiu) and one dog". Nigdy więcej postaci.
+                    3. Styl: "Vibrant flat vector illustration, clean bold lines, comic book style, high contrast".
+                    4. ZERO tekstu na grafice.
                     
                     Zwróć JSON:
                     {
-                        "title": "Tytuł",
+                        "title": "Tytuł (max 3 słowa)",
                         "panels": [
-                            {
-                                "narration": "tekst u góry",
-                                "dialogue": "tekst w dymku",
-                                "imagePrompt": "DETAILED visual description in English, focusing on consistent character appearance and background"
-                            }
+                            {"narration": "tekst żółty", "dialogue": "tekst w dymku", "imagePrompt": "Description in English"}
                         ]
                     }`;
 
@@ -91,7 +90,7 @@
                         method: 'POST', 
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ 
-                            prompt: `Temat: ${topic}. Odbiorcy: ${ageGroup}. Stwórz komiks o bohaterze o imieniu Jasiu.`, 
+                            prompt: `Temat: ${topic}. Pamiętaj o zielonej koszulce Jasia i jednym psie.`, 
                             system: systemPrompt, 
                             format: "json", 
                             model: "gpt-4o-mini" 
@@ -101,64 +100,44 @@
                     const dataChat = await resChat.json();
                     let comicObj = JSON.parse(dataChat.text.match(/\{[\s\S]*\}/)[0]);
 
-                    setLoadingStatus('Rysuję kadry (dbam o anatomię)...');
-                    const engStyle = translateStyle(artStyle);
-                    
                     for (let i = 0; i < comicObj.panels.length; i++) {
-                        setLoadingProgress(25 + (i * 18));
-                        
-                        // Ulepszony prompt dla generatora obrazów
-                        const finalImagePrompt = `${comicObj.panels[i].imagePrompt}. ${engStyle}. Consistent character design, clear faces, high quality, masterpiece, sharp focus. NO TEXT, NO SPEECH BUBBLES, NO DEFORMATIONS, NO ANIMAL-HUMAN HYBRIDS.`;
+                        setProgress(20 + (i * 20));
+                        const finalPrompt = `${comicObj.panels[i].imagePrompt}. High quality vector art, cel shaded, clean bold outlines, flat colors, masterpiece. NO REFLECTIONS, NO MIRRORS, ONLY ONE BOY, ONLY ONE DOG.`;
 
                         const responseImg = await fetch('/api/generate', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ 
-                                prompt: finalImagePrompt,
-                                negative_prompt: "text, words, logo, watermark, blurry, deformed hands, deformed face, dog head on human, human head on dog, mutant, extra limbs, ugly",
+                                prompt: finalPrompt,
+                                negative_prompt: "text, words, blurry, mirror, reflection, two boys, two dogs, clones, extra limbs, ugly, messy lines, watermark",
                                 aspect_ratio: '1:1'
                             })
                         });
                         
-                        if (responseImg.ok) {
-                            const dataImg = await responseImg.json();
-                            comicObj.panels[i].imageUrl = dataImg.imageUrl || dataImg.url || (dataImg.data && dataImg.data[0]?.url);
-                        }
+                        const dataImg = await responseImg.json();
+                        comicObj.panels[i].imageUrl = dataImg.imageUrl || dataImg.url || (dataImg.data && dataImg.data[0]?.url);
                     }
 
                     setComicData(comicObj);
                     setStep('review');
-                } catch (error) {
-                    console.error(error);
-                    alert('Błąd generatora. Spróbuj zmienić temat.');
+                } catch (e) {
+                    alert('Błąd! Spróbuj ponownie.');
                     setStep('config');
-                }
+                } finally { setLoading(false); }
             };
 
             if (step === 'config') {
                 return (
-                    <div className="min-h-screen flex flex-col items-center justify-center p-6 halftone-bg">
-                        <div className="bg-white p-8 rounded-2xl shadow-solid border-4 border-black w-full max-w-xl">
-                            <h1 className="text-5xl font-bangers text-black text-center mb-6">EduKomiks AI v2</h1>
-                            <div className="space-y-4">
-                                <label className="block font-bold text-black uppercase text-sm">Temat komiksu:</label>
-                                <input type="text" value={topic} onChange={e => setTopic(e.target.value)} placeholder="np. Jasiu myje zęby z psem" className="w-full p-4 border-4 border-black rounded-xl font-bold text-black" />
-                                
-                                <div className="grid grid-cols-2 gap-4">
-                                    <select value={artStyle} onChange={e => setArtStyle(e.target.value)} className="p-4 border-4 border-black rounded-xl font-bold text-black">
-                                        <option>Klasyczny Komiks</option>
-                                        <option>Manga / Anime</option>
-                                        <option>Bajkowe 3D</option>
-                                        <option>Kredki / Szkic</option>
-                                    </select>
-                                    <select value={ageGroup} onChange={e => setAgeGroup(e.target.value)} className="p-4 border-4 border-black rounded-xl font-bold text-black">
-                                        <option>Przedszkole</option>
-                                        <option>Klasy 1-3</option>
-                                    </select>
+                    <div className="min-h-screen flex items-center justify-center p-6 halftone-bg">
+                        <div className="bg-white p-10 rounded-3xl shadow-solid border-4 border-black w-full max-w-lg">
+                            <h1 className="text-5xl font-bangers text-black text-center mb-8 tracking-wide">EduKomiks <span className="text-red-500">PRO</span></h1>
+                            <div className="space-y-6">
+                                <div>
+                                    <label className="block font-black text-black uppercase text-sm mb-2">O czym ma być komiks?</label>
+                                    <input type="text" value={topic} onChange={e => setTopic(e.target.value)} placeholder="np. Jasiu uczy psa jak segregować papier" className="w-full p-4 border-4 border-black rounded-xl font-bold text-black outline-none focus:bg-yellow-50" />
                                 </div>
-
-                                <button onClick={generateComic} className="w-full bg-yellow-400 hover:bg-yellow-300 text-black py-4 rounded-xl font-bangers text-3xl border-4 border-black shadow-solid transition-transform active:translate-y-1">
-                                    GENERUJ KOMIKS!
+                                <button onClick={generateComic} className="w-full bg-yellow-400 hover:bg-yellow-300 text-black py-5 rounded-xl font-bangers text-3xl border-4 border-black shadow-solid transition-transform active:translate-y-2">
+                                    RYSUJ KOMIKS!
                                 </button>
                             </div>
                         </div>
@@ -168,13 +147,14 @@
 
             if (step === 'generating') {
                 return (
-                    <div className="min-h-screen flex items-center justify-center bg-amber-400 halftone-bg p-6">
-                        <div className="bg-white border-4 border-black p-10 rounded-3xl shadow-solid text-center max-w-md w-full">
-                            <i className="ph-fill ph-paint-brush-broad animate-bounce text-6xl text-red-500 mb-4"></i>
-                            <h2 className="text-3xl font-bangers mb-2">Sztuczna inteligencja rysuje...</h2>
-                            <p className="font-bold text-slate-600 mb-6">{loadingStatus}</p>
-                            <div className="w-full h-4 bg-slate-200 border-2 border-black rounded-full overflow-hidden">
-                                <div className="h-full bg-red-500 transition-all" style={{ width: `${loadingProgress}%` }}></div>
+                    <div className="min-h-screen flex items-center justify-center bg-red-500 halftone-bg p-6 text-white">
+                        <div className="text-center bg-white border-4 border-black p-10 rounded-3xl shadow-solid text-black max-w-sm w-full">
+                            <div className="w-20 h-20 bg-amber-400 border-4 border-black rounded-full flex items-center justify-center mx-auto mb-4 animate-spin">
+                                <i className="ph-fill ph-pencil-line text-4xl"></i>
+                            </div>
+                            <h2 className="text-3xl font-bangers mb-2">PRODUKCJA...</h2>
+                            <div className="w-full h-6 bg-slate-100 border-4 border-black rounded-full overflow-hidden">
+                                <div className="h-full bg-blue-500 transition-all duration-500" style={{ width: `${progress}%` }}></div>
                             </div>
                         </div>
                     </div>
@@ -183,30 +163,42 @@
 
             if (step === 'review') {
                 return (
-                    <div className="min-h-screen p-4 md:p-10 bg-slate-200">
+                    <div className="min-h-screen p-4 md:p-8 bg-slate-900 overflow-y-auto">
                         <div className="max-w-4xl mx-auto bg-white border-4 border-black shadow-solid p-6 md:p-10 print-area rounded-xl">
-                            <h1 className="text-5xl font-bangers text-center text-black mb-8 border-b-4 border-black pb-4 uppercase">{comicData.title}</h1>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-black p-4 rounded-xl border-4 border-black">
+                            <h1 className="text-5xl font-bangers text-center text-black mb-10 border-b-8 border-black pb-4 uppercase tracking-widest">{comicData.title}</h1>
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-black p-4 rounded-xl border-4 border-black">
                                 {comicData.panels.map((panel, idx) => (
                                     <div key={idx} className="relative bg-white aspect-square border-4 border-black overflow-hidden flex flex-col group">
-                                        <img src={panel.imageUrl} className="absolute inset-0 w-full h-full object-cover" />
-                                        <div className="relative z-10 w-full bg-yellow-300 border-b-4 border-black p-2 font-comic font-bold text-xs md:text-sm text-black">
+                                        <img src={panel.imageUrl} className="absolute inset-0 w-full h-full object-cover" alt="panel" />
+                                        
+                                        {/* Narracja - Żółty pasek */}
+                                        <div className="relative z-10 w-full bg-yellow-300 border-b-4 border-black p-3 font-bold text-sm text-black">
                                             {panel.narration}
                                         </div>
-                                        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-white border-4 border-black rounded-2xl p-3 max-w-[80%] text-center font-comic font-bold text-sm shadow-solid-sm z-20">
-                                            {panel.dialogue}
-                                            <div className="bubble-tail-border"></div>
-                                            <div className="bubble-tail"></div>
-                                        </div>
-                                        <div className="absolute bottom-2 right-2 bg-black text-white font-bangers w-6 h-6 flex items-center justify-center rounded-full text-xs z-30">
+
+                                        {/* DYMEK - TERAZ ZAWSZE CZYTELNY */}
+                                        {panel.dialogue && (
+                                            <div className="absolute bottom-10 left-1/2 -translate-x-1/2 w-[85%] z-20">
+                                                <div className="comic-bubble-fixed relative">
+                                                    {panel.dialogue}
+                                                    <div className="bubble-tail-border"></div>
+                                                    <div className="bubble-tail"></div>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Numer kadru */}
+                                        <div className="absolute bottom-2 right-2 bg-black text-white font-bangers w-8 h-8 flex items-center justify-center rounded-full text-lg z-30">
                                             {idx + 1}
                                         </div>
                                     </div>
                                 ))}
                             </div>
-                            <div className="mt-8 flex gap-4 no-print">
-                                <button onClick={() => window.print()} className="flex-1 bg-green-500 text-white font-bangers text-2xl py-3 rounded-xl border-4 border-black shadow-solid">DRUKUJ DO PDF</button>
-                                <button onClick={() => setStep('config')} className="flex-1 bg-white text-black font-bangers text-2xl py-3 rounded-xl border-4 border-black shadow-solid">NOWY KOMIKS</button>
+
+                            <div className="mt-10 flex gap-4 no-print">
+                                <button onClick={() => window.print()} className="flex-1 bg-green-500 hover:bg-green-400 text-white font-bangers text-3xl py-4 rounded-xl border-4 border-black shadow-solid-sm active:translate-y-1">DRUKUJ (PDF)</button>
+                                <button onClick={() => setStep('config')} className="flex-1 bg-white hover:bg-slate-100 text-black font-bangers text-3xl py-4 rounded-xl border-4 border-black shadow-solid-sm active:translate-y-1">NOWY KOMIKS</button>
                             </div>
                         </div>
                     </div>
