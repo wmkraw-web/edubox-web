@@ -119,7 +119,6 @@
                 setFreeTries(savedTries);
             }, []);
 
-            // GŁÓWNA FUNKCJA GENERUJĄCA - PODPIĘTA POD TWÓJ VERCEL BACKEND
             const generatePoster = async () => {
                 if (!isAuthenticated && freeTries >= FREE_TRIES_LIMIT) {
                     setShowPaywall(true); return;
@@ -133,33 +132,27 @@
                 setGeneratedImage(null);
 
                 try {
-                    // Tłumaczenie w locie dla lepszej skuteczności AI
                     let translatedPrompt = promptInput;
                     try {
                         const res = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=pl&tl=en&dt=t&q=${encodeURIComponent(promptInput)}`);
                         if (res.ok) { const data = await res.json(); translatedPrompt = data[0][0][0]; }
                     } catch(e) { console.log("Tłumaczenie nie powiodło się, używam oryginału."); }
 
-                    // Modyfikatory stylu (bez zbytnich restrykcji, by utrzymać jakość artystyczną)
+                    // Uproszczone modyfikatory stylu, by model skupił się na logice, a nie detalach "idealności"
                     let styleModifier = "";
                     if (styleOption === 'akwarela') {
-                        styleModifier = "stunning watercolor painting, luminous soft vibrant colors, award-winning storybook illustration, 8k resolution, crisp details";
+                        styleModifier = "beautiful watercolor painting, children's book illustration style, soft and harmonious";
                     } else if (styleOption === '3d') {
-                        styleModifier = "cute 3d render, modern disney pixar animation style, ultra-detailed adorable characters, 8k resolution, unreal engine 5";
+                        styleModifier = "high quality 3D Pixar Disney animation style render, cute and cohesive";
                     } else if (styleOption === 'plakat') {
-                        styleModifier = "modern flat vector art, bold vibrant colors, minimalist illustration, crisp clean lines, highly detailed";
+                        styleModifier = "flat vector illustration, modern poster art, clean design";
                     }
 
-                    // Informacja o orientacji
-                    let orientationText = orientationOption === '3:4' ? 'Vertical portrait poster format.' : (orientationOption === '4:3' ? 'Horizontal landscape format.' : 'Square format.');
-
-                    // POTĘŻNE WYMOGI ANATOMICZNE (Rasa biała, poprawna budowa ciała)
-                    const fullPrompt = `A breathtaking artwork. MAIN SUBJECT: ${translatedPrompt}. STYLE: ${styleModifier}. ${orientationText} Professional illustration, perfect composition. ABSOLUTELY NO TEXT, no words. If there are people, they MUST be Caucasian/European. Extremely strict requirement: flawless, physically accurate human anatomy, naturally posed, perfectly drawn hands with exactly 5 fingers per hand, correct number of legs and arms.`;
+                    // Naturalny prompt z łagodnym, ale stanowczym wymuszeniem logiki relacyjnej i rasowej
+                    const fullPrompt = `${translatedPrompt}. Featuring European Caucasian people. ${styleModifier}. Perfect logical composition, characters interacting naturally. High quality masterpiece. No text.`;
                     
-                    // POTĘŻNY NEGATIVE PROMPT (Wymuszający na modelach API odrzucanie potworków)
-                    const negativePrompt = "mutated, deformed, ugly, bad anatomy, bad proportions, bad hands, missing fingers, extra fingers, extra limbs, fused fingers, poorly drawn face, disfigured, cross-eyed, text, words, watermark";
+                    const negativePrompt = "text, words, floating objects, extra limbs, bad anatomy, deformed, missing fingers, extra fingers, ugly, poorly drawn";
 
-                    // Rozbudowujemy paczkę (payload) tak, aby każdy model (OpenAI, Leonardo, Fal) zrozumiał wymiary:
                     let sizeParam = '1024x1024';
                     let widthParam = 1024;
                     let heightParam = 1024;
@@ -174,13 +167,12 @@
                         heightParam = 768;       // Leonardo / Fal poziom
                     }
 
-                    // Połączenie z Twoim backendem Vercel
                     const response = await fetch('/api/generate', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ 
                             prompt: fullPrompt,
-                            negative_prompt: negativePrompt, // Przekazujemy listę zakazanych mutacji
+                            negative_prompt: negativePrompt,
                             aspect_ratio: orientationOption,
                             style_preset: styleOption,
                             size: sizeParam,
@@ -196,7 +188,6 @@
                     
                     const data = await response.json();
                     
-                    // Bezpieczny parser obsługujący różnorodne backendy
                     let finalImage = data.imageUrl || data.image_url || data.url || (data.data && data.data[0] && data.data[0].url) || data.image;
                     
                     if (finalImage) {
@@ -451,7 +442,7 @@
                                 </div>
                                 <div className="text-center mt-6 p-4 bg-slate-800/50 rounded-xl border border-slate-700">
                                     <p className="text-slate-400 text-sm font-medium leading-relaxed">
-                                        <span className="text-amber-400">💡 Ważna wskazówka:</span> AI najlepiej rysuje detale z bliska! Jeśli chcesz pięknych twarzy, wpisuj hasła typu: <span className="text-white">"Zbliżenie na twarz uśmiechniętej mamy"</span>. Twarze w bardzo dalekim tle (np. tłum) zawsze będą mniej wyraźne i podatne na zniekształcenia.
+                                        <span className="text-amber-400">💡 Ważna wskazówka dla scen wieloosobowych:</span> Zamiast pisać "Chłopiec i dziewczynka dają kwiaty mamie" (co bardzo myli AI), spróbuj opisać sytuację bardziej przestrzennie: <span className="text-white">"Uśmiechnięta mama stoi w środku, a uśmiechnięty chłopiec po lewej i dziewczynka po prawej trzymają bukiety kwiatów"</span>.
                                     </p>
                                 </div>
                             </div>
