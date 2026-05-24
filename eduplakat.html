@@ -133,32 +133,29 @@
                 setGeneratedImage(null);
 
                 try {
-                    // Tłumaczenie w locie dla lepszej skuteczności AI (zwłaszcza anatomii)
+                    // Tłumaczenie w locie dla lepszej skuteczności AI
                     let translatedPrompt = promptInput;
                     try {
                         const res = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=pl&tl=en&dt=t&q=${encodeURIComponent(promptInput)}`);
                         if (res.ok) { const data = await res.json(); translatedPrompt = data[0][0][0]; }
                     } catch(e) { console.log("Tłumaczenie nie powiodło się, używam oryginału."); }
 
-                    // Modyfikatory stylu wymuszające poprawność na modelu
+                    // Modyfikatory stylu (bez zbytnich restrykcji, by utrzymać jakość artystyczną)
                     let styleModifier = "";
                     if (styleOption === 'akwarela') {
-                        styleModifier = "stunning watercolor painting, luminous soft vibrant colors, flawless expressive faces, anatomically correct, perfect hands, highly detailed characters, award-winning storybook illustration, 8k resolution, crisp details";
+                        styleModifier = "stunning watercolor painting, luminous soft vibrant colors, award-winning storybook illustration, 8k resolution, crisp details";
                     } else if (styleOption === '3d') {
-                        styleModifier = "cute 3d render, modern disney pixar animation style, flawless charming faces, perfect anatomy, exactly 5 fingers per hand, big expressive eyes, ultra-detailed adorable characters, 8k resolution, unreal engine 5";
+                        styleModifier = "cute 3d render, modern disney pixar animation style, ultra-detailed adorable characters, 8k resolution, unreal engine 5";
                     } else if (styleOption === 'plakat') {
-                        styleModifier = "modern flat vector art, bold vibrant colors, beautiful flawless stylized characters, perfect proportions, minimalist illustration, crisp clean lines, highly detailed";
+                        styleModifier = "modern flat vector art, bold vibrant colors, minimalist illustration, crisp clean lines, highly detailed";
                     }
 
-                    // Informacja o orientacji bezpośrednio w prompcie, gdyby backend nie obsługiwał parametru aspect_ratio
+                    // Informacja o orientacji
                     let orientationText = orientationOption === '3:4' ? 'Vertical portrait poster format.' : (orientationOption === '4:3' ? 'Horizontal landscape format.' : 'Square format.');
 
-                    const fullPrompt = `A breathtaking artwork. MAIN SUBJECT: ${translatedPrompt}. STYLE: ${styleModifier}. ${orientationText} Masterpiece, highly detailed, perfect composition, clear focus on the beautiful flawless characters, anatomically correct.`;
+                    // POTĘŻNE WZIOSY DLA FLUXA (Zero tekstu, rasa biała, poprawna anatomia)
+                    const fullPrompt = `A breathtaking artwork. MAIN SUBJECT: ${translatedPrompt}. STYLE: ${styleModifier}. ${orientationText} High quality masterpiece, perfect composition. ABSOLUTELY NO TEXT, no words, no letters. If there are people, they MUST be Caucasian, European, Polish with perfect human anatomy, flawless faces and exactly 5 fingers.`;
 
-                    // =========================================================
-                    // POŁĄCZENIE Z TWOIM BACKENDEM VERCEL (Tym z EduGeneratora)
-                    // =========================================================
-                    
                     // Rozbudowujemy paczkę (payload) tak, aby każdy model (OpenAI, Leonardo, Fal) zrozumiał wymiary:
                     let sizeParam = '1024x1024';
                     let widthParam = 1024;
@@ -174,6 +171,7 @@
                         heightParam = 768;       // Leonardo / Fal poziom
                     }
 
+                    // Połączenie z Twoim backendem Vercel
                     const response = await fetch('/api/generate', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -181,9 +179,9 @@
                             prompt: fullPrompt,
                             aspect_ratio: orientationOption,
                             style_preset: styleOption,
-                            size: sizeParam,        // Używane przez OpenAI DALL-E 3
-                            width: widthParam,      // Używane przez Leonardo / Fal.ai
-                            height: heightParam     // Używane przez Leonardo / Fal.ai
+                            size: sizeParam,
+                            width: widthParam,
+                            height: heightParam
                         })
                     });
                     
@@ -194,11 +192,10 @@
                     
                     const data = await response.json();
                     
-                    // Bezpieczny parser obsługujący różnorodne backendy (DALL-E, Fal.ai, Leonardo)
+                    // Bezpieczny parser obsługujący różnorodne backendy
                     let finalImage = data.imageUrl || data.image_url || data.url || (data.data && data.data[0] && data.data[0].url) || data.image;
                     
                     if (finalImage) {
-                        // Sprawdzamy czy to base64 bez nagłówka
                         if (finalImage.length > 1000 && !finalImage.startsWith('http') && !finalImage.startsWith('data:')) {
                             finalImage = `data:image/png;base64,${finalImage}`;
                         }
@@ -360,7 +357,7 @@
                                     Twórz piękne <span className="text-gradient">plakaty szkolne.</span>
                                 </h1>
                                 <p className="text-slate-400 text-lg">
-                                    Opisz krótko jaką grafikę potrzebujesz, a my wygenerujemy tło plakatowe wysokiej jakości, na którym samodzielnie dodasz napisy.
+                                    Opisz krótko jaką grafikę potrzebujesz, a my wygenerujemy puste tło plakatowe, na którym samodzielnie dodasz napisy.
                                 </p>
                             </div>
 
@@ -462,10 +459,10 @@
                                         <h3 className="text-xl font-bold text-white text-center sm:text-left">Twój Gotowy Plakat</h3>
                                         <div className="flex gap-3 w-full sm:w-auto flex-col sm:flex-row">
                                             <button onClick={handleDownload} className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-3 rounded-xl font-bold flex items-center gap-2 transition-all btn-bounce shadow-lg justify-center">
-                                                📥 Pobierz
+                                                📥 Pobierz (do Canvy)
                                             </button>
                                             <button onClick={handlePrint} className="bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-3 rounded-xl font-bold flex items-center gap-2 transition-all btn-bounce shadow-lg justify-center">
-                                                🖨️ Drukuj na całą stronę
+                                                🖨️ Drukuj (np. na A4/A3)
                                             </button>
                                         </div>
                                     </div>
