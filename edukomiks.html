@@ -3,57 +3,43 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>EduKomiks AI v3 - Stabilna Wersja</title>
-    <!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-3RQ9R0N0K8"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-
-  gtag('config', 'G-3RQ9R0N0K8');
-</script>
-
+    <title>EduKomiks AI v4 - Profesjonalny Kreator</title>
     
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Comic+Neue:wght@700&family=Outfit:wght@400;700;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Comic+Neue:wght@700;900&family=Outfit:wght@400;700;900&display=swap" rel="stylesheet">
 
     <style>
-        body { background-color: #020617; color: #f8fafc; font-family: 'Outfit', sans-serif; min-height: 100vh; }
-        .halftone-bg { background-image: radial-gradient(#334155 1.5px, transparent 1.5px); background-size: 12px 12px; }
+        body { 
+            background-color: #020617; 
+            color: #f8fafc; 
+            font-family: 'Outfit', sans-serif;
+            background-image: radial-gradient(circle at 10% 20%, rgba(234, 179, 8, 0.15) 0px, transparent 40%),
+                              radial-gradient(circle at 90% 80%, rgba(239, 68, 68, 0.15) 0px, transparent 40%);
+        }
+        .halftone-bg { background-image: radial-gradient(#334155 2px, transparent 2px); background-size: 14px 14px; }
         .shadow-solid { box-shadow: 8px 8px 0px 0px rgba(0,0,0,1); }
         .shadow-solid-sm { box-shadow: 4px 4px 0px 0px rgba(0,0,0,1); }
-        
-        /* Poprawka dymków - teraz tekst MUSI być widoczny */
-        .comic-bubble-fixed {
-            background-color: white !important;
-            color: black !important;
-            border: 4px solid black !important;
-            border-radius: 24px;
-            padding: 12px 16px;
-            font-family: 'Comic Neue', cursive;
-            font-weight: 900;
-            text-align: center;
-            line-height: 1.2;
-            filter: drop-shadow(4px 4px 0px rgba(0,0,0,0.1));
+        .comic-bubble {
+            background: white; border: 4px solid black; border-radius: 25px;
+            padding: 12px 18px; color: black; font-family: 'Comic Neue', cursive;
+            font-weight: 900; text-align: center; position: relative; z-index: 50;
+            box-shadow: 4px 4px 0px rgba(0,0,0,0.2);
         }
-
-        .bubble-tail { 
-            position: absolute; bottom: -18px; left: 50%; transform: translateX(-50%);
-            width: 24px; height: 24px; background: white; 
-            clip-path: polygon(0 0, 100% 0, 50% 100%); border: none; z-index: 10;
+        .bubble-tail {
+            position: absolute; bottom: -15px; left: 50%; transform: translateX(-50%);
+            width: 20px; height: 20px; background: white; clip-path: polygon(0 0, 100% 0, 50% 100%);
+            border: none; z-index: 51;
         }
         .bubble-tail-border {
-            position: absolute; bottom: -25px; left: 50%; transform: translateX(-50%);
-            width: 34px; height: 30px; background: black;
-            clip-path: polygon(0 0, 100% 0, 50% 100%); z-index: 9;
+            position: absolute; bottom: -21px; left: 50%; transform: translateX(-50%);
+            width: 28px; height: 26px; background: black; clip-path: polygon(0 0, 100% 0, 50% 100%);
+            z-index: 49;
         }
-
-        @media print { .no-print { display: none !important; } .print-area { width: 100% !important; background: white !important; padding: 0 !important; } }
+        @media print { .no-print { display: none !important; } .print-area { width: 100% !important; background: white !important; } }
     </style>
 </head>
 <body>
@@ -66,33 +52,30 @@
             const [topic, setTopic] = useState('');
             const [step, setStep] = useState('config');
             const [comicData, setComicData] = useState(null);
-            const [loading, setLoading] = useState(false);
-            const [progress, setProgress] = useState(0);
+            const [loadingMsg, setLoadingMsg] = useState('');
 
             const generateComic = async () => {
                 if (!topic.trim()) return;
                 setStep('generating');
-                setLoading(true);
-                setProgress(10);
+                setLoadingMsg('Analizuję bohaterów i układam scenariusz...');
                 
                 try {
-                    // System Prompt v3 - Bardziej rygorystyczny
-                    const systemPrompt = `Jesteś ilustratorem komiksów edukacyjnych. Twoim zadaniem jest stworzenie 4 kadrowej historii.
-                    BOHATEROWIE:
-                    - Główny bohater to Jasiu: 7-letni chłopiec, krótkie ciemne włosy, ZIELONA KOSZULKA (zawsze!).
-                    - Pies: Mały złoty szczeniak Golden Retriever.
-                    
-                    ZASADY OBRAZÓW (imagePrompt):
-                    1. Opisuj kadr bardzo prosto. NIE używaj luster ani skomplikowanych odbić.
-                    2. Zawsze pisz: "One boy (Jasiu) and one dog". Nigdy więcej postaci.
-                    3. Styl: "Vibrant flat vector illustration, clean bold lines, comic book style, high contrast".
-                    4. ZERO tekstu na grafice.
+                    // System Prompt v4 - Ekstremalnie rygorystyczny
+                    const systemPrompt = `Jesteś scenarzystą komiksów. Użytkownik podaje temat/bohatera.
+                    TWOJE ZADANIA:
+                    1. Wyłuskaj IMIĘ bohatera z zapytania (np. Kaziu, Ania). Jeśli brak, użyj "Jasiu".
+                    2. Stwórz stały opis wyglądu (np. "Short brown hair, blue hoodie, denim jeans").
+                    3. Stwórz 4 panele. W KAŻDYM imagePrompt MUSISZ zacząć od Stałego Opisu Wyglądu.
+                    4. Wymuś stałe otoczenie (np. "The same bathroom background in every panel").
+                    5. Zakaz plucia, ślinienia się, deformacji. Postacie mają być radosne i czyste.
                     
                     Zwróć JSON:
                     {
-                        "title": "Tytuł (max 3 słowa)",
+                        "heroName": "Imię z zapytania",
+                        "heroStyle": "dokładny opis wyglądu postaci",
+                        "title": "Tytuł",
                         "panels": [
-                            {"narration": "tekst żółty", "dialogue": "tekst w dymku", "imagePrompt": "Description in English"}
+                            {"narration": "...", "dialogue": "...", "imagePrompt": "Full scene description starting with heroStyle"}
                         ]
                     }`;
 
@@ -100,7 +83,7 @@
                         method: 'POST', 
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ 
-                            prompt: `Temat: ${topic}. Pamiętaj o zielonej koszulce Jasia i jednym psie.`, 
+                            prompt: `Temat: ${topic}. Użyj imienia z tematu!`, 
                             system: systemPrompt, 
                             format: "json", 
                             model: "gpt-4o-mini" 
@@ -110,16 +93,18 @@
                     const dataChat = await resChat.json();
                     let comicObj = JSON.parse(dataChat.text.match(/\{[\s\S]*\}/)[0]);
 
+                    setLoadingMsg(`Rysuję przygody bohatera: ${comicObj.heroName}...`);
+
                     for (let i = 0; i < comicObj.panels.length; i++) {
-                        setProgress(20 + (i * 20));
-                        const finalPrompt = `${comicObj.panels[i].imagePrompt}. High quality vector art, cel shaded, clean bold outlines, flat colors, masterpiece. NO REFLECTIONS, NO MIRRORS, ONLY ONE BOY, ONLY ONE DOG.`;
+                        // Dodajemy ulepszone parametry graficzne do każdego promptu
+                        const finalPrompt = `${comicObj.panels[i].imagePrompt}. High quality 2D digital comic book style, crisp lines, vibrant colors, expressive faces, Pixar-like charm. NO SPITTING, NO DROOLING, NO LIQUIDS ON FACE. consistent background. masterpiece.`;
 
                         const responseImg = await fetch('/api/generate', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ 
                                 prompt: finalPrompt,
-                                negative_prompt: "text, words, blurry, mirror, reflection, two boys, two dogs, clones, extra limbs, ugly, messy lines, watermark",
+                                negative_prompt: "spitting, drooling, liquid on chin, messy, ugly, deformed, blurry, two different boys, mirror reflection errors, text, watermark, signature",
                                 aspect_ratio: '1:1'
                             })
                         });
@@ -131,24 +116,35 @@
                     setComicData(comicObj);
                     setStep('review');
                 } catch (e) {
-                    alert('Błąd! Spróbuj ponownie.');
+                    alert('Coś poszło nie tak. Spróbuj ponownie.');
                     setStep('config');
-                } finally { setLoading(false); }
+                }
             };
 
             if (step === 'config') {
                 return (
-                    <div className="min-h-screen flex items-center justify-center p-6 halftone-bg">
-                        <div className="bg-white p-10 rounded-3xl shadow-solid border-4 border-black w-full max-w-lg">
-                            <h1 className="text-5xl font-bangers text-black text-center mb-8 tracking-wide">EduKomiks <span className="text-red-500">PRO</span></h1>
+                    <div className="min-h-screen flex flex-col items-center justify-center p-4 halftone-bg">
+                        <div className="text-center mb-10 relative transform -rotate-1 no-print">
+                             <div className="absolute -top-10 -right-10 bg-red-600 text-white font-bangers text-3xl py-2 px-6 border-4 border-black rounded-full rotate-12 shadow-solid-sm">BOOM!</div>
+                             <h1 className="text-6xl md:text-7xl font-bangers text-white tracking-widest drop-shadow-[4px_4px_0px_rgba(0,0,0,1)]">EDUKOMIKS AI</h1>
+                             <p className="text-yellow-400 font-black text-xl mt-2 uppercase tracking-tight">Twoje lekcje w formie komiksu!</p>
+                        </div>
+
+                        <div className="bg-white p-8 md:p-12 rounded-3xl border-8 border-black shadow-solid w-full max-w-2xl transform rotate-1">
                             <div className="space-y-6">
                                 <div>
-                                    <label className="block font-black text-black uppercase text-sm mb-2">O czym ma być komiks?</label>
-                                    <input type="text" value={topic} onChange={e => setTopic(e.target.value)} placeholder="np. Jasiu uczy psa jak segregować papier" className="w-full p-4 border-4 border-black rounded-xl font-bold text-black outline-none focus:bg-yellow-50" />
+                                    <label className="block font-black text-black uppercase text-lg mb-2 font-comic italic underline decoration-yellow-400">O czym ma być dzisiejsza historia?</label>
+                                    <textarea 
+                                        value={topic} 
+                                        onChange={e => setTopic(e.target.value)} 
+                                        placeholder="np. Kaziu uczy się, że nie wolno marnować wody..." 
+                                        className="w-full p-5 border-4 border-black rounded-2xl font-bold text-black text-xl outline-none focus:bg-yellow-50 h-32 resize-none"
+                                    />
                                 </div>
-                                <button onClick={generateComic} className="w-full bg-yellow-400 hover:bg-yellow-300 text-black py-5 rounded-xl font-bangers text-3xl border-4 border-black shadow-solid transition-transform active:translate-y-2">
-                                    RYSUJ KOMIKS!
+                                <button onClick={generateComic} className="w-full bg-yellow-400 hover:bg-amber-400 text-black py-6 rounded-2xl font-bangers text-4xl border-4 border-black shadow-solid transition-all active:translate-y-2 active:shadow-none flex items-center justify-center gap-4">
+                                    <i className="ph-fill ph-lightning"></i> STWÓRZ KOMIKS!
                                 </button>
+                                <p className="text-center text-slate-400 font-bold text-xs uppercase tracking-widest">Wpisz imię bohatera w opisie!</p>
                             </div>
                         </div>
                     </div>
@@ -157,15 +153,14 @@
 
             if (step === 'generating') {
                 return (
-                    <div className="min-h-screen flex items-center justify-center bg-red-500 halftone-bg p-6 text-white">
-                        <div className="text-center bg-white border-4 border-black p-10 rounded-3xl shadow-solid text-black max-w-sm w-full">
-                            <div className="w-20 h-20 bg-amber-400 border-4 border-black rounded-full flex items-center justify-center mx-auto mb-4 animate-spin">
-                                <i className="ph-fill ph-pencil-line text-4xl"></i>
+                    <div className="min-h-screen flex items-center justify-center bg-yellow-400 halftone-bg p-6">
+                        <div className="bg-white border-8 border-black p-12 rounded-3xl shadow-solid text-center max-w-md w-full">
+                            <div className="relative inline-block mb-6">
+                                <i className="ph-fill ph-paint-brush-broad text-8xl text-blue-600 animate-pulse"></i>
+                                <i className="ph-bold ph-sparkle absolute -top-2 -right-2 text-4xl text-yellow-500 animate-ping"></i>
                             </div>
-                            <h2 className="text-3xl font-bangers mb-2">PRODUKCJA...</h2>
-                            <div className="w-full h-6 bg-slate-100 border-4 border-black rounded-full overflow-hidden">
-                                <div className="h-full bg-blue-500 transition-all duration-500" style={{ width: `${progress}%` }}></div>
-                            </div>
+                            <h2 className="text-4xl font-bangers text-black mb-4">ARTYSTA PRACUJE...</h2>
+                            <p className="font-black text-slate-700 italic">{loadingMsg}</p>
                         </div>
                     </div>
                 );
@@ -173,24 +168,28 @@
 
             if (step === 'review') {
                 return (
-                    <div className="min-h-screen p-4 md:p-8 bg-slate-900 overflow-y-auto">
-                        <div className="max-w-4xl mx-auto bg-white border-4 border-black shadow-solid p-6 md:p-10 print-area rounded-xl">
-                            <h1 className="text-5xl font-bangers text-center text-black mb-10 border-b-8 border-black pb-4 uppercase tracking-widest">{comicData.title}</h1>
+                    <div className="min-h-screen p-4 md:p-10 bg-slate-900">
+                        <div className="max-w-5xl mx-auto bg-white border-[6px] border-black shadow-solid p-6 md:p-12 print-area rounded-lg">
+                            <header className="text-center mb-10 border-b-8 border-black pb-6">
+                                <h1 className="text-6xl md:text-7xl font-bangers text-black uppercase tracking-tighter">{comicData.title}</h1>
+                                <p className="font-black text-red-600 text-xl italic uppercase">Główny bohater: {comicData.heroName}</p>
+                            </header>
                             
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-black p-4 rounded-xl border-4 border-black">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-10 bg-black p-6 rounded-lg">
                                 {comicData.panels.map((panel, idx) => (
                                     <div key={idx} className="relative bg-white aspect-square border-4 border-black overflow-hidden flex flex-col group">
-                                        <img src={panel.imageUrl} className="absolute inset-0 w-full h-full object-cover" alt="panel" />
-                                        
-                                        {/* Narracja - Żółty pasek */}
-                                        <div className="relative z-10 w-full bg-yellow-300 border-b-4 border-black p-3 font-bold text-sm text-black">
+                                        {/* GÓRNY PASEK NARRACJI */}
+                                        <div className="relative z-30 w-full bg-yellow-300 border-b-4 border-black p-4 font-black text-black text-sm md:text-base leading-tight">
                                             {panel.narration}
                                         </div>
 
-                                        {/* DYMEK - TERAZ ZAWSZE CZYTELNY */}
+                                        {/* OBRAZEK */}
+                                        <img src={panel.imageUrl} className="absolute inset-0 w-full h-full object-cover z-10" alt="kadr" />
+                                        
+                                        {/* DYMEK DIALOGOWY */}
                                         {panel.dialogue && (
-                                            <div className="absolute bottom-10 left-1/2 -translate-x-1/2 w-[85%] z-20">
-                                                <div className="comic-bubble-fixed relative">
+                                            <div className="absolute bottom-12 left-1/2 -translate-x-1/2 w-[80%] z-40">
+                                                <div className="comic-bubble">
                                                     {panel.dialogue}
                                                     <div className="bubble-tail-border"></div>
                                                     <div className="bubble-tail"></div>
@@ -198,17 +197,17 @@
                                             </div>
                                         )}
 
-                                        {/* Numer kadru */}
-                                        <div className="absolute bottom-2 right-2 bg-black text-white font-bangers w-8 h-8 flex items-center justify-center rounded-full text-lg z-30">
+                                        {/* NUMER KADRU */}
+                                        <div className="absolute bottom-3 right-3 bg-black text-white font-bangers w-10 h-10 flex items-center justify-center rounded-full text-xl z-50 border-2 border-white">
                                             {idx + 1}
                                         </div>
                                     </div>
                                 ))}
                             </div>
 
-                            <div className="mt-10 flex gap-4 no-print">
-                                <button onClick={() => window.print()} className="flex-1 bg-green-500 hover:bg-green-400 text-white font-bangers text-3xl py-4 rounded-xl border-4 border-black shadow-solid-sm active:translate-y-1">DRUKUJ (PDF)</button>
-                                <button onClick={() => setStep('config')} className="flex-1 bg-white hover:bg-slate-100 text-black font-bangers text-3xl py-4 rounded-xl border-4 border-black shadow-solid-sm active:translate-y-1">NOWY KOMIKS</button>
+                            <div className="mt-12 flex flex-col md:flex-row gap-6 no-print">
+                                <button onClick={() => window.print()} className="flex-1 bg-green-500 hover:bg-green-400 text-white font-bangers text-4xl py-5 rounded-2xl border-4 border-black shadow-solid active:translate-y-1">DRUKUJ (PDF)</button>
+                                <button onClick={() => setStep('config')} className="flex-1 bg-white hover:bg-slate-100 text-black font-bangers text-4xl py-5 rounded-2xl border-4 border-black shadow-solid active:translate-y-1">NOWA PRZYGODA</button>
                             </div>
                         </div>
                     </div>
