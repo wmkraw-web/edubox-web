@@ -108,7 +108,9 @@
             const [orientationOption, setOrientationOption] = useState('3:4'); // Proporcje
             
             const [generatedImage, setGeneratedImage] = useState(null);
-            const [isGenerating, setIsGenerating] = useState(false);
+            
+            // Nowy stan do informowania usera, co się dzieje
+            const [generatingStatus, setGeneratingStatus] = useState(''); 
             const [error, setError] = useState('');
             const resultRef = useRef(null);
 
@@ -119,6 +121,7 @@
                 setFreeTries(savedTries);
             }, []);
 
+            // GŁÓWNA FUNKCJA GENERUJĄCA
             const generatePoster = async () => {
                 if (!isAuthenticated && freeTries >= FREE_TRIES_LIMIT) {
                     setShowPaywall(true); return;
@@ -127,44 +130,68 @@
                     setError('Wpisz co ma być na plakacie!'); return;
                 }
 
-                setIsGenerating(true);
+                setGeneratingStatus('1/2 Wzbogacam Twój opis (AI)...');
                 setError('');
                 setGeneratedImage(null);
 
                 try {
-                    let translatedPrompt = promptInput;
+                    // ETAP 1: GPT-4o-mini REŻYSERUJE SCENĘ
+                    let enhancedPrompt = promptInput;
                     try {
-                        const res = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=pl&tl=en&dt=t&q=${encodeURIComponent(promptInput)}`);
-                        if (res.ok) { const data = await res.json(); translatedPrompt = data[0][0][0]; }
-                    } catch(e) { console.log("Tłumaczenie nie powiodło się, używam oryginału."); }
+                        const systemPrompt = `You are an expert AI image prompt engineer. The user will give you a simple idea in Polish. 
+                        Your job is to rewrite it into a highly detailed, physically logical, and descriptive image prompt IN ENGLISH. 
+                        CRITICAL RULES:
+                        1. Define spatial relations clearly (e.g., 'A boy stands on the left holding a flower, handing it to his mother standing on the right').
+                        2. Prevent object merging (ensure hands hold correct items).
+                        3. If there are people, clearly specify they are Caucasian/European.
+                        4. Keep it under 60 words.
+                        5. Reply ONLY with the English prompt, nothing else.`;
 
-                    // Uproszczone modyfikatory stylu, by model skupił się na logice, a nie detalach "idealności"
+                        const resChat = await fetch('/api/chat', {
+                            method: 'POST', 
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ 
+                                prompt: promptInput, 
+                                system: systemPrompt, 
+                                temperature: 0.7, 
+                                model: "gpt-4o-mini" 
+                            })
+                        });
+                        if (resChat.ok) { 
+                            const dataChat = await resChat.json(); 
+                            enhancedPrompt = dataChat.text.trim(); 
+                        }
+                    } catch(e) { console.log("GPT Enhancer failed, using original prompt."); }
+
+                    // ETAP 2: GENEROWANIE OBRAZU W FAL.AI
+                    setGeneratingStatus('2/2 Malowanie arcydzieła...');
+
+                    // Modyfikatory stylu
                     let styleModifier = "";
                     if (styleOption === 'akwarela') {
-                        styleModifier = "beautiful watercolor painting, children's book illustration style, soft and harmonious";
+                        styleModifier = "beautiful watercolor painting, children's book illustration style, soft and harmonious, artistic masterpiece";
                     } else if (styleOption === '3d') {
-                        styleModifier = "high quality 3D Pixar Disney animation style render, cute and cohesive";
+                        styleModifier = "high quality 3D Pixar Disney animation style render, cute and cohesive, unreal engine 5";
                     } else if (styleOption === 'plakat') {
-                        styleModifier = "flat vector illustration, modern poster art, clean design";
+                        styleModifier = "flat vector illustration, modern poster art, clean design, minimalist";
                     }
 
-                    // Naturalny prompt z łagodnym, ale stanowczym wymuszeniem logiki relacyjnej i rasowej
-                    const fullPrompt = `${translatedPrompt}. Featuring European Caucasian people. ${styleModifier}. Perfect logical composition, characters interacting naturally. High quality masterpiece. No text.`;
-                    
-                    const negativePrompt = "text, words, floating objects, extra limbs, bad anatomy, deformed, missing fingers, extra fingers, ugly, poorly drawn";
+                    // Informacja o orientacji
+                    let orientationText = orientationOption === '3:4' ? 'Vertical portrait format.' : (orientationOption === '4:3' ? 'Horizontal landscape format.' : 'Square format.');
 
+                    // Łączymy ulepszony przez GPT prompt ze stylem i zakazami
+                    const fullPrompt = `${enhancedPrompt}. STYLE: ${styleModifier}. ${orientationText} ABSOLUTELY NO TEXT, no words, no letters. Perfect human anatomy.`;
+                    const negativePrompt = "text, words, letters, extra limbs, bad anatomy, deformed, missing fingers, extra fingers, ugly, poorly drawn";
+
+                    // Rozbudowujemy paczkę wymiarów
                     let sizeParam = '1024x1024';
                     let widthParam = 1024;
                     let heightParam = 1024;
                     
                     if (orientationOption === '3:4') {
-                        sizeParam = '1024x1792'; // DALL-E 3 format pionowy
-                        widthParam = 768;        // Leonardo / Fal pion
-                        heightParam = 1024;
+                        sizeParam = '1024x1792'; widthParam = 768; heightParam = 1024;
                     } else if (orientationOption === '4:3') {
-                        sizeParam = '1792x1024'; // DALL-E 3 format poziomy
-                        widthParam = 1024;
-                        heightParam = 768;       // Leonardo / Fal poziom
+                        sizeParam = '1792x1024'; widthParam = 1024; heightParam = 768;
                     }
 
                     const response = await fetch('/api/generate', {
@@ -204,13 +231,13 @@
                         }
                         setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
                     } else {
-                        throw new Error("Pusta odpowiedź z API. Twój backend na Vercelu nie zwrócił prawidłowego linku do obrazu.");
+                        throw new Error("Pusta odpowiedź z API.");
                     }
                 } catch (err) {
                     console.error("Błąd generacji:", err);
                     setError(`Wystąpił problem z backendem: ${err.message}. Spróbuj ponownie.`);
                 } finally {
-                    setIsGenerating(false);
+                    setGeneratingStatus('');
                 }
             };
 
@@ -352,7 +379,7 @@
                                     Twórz piękne <span className="text-gradient">plakaty szkolne.</span>
                                 </h1>
                                 <p className="text-slate-400 text-lg">
-                                    Opisz krótko jaką grafikę potrzebujesz, a my wygenerujemy puste tło plakatowe, na którym samodzielnie dodasz napisy.
+                                    Wpisz krótko co potrzebujesz. Nasz system <strong>automatycznie rozbuduje Twój opis</strong> i przekaże do malarza AI!
                                 </p>
                             </div>
 
@@ -411,7 +438,7 @@
                                         value={promptInput}
                                         onChange={(e) => setPromptInput(e.target.value)}
                                         onKeyPress={(e) => { if(e.key === 'Enter') generatePoster(); }}
-                                        placeholder="Np. Mama przytulająca dzieci w wiosennym ogrodzie..."
+                                        placeholder="Wpisz po prostu: 'chłopiec i dziewczynka dają mamie kwiaty'"
                                         className="w-full bg-slate-900/80 border border-slate-600 text-white rounded-2xl px-6 py-5 focus:ring-2 focus:ring-purple-500 outline-none text-lg pr-16 shadow-inner"
                                     />
                                     <span className="absolute right-5 top-1/2 -translate-y-1/2 text-2xl">✨</span>
@@ -431,18 +458,19 @@
                                 <div className="mt-10 flex justify-center">
                                     <button 
                                         onClick={generatePoster}
-                                        disabled={isGenerating || !promptInput}
+                                        disabled={generatingStatus !== '' || !promptInput}
                                         className={`w-full sm:w-auto px-12 py-5 rounded-2xl font-black text-white text-lg transition-all flex items-center justify-center gap-3 shadow-[0_0_20px_rgba(168,85,247,0.3)] btn-bounce
-                                            ${isGenerating ? 'bg-slate-700 cursor-not-allowed' : 'bg-gradient-to-r from-purple-600 to-cyan-500 hover:scale-105'}`}
+                                            ${generatingStatus !== '' ? 'bg-slate-700 cursor-not-allowed' : 'bg-gradient-to-r from-purple-600 to-cyan-500 hover:scale-105'}`}
                                     >
-                                        {isGenerating ? (
-                                            <><svg className="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Projektowanie...</>
+                                        {generatingStatus !== '' ? (
+                                            <><svg className="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> {generatingStatus}</>
                                         ) : (!isAuthenticated && freeTries >= FREE_TRIES_LIMIT ? 'Odblokuj dostęp PRO' : 'Zaprojektuj Plakat')}
                                     </button>
                                 </div>
+                                
                                 <div className="text-center mt-6 p-4 bg-slate-800/50 rounded-xl border border-slate-700">
-                                    <p className="text-slate-400 text-sm font-medium leading-relaxed">
-                                        <span className="text-amber-400">💡 Ważna wskazówka dla scen wieloosobowych:</span> Zamiast pisać "Chłopiec i dziewczynka dają kwiaty mamie" (co bardzo myli AI), spróbuj opisać sytuację bardziej przestrzennie: <span className="text-white">"Uśmiechnięta mama stoi w środku, a uśmiechnięty chłopiec po lewej i dziewczynka po prawej trzymają bukiety kwiatów"</span>.
+                                    <p className="text-slate-400 text-xs font-medium leading-relaxed">
+                                        Pisz naturalnie! Zanim Twoje zapytanie trafi do generatora, <strong className="text-white">nasz inteligentny asystent ułoży je odpowiednio</strong>, budując relacje przestrzenne i wymuszając poprawność obrazu.
                                     </p>
                                 </div>
                             </div>
