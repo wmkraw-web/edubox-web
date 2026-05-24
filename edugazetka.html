@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="pl" translate="no" class="notranslate">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="google" content="notranslate">
+    <title>EduGazetka AI PRO - EduBox</title>
+    
+    <!-- Wymuszenie HTTPS -->
+    <script>
+        if (window.location.protocol === 'http:' && window.location.hostname !== 'localhost') {
+            window.location.href = window.location.href.replace('http:', 'https:');
+        }
+    </script>
+
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-3RQ9R0N0K8"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-3RQ9R0N0K8');
+    </script>
+
+    <!-- Biblioteki -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+    <!-- Fonty -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800;900&family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
+
+    <!-- Tailwind Config -->
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Outfit', 'sans-serif'],
+                        display: ['Fredoka', 'sans-serif']
+                    },
+                    colors: { slate: { 950: '#020617' } }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body { 
+            background-color: #020617; 
+            color: #f8fafc; 
+            background-image: 
+                radial-gradient(circle at 80% 20%, rgba(20, 184, 166, 0.15) 0px, transparent 40%),
+                radial-gradient(circle at 20% 80%, rgba(14, 165, 233, 0.15) 0px, transparent 40%);
+            background-attachment: fixed;
+            min-height: 100vh;
+        }
+
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.6);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+        }
+        
+        .corkboard-pattern {
+            background-color: #e5e7eb;
+            background-image: url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M20 20.5V18H0v-2h20v-2H0v-2h20v-2H0V8h20V6H0V4h20V2H0V0h22v20h2V0h2v20h2V0h2v20h2V0h2v20h2V0h2v20h2v2H20v-1.5zM0 20h2v20H0V20zm4 0h2v20H4V20zm4 0h2v20H8V20zm4 0h2v20h-2V20zm4 0h2v20h-2V20zm4 4h20v2H20v-2zm0 4h20v2H20v-2zm0 4h20v2H20v-2zm0 4h20v2H20v-2z' fill='%2394a3b8' fill-opacity='0.1' fill-rule='evenodd'/%3E%3C/svg%3E");
+        }
+
+        .pin {
+            width: 16px; height: 16px; border-radius: 50%;
+            position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+            background: radial-gradient(circle at 30% 30%, #ef4444, #991b1b);
+            box-shadow: 2px 4px 6px rgba(0,0,0,0.4), inset -2px -2px 4px rgba(0,0,0,0.3);
+            z-index: 10;
+        }
+
+        /* --- PRINT STYLES --- */
+        @media print {
+            body { background: white; color: black; background-image: none; margin: 0; padding: 0; }
+            .no-print { display: none !important; }
+            #render-area { width: 100% !important; background: white !important; }
+            
+            /* Strona z jedną wielką literą */
+            .print-letter-page {
+                width: 100%;
+                height: 280mm;
+                page-break-after: always;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                border: 2px dashed #cbd5e1;
+                box-sizing: border-box;
+                margin-bottom: 0;
+            }
+            .print-letter { font-size: 280pt; font-family: 'Fredoka', sans-serif; font-weight: 900; color: black; }
+            
+            /* Strona z plakatem informacyjnym (A4 Pion) */
+            .print-poster-page {
+                width: 100%;
+                height: 280mm;
+                page-break-after: always;
+                display: flex;
+                flex-direction: column;
+                border: 3px solid #0f172a;
+                border-radius: 12px;
+                overflow: hidden;
+                box-sizing: border-box;
+                margin-bottom: 0;
+            }
+            .print-poster-img { width: 100%; height: 60%; object-fit: cover; border-bottom: 4px solid #0f172a; }
+            .print-poster-text { height: 40%; padding: 40px; background: #f8fafc; font-size: 26pt; line-height: 1.5; font-family: 'Outfit', sans-serif; font-weight: 600; text-align: center; display: flex; align-items: center; justify-content: center;}
+            
+            @page { margin: 10mm; size: A4 portrait; }
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        function App() {
+            // State
+            const [isPremium, setIsPremium] = useState(false);
+            const [usagesLeft, setUsagesLeft] = useState(2);
+            const [showPremiumModal, setShowPremiumModal] = useState(false);
+            const [accessCode, setAccessCode] = useState('');
+            const [toastMessage, setToastMessage] = useState('');
+
+            // Config
+            const [topic, setTopic] = useState('');
+            const [ageGroup, setAgeGroup] = useState('Klasy 4-8');
+            const [artStyle, setArtStyle] = useState('Nowoczesny Wektor'); 
+            
+            const [step, setStep] = useState('config'); // config, generating, review
+            const [gazetkaData, setGazetkaData] = useState(null);
+            const [loadingStatus, setLoadingStatus] = useState('');
+            const [loadingProgress, setLoadingProgress] = useState(0);
+
+            // Regeneracja kadru
+            const [regeneratingIndex, setRegeneratingIndex] = useState(null);
+
+            useEffect(() => {
+                const premiumStatus = localStorage.getItem('edubox_premium_unlocked');
+                const storedUsages = localStorage.getItem('edugazetka_usages');
+                if (premiumStatus === 'true') setIsPremium(true);
+                else {
+                    if (storedUsages !== null) setUsagesLeft(parseInt(storedUsages, 10));
+                    else localStorage.setItem('edugazetka_usages', '2');
+                }
+            }, []);
+
+            const showToast = (msg) => { setToastMessage(msg); setTimeout(() => setToastMessage(''), 4000); };
+
+            const handleVerifyCode = (e) => {
+                e?.preventDefault();
+                if (accessCode.trim().toUpperCase() === 'KAWA2024') { 
+                    localStorage.setItem('edubox_premium_unlocked', 'true');
+                    setIsPremium(true); setShowPremiumModal(false); setAccessCode(''); 
+                    showToast('Odblokowano Premium! 🌟'); 
+                } else { showToast('Błędny kod dostępu!'); }
+            };
+
+            const translateStyle = (styleName) => {
+                switch(styleName) {
+                    case 'Nowoczesny Wektor': return 'flat vector illustration, modern colorful school poster, clean design, vibrant';
+                    case 'Akwarela': return 'beautiful watercolor painting, artistic, soft edges, vibrant, aesthetic';
+                    case 'Magiczne 3D': return 'cute 3D Pixar Disney style render, unreal engine 5, detailed, joyful';
+                    case 'Kredki / Szkic': return 'hand drawn crayon style, cute children book illustration, textured';
+                    default: return 'high quality illustration';
+                }
+            };
+
+            // ETAP 1 & 2: GENEROWANIE ŁAŃCUCHOWE
+            const generateGazetka = async () => {
+                if (!isPremium && usagesLeft <= 0) return setShowPremiumModal(true);
+                if (!topic.trim()) return showToast('Wpisz temat gazetki!');
+
+                setStep('generating');
+                setLoadingStatus('1/2 Wymyślam hasła i ciekawostki...');
+                setLoadingProgress(10);
+                
+                try {
+                    // 1. TEKSTY Z GPT-4o-mini
+                    const systemPrompt = `Jesteś kreatywnym nauczycielem przygotowującym materiały na szkolną gazetkę ścienną (tablicę korkową).
+                    
+                    Zwróć WYŁĄCZNIE poprawny JSON:
+                    {
+                        "title": "BARDZO KRÓTKI I CHWYTLIWY TYTUŁ (max 2 słowa, np. 'DZIEŃ ZIEMI', 'KOSMOS', 'ZDROWE CIAŁO'). Zostanie on wydrukowany w formie wielkich liter.",
+                        "posters": [
+                            {
+                                "fact": "Ciekawostka / Edukacyjny fakt po POLSKU (2-3 zdania).",
+                                "imagePrompt": "Szczegółowy opis obrazka po ANGIELSKU dla AI (co ma na nim być). WAŻNE: ABSOLUTELY NO TEXT, NO WORDS, NO LETTERS. Tylko wizualia."
+                            },
+                            ... (dokładnie 4 takie obiekty)
+                        ]
+                    }`;
+
+                    const userPrompt = `Temat główny: ${topic}. Wiek odbiorców (dostosuj język ciekawostek): ${ageGroup}.`;
+
+                    const resChat = await fetch('/api/chat', {
+                        method: 'POST', 
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ prompt: userPrompt, system: systemPrompt, format: "json", temperature: 0.7, model: "gpt-4o-mini" })
+                    });
+                    
+                    if (!resChat.ok) throw new Error("Błąd podczas tworzenia scenariusza");
+                    const dataChat = await resChat.json();
+                    
+                    let jsonStr = dataChat.text.replace(/```json/gi, '').replace(/```/g, '').trim();
+                    if(jsonStr.indexOf('{') !== -1) jsonStr = jsonStr.substring(jsonStr.indexOf('{'), jsonStr.lastIndexOf('}') + 1);
+                    let gazetkaObj = JSON.parse(jsonStr);
+
+                    // 2. GENEROWANIE OBRAZÓW (Flux na Vercel API)
+                    setLoadingStatus('2/2 Maluję plakaty do Twojej gazetki...');
+                    const engStyle = translateStyle(artStyle);
+                    
+                    for (let i = 0; i < gazetkaObj.posters.length; i++) {
+                        setLoadingProgress(25 + (i * 18));
+                        
+                        const fullPrompt = `${gazetkaObj.posters[i].imagePrompt}. STYLE: ${engStyle}. High quality masterpiece. ABSOLUTELY NO TEXT, NO WORDS, NO WATERMARK.`;
+
+                        const responseImg = await fetch('/api/generate', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ 
+                                prompt: fullPrompt,
+                                negative_prompt: "text, words, letters, watermark, mutated, bad anatomy",
+                                aspect_ratio: '1:1', // Kwadrat sprawdza się najlepiej nad tekstem
+                                size: '1024x1024',
+                                width: 1024,
+                                height: 1024
+                            })
+                        });
+                        
+                        if (responseImg.ok) {
+                            const dataImg = await responseImg.json();
+                            let imgUrl = dataImg.imageUrl || dataImg.image_url || dataImg.url || (dataImg.data && dataImg.data[0]?.url) || dataImg.image;
+                            if (imgUrl) {
+                                if (imgUrl.length > 1000 && !imgUrl.startsWith('http') && !imgUrl.startsWith('data:')) {
+                                    imgUrl = `data:image/png;base64,${imgUrl}`;
+                                }
+                                gazetkaObj.posters[i].imageUrl = imgUrl;
+                            }
+                        }
+                    }
+
+                    setGazetkaData(gazetkaObj);
+                    setLoadingProgress(100);
+                    
+                    if (!isPremium) {
+                        const newUsages = usagesLeft - 1;
+                        setUsagesLeft(newUsages);
+                        localStorage.setItem('edugazetka_usages', newUsages.toString());
+                    }
+
+                    setTimeout(() => setStep('review'), 500);
+
+                } catch (error) {
+                    console.error("Błąd generatora:", error);
+                    showToast('Wystąpił błąd! Serwery są przeciążone. Spróbuj ponownie.');
+                    setStep('config');
+                }
+            };
+
+            // REGENERACJA JEDNEGO PLAKATU
+            const regeneratePoster = async (index) => {
+                if (regeneratingIndex !== null) return; 
+                setRegeneratingIndex(index);
+                showToast("Odświeżam obrazek dla tego plakatu...");
+                
+                try {
+                    const engStyle = translateStyle(artStyle);
+                    const fullPrompt = `${gazetkaData.posters[index].imagePrompt}. STYLE: ${engStyle}. High quality masterpiece. ABSOLUTELY NO TEXT, NO WORDS.`;
+
+                    const responseImg = await fetch('/api/generate', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                            prompt: fullPrompt,
+                            negative_prompt: "text, words, speech bubbles, watermark, mutated, bad anatomy",
+                            aspect_ratio: '1:1',
+                            size: '1024x1024',
+                            width: 1024,
+                            height: 1024
+                        })
+                    });
+                    
+                    if (responseImg.ok) {
+                        const dataImg = await responseImg.json();
+                        let imgUrl = dataImg.imageUrl || dataImg.image_url || dataImg.url || (dataImg.data && dataImg.data[0]?.url) || dataImg.image;
+                        if (imgUrl) {
+                            if (imgUrl.length > 1000 && !imgUrl.startsWith('http') && !imgUrl.startsWith('data:')) {
+                                imgUrl = `data:image/png;base64,${imgUrl}`;
+                            }
+                            const newData = {...gazetkaData};
+                            newData.posters[index].imageUrl = imgUrl;
+                            setGazetkaData(newData);
+                            showToast("Gotowe! Mamy nowy rysunek.");
+                        }
+                    }
+                } catch (err) {
+                    console.error(err);
+                    showToast("Błąd przy odświeżaniu. Spróbuj jeszcze raz.");
+                } finally {
+                    setRegeneratingIndex(null);
+                }
+            };
+
+            // RENDER: Konfigurator
+            if (step === 'config') {
+                return (
+                    <div className="min-h-screen flex flex-col font-sans relative">
+                        {toastMessage && (
+                            <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[300] bg-teal-500 text-white px-6 py-3 rounded-full font-bold shadow-lg transition-all duration-300">
+                                {toastMessage}
+                            </div>
+                        )}
+
+                        <nav className="fixed top-0 w-full z-[100] bg-slate-900/90 backdrop-blur-md border-b border-slate-800 h-20 shadow-sm">
+                            <div className="max-w-7xl mx-auto px-6 h-full flex items-center justify-between">
+                                <div className="flex items-center gap-3 cursor-pointer" onClick={() => window.scrollTo(0,0)}>
+                                    <div className="w-10 h-10 bg-gradient-to-br from-teal-400 to-emerald-500 flex items-center justify-center rounded-xl shadow-lg">
+                                        <i className="ph-bold ph-push-pin text-white text-2xl"></i>
+                                    </div>
+                                    <span className="text-2xl font-display font-bold text-white mt-1">EduGazetka <span className="text-teal-400">PRO</span></span>
+                                </div>
+                                <div className="flex items-center gap-3 md:gap-4 flex-wrap justify-end">
+                                    {!isPremium && (
+                                        <div className="text-xs md:text-sm px-3 md:px-4 py-2 bg-slate-800 border border-slate-700 font-bold text-white rounded-xl flex items-center gap-2">
+                                            <i className="ph-fill ph-lightning text-yellow-400"></i>
+                                            <span className="hidden sm:inline">Darmowe pule:</span><strong className="text-teal-400">{usagesLeft}</strong>
+                                        </div>
+                                    )}
+                                    
+                                    <a href="https://buycoffee.to/magiccolor" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-white hover:bg-slate-800 transition-colors text-xs md:text-sm font-bold px-3 md:px-4 py-2 border border-slate-700 bg-slate-900 rounded-xl shadow-md">
+                                        <i className="ph-fill ph-coffee text-amber-400 text-lg"></i> <span className="hidden md:inline">Postaw Kawę</span>
+                                    </a>
+
+                                    <a href="index.html" className="flex items-center gap-2 text-white hover:bg-slate-800 transition-colors text-xs md:text-sm font-bold bg-slate-900 px-3 md:px-4 py-2 border border-slate-700 rounded-xl shadow-md">
+                                        <i className="ph-bold ph-arrow-left"></i> <span className="hidden sm:inline">Portfolio</span>
+                                    </a>
+                                </div>
+                            </div>
+                        </nav>
+
+                        <div className="max-w-4xl mx-auto px-4 pt-36 pb-24 flex-grow w-full relative z-10">
+                            
+                            <div className="text-center mb-12">
+                                <div className="inline-block bg-teal-900/30 border border-teal-500/30 text-teal-400 px-4 py-1.5 rounded-full text-xs font-bold tracking-widest uppercase mb-4">Wystawy Szkolne AI</div>
+                                <h1 className="text-5xl md:text-6xl font-display font-bold text-white mb-6">Wystrój klasy <br/><span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-emerald-400">w 30 sekund</span></h1>
+                                <p className="text-slate-400 text-lg max-w-2xl mx-auto">Wpisz temat, a system wygeneruje wielkie litery tytułowe do wycięcia oraz 4 piękne plakaty z ciekawostkami na tablicę korkową.</p>
+                            </div>
+
+                            <div className="glass-panel p-8 md:p-10 rounded-3xl relative">
+                                <div className="space-y-6">
+                                    <div>
+                                        <label className="text-xs font-bold text-teal-400 uppercase tracking-widest block mb-2">1. O czym robimy gazetkę? *</label>
+                                        <input type="text" value={topic} onChange={e => setTopic(e.target.value)} placeholder="np. Bezpieczny Internet, Dzień Ziemi, Powstanie Styczniowe..." className="w-full p-5 bg-slate-900/80 border border-slate-700 rounded-2xl text-lg font-medium outline-none text-white focus:border-teal-500 transition-colors shadow-inner" />
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div>
+                                            <label className="text-xs font-bold text-slate-400 uppercase tracking-widest block mb-2">2. Słownictwo i ciekawostki dla:</label>
+                                            <select value={ageGroup} onChange={e => setAgeGroup(e.target.value)} className="w-full p-5 bg-slate-900/80 border border-slate-700 rounded-2xl outline-none text-white font-medium focus:border-teal-500 transition-colors cursor-pointer">
+                                                <option>Przedszkole</option><option>Klasy 1-3</option><option>Klasy 4-8</option><option>Szkoła Średnia</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="text-xs font-bold text-slate-400 uppercase tracking-widest block mb-2">3. Styl plakatów</label>
+                                            <select value={artStyle} onChange={e => setArtStyle(e.target.value)} className="w-full p-5 bg-slate-900/80 border border-slate-700 rounded-2xl outline-none text-white font-medium focus:border-teal-500 transition-colors cursor-pointer">
+                                                <option>Nowoczesny Wektor</option>
+                                                <option>Akwarela</option>
+                                                <option>Magiczne 3D</option>
+                                                <option>Kredki / Szkic</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <button onClick={generateGazetka} className="w-full mt-6 bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-white py-5 rounded-2xl font-bold text-xl tracking-wide shadow-[0_0_30px_rgba(20,184,166,0.3)] transition-all active:scale-95 flex justify-center items-center gap-3">
+                                        <i className="ph-bold ph-magic-wand"></i> Stwórz Gazetkę!
+                                    </button>
+                                    
+                                    {!isPremium && usagesLeft <= 0 && (
+                                        <p className="text-center text-sm text-red-400 font-bold mt-4 cursor-pointer hover:text-red-300" onClick={() => setShowPremiumModal(true)}>
+                                            Wyczerpano darmowe próby. Kliknij, aby odblokować kodem.
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Paywall */}
+                        {showPremiumModal && (
+                            <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-sm">
+                                <div className="glass-panel p-10 border border-teal-500/30 rounded-3xl max-w-md w-full text-center shadow-2xl relative">
+                                    <div className="w-16 h-16 bg-teal-500/20 text-teal-400 rounded-full flex items-center justify-center mx-auto mb-6">
+                                        <i className="ph-fill ph-lock-key text-3xl"></i>
+                                    </div>
+                                    <h3 className="text-3xl font-display font-bold text-white mb-2 tracking-wide">Konto Premium</h3>
+                                    <p className="text-sm text-slate-300 mb-8 leading-relaxed">Wyczerpałeś darmowe próby dekorowania klasy. Wpisz kod <span className="font-mono bg-slate-800 text-teal-400 px-2 py-0.5 rounded">KAWA2024</span>, aby generować gazetki bez limitu!</p>
+                                    
+                                    <input type="text" value={accessCode} onChange={e => setAccessCode(e.target.value)} placeholder="Wpisz kod..." className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-4 text-center text-xl font-bold text-white mb-4 outline-none focus:border-teal-500 uppercase tracking-widest" />
+                                    <button onClick={handleVerifyCode} className="w-full bg-teal-500 text-white font-bold tracking-widest text-lg py-4 rounded-xl shadow-lg active:scale-95 transition-transform mb-4">Aktywuj Kod</button>
+                                    
+                                    <a href="https://buycoffee.to/magiccolor" target="_blank" rel="noopener noreferrer" className="block w-full bg-slate-800 hover:bg-slate-700 border border-slate-600 py-3.5 rounded-xl font-bold text-sm active:scale-95 text-white transition-colors">☕ Zdobądź Kod (Postaw Kawę)</a>
+                                    
+                                    <button onClick={() => setShowPremiumModal(false)} className="mt-6 text-xs font-bold text-slate-500 uppercase hover:text-white transition-colors">Anuluj</button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                );
+            }
+
+            // RENDER: Loading
+            if (step === 'generating') {
+                return (
+                    <div className="min-h-screen flex items-center justify-center flex-col text-center px-4 bg-slate-950">
+                        <div className="glass-panel p-10 rounded-3xl border border-teal-500/20 flex flex-col items-center max-w-md w-full shadow-[0_0_50px_rgba(20,184,166,0.15)]">
+                            <i className="ph-fill ph-scissors animate-bounce text-6xl text-teal-400 mb-6"></i>
+                            <h2 className="text-2xl font-display font-bold text-white mb-3">Projektowanie trwa...</h2>
+                            <p className="text-sm text-slate-400 font-medium mb-8">{loadingStatus}</p>
+                            
+                            <div className="w-full h-3 bg-slate-900 rounded-full overflow-hidden relative">
+                                <div className="h-full bg-gradient-to-r from-teal-500 to-emerald-500 transition-all duration-300" style={{ width: `${loadingProgress}%` }}></div>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
+            // RENDER: Podgląd i Wydruk
+            if (step === 'review') {
+                return (
+                    <div className="min-h-screen flex flex-col bg-slate-100 corkboard-pattern text-slate-900">
+                        {toastMessage && (
+                            <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[9999] bg-teal-600 text-white px-6 py-3 rounded-full font-bold shadow-lg">
+                                {toastMessage}
+                            </div>
+                        )}
+                        
+                        <nav className="bg-white border-b border-slate-200 h-16 flex items-center justify-between px-6 shadow-sm no-print sticky top-0 z-50">
+                            <h1 className="text-xl font-display font-bold text-slate-800 flex items-center gap-2"><i className="ph-fill ph-check-circle text-teal-500 text-2xl"></i> Gazetka Gotowa!</h1>
+                            <div className="flex gap-3">
+                                <button onClick={() => window.print()} className="bg-teal-600 hover:bg-teal-500 text-white px-5 py-2 rounded-xl font-bold flex items-center gap-2 shadow-md active:scale-95 transition-all text-sm">
+                                    <i className="ph-bold ph-printer text-lg"></i> Drukuj Gazetkę (PDF)
+                                </button>
+                                <button onClick={() => setStep('config')} className="bg-slate-200 hover:bg-slate-300 text-slate-700 px-4 py-2 rounded-xl font-bold shadow-sm active:scale-95 transition-all text-sm">Nowa Wystawa</button>
+                            </div>
+                        </nav>
+
+                        <div className="flex-1 p-4 md:p-8">
+                            
+                            <div className="no-print max-w-5xl mx-auto bg-amber-100 border border-amber-300 text-amber-800 p-4 rounded-xl mb-8 text-sm font-bold flex items-start md:items-center gap-3 shadow-sm">
+                                <i className="ph-fill ph-info text-2xl shrink-0"></i> 
+                                <p>To jest podgląd wirtualnej tablicy korkowej. Po kliknięciu <strong>"Drukuj"</strong> system automatycznie rozbije ten widok na pojedyncze kartki A4. <br className="hidden md:block"/>Na pierwszych stronach wydrukują się wielkie litery tytułu, a na kolejnych 4 duże plakaty z ciekawostkami.</p>
+                            </div>
+
+                            {/* WIRTUALNA TABLICA KORKOWA (PODGLĄD) */}
+                            <div id="render-area" className="max-w-6xl mx-auto">
+                                
+                                {/* 1. SEKCJA TYTUŁU (LITERY) */}
+                                <div className="flex flex-wrap justify-center gap-2 md:gap-4 mb-16 no-print">
+                                    {gazetkaData.title.split('').map((char, idx) => {
+                                        if (char === ' ') return <div key={idx} className="w-8 md:w-16"></div>;
+                                        return (
+                                            <div key={idx} className="w-16 h-20 md:w-24 md:h-32 bg-white border border-slate-300 shadow-md flex items-center justify-center text-4xl md:text-6xl font-display font-black text-slate-800 relative transform rotate-1 hover:rotate-0 transition-transform">
+                                                <div className="pin scale-50 -top-2"></div>
+                                                {char.toUpperCase()}
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+
+                                {/* TYTUŁ W DRUKU - KAŻDA LITERA NA A4 */}
+                                <div className="hidden print:block">
+                                    {gazetkaData.title.split('').map((char, idx) => {
+                                        if (char === ' ') return null;
+                                        return (
+                                            <div key={`print-char-${idx}`} className="print-letter-page">
+                                                <span className="print-letter">{char.toUpperCase()}</span>
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+
+                                {/* 2. SEKCJA PLAKATÓW */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 pb-12 no-print">
+                                    {gazetkaData.posters.map((poster, idx) => (
+                                        <div key={idx} className="bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden relative group transform -rotate-1 hover:rotate-0 transition-transform duration-300 flex flex-col">
+                                            <div className="pin"></div>
+                                            
+                                            {/* Obrazek Plakatu */}
+                                            <div className="relative aspect-square w-full bg-slate-100 border-b-4 border-slate-800">
+                                                {poster.imageUrl ? (
+                                                    <img src={poster.imageUrl} className="absolute inset-0 w-full h-full object-cover" />
+                                                ) : (
+                                                    <div className="absolute inset-0 flex items-center justify-center text-slate-400 font-bold">Ładowanie grafiki...</div>
+                                                )}
+
+                                                {/* Przycisk regeneracji */}
+                                                <button 
+                                                    onClick={() => regeneratePoster(idx)} 
+                                                    disabled={regeneratingIndex !== null}
+                                                    className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-teal-500 border-2 border-white text-white px-5 py-3 rounded-xl shadow-xl font-bold flex items-center gap-2 transition-all hover:bg-teal-400 hover:scale-105 z-50 ${regeneratingIndex === idx ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                                                >
+                                                    {regeneratingIndex === idx ? <><i className="ph-bold ph-spinner animate-spin"></i> Rysuję...</> : <><i className="ph-bold ph-arrows-clockwise"></i> Zmień obrazek</>}
+                                                </button>
+                                            </div>
+
+                                            {/* Tekst Plakatu */}
+                                            <div className="p-6 md:p-8 flex-1 flex items-center justify-center text-center bg-slate-50">
+                                                <p className="text-xl md:text-2xl font-semibold text-slate-800 leading-snug">{poster.fact}</p>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                {/* PLAKATY W DRUKU - KAŻDY NA A4 */}
+                                <div className="hidden print:block">
+                                    {gazetkaData.posters.map((poster, idx) => (
+                                        <div key={`print-poster-${idx}`} className="print-poster-page">
+                                            {poster.imageUrl && <img src={poster.imageUrl} className="print-poster-img" />}
+                                            <div className="print-poster-text">
+                                                <p>{poster.fact}</p>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
+            return null;
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
