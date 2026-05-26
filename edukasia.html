@@ -250,11 +250,21 @@
                     const isLocal = window.location.protocol === 'file:' || window.location.hostname === 'localhost' || !window.location.hostname;
                     if (isLocal) throw new Error("Uruchomiłeś plik lokalnie. Otwórz przez Vercel lub Preview w czacie.");
 
+                    // BARDZO WAŻNE: Wyciągamy 'prompt' z payloadu, bo Twój serwer Vercel tego bezwzględnie wymaga!
+                    let extractedPrompt = "";
+                    if (payload && payload.contents && payload.contents[0] && payload.contents[0].parts && payload.contents[0].parts[0]) {
+                        extractedPrompt = payload.contents[0].parts[0].text;
+                    }
+
                     try {
                         const response = await fetch('/api/gemini', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ payload: payload, type: endpointType })
+                            body: JSON.stringify({ 
+                                payload: payload, 
+                                type: endpointType,
+                                prompt: extractedPrompt // <--- To rozwiązuje Twój błąd Vercela!
+                            })
                         });
                         const contentType = response.headers.get("content-type");
                         if (!contentType || !contentType.includes("application/json")) throw new Error("Oczekiwano JSON. Sprawdź plik api/gemini.js na Vercel.");
@@ -273,9 +283,9 @@
                 if (!sosInput.trim()) { setSosError('Opisz krótko sytuację w klasie.'); return; }
                 setIsGeneratingSos(true); setSosError(''); setSosResult(''); setSosSources([]);
                 try {
+                    const fullText = `SYSTEM: ${PROMPTS[`sos_${sosMode}`]}\n\nPROBLEM DO ROZWIĄZANIA: ${sosInput}`;
                     const payload = {
-                        contents: [{ parts: [{ text: `Rozwiąż problem: ${sosInput}` }] }],
-                        systemInstruction: { parts: [{ text: PROMPTS[`sos_${sosMode}`] }] },
+                        contents: [{ parts: [{ text: fullText }] }],
                         generationConfig: { temperature: 0.5 }
                     };
                     if (useWebSearch) payload.tools = [{ google_search: {} }];
@@ -306,15 +316,15 @@
                 if (!successName.trim() || !successAction.trim()) return;
                 setIsGeneratingSuccess(true); setShowSuccessCard(false); setSuccessText('');
                 try {
+                    const fullText = `SYSTEM: Jesteś pełnym ciepła wychowawcą przedszkolnym.\n\nZADANIE: Dziecko o imieniu ${successName} osiągnęło sukces: ${successAction}. Napisz radosną, krótką (max 3 zdania) pochwałę dla rodziców. Zacznij od 'Wielkie brawa!'.`;
                     const payload = {
-                        contents: [{ parts: [{ text: `Dziecko o imieniu ${successName} osiągnęło sukces: ${successAction}. Napisz radosną, krótką (max 3 zdania) pochwałę dla rodziców. Zacznij od 'Wielkie brawa!'.` }] }],
-                        systemInstruction: { parts: [{ text: "Jesteś pełnym ciepła wychowawcą przedszkolnym." }] },
+                        contents: [{ parts: [{ text: fullText }] }],
                         generationConfig: { temperature: 0.7 }
                     };
                     const data = await secureApiCall(payload, 'text');
                     let text = data.candidates?.[0]?.content?.parts?.[0]?.text;
                     if (text) { setSuccessText(text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim()); setShowSuccessCard(true); } 
-                    else throw new Error();
+                    else throw new Error("Brak odpowiedzi z serwera.");
                 } catch (err) { alert("Błąd generowania: " + err.message); } finally { setIsGeneratingSuccess(false); }
             };
 
@@ -322,13 +332,14 @@
                 if (!storyProblem.trim()) { setStoryError('Wpisz problem ucznia.'); return; }
                 setIsGeneratingStory(true); setStoryError(''); setGeneratedStory(''); setGeneratedImage('');
                 try {
+                    const fullText = `SYSTEM: Jesteś bajkoterapeutą. Odpowiadaj TYLKO w formacie JSON.\n\nZADANIE: Napisz radosną rymowankę (4 LINIJKI). Problem: ${storyProblem}. Użyj układu rymów AABB lub ABAB. Zwróć JSON: {"story": "linijka 1\\nlinijka 2\\nlinijka 3\\nlinijka 4", "image_prompt": "angielski opis sceny do wygenerowania obrazka..."}`;
                     const textPayload = { 
-                        contents: [{ parts: [{ text: `Jesteś bajkoterapeutą. Napisz radosną rymowankę (4 LINIJKI). Problem: ${storyProblem}. Użyj układu rymów AABB lub ABAB. Zwróć odpowiedź WYŁĄCZNIE jako czysty kod JSON: {"story": "linijka 1\\nlinijka 2\\nlinijka 3\\nlinijka 4", "image_prompt": "angielski opis sceny do wygenerowania obrazka..."}` }] }], 
+                        contents: [{ parts: [{ text: fullText }] }], 
                         generationConfig: { temperature: 0.7 } 
                     };
                     const textData = await secureApiCall(textPayload, 'text');
                     let rawText = textData.candidates?.[0]?.content?.parts?.[0]?.text;
-                    if (!rawText) throw new Error("Brak odpowiedzi z serwera. Sprawdź połączenie API na Vercelu.");
+                    if (!rawText) throw new Error("Brak odpowiedzi z serwera.");
                     
                     rawText = rawText.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
                     let jsonStr = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
@@ -340,19 +351,18 @@
                     try {
                         parsedData = JSON.parse(jsonStr);
                     } catch (e) {
-                        throw new Error("AI wygenerowało błędny format. Kliknij przycisk jeszcze raz!");
+                        throw new Error("AI zaplątało się w kodzie. Spróbuj kliknąć jeszcze raz!");
                     }
                     
-                    // Darmowe i niezawodne generowanie obrazków przez Pollinations AI
+                    // Niezawodne generowanie obrazków przez Pollinations AI
                     const seed = Math.floor(Math.random() * 1000000);
                     const encodedPrompt = encodeURIComponent(`Cute 2D illustration for children book, flat vector style. ${parsedData.image_prompt}. Bright colors, therapeutic, calming. NO TEXT.`);
                     const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?seed=${seed}&width=1024&height=1024&nologo=true`;
 
-                    // Czekamy na załadowanie obrazka
                     const imgPromise = new Promise((resolve, reject) => {
                         const img = new Image();
                         img.onload = () => resolve(imageUrl);
-                        img.onerror = () => reject(new Error("Nie udało się pobrać obrazka. Spróbuj ponownie."));
+                        img.onerror = () => reject(new Error("Nie udało się pobrać obrazka."));
                         img.src = imageUrl;
                     });
                     
@@ -360,13 +370,7 @@
                     
                     setGeneratedStory(parsedData.story); 
                     setGeneratedImage(finalImageUrl);
-
-                } catch (err) { 
-                    setStoryError('Błąd: ' + err.message); 
-                    console.error(err);
-                } finally { 
-                    setIsGeneratingStory(false); 
-                }
+                } catch (err) { setStoryError('Błąd: ' + err.message); } finally { setIsGeneratingStory(false); }
             };
 
             const handlePrint = () => { window.print(); };
@@ -510,7 +514,7 @@
                                     <h2 className="text-3xl font-black text-amber-400 mb-6 text-center">Magiczny Komiks AI 🎨</h2>
                                     <textarea value={storyProblem} onChange={(e) => setStoryProblem(e.target.value)} placeholder="Opisz lęk dziecka (np. boi się nożyczek)..." className="w-full h-24 bg-slate-900 border border-slate-600 text-white rounded-xl p-4 mb-4 custom-scrollbar"></textarea>
                                     
-                                    {/* TUTAJ BRAKOWAŁO WYŚWIETLANIA BŁĘDU! */}
+                                    {/* Przywrócone wyświetlanie błędu na ekranie! */}
                                     {storyError && <div className="mb-4 text-red-400 text-sm font-bold p-3 bg-red-900/30 border border-red-500/50 rounded-xl text-center">{storyError}</div>}
                                     
                                     <button onClick={generateStoryAndImage} disabled={isGeneratingStory || !storyProblem} className="w-full bg-amber-600 text-white font-black py-4 rounded-xl disabled:bg-slate-700">{isGeneratingStory ? '✨ Maluję i piszę wiersz...' : 'Stwórz Magiczną Bajkę'}</button>
