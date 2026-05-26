@@ -323,13 +323,12 @@
                 setIsGeneratingStory(true); setStoryError(''); setGeneratedStory(''); setGeneratedImage('');
                 try {
                     const textPayload = { 
-                        contents: [{ parts: [{ text: `Napisz radosną rymowankę (4 LINIJKI). Problem: ${storyProblem}. Użyj układu rymów AABB lub ABAB. Zwróć JSON: {"story": "linijka 1\\nlinijka 2\\nlinijka 3\\nlinijka 4", "image_prompt": "angielski opis sceny..."}` }] }], 
-                        systemInstruction: { parts: [{ text: "Jesteś bajkoterapeutą. Odpowiadaj TYLKO w formacie JSON." }] },
-                        generationConfig: { temperature: 0.5 } 
+                        contents: [{ parts: [{ text: `Jesteś bajkoterapeutą. Napisz radosną rymowankę (4 LINIJKI). Problem: ${storyProblem}. Użyj układu rymów AABB lub ABAB. Zwróć odpowiedź WYŁĄCZNIE jako czysty kod JSON: {"story": "linijka 1\\nlinijka 2\\nlinijka 3\\nlinijka 4", "image_prompt": "angielski opis sceny do wygenerowania obrazka..."}` }] }], 
+                        generationConfig: { temperature: 0.7 } 
                     };
                     const textData = await secureApiCall(textPayload, 'text');
                     let rawText = textData.candidates?.[0]?.content?.parts?.[0]?.text;
-                    if (!rawText) throw new Error("Brak odpowiedzi tekstowej z API.");
+                    if (!rawText) throw new Error("Brak odpowiedzi z serwera. Sprawdź połączenie API na Vercelu.");
                     
                     rawText = rawText.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
                     let jsonStr = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
@@ -341,7 +340,7 @@
                     try {
                         parsedData = JSON.parse(jsonStr);
                     } catch (e) {
-                        throw new Error("Sztuczna Inteligencja trochę się zaplątała. Kliknij przycisk jeszcze raz!");
+                        throw new Error("AI wygenerowało błędny format. Kliknij przycisk jeszcze raz!");
                     }
                     
                     // Darmowe i niezawodne generowanie obrazków przez Pollinations AI
@@ -353,7 +352,7 @@
                     const imgPromise = new Promise((resolve, reject) => {
                         const img = new Image();
                         img.onload = () => resolve(imageUrl);
-                        img.onerror = () => reject(new Error("Nie udało się wygenerować obrazka z serwera."));
+                        img.onerror = () => reject(new Error("Nie udało się pobrać obrazka. Spróbuj ponownie."));
                         img.src = imageUrl;
                     });
                     
@@ -510,6 +509,10 @@
                                 <div className="glass-panel p-6 sm:p-8 rounded-[2rem] fade-in border border-amber-500/30 print-hidden">
                                     <h2 className="text-3xl font-black text-amber-400 mb-6 text-center">Magiczny Komiks AI 🎨</h2>
                                     <textarea value={storyProblem} onChange={(e) => setStoryProblem(e.target.value)} placeholder="Opisz lęk dziecka (np. boi się nożyczek)..." className="w-full h-24 bg-slate-900 border border-slate-600 text-white rounded-xl p-4 mb-4 custom-scrollbar"></textarea>
+                                    
+                                    {/* TUTAJ BRAKOWAŁO WYŚWIETLANIA BŁĘDU! */}
+                                    {storyError && <div className="mb-4 text-red-400 text-sm font-bold p-3 bg-red-900/30 border border-red-500/50 rounded-xl text-center">{storyError}</div>}
+                                    
                                     <button onClick={generateStoryAndImage} disabled={isGeneratingStory || !storyProblem} className="w-full bg-amber-600 text-white font-black py-4 rounded-xl disabled:bg-slate-700">{isGeneratingStory ? '✨ Maluję i piszę wiersz...' : 'Stwórz Magiczną Bajkę'}</button>
                                     
                                     {generatedStory && generatedImage && (
