@@ -337,20 +337,37 @@
                     const end = jsonStr.lastIndexOf('}');
                     if (start !== -1 && end !== -1) jsonStr = jsonStr.substring(start, end + 1);
                     
-                    const parsedData = JSON.parse(jsonStr);
+                    let parsedData;
+                    try {
+                        parsedData = JSON.parse(jsonStr);
+                    } catch (e) {
+                        throw new Error("Sztuczna Inteligencja trochę się zaplątała. Kliknij przycisk jeszcze raz!");
+                    }
                     
-                    const imgPayload = { 
-                        instances: [{ prompt: `Cute 2D illustration for children book, flat vector style. ${parsedData.image_prompt}. Bright colors, therapeutic, calming. NO TEXT.` }], 
-                        parameters: { sampleCount: 1 } 
-                    };
-                    const imgData = await secureApiCall(imgPayload, 'image');
+                    // Darmowe i niezawodne generowanie obrazków przez Pollinations AI
+                    const seed = Math.floor(Math.random() * 1000000);
+                    const encodedPrompt = encodeURIComponent(`Cute 2D illustration for children book, flat vector style. ${parsedData.image_prompt}. Bright colors, therapeutic, calming. NO TEXT.`);
+                    const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?seed=${seed}&width=1024&height=1024&nologo=true`;
+
+                    // Czekamy na załadowanie obrazka
+                    const imgPromise = new Promise((resolve, reject) => {
+                        const img = new Image();
+                        img.onload = () => resolve(imageUrl);
+                        img.onerror = () => reject(new Error("Nie udało się wygenerować obrazka z serwera."));
+                        img.src = imageUrl;
+                    });
                     
-                    if (imgData.predictions && imgData.predictions[0] && imgData.predictions[0].bytesBase64Encoded) {
-                        setGeneratedStory(parsedData.story); setGeneratedImage(`data:image/png;base64,${imgData.predictions[0].bytesBase64Encoded}`);
-                    } else if (imgData.isVercelUrl) {
-                        setGeneratedStory(parsedData.story); setGeneratedImage(imgData.url);
-                    } else throw new Error("Brak obrazka w odpowiedzi.");
-                } catch (err) { setStoryError('Błąd: ' + err.message); } finally { setIsGeneratingStory(false); }
+                    const finalImageUrl = await imgPromise;
+                    
+                    setGeneratedStory(parsedData.story); 
+                    setGeneratedImage(finalImageUrl);
+
+                } catch (err) { 
+                    setStoryError('Błąd: ' + err.message); 
+                    console.error(err);
+                } finally { 
+                    setIsGeneratingStory(false); 
+                }
             };
 
             const handlePrint = () => { window.print(); };
