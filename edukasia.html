@@ -316,12 +316,22 @@
                 if (!storyProblem.trim()) { setStoryError('Wpisz problem ucznia.'); return; }
                 setIsGeneratingStory(true); setStoryError(''); setGeneratedPanels([]);
                 try {
-                    // Precyzyjny prompt wymuszający tablicę 4 kadrów!
-                    const fullText = `SYSTEM: Jesteś wybitnym polskim bajkoterapeutą i poetą dziecięcym. Odpowiadaj TYLKO i WYŁĄCZNIE w formacie JSON.\n\nZADANIE: Napisz bardzo precyzyjną, piękną i uspokajającą rymowankę terapeutyczną dla dziecka. \nProblem dziecka: ${storyProblem}.\n\nWierszyk MUSI mieć dokładnie 4 krótkie zwrotki (każda po 2-4 linijki, idealne i dźwięczne rymy).\n\nZwróć odpowiedź w takim formacie JSON (tablica z 4 elementami):\n{\n  "panels": [\n    { "text": "Zwrotka pierwsza...", "image_prompt": "angielski opis sceny do pierwszego obrazka..." },\n    { "text": "Zwrotka druga...", "image_prompt": "angielski opis sceny do drugiego obrazka..." },\n    { "text": "Zwrotka trzecia...", "image_prompt": "angielski opis sceny do trzeciego obrazka..." },\n    { "text": "Zwrotka czwarta...", "image_prompt": "angielski opis sceny do czwartego obrazka..." }\n  ]\n}`;
+                    // ZMIANA 1: Precyzyjny prompt terapeutyczny. ZERO metafor, wymuszona spójność postaci.
+                    const fullText = `SYSTEM: Jesteś wybitnym pedagogiem specjalnym i autorem bajek terapeutycznych dla dzieci ze spektrum autyzmu. Odpowiadaj WYŁĄCZNIE jako JSON.
+ZADANIE: Napisz bardzo dosłowną, prostą rymowankę uspokajającą.
+Problem dziecka: ${storyProblem}
+
+KRYTYCZNE ZASADY:
+1. Użyj imienia dziecka z problemu. Język musi być BARDZO PROSTY, bezpieczny i dosłowny. Zero abstrakcyjnych metafor (np. zamiast "chmury tańczą" napisz "siedzę w ciepłym domu", "mama mnie przytula", "mam swój miękki kocyk").
+2. Dokładnie 4 zwrotki (każda po 4 linijki, rymy parzyste AABB).
+3. Stwórz "image_prompt" (PO ANGIELSKU, max 15 słów). W KAŻDYM prompcie MUSISZ zacząć od spójnego opisu dziecka (np. "Cute 5-year-old girl with blonde hair..."), aby postać na wszystkich 4 obrazkach wyglądała tak samo!
+
+Format JSON:
+{"panels": [{ "text": "...", "image_prompt": "..." }, ...]}`;
                     
                     const textPayload = { 
                         contents: [{ parts: [{ text: fullText }] }], 
-                        generationConfig: { temperature: 0.6 } 
+                        generationConfig: { temperature: 0.4 } 
                     };
                     const textData = await secureApiCall(textPayload, 'text');
                     let rawText = textData.candidates?.[0]?.content?.parts?.[0]?.text;
@@ -343,16 +353,14 @@
                     
                     const panelsData = parsedData.panels;
 
-                    // ROZWIĄZANIE BŁĘDU NR 1: Przypisujemy linki bezpośrednio do przeglądarki. 
-                    // Przeglądarka załaduje je "w swoim tempie", omijając zabezpieczenia antyspamowe serwera graficznego.
+                    // ZMIANA 2: Zapisujemy czysty prompt w JSONie, aby móc go ponowić w razie błędu serwera
+                    const baseSeed = Math.floor(Math.random() * 1000000);
                     const completedPanels = panelsData.map((panel, index) => {
-                        const seed = Math.floor(Math.random() * 1000000) + index;
-                        // Skracamy prompt, gdyby AI przesadziło z długością opisu (co też potrafi blokować obrazek)
-                        const safePrompt = panel.image_prompt ? panel.image_prompt.substring(0, 400) : "cute happy child illustration";
-                        const encodedPrompt = encodeURIComponent(`Cute 2D illustration for children book, flat vector style, pastel colors. ${safePrompt}. NO TEXT.`);
-                        const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?seed=${seed}&width=512&height=512&nologo=true`;
+                        const safePrompt = panel.image_prompt ? panel.image_prompt.substring(0, 150) : "cute happy child";
+                        const encodedPrompt = encodeURIComponent(`Childrens book illustration, simple flat vector style, pastel colors. ${safePrompt}. NO TEXT.`);
+                        const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?seed=${baseSeed + index}&width=512&height=512&nologo=true`;
 
-                        return { text: panel.text, image: imageUrl };
+                        return { text: panel.text, image: imageUrl, originalPrompt: encodedPrompt };
                     });
                     
                     setGeneratedPanels(completedPanels);
@@ -520,10 +528,15 @@
                                                 {generatedPanels.map((panel, idx) => (
                                                     <div key={idx} className="bg-slate-800 rounded-3xl overflow-hidden border-2 border-amber-500/20 shadow-xl flex flex-col group hover:border-amber-500/60 transition-colors">
                                                         <div className="relative bg-slate-900 flex items-center justify-center min-h-[224px] md:min-h-[288px]">
-                                                            {/* Zaktualizowany obrazek z animacją ładowania w tle i kołem ratunkowym */}
+                                                            {/* ZMIANA 3: Jeśli serwer odrzuci obrazek, ponawiamy ten SAM prompt z innym seedem, a nie awaryjnego niedźwiadka */}
                                                             <img 
                                                                 src={panel.image} 
-                                                                onError={(e) => { e.target.src = `https://image.pollinations.ai/prompt/cute%20animal%20reading%20a%20book%20illustration?seed=${Math.random()}&width=512&height=512&nologo=true`; }}
+                                                                onError={(e) => { 
+                                                                    if(!e.target.dataset.retried) {
+                                                                        e.target.dataset.retried = true;
+                                                                        e.target.src = `https://image.pollinations.ai/prompt/${panel.originalPrompt}?seed=${Math.floor(Math.random()*10000)}&width=512&height=512&nologo=true`;
+                                                                    }
+                                                                }}
                                                                 className="w-full h-56 md:h-72 object-cover border-b-2 border-amber-500/20 relative z-10" 
                                                                 alt={`Kadr ${idx + 1}`}
                                                             />
