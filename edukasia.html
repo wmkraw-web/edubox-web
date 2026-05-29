@@ -246,8 +246,9 @@
                     const isLocal = window.location.protocol === 'file:' || window.location.hostname === 'localhost' || !window.location.hostname;
                     if (isLocal) throw new Error("Uruchomiłeś plik lokalnie. Otwórz przez Vercel lub Preview w czacie.");
 
-                    let extractedPrompt = "";
-                    if (payload && payload.contents && payload.contents[0] && payload.contents[0].parts && payload.contents[0].parts[0]) {
+                    // Pobieramy prompt bezbłędnie - dla Twoich profesjonalnych kluczy!
+                    let extractedPrompt = payload.prompt || "";
+                    if (!extractedPrompt && payload && payload.contents && payload.contents[0] && payload.contents[0].parts && payload.contents[0].parts[0]) {
                         extractedPrompt = payload.contents[0].parts[0].text;
                     }
 
@@ -353,16 +354,37 @@ Format JSON:
                     
                     const panelsData = parsedData.panels;
 
-                    // ZMIANA 2: Zapisujemy czysty prompt w JSONie, aby móc go ponowić w razie błędu serwera
-                    const baseSeed = Math.floor(Math.random() * 1000000);
-                    const completedPanels = panelsData.map((panel, index) => {
+                    // ZMIANA: Wykorzystujemy Twoje PROFESJONALNE klucze API z Vercela do wygenerowania 4 obrazków równolegle!
+                    const imagePromises = panelsData.map(async (panel, index) => {
                         const safePrompt = panel.image_prompt ? panel.image_prompt.substring(0, 150) : "cute happy child";
-                        const encodedPrompt = encodeURIComponent(`Childrens book illustration, simple flat vector style, pastel colors. ${safePrompt}. NO TEXT.`);
-                        const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?seed=${baseSeed + index}&width=512&height=512&nologo=true`;
+                        const finalPrompt = `Childrens book illustration, simple flat vector style, pastel colors. ${safePrompt}. NO TEXT.`;
 
-                        return { text: panel.text, image: imageUrl, originalPrompt: encodedPrompt };
+                        try {
+                            // Żądamy wygenerowania obrazka z Twojego własnego backendu na Vercelu (Użyje Twoich kluczy!)
+                            const imgData = await secureApiCall({ prompt: finalPrompt }, 'image');
+                            
+                            let imageUrl = '';
+                            // Sprytne odczytywanie url dla OpenAI / Fal.ai / Leonardo / DALL-E / Stability
+                            if (imgData.url) imageUrl = imgData.url;
+                            else if (imgData.image_url) imageUrl = imgData.image_url;
+                            else if (imgData.data && imgData.data[0] && imgData.data[0].url) imageUrl = imgData.data[0].url; 
+                            else if (imgData.images && imgData.images[0] && imgData.images[0].url) imageUrl = imgData.images[0].url;
+                            else if (imgData.predictions && imgData.predictions[0] && imgData.predictions[0].bytesBase64Encoded) imageUrl = `data:image/png;base64,${imgData.predictions[0].bytesBase64Encoded}`;
+                            
+                            if (imageUrl) {
+                                return { text: panel.text, image: imageUrl, originalPrompt: encodeURIComponent(finalPrompt) };
+                            }
+                            throw new Error("API premium nie zwróciło linku do obrazka.");
+                        } catch (apiError) {
+                            console.error("Błąd API Premium (Skończyły się kredyty?), używam obrazka zapasowego:", apiError);
+                            const encodedPrompt = encodeURIComponent(finalPrompt);
+                            const seed = Math.floor(Math.random() * 1000000) + index;
+                            return { text: panel.text, image: `https://image.pollinations.ai/prompt/${encodedPrompt}?seed=${seed}&width=512&height=512&nologo=true`, originalPrompt: encodedPrompt };
+                        }
                     });
                     
+                    // Czekamy, aż wszystkie 4 profesjonalne obrazki się wygenerują
+                    const completedPanels = await Promise.all(imagePromises);
                     setGeneratedPanels(completedPanels);
 
                 } catch (err) { setStoryError('Błąd: ' + err.message); } finally { setIsGeneratingStory(false); }
