@@ -48,7 +48,6 @@
 
         .success-card { background: linear-gradient(135deg, #ffffff 0%, #fdf2f8 100%); border: 8px solid #fbcfe8; box-shadow: 0 25px 50px -12px rgba(244, 63, 94, 0.25); color: #4c1d95; position: relative; overflow: hidden; }
 
-        /* WSPARCIE DLA DRUKOWANIA */
         @media print {
             body { background-color: white !important; color: black !important; }
             .print-hidden { display: none !important; }
@@ -56,12 +55,10 @@
             .success-card { border: 4px solid #fbcfe8 !important; box-shadow: none !important; transform: scale(1.1); margin: 2cm auto; }
             * { text-shadow: none !important; }
 
-            /* Druk Kart PECS */
             .pecs-print-container { display: flex !important; flex-wrap: wrap !important; gap: 5mm !important; justify-content: flex-start !important; padding: 10mm !important; }
             .pecs-card-print { width: 50mm !important; height: 50mm !important; border: 2px solid black !important; display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: space-between !important; padding: 5mm !important; page-break-inside: avoid !important; box-sizing: border-box !important; }
             .pecs-img-print { max-height: 25mm !important; max-width: 35mm !important; object-fit: contain !important; }
             
-            /* Druk Zadań z Rzepami */
             .rzepy-page { width: 210mm !important; height: 297mm !important; display: flex !important; flex-direction: column !important; page-break-after: always !important; }
             .rzepy-board { height: 50% !important; border-bottom: 2px dashed #999 !important; padding: 10mm !important; }
             .rzepy-elements { height: 50% !important; padding: 10mm !important; }
@@ -76,7 +73,6 @@
     <script type="text/babel">
         const { useState, useRef, useEffect } = React;
 
-        // --- IKONY SVG ---
         const Icon = ({ name, className = "w-5 h-5" }) => {
             const icons = {
                 Grid: <><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></>,
@@ -158,6 +154,7 @@
             const [showSuccessCard, setShowSuccessCard] = useState(false);
             const [isGeneratingSuccess, setIsGeneratingSuccess] = useState(false);
 
+            // STANY DLA 4-KADROWEJ BAJKI
             const [storyProblem, setStoryProblem] = useState('');
             const [generatedPanels, setGeneratedPanels] = useState([]);
             const [isGeneratingStory, setIsGeneratingStory] = useState(false);
@@ -172,20 +169,20 @@
             const [selectedRzepySet, setSelectedRzepySet] = useState(RZEPY_SETS[0]);
             const [searchQuery, setSearchQuery] = useState('');
 
-            // Wczytanie głosów na starcie dla przeglądarek
+            // Wczytanie głosów lektora
             useEffect(() => {
                 if ('speechSynthesis' in window) {
                     window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
                 }
             }, []);
 
-            // Ulepszony Lektor (Głos TTS) - zwalnia tempo, by brzmieć terapeutycznie
+            // Ulepszony Lektor
             const speakText = (text) => {
                 if ('speechSynthesis' in window) {
                     window.speechSynthesis.cancel(); 
                     const utterance = new SpeechSynthesisUtterance(text);
                     utterance.lang = 'pl-PL';
-                    utterance.rate = 0.85; // ZWOLNIONE TEMPO = bardziej uspokajająco
+                    utterance.rate = 0.85; // Wolniejsze, kojące tempo
                     utterance.pitch = 1.0; 
                     
                     const voices = window.speechSynthesis.getVoices();
@@ -213,7 +210,7 @@
             const removePecsCard = (id) => setPecsCards(pecsCards.filter(c => c.id !== id));
             const updatePecsCard = (id, field, value) => setPecsCards(pecsCards.map(c => c.id === id ? { ...c, [field]: value } : c));
 
-            // BEZPIECZNY KONTROLER API
+            // BEZPIECZNE POŁĄCZENIE Z VERCELEM
             const secureApiCall = async (payload, endpointType) => {
                 const apiKey = ""; 
 
@@ -238,7 +235,7 @@
                     return await fetchWithRetry(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
                 } else {
                     const isLocal = window.location.protocol === 'file:' || window.location.hostname === 'localhost' || !window.location.hostname;
-                    if (isLocal) throw new Error("Uruchomiłeś plik lokalnie. Otwórz przez Vercel lub Preview w czacie.");
+                    if (isLocal) throw new Error("Uruchomiłeś plik lokalnie. Wgraj na Vercel.");
 
                     let extractedPrompt = payload.prompt || "";
                     if (!extractedPrompt && payload && payload.contents && payload.contents[0] && payload.contents[0].parts && payload.contents[0].parts[0]) {
@@ -252,7 +249,7 @@
                             body: JSON.stringify({ payload: payload, type: endpointType, prompt: extractedPrompt })
                         });
                         const contentType = response.headers.get("content-type");
-                        if (!contentType || !contentType.includes("application/json")) throw new Error("Oczekiwano JSON. Sprawdź plik api/gemini.js na Vercel.");
+                        if (!contentType || !contentType.includes("application/json")) throw new Error("Sprawdź plik api/gemini.js na Vercel.");
                         if (!response.ok) {
                             const errData = await response.json().catch(() => ({}));
                             throw new Error(`Błąd Vercela: ${errData.error || response.statusText}`);
@@ -317,33 +314,34 @@
                 }
             };
 
+            // GŁÓWNA ZMIANA: Prawidłowe pobieranie 4 kadrów po kolei
             const generateStoryAndImage = async () => {
                 if (!storyProblem.trim()) { setStoryError('Wpisz problem ucznia.'); return; }
                 
                 setIsGeneratingStory(true); setStoryError(''); setGeneratedPanels([]);
 
                 try {
-                    // KROK 1: Precyzyjny prompt wymuszający 4 proste, dosłowne zwrotki
-                    const fullText = `SYSTEM: Jesteś wybitnym pedagogiem specjalnym i bajkoterapeutą. Odpowiadaj WYŁĄCZNIE jako JSON.
-ZADANIE: Napisz bardzo dosłowną, prostą i uspokajającą rymowankę.
+                    const fullText = `SYSTEM: Jesteś wybitnym pedagogiem specjalnym i bajkoterapeutą dziecięcym. Odpowiadaj WYŁĄCZNIE jako obiekt JSON.
+ZADANIE: Napisz bardzo prostą, kojącą i dosłowną rymowankę terapeutyczną dla przedszkolaka.
 Problem dziecka: ${storyProblem}
 
-KRYTYCZNE ZASADY:
-1. Język musi być BARDZO PROSTY, dosłowny i dawać poczucie bezpieczeństwa. Zero abstrakcyjnych metafor (np. zamiast "chmury tańczą" napisz "siedzę w ciepłym pokoju"). Rymy muszą być dokładne (np. słońce-końce). 
-2. DOKŁADNIE 4 zwrotki (każda po 4 krótkie linijki).
-3. Stwórz "image_prompt" (PO ANGIELSKU, max 15 słów). W KAŻDYM prompcie ZACZNIJ od dokładnego opisu dziecka (np. "Cute 5-year-old girl with blonde hair..."), aby zachować tę samą postać na obrazkach!
+KRYTYCZNE ZASADY RYMOWANIA I TREŚCI:
+1. Używaj wyłącznie prostego, codziennego słownictwa (zero trudnych metafor typu "szepty deszczu" czy "tańczące chmury"). Pisz w pierwszej osobie lub bezpośrednio do dziecka.
+2. Rymy muszą być bardzo dokładne i proste (np. kocyk/kamyk to zły rym. Dobry rym to: kocyk/loczek, koce/noce, burza/chmurza). Układ AABB lub ABAB.
+3. Utwór musi składać się z DOKŁADNIE 4 zwrotek (każda po 4 linijki).
+4. Stwórz "image_prompt" (PO ANGIELSKU, max 15 słów). W każdym opisie na samym początku użyj dokładnie tego samego opisu dziecka (np. "Cute 5-year-old girl with brown hair..."), aby zachować spójność postaci.
 
 Format JSON:
 {"panels": [{ "text": "...", "image_prompt": "..." }, { "text": "...", "image_prompt": "..." }, { "text": "...", "image_prompt": "..." }, { "text": "...", "image_prompt": "..." }]}`;
 
                     const textPayload = { 
                         contents: [{ parts: [{ text: fullText }] }], 
-                        generationConfig: { temperature: 0.4 } 
+                        generationConfig: { temperature: 0.3 } // Niska temperatura = mniej "halucynacji" i lepsze rymy
                     };
                     
                     const textData = await secureApiCall(textPayload, 'text');
                     let rawText = textData.candidates?.[0]?.content?.parts?.[0]?.text;
-                    if (!rawText) throw new Error("Brak odpowiedzi tekstowej z API.");
+                    if (!rawText) throw new Error("Brak odpowiedzi tekstowej z serwera AI.");
                     
                     rawText = rawText.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
                     let jsonStr = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
@@ -352,9 +350,9 @@ Format JSON:
                     if (start !== -1 && end !== -1) jsonStr = jsonStr.substring(start, end + 1);
                     
                     const parsedData = JSON.parse(jsonStr);
-                    if (!parsedData.panels || parsedData.panels.length !== 4) throw new Error("AI nie wygenerowało 4 kadrów.");
+                    if (!parsedData.panels || parsedData.panels.length !== 4) throw new Error("AI nie wygenerowało dokładnie 4 kadrów.");
 
-                    // KROK 2: Ustawiamy wstępny stan (Szkielet komiksu) z animacją ładowania
+                    // Ustawienie początkowego stanu na ekranie (widoczne kręcące się "ładowanie" 4 kadrów)
                     let currentPanels = parsedData.panels.map(p => ({
                         text: p.text,
                         image_prompt: p.image_prompt,
@@ -363,42 +361,49 @@ Format JSON:
                     }));
                     setGeneratedPanels([...currentPanels]);
 
-                    // KROK 3: Generujemy obrazki SEKWENCYJNIE (Jeden po drugim), aby nie zawiesić serwera!
+                    // SEKWENCYJNE ŁADOWANIE OBRAZKÓW (Omija darmowe limity serwerów!)
+                    const baseSeed = Math.floor(Math.random() * 1000000);
+                    
                     for (let i = 0; i < currentPanels.length; i++) {
                         try {
                             const safePrompt = currentPanels[i].image_prompt ? currentPanels[i].image_prompt.substring(0, 150) : "cute happy child";
-                            const finalPrompt = `Childrens book illustration, simple flat vector style, pastel colors. ${safePrompt}. NO TEXT.`;
+                            const finalPrompt = `Childrens book illustration, flat vector style, pastel colors. ${safePrompt}. NO TEXT.`;
 
-                            // Żądanie o obrazek z Twojego Vercela (Fal/Leonardo/OpenAI)
-                            const imgData = await secureApiCall({ prompt: finalPrompt }, 'image');
-                            
+                            // Próbuje zapytać Twojego Vercela o płatny klucz (jeśli masz np. Leonardo/Fal wpięte do Vercela)
                             let imageUrl = '';
-                            if (imgData.url) imageUrl = imgData.url;
-                            else if (imgData.image_url) imageUrl = imgData.image_url;
-                            else if (imgData.data && imgData.data[0] && imgData.data[0].url) imageUrl = imgData.data[0].url;
-                            else if (imgData.images && imgData.images[0] && imgData.images[0].url) imageUrl = imgData.images[0].url;
-                            else if (imgData.predictions && imgData.predictions[0] && imgData.predictions[0].bytesBase64Encoded) imageUrl = `data:image/png;base64,${imgData.predictions[0].bytesBase64Encoded}`;
+                            try {
+                                const imgData = await secureApiCall({ prompt: finalPrompt }, 'image');
+                                if (imgData.url) imageUrl = imgData.url;
+                                else if (imgData.image_url) imageUrl = imgData.image_url;
+                                else if (imgData.data && imgData.data[0] && imgData.data[0].url) imageUrl = imgData.data[0].url;
+                                else if (imgData.predictions && imgData.predictions[0] && imgData.predictions[0].bytesBase64Encoded) imageUrl = `data:image/png;base64,${imgData.predictions[0].bytesBase64Encoded}`;
+                            } catch (e) {
+                                // Jeśli Vercel zwróci błąd (brak klucza/kasy), łagodnie przeskakuje do darmowego rozwiązania poniżej
+                                console.warn("Fallback do darmowego API obrazków...");
+                            }
 
-                            if (!imageUrl) throw new Error("Brak URL z API Premium");
+                            // Jeśli serwer Vercela nie dał obrazka, używamy niezawodnego, darmowego serwera!
+                            if (!imageUrl) {
+                                const encodedPrompt = encodeURIComponent(finalPrompt);
+                                imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?seed=${baseSeed + i}&width=512&height=512&nologo=true`;
+                            }
 
                             currentPanels[i].image = imageUrl;
                         } catch (imgError) {
-                            console.error(`Błąd obrazka ${i+1}, używam zastępczego Pollinations:`, imgError);
-                            // Koło ratunkowe - Pollinations AI
-                            const encodedPrompt = encodeURIComponent(`Childrens book illustration. ${currentPanels[i].image_prompt}. NO TEXT.`);
-                            const seed = Math.floor(Math.random() * 1000000) + i;
-                            currentPanels[i].image = `https://image.pollinations.ai/prompt/${encodedPrompt}?seed=${seed}&width=512&height=512&nologo=true`;
+                            console.error(`Błąd obrazka ${i+1}:`, imgError);
+                            // Ostateczne koło ratunkowe
+                            currentPanels[i].image = `https://image.pollinations.ai/prompt/cute%20animal%20illustration?width=512&height=512&nologo=true`;
                         }
                         
                         currentPanels[i].isLoading = false;
-                        setGeneratedPanels([...currentPanels]); // Aktualizuje widok na żywo!
+                        setGeneratedPanels([...currentPanels]); // Renderuje obrazek od razu po pobraniu!
                         
-                        // Zabezpieczenie: Odczekaj 1.5 sekundy przed kolejnym obrazkiem, żeby Vercel złapał oddech
+                        // Złoty środek: opóźnienie 1.5 sekundy, żeby darmowy serwer nas nie zbanował za spam
                         await new Promise(r => setTimeout(r, 1500)); 
                     }
 
                 } catch (err) {
-                    setStoryError('Błąd: ' + err.message);
+                    setStoryError('Wystąpił błąd: ' + err.message);
                 } finally {
                     setIsGeneratingStory(false);
                 }
@@ -462,7 +467,7 @@ Format JSON:
                     <main className="flex-grow pt-24 pb-20 px-4 sm:px-6 print:pt-0 print:pb-0 print:px-0">
                         <div className="max-w-6xl mx-auto">
                             
-                            {/* Pasek Zakładek (Scrollowany) */}
+                            {/* Pasek Zakładek */}
                             <div className="flex overflow-x-auto gap-3 pb-4 mb-6 custom-scrollbar print-hidden">
                                 {[
                                     { id: 'sos', label: 'Porady SOS', icon: '🚨', color: 'blue' },
