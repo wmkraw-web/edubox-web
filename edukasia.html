@@ -182,7 +182,7 @@
                     window.speechSynthesis.cancel(); 
                     const utterance = new SpeechSynthesisUtterance(text);
                     utterance.lang = 'pl-PL';
-                    utterance.rate = 0.85; // Wolniejsze, kojące tempo
+                    utterance.rate = 0.85; 
                     utterance.pitch = 1.0; 
                     
                     const voices = window.speechSynthesis.getVoices();
@@ -314,6 +314,7 @@
                 }
             };
 
+            // SEKWENCYJNE GENEROWANIE KOMIKSU
             const generateStoryAndImage = async () => {
                 if (!storyProblem.trim()) { setStoryError('Wpisz lęk lub problem dziecka.'); return; }
                 
@@ -325,7 +326,7 @@ ZADANIE: Napisz nieskomplikowaną, bezpieczną i bardzo dosłowną rymowankę.
 Lęk/Problem dziecka: ${storyProblem}
 
 KRYTYCZNE ZASADY RYMOWANIA I TREŚCI:
-1. ZABRONIONE SĄ JAKIEKOLWIEK METAFORY I POEZJA (żadnych "tańczących chmur", "szeptów wiatru"). Pisz prostym językiem komunikatywnym. Używaj pierwszej osoby (np. "Mam mój kocyk, jest mi ciepło. Burza stuka sobie w szkło.").
+1. ZABRONIONE SĄ JAKIEKOLWIEK METAFORY I POEZJA. Pisz prostym językiem. Używaj pierwszej osoby (np. "Mam mój kocyk, jest mi ciepło. Burza stuka sobie w szkło.").
 2. Rymy muszą być bardzo dokładne i dziecięce (AABB lub ABAB).
 3. Utwór musi składać się z DOKŁADNIE 4 zwrotek (każda po 4 linijki).
 4. Stwórz "image_prompt" (PO ANGIELSKU). W każdym opisie na samym początku użyj dokładnie tego samego opisu dziecka (np. "Cute 5-year-old girl with blonde hair..."), aby zachować spójność postaci.
@@ -351,7 +352,6 @@ Format JSON (dokładnie 4 elementy w tablicy):
                     const parsedData = JSON.parse(jsonStr);
                     if (!parsedData.panels || parsedData.panels.length !== 4) throw new Error("AI nie wygenerowało dokładnie 4 kadrów. Spróbuj jeszcze raz.");
 
-                    // Ustawienie początkowego stanu na ekranie (widoczne kręcące się "ładowanie" 4 kadrów)
                     let currentPanels = parsedData.panels.map(p => ({
                         text: p.text,
                         image_prompt: p.image_prompt,
@@ -360,42 +360,22 @@ Format JSON (dokładnie 4 elementy w tablicy):
                     }));
                     setGeneratedPanels([...currentPanels]);
 
-                    // SEKWENCYJNE ŁADOWANIE OBRAZKÓW (Omija darmowe limity serwerów!)
                     const baseSeed = Math.floor(Math.random() * 1000000);
                     
+                    // Ładujemy jeden obrazek po drugim, by uniknąć przeciążenia
                     for (let i = 0; i < currentPanels.length; i++) {
-                        try {
-                            const safePrompt = currentPanels[i].image_prompt ? currentPanels[i].image_prompt.substring(0, 150) : "cute happy child";
-                            const finalPrompt = `Childrens book illustration, flat vector style, pastel colors, therapeutic, safe. ${safePrompt}. NO TEXT.`;
-
-                            let imageUrl = '';
-                            try {
-                                const imgData = await secureApiCall({ prompt: finalPrompt }, 'image');
-                                if (imgData.url) imageUrl = imgData.url;
-                                else if (imgData.image_url) imageUrl = imgData.image_url;
-                                else if (imgData.data && imgData.data[0] && imgData.data[0].url) imageUrl = imgData.data[0].url;
-                                else if (imgData.predictions && imgData.predictions[0] && imgData.predictions[0].bytesBase64Encoded) imageUrl = `data:image/png;base64,${imgData.predictions[0].bytesBase64Encoded}`;
-                            } catch (e) {
-                                console.warn("Fallback do Pollinations AI...");
-                            }
-
-                            // Jeśli serwer Vercela nie dał obrazka (lub zawiódł API key), używamy niezawodnego, darmowego serwera!
-                            if (!imageUrl) {
-                                const encodedPrompt = encodeURIComponent(finalPrompt);
-                                imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?seed=${baseSeed + i}&width=512&height=512&nologo=true`;
-                            }
-
-                            currentPanels[i].image = imageUrl;
-                        } catch (imgError) {
-                            console.error(`Błąd obrazka ${i+1}:`, imgError);
-                            currentPanels[i].image = `https://image.pollinations.ai/prompt/cute%20animal%20illustration?width=512&height=512&nologo=true`;
-                        }
+                        const safePrompt = currentPanels[i].image_prompt ? currentPanels[i].image_prompt.substring(0, 150) : "cute happy child";
+                        const finalPrompt = `Childrens book illustration, flat vector style, pastel colors, therapeutic, safe. ${safePrompt}. NO TEXT.`;
+                        const encodedPrompt = encodeURIComponent(finalPrompt);
                         
+                        // Zabezpieczony link do generowania obrazka
+                        currentPanels[i].image = `https://image.pollinations.ai/prompt/${encodedPrompt}?seed=${baseSeed + i}&width=512&height=512&nologo=true`;
                         currentPanels[i].isLoading = false;
+                        
                         setGeneratedPanels([...currentPanels]); 
                         
-                        // Czekamy równe 2 sekundy przed kolejnym żądaniem obrazka, aby ostudzić zabezpieczenia!
-                        await new Promise(r => setTimeout(r, 2000)); 
+                        // Odpoczynek przed kolejnym obrazkiem, żeby serwery nie zablokowały żądania
+                        await new Promise(r => setTimeout(r, 1500)); 
                     }
 
                 } catch (err) {
@@ -425,7 +405,7 @@ Format JSON (dokładnie 4 elementy w tablicy):
                                 <a href="https://buycoffee.to/magiccolor" target="_blank" className="flex items-center justify-center gap-2 w-full bg-amber-600 hover:bg-amber-500 text-white font-bold py-3 rounded-xl transition-all btn-bounce text-sm shadow-md mt-6 mb-4">
                                     ☕ Postaw Kawę, by otrzymać kod dostępu
                                 </a>
-                                <p className="text-slate-400 text-sm mb-4 font-medium">Podaj kod dostępu (PIN) otrzymany w podziękowaniu, aby odblokować system.</p>
+                                <p className="text-slate-400 text-sm mb-4 font-medium">Masz już kod dostępu? Wpisz go poniżej, aby odblokować system.</p>
                                 <div className="relative">
                                     <input 
                                         type="password" value={passwordInput} onChange={(e) => setPasswordInput(e.target.value)}
@@ -514,7 +494,7 @@ Format JSON (dokładnie 4 elementy w tablicy):
                                         ))}
                                     </div>
                                     <div className="flex gap-4">
-                                        <input type="text" value={customText} onChange={(e) => setCustomText(e.target.value)} placeholder="Wpisz dowol słowo..." className="flex-1 bg-slate-900 border border-slate-600 text-white rounded-xl px-5 py-4 focus:ring-2 focus:ring-indigo-500 outline-none" />
+                                        <input type="text" value={customText} onChange={(e) => setCustomText(e.target.value)} placeholder="Wpisz dowolne słowo..." className="flex-1 bg-slate-900 border border-slate-600 text-white rounded-xl px-5 py-4 focus:ring-2 focus:ring-indigo-500 outline-none" />
                                         <button onClick={() => { if(customText) speakText(customText); }} className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-8 py-4 rounded-xl transition-all btn-bounce">🔊 Czytaj</button>
                                     </div>
                                 </div>
@@ -574,7 +554,15 @@ Format JSON (dokładnie 4 elementy w tablicy):
                                                                     <span className="text-sm font-bold animate-pulse">Malowanie kadru {idx + 1}... 🎨</span>
                                                                 </div>
                                                             ) : (
-                                                                <img src={panel.image} className="w-full h-56 md:h-72 object-cover border-b-2 border-amber-500/20 relative z-10" alt={`Kadr ${idx + 1}`} />
+                                                                <img 
+                                                                    src={panel.image} 
+                                                                    onError={(e) => { 
+                                                                        e.target.onerror = null; 
+                                                                        e.target.src = `https://image.pollinations.ai/prompt/cute%20animal%20illustration?seed=${Math.random()}&width=512&height=512&nologo=true`; 
+                                                                    }}
+                                                                    className="w-full h-56 md:h-72 object-cover border-b-2 border-amber-500/20 relative z-10" 
+                                                                    alt={`Kadr ${idx + 1}`} 
+                                                                />
                                                             )}
                                                             <div className="absolute top-4 left-4 bg-amber-500 text-slate-900 w-8 h-8 rounded-full flex items-center justify-center font-black shadow-lg z-20">{idx + 1}</div>
                                                         </div>
