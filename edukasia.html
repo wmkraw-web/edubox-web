@@ -154,6 +154,7 @@
             const [showSuccessCard, setShowSuccessCard] = useState(false);
             const [isGeneratingSuccess, setIsGeneratingSuccess] = useState(false);
 
+            // STANY DLA 4-KADROWEJ BAJKI
             const [storyProblem, setStoryProblem] = useState('');
             const [generatedPanels, setGeneratedPanels] = useState([]);
             const [isGeneratingStory, setIsGeneratingStory] = useState(false);
@@ -168,12 +169,14 @@
             const [selectedRzepySet, setSelectedRzepySet] = useState(RZEPY_SETS[0]);
             const [searchQuery, setSearchQuery] = useState('');
 
+            // Wczytanie głosów lektora
             useEffect(() => {
                 if ('speechSynthesis' in window) {
                     window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
                 }
             }, []);
 
+            // Ulepszony Lektor (Poprawiona składnia bez błędów)
             const speakText = (text) => {
                 if ('speechSynthesis' in window) {
                     window.speechSynthesis.cancel(); 
@@ -187,7 +190,9 @@
                                          voices.find(v => v.lang === 'pl-PL' && (v.name.includes('Paulina') || v.name.includes('Zosia'))) ||
                                          voices.find(v => v.lang.startsWith('pl'));
                     
-                    if (premiumVoice) utterance.voice = premiumVoice;
+                    if (premiumVoice) {
+                        utterance.voice = premiumVoice;
+                    }
                     window.speechSynthesis.speak(utterance);
                 }
             };
@@ -207,6 +212,7 @@
             const removePecsCard = (id) => setPecsCards(pecsCards.filter(c => c.id !== id));
             const updatePecsCard = (id, field, value) => setPecsCards(pecsCards.map(c => c.id === id ? { ...c, [field]: value } : c));
 
+            // BEZPIECZNE POŁĄCZENIE Z VERCELEM
             const secureApiCall = async (payload, endpointType) => {
                 const apiKey = ""; 
 
@@ -310,28 +316,29 @@
                 }
             };
 
+            // NOWA LOGIKA GENEROWANIA 4 OBRAZKÓW NIEZALEŻNIE (BEZ ZAWIESZANIA!)
             const generateStoryAndImage = async () => {
                 if (!storyProblem.trim()) { setStoryError('Wpisz lęk lub problem dziecka.'); return; }
                 
                 setIsGeneratingStory(true); setStoryError(''); setGeneratedPanels([]);
 
                 try {
-                    const fullText = `SYSTEM: Jesteś wybitnym pedagogiem specjalnym i bajkoterapeutą dziecięcym dla dzieci ze spektrum autyzmu. Odpowiadaj WYŁĄCZNIE jako obiekt JSON.
-ZADANIE: Napisz nieskomplikowaną, bezpieczną i bardzo dosłowną rymowankę.
-Lęk/Problem dziecka: ${storyProblem}
+                    // Żądanie o JSON z rymowanką
+                    const fullText = `SYSTEM: Jesteś logopedą i pedagogiem specjalnym. Odpowiadaj WYŁĄCZNIE jako obiekt JSON.
+ZADANIE: Napisz najprostszą, dosłowną 4-częściową historyjkę obrazkową (rymowankę).
+Problem dziecka: ${storyProblem}
 
-KRYTYCZNE ZASADY RYMOWANIA I TREŚCI:
-1. ZABRONIONE SĄ JAKIEKOLWIEK METAFORY I POEZJA. Pisz nieskomplikowanym językiem. Używaj pierwszej osoby (np. "Mam mój kocyk, jest mi ciepło. Burza puka sobie w szkło."). Używaj słownictwa znanego 4-latkom.
-2. Rymy muszą być bardzo dokładne i poprawne (AABB lub ABAB). Nie zmyślaj słów. 
-3. Utwór musi składać się z DOKŁADNIE 4 zwrotek (każda po 2 do 4 linijek).
-4. Stwórz "image_prompt" (PO ANGIELSKU). W KAŻDYM PROMPCIE MUSISZ na początku opisać to samo dziecko (np. "Cute 5-year-old child with blonde hair..."), a potem sytuację, aby obrazki były ze sobą spójne.
+KRYTYCZNE ZASADY:
+1. ZABRONIONA JEST POEZJA I METAFORY (żadnych "szeptów wiatru", "słońc z uśmiechem"). Używaj bardzo krótkich zdań dla 4-latków (np. "Mam mój kocyk, tu jest dom.").
+2. Dokładnie 4 zwrotki. Każda zwrotka to TYLKO 2 krótkie linijki z bardzo dokładnym rymem prostym (np. miś/tu dziś).
+3. "image_prompt" musi być krótki (PO ANGIELSKU). W każdym prompcie na początku użyj tego samego bohatera (np. "Cute 5-year-old child...").
 
-Format JSON (dokładnie 4 elementy w tablicy):
+Format JSON:
 {"panels": [{ "text": "...", "image_prompt": "..." }, { "text": "...", "image_prompt": "..." }, { "text": "...", "image_prompt": "..." }, { "text": "...", "image_prompt": "..." }]}`;
 
                     const textPayload = { 
                         contents: [{ parts: [{ text: fullText }] }], 
-                        generationConfig: { temperature: 0.2 } // Bardzo niska temperatura dla ścisłego przestrzegania rymów
+                        generationConfig: { temperature: 0.2 } 
                     };
                     
                     const textData = await secureApiCall(textPayload, 'text');
@@ -347,7 +354,7 @@ Format JSON (dokładnie 4 elementy w tablicy):
                     const parsedData = JSON.parse(jsonStr);
                     if (!parsedData.panels || parsedData.panels.length !== 4) throw new Error("AI nie wygenerowało dokładnie 4 kadrów. Spróbuj jeszcze raz.");
 
-                    // Ładowanie początkowe 4 kadrów
+                    // Inicjujemy stan pustych okienek na ekranie
                     let currentPanels = parsedData.panels.map(p => ({
                         text: p.text,
                         image_prompt: p.image_prompt,
@@ -358,19 +365,21 @@ Format JSON (dokładnie 4 elementy w tablicy):
 
                     const baseSeed = Math.floor(Math.random() * 1000000);
                     
-                    // Ładujemy obrazki po kolei omijając Vercela. Bezpośrednie URL do obrazków chroni przed timeoutem!
+                    // Ładowanie obrazków jeden po drugim z 3 SEKUNDOWYM OPÓŹNIENIEM
                     for (let i = 0; i < currentPanels.length; i++) {
-                        const safePrompt = currentPanels[i].image_prompt ? currentPanels[i].image_prompt.substring(0, 150) : "cute happy child";
-                        const finalPrompt = `Childrens book illustration, flat vector style, pastel colors, therapeutic, safe. ${safePrompt}. NO TEXT. NO WORDS. NO LETTERS.`;
+                        const safePrompt = currentPanels[i].image_prompt ? currentPanels[i].image_prompt.substring(0, 150) : "cute child";
+                        const finalPrompt = `Childrens book illustration, flat vector style, therapeutic, safe. ${safePrompt}. NO TEXT. NO WORDS.`;
                         const encodedPrompt = encodeURIComponent(finalPrompt);
                         
-                        // Zabezpieczony bezpośredni link
-                        currentPanels[i].image = `https://image.pollinations.ai/prompt/${encodedPrompt}?seed=${baseSeed + i}&width=512&height=512&nologo=true`;
+                        // Zabezpieczony bezpośredni link omijający limity Vercela
+                        const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?seed=${baseSeed + i}&width=512&height=512&nologo=true`;
+                        
+                        currentPanels[i].image = imageUrl;
                         currentPanels[i].isLoading = false;
                         
                         setGeneratedPanels([...currentPanels]); 
                         
-                        // 3 sekundy relaksu dla serwera, by nie zbanował IP
+                        // Obowiązkowa pauza, żeby darmowy serwer się nie zbuntował!
                         await new Promise(r => setTimeout(r, 3000)); 
                     }
 
@@ -529,7 +538,7 @@ Format JSON (dokładnie 4 elementy w tablicy):
                                     {storyError && <div className="mb-4 text-red-400 text-sm font-bold p-3 bg-red-900/30 border border-red-500/50 rounded-xl">{storyError}</div>}
                                     
                                     <button onClick={generateStoryAndImage} disabled={isGeneratingStory || !storyProblem} className="w-full bg-amber-600 hover:bg-amber-500 text-white font-black py-4 rounded-xl disabled:bg-slate-700 shadow-lg btn-bounce transition-colors">
-                                        {isGeneratingStory ? '✨ Piszę wiersz i ładuję kadry... (ok. 10s)' : 'Stwórz Magiczny Komiks (4 Obrazki)'}
+                                        {isGeneratingStory ? '✨ Piszę wiersz i ładuję kadry po kolei... (poczekaj chwile)' : 'Stwórz Magiczny Komiks (4 Obrazki)'}
                                     </button>
                                     
                                     {generatedPanels.length > 0 && (
@@ -553,7 +562,8 @@ Format JSON (dokładnie 4 elementy w tablicy):
                                                                 <img 
                                                                     src={panel.image} 
                                                                     className="w-full h-56 md:h-72 object-cover border-b-2 border-amber-500/20 relative z-10" 
-                                                                    alt={`Kadr ${idx + 1}`} 
+                                                                    alt={`Kadr ${idx + 1}`}
+                                                                    onError={(e) => { e.target.src = "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?q=80&w=512&auto=format&fit=crop"; }}
                                                                 />
                                                             )}
                                                             <div className="absolute top-4 left-4 bg-amber-500 text-slate-900 w-8 h-8 rounded-full flex items-center justify-center font-black shadow-lg z-20">{idx + 1}</div>
