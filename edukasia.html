@@ -116,7 +116,8 @@
             { title: 'EduBoxPro MagicLetters', desc: 'Profesjonalny generator girland ze wsparciem AI.', url: 'magicletters.html', icon: '✨' },
             { title: 'EduGenerator PRO', desc: 'Dyplomy dla klasy i ozdobne girlandy z wycinaniem tła.', url: 'edugenerator.html', icon: '📜' },
             { title: 'EduWizualizator (AAC)', desc: 'Dzieli trudną czynność na kroki z piktogramami.', url: 'eduwizualizator.html', icon: '👀' },
-            { title: 'EduGrupy (Koło Fortuny)', desc: 'Koło Fortuny do losowania uczniów i podział na grupy.', url: 'edugrupy.html', icon: '🎡' }
+            { title: 'EduGrupy (Koło Fortuny)', desc: 'Koło Fortuny do losowania uczniów i podział na grupy.', url: 'edugrupy.html', icon: '🎡' },
+            { title: 'Kreator Ikon PRO', desc: 'Konwertuje grafiki na pliki Windows .ICO.', url: 'https://kreator-ikon.vercel.app/', icon: 'Image' }
         ];
 
         const RZEPY_SETS = [
@@ -157,7 +158,6 @@
             const [showSuccessCard, setShowSuccessCard] = useState(false);
             const [isGeneratingSuccess, setIsGeneratingSuccess] = useState(false);
 
-            // Zmienione stany dla 4 kadrów
             const [storyProblem, setStoryProblem] = useState('');
             const [generatedPanels, setGeneratedPanels] = useState([]);
             const [isGeneratingStory, setIsGeneratingStory] = useState(false);
@@ -172,34 +172,28 @@
             const [selectedRzepySet, setSelectedRzepySet] = useState(RZEPY_SETS[0]);
             const [searchQuery, setSearchQuery] = useState('');
 
-            // Wczytanie głosów na starcie, by uniknąć pustej listy w przeglądarkach (szczególnie Chrome)
+            // Wczytanie głosów na starcie dla przeglądarek
             useEffect(() => {
                 if ('speechSynthesis' in window) {
-                    window.speechSynthesis.onvoiceschanged = () => {
-                        window.speechSynthesis.getVoices();
-                    };
+                    window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
                 }
             }, []);
 
-            // Ulepszony Lektor (Głos TTS) - szuka głosów premium (Google/Zosia/Paulina), zwalnia tempo
+            // Ulepszony Lektor (Głos TTS) - zwalnia tempo, by brzmieć terapeutycznie
             const speakText = (text) => {
                 if ('speechSynthesis' in window) {
-                    window.speechSynthesis.cancel(); // Przerywa poprzednie
+                    window.speechSynthesis.cancel(); 
                     const utterance = new SpeechSynthesisUtterance(text);
                     utterance.lang = 'pl-PL';
-                    utterance.rate = 0.85; // ZWOLNIONE TEMPO = bardziej uspokajająco (terapeutycznie)
+                    utterance.rate = 0.85; // ZWOLNIONE TEMPO = bardziej uspokajająco
                     utterance.pitch = 1.0; 
                     
                     const voices = window.speechSynthesis.getVoices();
-                    // Szukamy najlepszego polskiego głosu (Google, Paulina, Zosia itp.)
                     const premiumVoice = voices.find(v => v.lang === 'pl-PL' && v.name.includes('Google')) ||
                                          voices.find(v => v.lang === 'pl-PL' && (v.name.includes('Paulina') || v.name.includes('Zosia'))) ||
                                          voices.find(v => v.lang.startsWith('pl'));
                     
-                    if (premiumVoice) {
-                        utterance.voice = premiumVoice;
-                    }
-
+                    if (premiumVoice) utterance.voice = premiumVoice;
                     window.speechSynthesis.speak(utterance);
                 }
             };
@@ -246,7 +240,6 @@
                     const isLocal = window.location.protocol === 'file:' || window.location.hostname === 'localhost' || !window.location.hostname;
                     if (isLocal) throw new Error("Uruchomiłeś plik lokalnie. Otwórz przez Vercel lub Preview w czacie.");
 
-                    // Pobieramy prompt bezbłędnie - dla Twoich profesjonalnych kluczy!
                     let extractedPrompt = payload.prompt || "";
                     if (!extractedPrompt && payload && payload.contents && payload.contents[0] && payload.contents[0].parts && payload.contents[0].parts[0]) {
                         extractedPrompt = payload.contents[0].parts[0].text;
@@ -301,42 +294,56 @@
 
             const handleSuccessGenerate = async () => {
                 if (!successName.trim() || !successAction.trim()) return;
+                
                 setIsGeneratingSuccess(true); setShowSuccessCard(false); setSuccessText('');
                 try {
-                    const fullText = `SYSTEM: Jesteś pełnym ciepła wychowawcą przedszkolnym.\n\nZADANIE: Dziecko o imieniu ${successName} osiągnęło sukces: ${successAction}. Napisz radosną, krótką (max 3 zdania) pochwałę dla rodziców. Zacznij od 'Wielkie brawa!'.`;
-                    const payload = { contents: [{ parts: [{ text: fullText }] }], generationConfig: { temperature: 0.7 } };
+                    const payload = {
+                        contents: [{ parts: [{ text: `Dziecko o imieniu ${successName} osiągnęło sukces: ${successAction}. Napisz bardzo radosną, krótką (max 3 zdania) pochwałę/dyplomik dla rodziców. Zacznij od 'Wielkie brawa!'. Dodaj urocze emotikony.` }] }],
+                        systemInstruction: { parts: [{ text: "Jesteś pełnym ciepła wychowawcą przedszkolnym." }] },
+                        generationConfig: { temperature: 0.7 }
+                    };
+                    
                     const data = await secureApiCall(payload, 'text');
                     let text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-                    if (text) { setSuccessText(text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim()); setShowSuccessCard(true); } 
-                    else throw new Error("Brak odpowiedzi z serwera.");
-                } catch (err) { alert("Błąd generowania: " + err.message); } finally { setIsGeneratingSuccess(false); }
+                    if (text) { 
+                        text = text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+                        setSuccessText(text); 
+                        setShowSuccessCard(true); 
+                    } else throw new Error();
+                } catch (err) {
+                    alert("Błąd generowania. Spróbuj ponownie: " + err.message);
+                } finally {
+                    setIsGeneratingSuccess(false);
+                }
             };
 
-            // NOWA WERSJA GENERATORA KOMIKSU (4 KADRY)
             const generateStoryAndImage = async () => {
                 if (!storyProblem.trim()) { setStoryError('Wpisz problem ucznia.'); return; }
+                
                 setIsGeneratingStory(true); setStoryError(''); setGeneratedPanels([]);
+
                 try {
-                    // ZMIANA 1: Precyzyjny prompt terapeutyczny. ZERO metafor, wymuszona spójność postaci.
-                    const fullText = `SYSTEM: Jesteś wybitnym pedagogiem specjalnym i autorem bajek terapeutycznych dla dzieci ze spektrum autyzmu. Odpowiadaj WYŁĄCZNIE jako JSON.
-ZADANIE: Napisz bardzo dosłowną, prostą rymowankę uspokajającą.
+                    // KROK 1: Precyzyjny prompt wymuszający 4 proste, dosłowne zwrotki
+                    const fullText = `SYSTEM: Jesteś wybitnym pedagogiem specjalnym i bajkoterapeutą. Odpowiadaj WYŁĄCZNIE jako JSON.
+ZADANIE: Napisz bardzo dosłowną, prostą i uspokajającą rymowankę.
 Problem dziecka: ${storyProblem}
 
 KRYTYCZNE ZASADY:
-1. Użyj imienia dziecka z problemu. Język musi być BARDZO PROSTY, bezpieczny i dosłowny. Zero abstrakcyjnych metafor (np. zamiast "chmury tańczą" napisz "siedzę w ciepłym domu", "mama mnie przytula", "mam swój miękki kocyk").
-2. Dokładnie 4 zwrotki (każda po 4 linijki, rymy parzyste AABB).
-3. Stwórz "image_prompt" (PO ANGIELSKU, max 15 słów). W KAŻDYM prompcie MUSISZ zacząć od spójnego opisu dziecka (np. "Cute 5-year-old girl with blonde hair..."), aby postać na wszystkich 4 obrazkach wyglądała tak samo!
+1. Język musi być BARDZO PROSTY, dosłowny i dawać poczucie bezpieczeństwa. Zero abstrakcyjnych metafor (np. zamiast "chmury tańczą" napisz "siedzę w ciepłym pokoju"). Rymy muszą być dokładne (np. słońce-końce). 
+2. DOKŁADNIE 4 zwrotki (każda po 4 krótkie linijki).
+3. Stwórz "image_prompt" (PO ANGIELSKU, max 15 słów). W KAŻDYM prompcie ZACZNIJ od dokładnego opisu dziecka (np. "Cute 5-year-old girl with blonde hair..."), aby zachować tę samą postać na obrazkach!
 
 Format JSON:
-{"panels": [{ "text": "...", "image_prompt": "..." }, ...]}`;
-                    
+{"panels": [{ "text": "...", "image_prompt": "..." }, { "text": "...", "image_prompt": "..." }, { "text": "...", "image_prompt": "..." }, { "text": "...", "image_prompt": "..." }]}`;
+
                     const textPayload = { 
                         contents: [{ parts: [{ text: fullText }] }], 
                         generationConfig: { temperature: 0.4 } 
                     };
+                    
                     const textData = await secureApiCall(textPayload, 'text');
                     let rawText = textData.candidates?.[0]?.content?.parts?.[0]?.text;
-                    if (!rawText) throw new Error("Brak odpowiedzi z serwera.");
+                    if (!rawText) throw new Error("Brak odpowiedzi tekstowej z API.");
                     
                     rawText = rawText.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
                     let jsonStr = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
@@ -344,50 +351,57 @@ Format JSON:
                     const end = jsonStr.lastIndexOf('}');
                     if (start !== -1 && end !== -1) jsonStr = jsonStr.substring(start, end + 1);
                     
-                    let parsedData;
-                    try {
-                        parsedData = JSON.parse(jsonStr);
-                        if (!parsedData.panels || parsedData.panels.length === 0) throw new Error();
-                    } catch (e) {
-                        throw new Error("AI zaplątało się w pisaniu rymów. Kliknij przycisk jeszcze raz!");
-                    }
-                    
-                    const panelsData = parsedData.panels;
+                    const parsedData = JSON.parse(jsonStr);
+                    if (!parsedData.panels || parsedData.panels.length !== 4) throw new Error("AI nie wygenerowało 4 kadrów.");
 
-                    // ZMIANA: Wykorzystujemy Twoje PROFESJONALNE klucze API z Vercela do wygenerowania 4 obrazków równolegle!
-                    const imagePromises = panelsData.map(async (panel, index) => {
-                        const safePrompt = panel.image_prompt ? panel.image_prompt.substring(0, 150) : "cute happy child";
-                        const finalPrompt = `Childrens book illustration, simple flat vector style, pastel colors. ${safePrompt}. NO TEXT.`;
+                    // KROK 2: Ustawiamy wstępny stan (Szkielet komiksu) z animacją ładowania
+                    let currentPanels = parsedData.panels.map(p => ({
+                        text: p.text,
+                        image_prompt: p.image_prompt,
+                        image: null,
+                        isLoading: true
+                    }));
+                    setGeneratedPanels([...currentPanels]);
 
+                    // KROK 3: Generujemy obrazki SEKWENCYJNIE (Jeden po drugim), aby nie zawiesić serwera!
+                    for (let i = 0; i < currentPanels.length; i++) {
                         try {
-                            // Żądamy wygenerowania obrazka z Twojego własnego backendu na Vercelu (Użyje Twoich kluczy!)
+                            const safePrompt = currentPanels[i].image_prompt ? currentPanels[i].image_prompt.substring(0, 150) : "cute happy child";
+                            const finalPrompt = `Childrens book illustration, simple flat vector style, pastel colors. ${safePrompt}. NO TEXT.`;
+
+                            // Żądanie o obrazek z Twojego Vercela (Fal/Leonardo/OpenAI)
                             const imgData = await secureApiCall({ prompt: finalPrompt }, 'image');
                             
                             let imageUrl = '';
-                            // Sprytne odczytywanie url dla OpenAI / Fal.ai / Leonardo / DALL-E / Stability
                             if (imgData.url) imageUrl = imgData.url;
                             else if (imgData.image_url) imageUrl = imgData.image_url;
-                            else if (imgData.data && imgData.data[0] && imgData.data[0].url) imageUrl = imgData.data[0].url; 
+                            else if (imgData.data && imgData.data[0] && imgData.data[0].url) imageUrl = imgData.data[0].url;
                             else if (imgData.images && imgData.images[0] && imgData.images[0].url) imageUrl = imgData.images[0].url;
                             else if (imgData.predictions && imgData.predictions[0] && imgData.predictions[0].bytesBase64Encoded) imageUrl = `data:image/png;base64,${imgData.predictions[0].bytesBase64Encoded}`;
-                            
-                            if (imageUrl) {
-                                return { text: panel.text, image: imageUrl, originalPrompt: encodeURIComponent(finalPrompt) };
-                            }
-                            throw new Error("API premium nie zwróciło linku do obrazka.");
-                        } catch (apiError) {
-                            console.error("Błąd API Premium (Skończyły się kredyty?), używam obrazka zapasowego:", apiError);
-                            const encodedPrompt = encodeURIComponent(finalPrompt);
-                            const seed = Math.floor(Math.random() * 1000000) + index;
-                            return { text: panel.text, image: `https://image.pollinations.ai/prompt/${encodedPrompt}?seed=${seed}&width=512&height=512&nologo=true`, originalPrompt: encodedPrompt };
-                        }
-                    });
-                    
-                    // Czekamy, aż wszystkie 4 profesjonalne obrazki się wygenerują
-                    const completedPanels = await Promise.all(imagePromises);
-                    setGeneratedPanels(completedPanels);
 
-                } catch (err) { setStoryError('Błąd: ' + err.message); } finally { setIsGeneratingStory(false); }
+                            if (!imageUrl) throw new Error("Brak URL z API Premium");
+
+                            currentPanels[i].image = imageUrl;
+                        } catch (imgError) {
+                            console.error(`Błąd obrazka ${i+1}, używam zastępczego Pollinations:`, imgError);
+                            // Koło ratunkowe - Pollinations AI
+                            const encodedPrompt = encodeURIComponent(`Childrens book illustration. ${currentPanels[i].image_prompt}. NO TEXT.`);
+                            const seed = Math.floor(Math.random() * 1000000) + i;
+                            currentPanels[i].image = `https://image.pollinations.ai/prompt/${encodedPrompt}?seed=${seed}&width=512&height=512&nologo=true`;
+                        }
+                        
+                        currentPanels[i].isLoading = false;
+                        setGeneratedPanels([...currentPanels]); // Aktualizuje widok na żywo!
+                        
+                        // Zabezpieczenie: Odczekaj 1.5 sekundy przed kolejnym obrazkiem, żeby Vercel złapał oddech
+                        await new Promise(r => setTimeout(r, 1500)); 
+                    }
+
+                } catch (err) {
+                    setStoryError('Błąd: ' + err.message);
+                } finally {
+                    setIsGeneratingStory(false);
+                }
             };
 
             const handlePrint = () => { window.print(); };
@@ -525,7 +539,7 @@ Format JSON:
                                 </div>
                             )}
 
-                            {/* WIDOK: BAJKA KOMIKS 4-KADRY */}
+                            {/* WIDOK: BAJKA */}
                             {activeTab === 'bajka' && (
                                 <div className="glass-panel p-6 sm:p-8 rounded-[2rem] fade-in border border-amber-500/30 print-hidden">
                                     <h2 className="text-3xl font-black text-amber-400 mb-6 text-center">Magiczny Komiks AI 🎨</h2>
@@ -533,14 +547,13 @@ Format JSON:
                                     
                                     {storyError && <div className="mb-4 text-red-400 text-sm font-bold p-3 bg-red-900/30 border border-red-500/50 rounded-xl text-center">{storyError}</div>}
                                     
-                                    <button onClick={generateStoryAndImage} disabled={isGeneratingStory || !storyProblem} className="w-full bg-amber-600 text-white font-black py-4 rounded-xl disabled:bg-slate-700 shadow-lg btn-bounce">
-                                        {isGeneratingStory ? '✨ Maluję 4 kadry i układam wiersze... (ok. 5 sekund)' : 'Stwórz Magiczny Komiks (4 Obrazki)'}
+                                    <button onClick={generateStoryAndImage} disabled={isGeneratingStory || !storyProblem} className="w-full bg-amber-600 hover:bg-amber-500 text-white font-black py-4 rounded-xl disabled:bg-slate-700 shadow-lg btn-bounce transition-colors">
+                                        {isGeneratingStory ? '✨ Piszę wiersz i maluję kadry... (Czekaj)' : 'Stwórz Magiczny Komiks (4 Obrazki)'}
                                     </button>
                                     
                                     {generatedPanels.length > 0 && (
                                         <div className="mt-10 bg-slate-900/50 p-4 md:p-8 rounded-[2rem] border border-amber-500/30 fade-in shadow-inner">
-                                            
-                                            <div className="flex justify-center mb-6">
+                                            <div className="flex justify-center mb-8">
                                                 <button onClick={() => speakText(generatedPanels.map(p => p.text).join(' '))} className="bg-amber-600 hover:bg-amber-500 text-white px-8 py-4 rounded-full font-black shadow-lg flex items-center gap-3 transition-all btn-bounce">
                                                     <span className="text-2xl">🔊</span> Posłuchaj Lektora
                                                 </button>
@@ -550,21 +563,14 @@ Format JSON:
                                                 {generatedPanels.map((panel, idx) => (
                                                     <div key={idx} className="bg-slate-800 rounded-3xl overflow-hidden border-2 border-amber-500/20 shadow-xl flex flex-col group hover:border-amber-500/60 transition-colors">
                                                         <div className="relative bg-slate-900 flex items-center justify-center min-h-[224px] md:min-h-[288px]">
-                                                            {/* ZMIANA 3: Jeśli serwer odrzuci obrazek, ponawiamy ten SAM prompt z innym seedem, a nie awaryjnego niedźwiadka */}
-                                                            <img 
-                                                                src={panel.image} 
-                                                                onError={(e) => { 
-                                                                    if(!e.target.dataset.retried) {
-                                                                        e.target.dataset.retried = true;
-                                                                        e.target.src = `https://image.pollinations.ai/prompt/${panel.originalPrompt}?seed=${Math.floor(Math.random()*10000)}&width=512&height=512&nologo=true`;
-                                                                    }
-                                                                }}
-                                                                className="w-full h-56 md:h-72 object-cover border-b-2 border-amber-500/20 relative z-10" 
-                                                                alt={`Kadr ${idx + 1}`}
-                                                            />
-                                                            <div className="absolute inset-0 flex items-center justify-center text-slate-500 text-sm font-bold animate-pulse z-0">
-                                                                Malowanie obrazka... 🎨
-                                                            </div>
+                                                            {panel.isLoading ? (
+                                                                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 z-0 text-amber-500 bg-slate-900">
+                                                                    <div className="w-8 h-8 border-4 border-amber-500 border-t-transparent rounded-full animate-spin"></div>
+                                                                    <span className="text-sm font-bold animate-pulse">Malowanie kadru {idx + 1}... 🎨</span>
+                                                                </div>
+                                                            ) : (
+                                                                <img src={panel.image} className="w-full h-56 md:h-72 object-cover border-b-2 border-amber-500/20 relative z-10" alt={`Kadr ${idx + 1}`} />
+                                                            )}
                                                             <div className="absolute top-4 left-4 bg-amber-500 text-slate-900 w-8 h-8 rounded-full flex items-center justify-center font-black shadow-lg z-20">{idx + 1}</div>
                                                         </div>
                                                         <div className="p-6 text-slate-200 text-base md:text-lg italic flex-1 flex items-center justify-center text-center font-medium leading-relaxed bg-slate-900/50">
@@ -573,7 +579,6 @@ Format JSON:
                                                     </div>
                                                 ))}
                                             </div>
-                                            
                                         </div>
                                     )}
                                 </div>
