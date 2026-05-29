@@ -314,29 +314,29 @@
                 }
             };
 
-            // GŁÓWNA ZMIANA: Prawidłowe pobieranie 4 kadrów po kolei
+            // GŁÓWNA ZMIANA: Prawidłowe pobieranie 4 kadrów po kolei z wymuszonym bardzo prostym językiem.
             const generateStoryAndImage = async () => {
-                if (!storyProblem.trim()) { setStoryError('Wpisz problem ucznia.'); return; }
+                if (!storyProblem.trim()) { setStoryError('Wpisz lęk lub problem dziecka.'); return; }
                 
                 setIsGeneratingStory(true); setStoryError(''); setGeneratedPanels([]);
 
                 try {
-                    const fullText = `SYSTEM: Jesteś wybitnym pedagogiem specjalnym i bajkoterapeutą dziecięcym. Odpowiadaj WYŁĄCZNIE jako obiekt JSON.
-ZADANIE: Napisz bardzo prostą, kojącą i dosłowną rymowankę terapeutyczną dla przedszkolaka.
-Problem dziecka: ${storyProblem}
+                    const fullText = `SYSTEM: Jesteś wybitnym pedagogiem specjalnym i bajkoterapeutą dziecięcym dla dzieci ze spektrum autyzmu. Odpowiadaj WYŁĄCZNIE jako obiekt JSON.
+ZADANIE: Napisz nieskomplikowaną, bezpieczną i bardzo dosłowną rymowankę.
+Lęk/Problem dziecka: ${storyProblem}
 
 KRYTYCZNE ZASADY RYMOWANIA I TREŚCI:
-1. Używaj wyłącznie prostego, codziennego słownictwa (zero trudnych metafor typu "szepty deszczu" czy "tańczące chmury"). Pisz w pierwszej osobie lub bezpośrednio do dziecka.
-2. Rymy muszą być bardzo dokładne i proste (np. kocyk/kamyk to zły rym. Dobry rym to: kocyk/loczek, koce/noce, burza/chmurza). Układ AABB lub ABAB.
+1. ZABRONIONE SĄ JAKIEKOLWIEK METAFORY I POEZJA (żadnych "tańczących chmur", "szeptów wiatru"). Pisz prostym językiem komunikatywnym. Używaj pierwszej osoby (np. "Mam mój kocyk, jest mi ciepło. Burza stuka sobie w szkło.").
+2. Rymy muszą być bardzo dokładne i dziecięce (AABB lub ABAB).
 3. Utwór musi składać się z DOKŁADNIE 4 zwrotek (każda po 4 linijki).
-4. Stwórz "image_prompt" (PO ANGIELSKU, max 15 słów). W każdym opisie na samym początku użyj dokładnie tego samego opisu dziecka (np. "Cute 5-year-old girl with brown hair..."), aby zachować spójność postaci.
+4. Stwórz "image_prompt" (PO ANGIELSKU). W każdym opisie na samym początku użyj dokładnie tego samego opisu dziecka (np. "Cute 5-year-old girl with blonde hair..."), aby zachować spójność postaci.
 
-Format JSON:
+Format JSON (dokładnie 4 elementy w tablicy):
 {"panels": [{ "text": "...", "image_prompt": "..." }, { "text": "...", "image_prompt": "..." }, { "text": "...", "image_prompt": "..." }, { "text": "...", "image_prompt": "..." }]}`;
 
                     const textPayload = { 
                         contents: [{ parts: [{ text: fullText }] }], 
-                        generationConfig: { temperature: 0.3 } // Niska temperatura = mniej "halucynacji" i lepsze rymy
+                        generationConfig: { temperature: 0.3 } 
                     };
                     
                     const textData = await secureApiCall(textPayload, 'text');
@@ -350,7 +350,7 @@ Format JSON:
                     if (start !== -1 && end !== -1) jsonStr = jsonStr.substring(start, end + 1);
                     
                     const parsedData = JSON.parse(jsonStr);
-                    if (!parsedData.panels || parsedData.panels.length !== 4) throw new Error("AI nie wygenerowało dokładnie 4 kadrów.");
+                    if (!parsedData.panels || parsedData.panels.length !== 4) throw new Error("AI nie wygenerowało dokładnie 4 kadrów. Spróbuj jeszcze raz.");
 
                     // Ustawienie początkowego stanu na ekranie (widoczne kręcące się "ładowanie" 4 kadrów)
                     let currentPanels = parsedData.panels.map(p => ({
@@ -367,9 +367,8 @@ Format JSON:
                     for (let i = 0; i < currentPanels.length; i++) {
                         try {
                             const safePrompt = currentPanels[i].image_prompt ? currentPanels[i].image_prompt.substring(0, 150) : "cute happy child";
-                            const finalPrompt = `Childrens book illustration, flat vector style, pastel colors. ${safePrompt}. NO TEXT.`;
+                            const finalPrompt = `Childrens book illustration, flat vector style, pastel colors, therapeutic, safe. ${safePrompt}. NO TEXT.`;
 
-                            // Próbuje zapytać Twojego Vercela o płatny klucz (jeśli masz np. Leonardo/Fal wpięte do Vercela)
                             let imageUrl = '';
                             try {
                                 const imgData = await secureApiCall({ prompt: finalPrompt }, 'image');
@@ -378,11 +377,10 @@ Format JSON:
                                 else if (imgData.data && imgData.data[0] && imgData.data[0].url) imageUrl = imgData.data[0].url;
                                 else if (imgData.predictions && imgData.predictions[0] && imgData.predictions[0].bytesBase64Encoded) imageUrl = `data:image/png;base64,${imgData.predictions[0].bytesBase64Encoded}`;
                             } catch (e) {
-                                // Jeśli Vercel zwróci błąd (brak klucza/kasy), łagodnie przeskakuje do darmowego rozwiązania poniżej
-                                console.warn("Fallback do darmowego API obrazków...");
+                                console.warn("Fallback do Pollinations AI...");
                             }
 
-                            // Jeśli serwer Vercela nie dał obrazka, używamy niezawodnego, darmowego serwera!
+                            // Jeśli serwer Vercela nie dał obrazka (lub zawiódł API key), używamy niezawodnego, darmowego serwera!
                             if (!imageUrl) {
                                 const encodedPrompt = encodeURIComponent(finalPrompt);
                                 imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?seed=${baseSeed + i}&width=512&height=512&nologo=true`;
@@ -391,15 +389,14 @@ Format JSON:
                             currentPanels[i].image = imageUrl;
                         } catch (imgError) {
                             console.error(`Błąd obrazka ${i+1}:`, imgError);
-                            // Ostateczne koło ratunkowe
                             currentPanels[i].image = `https://image.pollinations.ai/prompt/cute%20animal%20illustration?width=512&height=512&nologo=true`;
                         }
                         
                         currentPanels[i].isLoading = false;
-                        setGeneratedPanels([...currentPanels]); // Renderuje obrazek od razu po pobraniu!
+                        setGeneratedPanels([...currentPanels]); 
                         
-                        // Złoty środek: opóźnienie 1.5 sekundy, żeby darmowy serwer nas nie zbanował za spam
-                        await new Promise(r => setTimeout(r, 1500)); 
+                        // Czekamy równe 2 sekundy przed kolejnym żądaniem obrazka, aby ostudzić zabezpieczenia!
+                        await new Promise(r => setTimeout(r, 2000)); 
                     }
 
                 } catch (err) {
@@ -548,12 +545,12 @@ Format JSON:
                             {activeTab === 'bajka' && (
                                 <div className="glass-panel p-6 sm:p-8 rounded-[2rem] fade-in border border-amber-500/30 print-hidden">
                                     <h2 className="text-3xl font-black text-amber-400 mb-6 text-center">Magiczny Komiks AI 🎨</h2>
-                                    <textarea value={storyProblem} onChange={(e) => setStoryProblem(e.target.value)} placeholder="Opisz lęk dziecka (np. Emilka boi się burzy i głośnych dźwięków)..." className="w-full h-24 bg-slate-900 border border-slate-600 text-white rounded-xl p-4 mb-4 custom-scrollbar"></textarea>
+                                    <textarea value={storyProblem} onChange={(e) => setStoryProblem(e.target.value)} placeholder="Opisz lęk dziecka (np. Emilka boi się burzy)..." className="w-full h-24 bg-slate-900 border border-slate-600 text-white rounded-xl p-4 mb-4 custom-scrollbar"></textarea>
                                     
-                                    {storyError && <div className="mb-4 text-red-400 text-sm font-bold p-3 bg-red-900/30 border border-red-500/50 rounded-xl text-center">{storyError}</div>}
+                                    {storyError && <div className="mb-4 text-red-400 text-sm font-bold p-3 bg-red-900/30 border border-red-500/50 rounded-xl">{storyError}</div>}
                                     
                                     <button onClick={generateStoryAndImage} disabled={isGeneratingStory || !storyProblem} className="w-full bg-amber-600 hover:bg-amber-500 text-white font-black py-4 rounded-xl disabled:bg-slate-700 shadow-lg btn-bounce transition-colors">
-                                        {isGeneratingStory ? '✨ Piszę wiersz i maluję kadry... (Czekaj)' : 'Stwórz Magiczny Komiks (4 Obrazki)'}
+                                        {isGeneratingStory ? '✨ Piszę wiersz i maluję kadry...' : 'Stwórz Magiczny Komiks (4 Obrazki)'}
                                     </button>
                                     
                                     {generatedPanels.length > 0 && (
