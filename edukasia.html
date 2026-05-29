@@ -343,21 +343,18 @@
                     
                     const panelsData = parsedData.panels;
 
-                    // Fetch 4 images in parallel for maximum speed!
-                    const imagePromises = panelsData.map(async (panel, index) => {
+                    // ROZWIĄZANIE BŁĘDU NR 1: Przypisujemy linki bezpośrednio do przeglądarki. 
+                    // Przeglądarka załaduje je "w swoim tempie", omijając zabezpieczenia antyspamowe serwera graficznego.
+                    const completedPanels = panelsData.map((panel, index) => {
                         const seed = Math.floor(Math.random() * 1000000) + index;
-                        const encodedPrompt = encodeURIComponent(`Cute 2D illustration for children book, flat vector style, pastel colors. ${panel.image_prompt}. NO TEXT.`);
+                        // Skracamy prompt, gdyby AI przesadziło z długością opisu (co też potrafi blokować obrazek)
+                        const safePrompt = panel.image_prompt ? panel.image_prompt.substring(0, 400) : "cute happy child illustration";
+                        const encodedPrompt = encodeURIComponent(`Cute 2D illustration for children book, flat vector style, pastel colors. ${safePrompt}. NO TEXT.`);
                         const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?seed=${seed}&width=512&height=512&nologo=true`;
 
-                        return new Promise((resolve, reject) => {
-                            const img = new Image();
-                            img.onload = () => resolve({ text: panel.text, image: imageUrl });
-                            img.onerror = () => reject(new Error(`Nie udało się wygenerować obrazka nr ${index + 1}`));
-                            img.src = imageUrl;
-                        });
+                        return { text: panel.text, image: imageUrl };
                     });
                     
-                    const completedPanels = await Promise.all(imagePromises);
                     setGeneratedPanels(completedPanels);
 
                 } catch (err) { setStoryError('Błąd: ' + err.message); } finally { setIsGeneratingStory(false); }
@@ -522,9 +519,18 @@
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                                 {generatedPanels.map((panel, idx) => (
                                                     <div key={idx} className="bg-slate-800 rounded-3xl overflow-hidden border-2 border-amber-500/20 shadow-xl flex flex-col group hover:border-amber-500/60 transition-colors">
-                                                        <div className="relative">
-                                                            <img src={panel.image} className="w-full h-56 md:h-72 object-cover border-b-2 border-amber-500/20" />
-                                                            <div className="absolute top-4 left-4 bg-amber-500 text-slate-900 w-8 h-8 rounded-full flex items-center justify-center font-black shadow-lg">{idx + 1}</div>
+                                                        <div className="relative bg-slate-900 flex items-center justify-center min-h-[224px] md:min-h-[288px]">
+                                                            {/* Zaktualizowany obrazek z animacją ładowania w tle i kołem ratunkowym */}
+                                                            <img 
+                                                                src={panel.image} 
+                                                                onError={(e) => { e.target.src = `https://image.pollinations.ai/prompt/cute%20animal%20reading%20a%20book%20illustration?seed=${Math.random()}&width=512&height=512&nologo=true`; }}
+                                                                className="w-full h-56 md:h-72 object-cover border-b-2 border-amber-500/20 relative z-10" 
+                                                                alt={`Kadr ${idx + 1}`}
+                                                            />
+                                                            <div className="absolute inset-0 flex items-center justify-center text-slate-500 text-sm font-bold animate-pulse z-0">
+                                                                Malowanie obrazka... 🎨
+                                                            </div>
+                                                            <div className="absolute top-4 left-4 bg-amber-500 text-slate-900 w-8 h-8 rounded-full flex items-center justify-center font-black shadow-lg z-20">{idx + 1}</div>
                                                         </div>
                                                         <div className="p-6 text-slate-200 text-base md:text-lg italic flex-1 flex items-center justify-center text-center font-medium leading-relaxed bg-slate-900/50">
                                                             {panel.text.split(/\\n|\n/).map((line, i) => (<React.Fragment key={i}>{line}<br/></React.Fragment>))}
