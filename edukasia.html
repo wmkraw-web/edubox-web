@@ -100,7 +100,6 @@
             sos_rodzic: `Jesteś psychologiem i mediatorem (NVC). Nauczyciel ma problem we współpracy z rodzicem. Podziel poradę na: 1. 💡 PERSPEKTYWA RODZICA: Z czego to wynika. 2. 🗣️ GOTOWE ZDANIA: 3 gotowe sformułowania do użycia przez nauczyciela. 3. 🚧 STRATEGIA: Jak ustalić granice.`
         };
 
-        // Baza wszystkich aplikacji z portfolio do wyszukiwarki
         const ALL_APPS = [
             { title: 'Asystent Pedagoga (IPET)', desc: 'Tworzy kompletne IPET-y i WOPFU w oparciu o prawo oświatowe.', url: 'asystent-pedagoga.html', icon: '📝' },
             { title: 'Kreator Awansu AI', desc: 'Automatyczne sprawozdania i "Ocena Dorobku Zawodowego".', url: 'awans.html', icon: '💼' },
@@ -120,7 +119,6 @@
             { title: 'EduGrupy (Koło Fortuny)', desc: 'Koło Fortuny do losowania uczniów i podział na grupy.', url: 'edugrupy.html', icon: '🎡' }
         ];
 
-        // Zestawy dla zadań z rzepami
         const RZEPY_SETS = [
             { id: 'farma', name: 'Zwierzęta na wsi', items: ['🐮', '🐷', '🐔', '🐴', '🐑', '🐶'] },
             { id: 'owoce', name: 'Zdrowe owoce', items: ['🍎', '🍌', '🍇', '🍉', '🍓', '🍊'] },
@@ -136,7 +134,6 @@
             const [activeTab, setActiveTab] = useState('sos'); 
             const resultRef = useRef(null);
 
-            // Stany SOS
             const [sosMode, setSosMode] = useState('zachowanie');
             const [sosInput, setSosInput] = useState('');
             const [useWebSearch, setUseWebSearch] = useState(true);
@@ -145,7 +142,6 @@
             const [isGeneratingSos, setIsGeneratingSos] = useState(false);
             const [sosError, setSosError] = useState('');
 
-            // Stany AAC
             const [customText, setCustomText] = useState('');
             const aacButtons = [
                 { id: 1, label: 'Chcę przerwę', emoji: '⏸️' }, { id: 2, label: 'Toaleta', emoji: '🚽' },
@@ -155,40 +151,55 @@
                 { id: 9, label: 'Zły', emoji: '😠' }, { id: 10, label: 'Wesoły', emoji: '😊' }
             ];
 
-            // Stany Sukces
             const [successName, setSuccessName] = useState('');
             const [successAction, setSuccessAction] = useState('');
             const [successText, setSuccessText] = useState('');
             const [showSuccessCard, setShowSuccessCard] = useState(false);
             const [isGeneratingSuccess, setIsGeneratingSuccess] = useState(false);
 
-            // Stany Bajka
+            // Zmienione stany dla 4 kadrów
             const [storyProblem, setStoryProblem] = useState('');
-            const [generatedStory, setGeneratedStory] = useState('');
-            const [generatedImage, setGeneratedImage] = useState('');
+            const [generatedPanels, setGeneratedPanels] = useState([]);
             const [isGeneratingStory, setIsGeneratingStory] = useState(false);
             const [storyError, setStoryError] = useState('');
 
-            // Stany PECS (EduPikto)
             const [pecsCards, setPecsCards] = useState([
                 { id: 1, word: 'Sok', img: '🧃' },
                 { id: 2, word: 'Książka', img: '📖' },
                 { id: 3, word: 'Zabawa', img: '🧸' }
             ]);
 
-            // Stany Rzepy
             const [selectedRzepySet, setSelectedRzepySet] = useState(RZEPY_SETS[0]);
-
-            // Stany Portfolio
             const [searchQuery, setSearchQuery] = useState('');
 
-            const speak = (text) => {
+            // Wczytanie głosów na starcie, by uniknąć pustej listy w przeglądarkach (szczególnie Chrome)
+            useEffect(() => {
                 if ('speechSynthesis' in window) {
-                    window.speechSynthesis.cancel();
+                    window.speechSynthesis.onvoiceschanged = () => {
+                        window.speechSynthesis.getVoices();
+                    };
+                }
+            }, []);
+
+            // Ulepszony Lektor (Głos TTS) - szuka głosów premium (Google/Zosia/Paulina), zwalnia tempo
+            const speakText = (text) => {
+                if ('speechSynthesis' in window) {
+                    window.speechSynthesis.cancel(); // Przerywa poprzednie
                     const utterance = new SpeechSynthesisUtterance(text);
                     utterance.lang = 'pl-PL';
-                    utterance.rate = 0.9;
-                    utterance.pitch = 1.1;
+                    utterance.rate = 0.85; // ZWOLNIONE TEMPO = bardziej uspokajająco (terapeutycznie)
+                    utterance.pitch = 1.0; 
+                    
+                    const voices = window.speechSynthesis.getVoices();
+                    // Szukamy najlepszego polskiego głosu (Google, Paulina, Zosia itp.)
+                    const premiumVoice = voices.find(v => v.lang === 'pl-PL' && v.name.includes('Google')) ||
+                                         voices.find(v => v.lang === 'pl-PL' && (v.name.includes('Paulina') || v.name.includes('Zosia'))) ||
+                                         voices.find(v => v.lang.startsWith('pl'));
+                    
+                    if (premiumVoice) {
+                        utterance.voice = premiumVoice;
+                    }
+
                     window.speechSynthesis.speak(utterance);
                 }
             };
@@ -204,21 +215,11 @@
                 }
             };
 
-            const addPecsCard = () => {
-                setPecsCards([...pecsCards, { id: Date.now(), word: 'Nowe', img: '❓' }]);
-            };
+            const addPecsCard = () => setPecsCards([...pecsCards, { id: Date.now(), word: 'Nowe', img: '❓' }]);
+            const removePecsCard = (id) => setPecsCards(pecsCards.filter(c => c.id !== id));
+            const updatePecsCard = (id, field, value) => setPecsCards(pecsCards.map(c => c.id === id ? { ...c, [field]: value } : c));
 
-            const removePecsCard = (id) => {
-                setPecsCards(pecsCards.filter(c => c.id !== id));
-            };
-
-            const updatePecsCard = (id, field, value) => {
-                setPecsCards(pecsCards.map(c => c.id === id ? { ...c, [field]: value } : c));
-            };
-
-            // ==================================================================================
             // BEZPIECZNY KONTROLER API
-            // ==================================================================================
             const secureApiCall = async (payload, endpointType) => {
                 const apiKey = ""; 
 
@@ -240,17 +241,11 @@
                             }
                         }
                     };
-
-                    return await fetchWithRetry(url, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
+                    return await fetchWithRetry(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
                 } else {
                     const isLocal = window.location.protocol === 'file:' || window.location.hostname === 'localhost' || !window.location.hostname;
                     if (isLocal) throw new Error("Uruchomiłeś plik lokalnie. Otwórz przez Vercel lub Preview w czacie.");
 
-                    // BARDZO WAŻNE: Wyciągamy 'prompt' z payloadu, bo Twój serwer Vercel tego bezwzględnie wymaga!
                     let extractedPrompt = "";
                     if (payload && payload.contents && payload.contents[0] && payload.contents[0].parts && payload.contents[0].parts[0]) {
                         extractedPrompt = payload.contents[0].parts[0].text;
@@ -260,11 +255,7 @@
                         const response = await fetch('/api/gemini', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ 
-                                payload: payload, 
-                                type: endpointType,
-                                prompt: extractedPrompt // <--- To rozwiązuje Twój błąd Vercela!
-                            })
+                            body: JSON.stringify({ payload: payload, type: endpointType, prompt: extractedPrompt })
                         });
                         const contentType = response.headers.get("content-type");
                         if (!contentType || !contentType.includes("application/json")) throw new Error("Oczekiwano JSON. Sprawdź plik api/gemini.js na Vercel.");
@@ -273,9 +264,7 @@
                             throw new Error(`Błąd Vercela: ${errData.error || response.statusText}`);
                         }
                         return await response.json();
-                    } catch (err) {
-                        throw new Error(`${err.message}`);
-                    }
+                    } catch (err) { throw new Error(`${err.message}`); }
                 }
             };
 
@@ -284,10 +273,7 @@
                 setIsGeneratingSos(true); setSosError(''); setSosResult(''); setSosSources([]);
                 try {
                     const fullText = `SYSTEM: ${PROMPTS[`sos_${sosMode}`]}\n\nPROBLEM DO ROZWIĄZANIA: ${sosInput}`;
-                    const payload = {
-                        contents: [{ parts: [{ text: fullText }] }],
-                        generationConfig: { temperature: 0.5 }
-                    };
+                    const payload = { contents: [{ parts: [{ text: fullText }] }], generationConfig: { temperature: 0.5 } };
                     if (useWebSearch) payload.tools = [{ google_search: {} }];
 
                     const data = await secureApiCall(payload, 'text');
@@ -317,10 +303,7 @@
                 setIsGeneratingSuccess(true); setShowSuccessCard(false); setSuccessText('');
                 try {
                     const fullText = `SYSTEM: Jesteś pełnym ciepła wychowawcą przedszkolnym.\n\nZADANIE: Dziecko o imieniu ${successName} osiągnęło sukces: ${successAction}. Napisz radosną, krótką (max 3 zdania) pochwałę dla rodziców. Zacznij od 'Wielkie brawa!'.`;
-                    const payload = {
-                        contents: [{ parts: [{ text: fullText }] }],
-                        generationConfig: { temperature: 0.7 }
-                    };
+                    const payload = { contents: [{ parts: [{ text: fullText }] }], generationConfig: { temperature: 0.7 } };
                     const data = await secureApiCall(payload, 'text');
                     let text = data.candidates?.[0]?.content?.parts?.[0]?.text;
                     if (text) { setSuccessText(text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim()); setShowSuccessCard(true); } 
@@ -328,14 +311,17 @@
                 } catch (err) { alert("Błąd generowania: " + err.message); } finally { setIsGeneratingSuccess(false); }
             };
 
+            // NOWA WERSJA GENERATORA KOMIKSU (4 KADRY)
             const generateStoryAndImage = async () => {
                 if (!storyProblem.trim()) { setStoryError('Wpisz problem ucznia.'); return; }
-                setIsGeneratingStory(true); setStoryError(''); setGeneratedStory(''); setGeneratedImage('');
+                setIsGeneratingStory(true); setStoryError(''); setGeneratedPanels([]);
                 try {
-                    const fullText = `SYSTEM: Jesteś bajkoterapeutą. Odpowiadaj TYLKO w formacie JSON.\n\nZADANIE: Napisz radosną rymowankę (4 LINIJKI). Problem: ${storyProblem}. Użyj układu rymów AABB lub ABAB. Zwróć JSON: {"story": "linijka 1\\nlinijka 2\\nlinijka 3\\nlinijka 4", "image_prompt": "angielski opis sceny do wygenerowania obrazka..."}`;
+                    // Precyzyjny prompt wymuszający tablicę 4 kadrów!
+                    const fullText = `SYSTEM: Jesteś wybitnym polskim bajkoterapeutą i poetą dziecięcym. Odpowiadaj TYLKO i WYŁĄCZNIE w formacie JSON.\n\nZADANIE: Napisz bardzo precyzyjną, piękną i uspokajającą rymowankę terapeutyczną dla dziecka. \nProblem dziecka: ${storyProblem}.\n\nWierszyk MUSI mieć dokładnie 4 krótkie zwrotki (każda po 2-4 linijki, idealne i dźwięczne rymy).\n\nZwróć odpowiedź w takim formacie JSON (tablica z 4 elementami):\n{\n  "panels": [\n    { "text": "Zwrotka pierwsza...", "image_prompt": "angielski opis sceny do pierwszego obrazka..." },\n    { "text": "Zwrotka druga...", "image_prompt": "angielski opis sceny do drugiego obrazka..." },\n    { "text": "Zwrotka trzecia...", "image_prompt": "angielski opis sceny do trzeciego obrazka..." },\n    { "text": "Zwrotka czwarta...", "image_prompt": "angielski opis sceny do czwartego obrazka..." }\n  ]\n}`;
+                    
                     const textPayload = { 
                         contents: [{ parts: [{ text: fullText }] }], 
-                        generationConfig: { temperature: 0.7 } 
+                        generationConfig: { temperature: 0.6 } 
                     };
                     const textData = await secureApiCall(textPayload, 'text');
                     let rawText = textData.candidates?.[0]?.content?.parts?.[0]?.text;
@@ -350,26 +336,30 @@
                     let parsedData;
                     try {
                         parsedData = JSON.parse(jsonStr);
+                        if (!parsedData.panels || parsedData.panels.length === 0) throw new Error();
                     } catch (e) {
-                        throw new Error("AI zaplątało się w kodzie. Spróbuj kliknąć jeszcze raz!");
+                        throw new Error("AI zaplątało się w pisaniu rymów. Kliknij przycisk jeszcze raz!");
                     }
                     
-                    // Niezawodne generowanie obrazków przez Pollinations AI
-                    const seed = Math.floor(Math.random() * 1000000);
-                    const encodedPrompt = encodeURIComponent(`Cute 2D illustration for children book, flat vector style. ${parsedData.image_prompt}. Bright colors, therapeutic, calming. NO TEXT.`);
-                    const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?seed=${seed}&width=1024&height=1024&nologo=true`;
+                    const panelsData = parsedData.panels;
 
-                    const imgPromise = new Promise((resolve, reject) => {
-                        const img = new Image();
-                        img.onload = () => resolve(imageUrl);
-                        img.onerror = () => reject(new Error("Nie udało się pobrać obrazka."));
-                        img.src = imageUrl;
+                    // Fetch 4 images in parallel for maximum speed!
+                    const imagePromises = panelsData.map(async (panel, index) => {
+                        const seed = Math.floor(Math.random() * 1000000) + index;
+                        const encodedPrompt = encodeURIComponent(`Cute 2D illustration for children book, flat vector style, pastel colors. ${panel.image_prompt}. NO TEXT.`);
+                        const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?seed=${seed}&width=512&height=512&nologo=true`;
+
+                        return new Promise((resolve, reject) => {
+                            const img = new Image();
+                            img.onload = () => resolve({ text: panel.text, image: imageUrl });
+                            img.onerror = () => reject(new Error(`Nie udało się wygenerować obrazka nr ${index + 1}`));
+                            img.src = imageUrl;
+                        });
                     });
                     
-                    const finalImageUrl = await imgPromise;
-                    
-                    setGeneratedStory(parsedData.story); 
-                    setGeneratedImage(finalImageUrl);
+                    const completedPanels = await Promise.all(imagePromises);
+                    setGeneratedPanels(completedPanels);
+
                 } catch (err) { setStoryError('Błąd: ' + err.message); } finally { setIsGeneratingStory(false); }
             };
 
@@ -472,14 +462,14 @@
                                     <h2 className="text-3xl font-black text-indigo-400 mb-8 text-center">Komunikator AAC 🗣️</h2>
                                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4 mb-8">
                                         {aacButtons.map(btn => (
-                                            <button key={btn.id} onClick={() => speak(btn.label)} className="bg-slate-800/50 hover:bg-indigo-600/30 border border-slate-700 hover:border-indigo-500 aspect-square rounded-2xl flex flex-col items-center justify-center gap-3 p-2 shadow-lg active:scale-95 transition-all">
+                                            <button key={btn.id} onClick={() => speakText(btn.label)} className="bg-slate-800/50 hover:bg-indigo-600/30 border border-slate-700 hover:border-indigo-500 aspect-square rounded-2xl flex flex-col items-center justify-center gap-3 p-2 shadow-lg active:scale-95 transition-all">
                                                 <span className="text-5xl">{btn.emoji}</span><span className="text-white font-bold text-xs">{btn.label}</span>
                                             </button>
                                         ))}
                                     </div>
                                     <div className="flex gap-4">
                                         <input type="text" value={customText} onChange={(e) => setCustomText(e.target.value)} placeholder="Wpisz dowolne słowo..." className="flex-1 bg-slate-900 border border-slate-600 text-white rounded-xl px-5 py-4 focus:ring-2 focus:ring-indigo-500 outline-none" />
-                                        <button onClick={() => { if(customText) speak(customText); }} className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-8 py-4 rounded-xl transition-all btn-bounce">🔊 Czytaj</button>
+                                        <button onClick={() => { if(customText) speakText(customText); }} className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-8 py-4 rounded-xl transition-all btn-bounce">🔊 Czytaj</button>
                                     </div>
                                 </div>
                             )}
@@ -508,32 +498,47 @@
                                 </div>
                             )}
 
-                            {/* WIDOK: BAJKA */}
+                            {/* WIDOK: BAJKA KOMIKS 4-KADRY */}
                             {activeTab === 'bajka' && (
                                 <div className="glass-panel p-6 sm:p-8 rounded-[2rem] fade-in border border-amber-500/30 print-hidden">
                                     <h2 className="text-3xl font-black text-amber-400 mb-6 text-center">Magiczny Komiks AI 🎨</h2>
-                                    <textarea value={storyProblem} onChange={(e) => setStoryProblem(e.target.value)} placeholder="Opisz lęk dziecka (np. boi się nożyczek)..." className="w-full h-24 bg-slate-900 border border-slate-600 text-white rounded-xl p-4 mb-4 custom-scrollbar"></textarea>
+                                    <textarea value={storyProblem} onChange={(e) => setStoryProblem(e.target.value)} placeholder="Opisz lęk dziecka (np. Emilka boi się burzy i głośnych dźwięków)..." className="w-full h-24 bg-slate-900 border border-slate-600 text-white rounded-xl p-4 mb-4 custom-scrollbar"></textarea>
                                     
-                                    {/* Przywrócone wyświetlanie błędu na ekranie! */}
                                     {storyError && <div className="mb-4 text-red-400 text-sm font-bold p-3 bg-red-900/30 border border-red-500/50 rounded-xl text-center">{storyError}</div>}
                                     
-                                    <button onClick={generateStoryAndImage} disabled={isGeneratingStory || !storyProblem} className="w-full bg-amber-600 text-white font-black py-4 rounded-xl disabled:bg-slate-700">{isGeneratingStory ? '✨ Maluję i piszę wiersz...' : 'Stwórz Magiczną Bajkę'}</button>
+                                    <button onClick={generateStoryAndImage} disabled={isGeneratingStory || !storyProblem} className="w-full bg-amber-600 text-white font-black py-4 rounded-xl disabled:bg-slate-700 shadow-lg btn-bounce">
+                                        {isGeneratingStory ? '✨ Maluję 4 kadry i układam wiersze... (ok. 5 sekund)' : 'Stwórz Magiczny Komiks (4 Obrazki)'}
+                                    </button>
                                     
-                                    {generatedStory && generatedImage && (
-                                        <div className="mt-8 bg-slate-900 p-6 rounded-3xl flex flex-col md:flex-row gap-6 items-center fade-in border border-amber-500/50">
-                                            <img src={generatedImage} className="w-full md:w-1/2 rounded-2xl border-4 border-amber-400 shadow-2xl" />
-                                            <div className="w-full md:w-1/2">
-                                                <p className="text-slate-200 text-lg italic mb-6 leading-relaxed">
-                                                    {generatedStory.split(/\\n|\n/).map((line, i) => (<React.Fragment key={i}>{line}<br/></React.Fragment>))}
-                                                </p>
-                                                <button onClick={() => speak(generatedStory.replace(/\\n|\n/g, ' '))} className="bg-amber-600 text-white px-6 py-3 rounded-xl font-bold">🔊 Przeczytaj na głos</button>
+                                    {generatedPanels.length > 0 && (
+                                        <div className="mt-10 bg-slate-900/50 p-4 md:p-8 rounded-[2rem] border border-amber-500/30 fade-in shadow-inner">
+                                            
+                                            <div className="flex justify-center mb-6">
+                                                <button onClick={() => speakText(generatedPanels.map(p => p.text).join(' '))} className="bg-amber-600 hover:bg-amber-500 text-white px-8 py-4 rounded-full font-black shadow-lg flex items-center gap-3 transition-all btn-bounce">
+                                                    <span className="text-2xl">🔊</span> Posłuchaj Lektora
+                                                </button>
                                             </div>
+
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                {generatedPanels.map((panel, idx) => (
+                                                    <div key={idx} className="bg-slate-800 rounded-3xl overflow-hidden border-2 border-amber-500/20 shadow-xl flex flex-col group hover:border-amber-500/60 transition-colors">
+                                                        <div className="relative">
+                                                            <img src={panel.image} className="w-full h-56 md:h-72 object-cover border-b-2 border-amber-500/20" />
+                                                            <div className="absolute top-4 left-4 bg-amber-500 text-slate-900 w-8 h-8 rounded-full flex items-center justify-center font-black shadow-lg">{idx + 1}</div>
+                                                        </div>
+                                                        <div className="p-6 text-slate-200 text-base md:text-lg italic flex-1 flex items-center justify-center text-center font-medium leading-relaxed bg-slate-900/50">
+                                                            {panel.text.split(/\\n|\n/).map((line, i) => (<React.Fragment key={i}>{line}<br/></React.Fragment>))}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            
                                         </div>
                                     )}
                                 </div>
                             )}
 
-                            {/* WIDOK: PECS (NOWOŚĆ) */}
+                            {/* WIDOK: PECS */}
                             {activeTab === 'pecs' && (
                                 <div className="glass-panel p-6 sm:p-8 rounded-[2rem] fade-in border border-emerald-500/30">
                                     <div className="flex justify-between items-center mb-6 print-hidden">
@@ -541,7 +546,6 @@
                                         <button onClick={handlePrint} className="bg-emerald-600 text-white px-4 py-2 rounded-xl font-bold flex items-center gap-2"><Icon name="Printer"/> Drukuj Karty</button>
                                     </div>
                                     
-                                    {/* Edytor PECS (Ukryty przy druku) */}
                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6 print-hidden">
                                         {pecsCards.map(card => (
                                             <div key={card.id} className="bg-slate-900 border border-slate-700 p-4 rounded-xl flex items-center gap-4">
@@ -566,7 +570,6 @@
                                         </button>
                                     </div>
 
-                                    {/* Widok do druku (Widoczny tylko podczas drukowania) */}
                                     <div className="hidden print:block">
                                         <div className="pecs-print-container">
                                             {pecsCards.map(card => (
@@ -584,7 +587,7 @@
                                 </div>
                             )}
 
-                            {/* WIDOK: RZEPY (NOWOŚĆ) */}
+                            {/* WIDOK: RZEPY */}
                             {activeTab === 'rzepy' && (
                                 <div className="glass-panel p-6 sm:p-8 rounded-[2rem] fade-in border border-purple-500/30">
                                     <div className="flex justify-between items-center mb-6 print-hidden">
@@ -600,7 +603,6 @@
                                         ))}
                                     </div>
 
-                                    {/* Podgląd na ekranie (ukryty przy druku) */}
                                     <div className="bg-white rounded-xl p-4 md:p-8 text-center print-hidden border-2 border-dashed border-purple-500/50 opacity-80 pointer-events-none">
                                         <p className="text-slate-500 font-bold mb-4 uppercase">Podgląd Wydruku</p>
                                         <div className="grid grid-cols-3 gap-4 mb-4 pb-4 border-b-2 border-dashed border-slate-300">
@@ -611,7 +613,6 @@
                                         </div>
                                     </div>
 
-                                    {/* Właściwy układ do druku A4 */}
                                     <div className="hidden print:block w-full">
                                         <div className="rzepy-page">
                                             <div className="rzepy-board" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10mm', alignContent: 'center', justifyItems: 'center' }}>
@@ -629,7 +630,7 @@
                                 </div>
                             )}
 
-                            {/* WIDOK: PORTFOLIO (NOWOŚĆ) */}
+                            {/* WIDOK: PORTFOLIO */}
                             {activeTab === 'portfolio' && (
                                 <div className="glass-panel p-6 sm:p-8 rounded-[2rem] fade-in border border-slate-500/30 print-hidden">
                                     <h2 className="text-3xl font-black text-slate-300 mb-6 flex items-center gap-3"><Icon name="Compass" className="w-8 h-8 text-blue-500"/> Baza EduBox</h2>
