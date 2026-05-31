@@ -27,6 +27,9 @@
         
         .print-only-footer { display: none; }
         
+        #wspolne-menu-kontener { position: relative; z-index: 50; }
+        #wspolne-menu-kontener nav { position: relative; }
+        
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: #0f172a; border-radius: 10px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #3b82f6; border-radius: 10px; }
@@ -60,7 +63,6 @@
     <!-- Skrypt ładujący menu -->
     <script>
         document.addEventListener("DOMContentLoaded", function() {
-            // Funkcja wstawiająca bezpieczne menu w przypadku błędu (np. w podglądzie lokalnym)
             function wstawMenuAwaryjne() {
                 document.getElementById('wspolne-menu-kontener').innerHTML = `
                     <nav class="w-full z-50 glass-nav shadow-lg print-hidden">
@@ -80,7 +82,7 @@
             }
 
             try {
-                fetch('/menu.html')
+                fetch('./menu.html')
                     .then(response => {
                         if (!response.ok) throw new Error('Błąd ładowania menu');
                         return response.text();
@@ -184,8 +186,8 @@
             };
 
             useEffect(() => {
-                if(mode === 'opiekun') setBotMessage("Tryb Dyrektora. Dokument zostanie zredagowany w 3-ciej osobie jako formalna ocena pracy dla nauczyciela.");
-                else if(mode === 'mentor') setBotMessage("Tryb Mentora. Dokument to oficjalna opinia o nauczycielu początkującym, napisana z perspektywy wspierającego mentora, zgodnie z nowymi przepisami.");
+                if(mode === 'opiekun') setBotMessage("Tryb Dyrektora. Dokument zostanie zredagowany w 3-ciej osobie jako formalna OCENA PRACY dla nauczyciela.");
+                else if(mode === 'mentor') setBotMessage("Tryb Mentora. Dokument to oficjalna OPINIA o nauczycielu początkującym, napisana z perspektywy wspierającego mentora, zgodnie z nowymi przepisami.");
                 else setBotMessage("Tryb Nauczyciela. Dokument zostanie zredagowany w 1-szej osobie jako Twoje osobiste sprawozdanie z realizacji planu.");
             }, [mode]);
 
@@ -207,11 +209,11 @@
                 if (mode === 'opiekun') {
                     systemPrompt = `Jesteś doświadczonym dyrektorem szkoły oraz ekspertem prawa oświatowego w Polsce. Znasz najnowsze przepisy dotyczące awansu zawodowego nauczycieli (w tym zmiany z 2022 r. i powiązane rozporządzenia o ocenie pracy).
 ZASADY KRYTYCZNE:
-1. Pisz w 3 osobie liczby pojedynczej o nauczycielu. Ton wybitnie profesjonalny, urzędowy.
+1. Pisz w 3 osobie liczby pojedynczej o nauczycielu. Ton wybitnie profesjonalny, urzędowy. Będzie to oficjalna OCENA PRACY.
 2. ${lengthInstruction}
 3. Dopasuj słownictwo do specyfiki zawodu: ${finalRole}. Używaj pojęć takich jak: kompetencje, warsztat pracy, metody aktywizujące, ewaluacja.
 4. Zwróć WYŁĄCZNIE format JSON: { "title": "...", "legal_basis": "Podstawa prawna z uwzględnieniem aktualnych przepisów KN i rozporządzeń z 2022/2023 r.", "document_body": "Używaj tu znaczników <br> oraz <b> do formatowania. Bez formatowania markdown." }`;
-                    userPrompt = `Imię: ${params.teacherName || '[Imię]'}\nStanowisko: ${finalRole}\nStopień: ${params.level}\nDziałania: ${params.achievements}\nNapisz pełną, aktualną opinię dyrektora do oceny pracy za okres przygotowania do zawodu / stażu.`;
+                    userPrompt = `Imię: ${params.teacherName || '[Imię]'}\nStanowisko: ${finalRole}\nStopień: ${params.level}\nDziałania: ${params.achievements}\nNapisz pełną, aktualną ocenę pracy nauczyciela za okres przygotowania do zawodu / stażu, wystawianą przez dyrektora.`;
                 } 
                 else if (mode === 'mentor') {
                     systemPrompt = `Jesteś doświadczonym nauczycielem mianowanym/dyplomowanym pełniącym funkcję MENTORA dla nauczyciela początkującego w Polsce. Znasz przepisy awansowe wprowadzone po 2022 roku (Karta Nauczyciela, przygotowanie do zawodu).
@@ -270,7 +272,7 @@ ZASADY KRYTYCZNE:
                         showToast(`Tryb testowy na komputerze. Dokument symulowany.`);
                         setTimeout(() => {
                             setGeneratedData({
-                                title: `OPINIA / SPRAWOZDANIE (${mode.toUpperCase()})`,
+                                title: `OPINIA / OCENA / SPRAWOZDANIE (${mode.toUpperCase()})`,
                                 legal_basis: "Podstawa prawna: Ustawa z dnia 26 stycznia 1982 r. – Karta Nauczyciela ze zmianami po 2022 roku.",
                                 document_body: "Twoja aplikacja <b>Kreator Awansu</b> zadziałała.<br><br>Testujesz ją na dysku, więc nie łączy się z serwerem kosztów.<br><br>Gdy umieścisz ją na serwerze (np. na eduboxpro.pl), połączy się ona z chmurą i wygeneruje poprawny dokument ze wskazanego trybu: " + mode.toUpperCase()
                             });
@@ -328,10 +330,9 @@ ZASADY KRYTYCZNE:
                                 </div>
                             )}
 
-                            {/* ZMIENIONE PRZYCISKI - 3 TRYBY */}
                             <div className="glass-panel p-2 rounded-2xl flex flex-col sm:flex-row gap-2">
                                 <button onClick={() => {setMode('opiekun'); setGeneratedData(null);}} className={`flex-1 py-3 px-2 rounded-xl flex flex-col items-center justify-center font-bold text-[10px] uppercase tracking-widest transition-all duration-300 ${mode === 'opiekun' ? 'bg-blue-600 text-white shadow-[0_0_20px_rgba(37,99,235,0.3)] border border-blue-500' : 'text-slate-400 hover:bg-slate-800'}`}>
-                                    <Icon name="FileSignature" size={20} className="mb-2 text-blue-300" /> Opinia <span className="text-[8px] font-normal opacity-70 mt-1">(Dyrektor)</span>
+                                    <Icon name="FileSignature" size={20} className="mb-2 text-blue-300" /> Ocena <span className="text-[8px] font-normal opacity-70 mt-1">(Dyrektor)</span>
                                 </button>
                                 <button onClick={() => {setMode('mentor'); setGeneratedData(null);}} className={`flex-1 py-3 px-2 rounded-xl flex flex-col items-center justify-center font-bold text-[10px] uppercase tracking-widest transition-all duration-300 ${mode === 'mentor' ? 'bg-teal-600 text-white shadow-[0_0_20px_rgba(13,148,136,0.3)] border border-teal-500' : 'text-slate-400 hover:bg-slate-800'}`}>
                                     <Icon name="Mentor" size={20} className="mb-2 text-teal-300" /> Opinia <span className="text-[8px] font-normal opacity-70 mt-1">(Mentor)</span>
