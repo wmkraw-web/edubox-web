@@ -79,38 +79,54 @@
         }
     </style>
 </head>
-<body>
+<body class="min-h-screen flex flex-col">
 
     <!-- Wspólne menu -->
     <div id="wspolne-menu-kontener"></div>
 
-    <!-- Skrypt ładujący menu -->
+    <!-- Skrypt ładujący menu z obsługą trybu awaryjnego -->
     <script>
         document.addEventListener("DOMContentLoaded", function() {
-            fetch('./menu.html')
-                .then(response => {
-                    if (!response.ok) throw new Error('Błąd ładowania menu');
-                    return response.text();
-                })
-                .then(data => {
-                    document.getElementById('wspolne-menu-kontener').innerHTML = data;
-                    if (typeof window.initMenuLogic === 'function') {
-                        window.initMenuLogic();
-                    }
-                })
-                .catch(error => {
-                    console.warn('Nie udało się pobrać pliku menu.', error);
-                });
+            function wstawMenuAwaryjne() {
+                document.getElementById('wspolne-menu-kontener').innerHTML = `
+                    <nav class="w-full z-50 glass-nav shadow-lg print-hidden bg-slate-900 border-b border-slate-800 p-4">
+                        <div class="max-w-7xl mx-auto flex items-center justify-between">
+                            <span class="text-2xl font-black text-white">Edu<span class="text-amber-500">Box</span> <span class="text-xs text-slate-400">Pro</span></span>
+                            <span class="text-xs text-amber-500 font-bold">Podgląd (Menu awaryjne)</span>
+                        </div>
+                    </nav>
+                `;
+            }
+
+            try {
+                fetch('./menu.html')
+                    .then(response => {
+                        if (!response.ok) throw new Error('Błąd ładowania menu');
+                        return response.text();
+                    })
+                    .then(data => {
+                        document.getElementById('wspolne-menu-kontener').innerHTML = data;
+                        if (typeof window.initMenuLogic === 'function') {
+                            window.initMenuLogic();
+                        }
+                    })
+                    .catch(error => {
+                        wstawMenuAwaryjne();
+                    });
+            } catch (error) {
+                wstawMenuAwaryjne();
+            }
         });
     </script>
 
 
-    <div id="root"></div>
+    <div id="root" class="flex-grow flex flex-col relative z-10"></div>
 
     <script type="text/babel">
         const { useState, useRef, useEffect } = React;
 
         const DAILY_LIMIT = 5;
+        const BUY_COFFEE_LINK = "https://buycoffee.to/magiccolor";
 
         const DOC_TYPES = [
             { id: 'gotowosc', label: 'Informacja o gotowości do podjęcia nauki w szkole (Przedszkole)' },
@@ -256,23 +272,39 @@ ZASADY KRYTYCZNE:
             };
 
             // ==================================================================================
-            // BEZPIECZNY KONTROLER API - UŻYWA TWOJEGO VERCELA DLA TEKSTU I OBRAZÓW
+            // BEZPIECZNY KONTROLER API - ROZWIĄZANIE BŁĘDU "Wymagany jest prompt"
             // ==================================================================================
-            const secureApiCall = async (payload, type = 'text') => {
+            const secureApiCall = async (payload, type = 'text', promptText = '') => {
                 if (window.location.protocol === 'file:') {
                     throw new Error("LocalTest");
                 }
 
                 try {
+                    // Pakujemy dane dokładnie tak, jak oczekuje tego serwer (z promptem na wierzchu)
+                    const requestBody = { 
+                        payload: payload, 
+                        type: type 
+                    };
+                    
+                    // Jeśli przekazano prompt textowy, dodajemy go, aby serwer nie wyrzucał błędu
+                    if (promptText) {
+                        requestBody.prompt = promptText;
+                    }
+
                     const response = await fetch('/api/gemini', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ payload: payload, type: type })
+                        body: JSON.stringify(requestBody)
                     });
+
+                    const contentType = response.headers.get("content-type");
+                    if (!contentType || !contentType.includes("application/json")) {
+                        throw new Error("Błąd serwera: Serwer zwrócił odpowiedź w złym formacie. Sprawdź, czy masz wgrany plik /api/gemini.js na Vercelu.");
+                    }
 
                     if (!response.ok) {
                         const errData = await response.json().catch(() => ({}));
-                        throw new Error(`Błąd API: ${errData.error || response.statusText}`);
+                        throw new Error(`Błąd z Vercela: ${errData.error || response.statusText}`);
                     }
                     
                     return await response.json();
@@ -336,12 +368,12 @@ ZASADY KRYTYCZNE:
                         finalPrompt = `Temat: ${genericInput}`;
                     }
 
-                    // 1. GENEROWANIE TEKSTU
+                    // 1. GENEROWANIE TEKSTU (Teraz przekazujemy finalPrompt jako trzeci argument, by zadowolić serwer!)
                     const textData = await secureApiCall({
                         contents: [{ parts: [{ text: finalPrompt }] }],
                         systemInstruction: { parts: [{ text: getSystemPrompt(activeModule, docType, naglowki, formatLength) }] },
                         generationConfig: { temperature: 0.4 }
-                    }, 'text');
+                    }, 'text', finalPrompt);
 
                     const story = textData.candidates?.[0]?.content?.parts?.[0]?.text;
                     if (!story) throw new Error("AI nie zwróciło tekstu. Spróbuj wygenerować jeszcze raz.");
@@ -395,31 +427,31 @@ ZASADY KRYTYCZNE:
                                 const res = await secureApiCall({ 
                                     instances: [{ prompt: imgPrompts[i] }], 
                                     parameters: { sampleCount: 1 } 
-                                }, 'image');
+                                }, 'image', imgPrompts[i]);
                                 
                                 if (res.predictions && res.predictions[0] && res.predictions[0].bytesBase64Encoded) {
                                     newImages.push(`data:image/png;base64,${res.predictions[0].bytesBase64Encoded}`);
                                 } else if (res.isVercelUrl || res.url) {
-                                    newImages.push(res.url); // Jeśli z Vercela wraca URL
+                                    newImages.push(res.url || res.isVercelUrl); // Zabezpieczenie dla Vercela
                                 }
                             }
                             
                             setGeneratedImages(newImages);
                             if (newImages.length === 0) {
-                                setError("Twój backend api/gemini nie zwrócił obrazków. Tekst wygenerowano poprawnie.");
+                                setError("Twój serwer nie zwrócił obrazków, ale tekst wygenerowano poprawnie.");
                             }
                         } catch(e) { 
                             console.error("Błąd grafiki:", e); 
-                            setError(`Wygenerowano tekst. Obrazków nie udało się załadować (Błąd API lub konfiguracji Vercel).`);
+                            setError(`Zignorowano błąd obrazków. Tekst gotowy.`);
                         }
                     }
 
                 } catch (err) {
                     if (err.message === "LocalTest") {
-                        setError('Tryb lokalny. Wgraj plik na Vercel, by używać pełnej sztucznej inteligencji.');
-                        setGeneratedText(`[TEST LOKALNY]\n\nW trybie testowym na komputerze pobieranie z API jest zablokowane ze względów bezpieczeństwa.\n\nGdy umieścisz plik na serwerze (eduboxpro.pl), wszystko zadziała poprawnie! Licznik został zmniejszony.`);
+                        setError('Tryb lokalny uruchomiony. (Użyto na komputerze)');
+                        setGeneratedText(`[WERSJA DEMONSTRACYJNY - TEST NA KOMPUTERZE LOKALNYM]\n\nAplikacja Asystent Pedagoga PRO działa świetnie!\n\nPrzechwyciłem Twoje wejście:\nTemat: ${genericInput || docType}\nZauważone objawy: ${diagnoza || 'brak'}\n\nGdy umieścisz ten plik na serwerze (eduboxpro.pl), połączy się on bez problemów z Twoim AI i wygeneruje poprawną diagnozę/tekst na podstawie wytycznych.\nLicznik zużyć działa i poprawnie obniżył Twój limit.`);
                     } else {
-                        setError('Błąd: ' + err.message);
+                        setError('Błąd serwera: ' + err.message);
                     }
                 } finally {
                     setIsGenerating(false);
@@ -448,7 +480,7 @@ ZASADY KRYTYCZNE:
                                 
                                 {!isPro ? (
                                     <div className="bg-slate-800/50 border border-slate-700 p-4 rounded-xl text-center">
-                                        <div className="text-xs text-slate-400 mb-2">Brak statusu PRO. Zużywasz darmowe limity. Wpisz kod na górnym pasku.</div>
+                                        <div className="text-xs text-slate-400 mb-2">Brak statusu PRO. Zużywasz darmowe limity. Wpisz kod na górnym pasku, aby odblokować.</div>
                                     </div>
                                 ) : (
                                     <div className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 p-4 rounded-xl flex items-center gap-4 shadow-inner">
