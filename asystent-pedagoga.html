@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google" content="notranslate">
     <title>Asystent Pedagoga - Kombajn Modułowy PRO</title>
-    <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-3RQ9R0N0K8"></script>
     <script>
       window.dataLayer = window.dataLayer || [];
@@ -13,13 +12,12 @@
       gtag('js', new Date());
       gtag('config', 'G-3RQ9R0N0K8');
     </script>
-    <!-- Biblioteki -->
+    
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- Biblioteka do czytania PDF w przeglądarce -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
     <script>
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
@@ -45,7 +43,6 @@
         .fade-in { animation: fadeIn 0.3s ease-out forwards; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 
-        /* Komponenty UI */
         .sidebar { background-color: #0f172a; border-right: 1px solid #1e293b; }
         .card-bg { background-color: #0b1120; border: 1px solid #1e293b; }
         .input-bg { background-color: #1e293b; border: 1px solid #334155; color: #f8fafc; transition: all 0.2s; }
@@ -81,10 +78,8 @@
 </head>
 <body class="min-h-screen flex flex-col">
 
-    <!-- Wspólne menu -->
     <div id="wspolne-menu-kontener"></div>
 
-    <!-- Skrypt ładujący menu z obsługą trybu awaryjnego -->
     <script>
         document.addEventListener("DOMContentLoaded", function() {
             function wstawMenuAwaryjne() {
@@ -164,15 +159,19 @@
                 return base;
             }
             if (module === 'historyjki') {
+                // NOWY, PANCERNY PROMPT - Odchodzimy od JSON, wymuszamy konkretne tagi
                 return `Jesteś pedagogiem specjalnym. Napisz rozbudowaną 'Historyjkę Społeczną'. Napisz ją w pierwszej osobie ("Ja"). Podziel tekst na 3 akapity: 1. PROBLEM, 2. STRATEGIA, 3. EFEKT.
                 
-Zwróć odpowiedź WYŁĄCZNIE jako obiekt JSON w formacie:
-{
-  "text": "Twój gotowy tekst w formacie HTML z użyciem <br> do oddzielania linii.",
-  "prompt1": "Szczegółowy opis po ANGIELSKU do pierwszego obrazka (Problem). Opisz dokładnie wiek, płeć i wygląd bohatera na podstawie tematu (np. jeśli to Basia, napisz 'little girl').",
-  "prompt2": "Szczegółowy opis po ANGIELSKU do drugiego obrazka (Strategia radzenia sobie). Ten sam bohater co na obrazku 1.",
-  "prompt3": "Szczegółowy opis po ANGIELSKU do trzeciego obrazka (Pozytywny Efekt). Ten sam bohater, uśmiechnięty."
-}`;
+ZWRÓĆ ODPOWIEDŹ DOKŁADNIE W PONIŻSZYM FORMACIE (i żadnym innym):
+
+[TEKST]
+Tutaj napisz cały polski tekst historyjki. Używaj <br> do robienia odstępów między akapitami.
+[OBRAZEK1]
+Tutaj napisz PO ANGIELSKU krótki, precyzyjny opis wyglądu bohatera i problemu. (Np. "A 5 year old boy with blonde hair, crying"). Żadnego polskiego języka tutaj!
+[OBRAZEK2]
+Tutaj napisz PO ANGIELSKU opis radzenia sobie ze złością/problemem. Ten sam bohater.
+[OBRAZEK3]
+Tutaj napisz PO ANGIELSKU opis pozytywnego zakończenia. Ten sam bohater, szczęśliwy.`;
             }
             if (module === 'rymowanki') {
                 return `Jesteś wybitnym autorem bardzo prostych rymowanek dla dzieci w wieku przedszkolnym. 
@@ -240,7 +239,6 @@ ZASADY KRYTYCZNE:
 
             const resultRef = useRef(null);
 
-            // Inicjalizacja limitów
             useEffect(() => {
                 const today = new Date().toLocaleDateString();
                 const usage = JSON.parse(localStorage.getItem('eduboxUsage')) || { date: today, count: 0 };
@@ -271,25 +269,13 @@ ZASADY KRYTYCZNE:
                 return true;
             };
 
-            // ==================================================================================
-            // BEZPIECZNY KONTROLER API - ROZWIĄZANIE BŁĘDU "Wymagany jest prompt"
-            // ==================================================================================
-            const secureApiCall = async (payload, type = 'text', promptText = '') => {
-                if (window.location.protocol === 'file:') {
-                    throw new Error("LocalTest");
-                }
+            // BEZPIECZNY KONTROLER API DLA TEKSTU
+            const secureTextApiCall = async (payload, promptText = '') => {
+                if (window.location.protocol === 'file:') throw new Error("LocalTest");
 
                 try {
-                    // Pakujemy dane dokładnie tak, jak oczekuje tego serwer (z promptem na wierzchu)
-                    const requestBody = { 
-                        payload: payload, 
-                        type: type 
-                    };
-                    
-                    // Jeśli przekazano prompt textowy, dodajemy go, aby serwer nie wyrzucał błędu
-                    if (promptText) {
-                        requestBody.prompt = promptText;
-                    }
+                    const requestBody = { payload: payload, type: 'text' };
+                    if (promptText) requestBody.prompt = promptText;
 
                     const response = await fetch('/api/gemini', {
                         method: 'POST',
@@ -297,16 +283,10 @@ ZASADY KRYTYCZNE:
                         body: JSON.stringify(requestBody)
                     });
 
-                    const contentType = response.headers.get("content-type");
-                    if (!contentType || !contentType.includes("application/json")) {
-                        throw new Error("Błąd serwera: Serwer zwrócił odpowiedź w złym formacie. Sprawdź, czy masz wgrany plik /api/gemini.js na Vercelu.");
-                    }
-
                     if (!response.ok) {
                         const errData = await response.json().catch(() => ({}));
-                        throw new Error(`Błąd z Vercela: ${errData.error || response.statusText}`);
+                        throw new Error(`Błąd Vercela: ${errData.error || response.statusText}`);
                     }
-                    
                     return await response.json();
                 } catch (err) {
                     throw new Error(`${err.message}`);
@@ -368,12 +348,12 @@ ZASADY KRYTYCZNE:
                         finalPrompt = `Temat: ${genericInput}`;
                     }
 
-                    // 1. GENEROWANIE TEKSTU (Teraz przekazujemy finalPrompt jako trzeci argument, by zadowolić serwer!)
-                    const textData = await secureApiCall({
+                    // 1. GENEROWANIE TEKSTU (API/GEMINI)
+                    const textData = await secureTextApiCall({
                         contents: [{ parts: [{ text: finalPrompt }] }],
                         systemInstruction: { parts: [{ text: getSystemPrompt(activeModule, docType, naglowki, formatLength) }] },
                         generationConfig: { temperature: 0.4 }
-                    }, 'text', finalPrompt);
+                    }, finalPrompt);
 
                     const story = textData.candidates?.[0]?.content?.parts?.[0]?.text;
                     if (!story) throw new Error("AI nie zwróciło tekstu. Spróbuj wygenerować jeszcze raz.");
@@ -381,32 +361,42 @@ ZASADY KRYTYCZNE:
                     let cleanText = story.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
                     let finalHtmlText = cleanText;
 
-                    // Domyślne, puste prompty dla grafiki (gdyby JSON nie zadziałał)
+                    // Domyślne prompty graficzne (awaryjne)
                     let imgPrompts = [
-                        `2D Flat vector illustration, children's book style. Scene showing the problem: ${genericInput}. Soft pastel colors. NO TEXT.`,
-                        `2D Flat vector illustration, children's book style. Scene showing coping strategy for: ${genericInput}. Soft blue colors. NO TEXT.`,
-                        `2D Flat vector illustration, children's book style. Scene showing success and happiness after overcoming: ${genericInput}. Bright colors. NO TEXT.`
+                        `A beautiful borderless 2D illustration for children. Scene showing the problem: ${genericInput}. Minimalist, clean, NO TEXT, NO WORDS, NO LETTERS.`,
+                        `A beautiful borderless 2D illustration for children. Scene showing coping strategy for: ${genericInput}. Minimalist, clean, NO TEXT, NO WORDS, NO LETTERS.`,
+                        `A beautiful borderless 2D illustration for children. Scene showing success and happiness after overcoming: ${genericInput}. Minimalist, clean, NO TEXT, NO WORDS, NO LETTERS.`
                     ];
 
-                    // WYCIĄGANIE DANYCH "REŻYSERA" (Dla Historyjek)
+                    // KULOODPORNE WYCIĄGANIE DANYCH "REŻYSERA" (Dla Historyjek)
                     if (activeModule === 'historyjki') {
                         try {
-                            let jsonStr = cleanText.replace(/```json/gi, '').replace(/```/g, '').trim();
-                            const start = jsonStr.indexOf('{');
-                            const end = jsonStr.lastIndexOf('}');
-                            if(start !== -1 && end !== -1) {
-                                jsonStr = jsonStr.substring(start, end + 1);
-                                const parsed = JSON.parse(jsonStr);
-                                if (parsed.text) finalHtmlText = parsed.text;
-                                if (parsed.prompt1 && parsed.prompt2 && parsed.prompt3) {
+                            const textMatch = cleanText.match(/\[TEKST\]([\s\S]*?)\[OBRAZEK1\]/i);
+                            const img1Match = cleanText.match(/\[OBRAZEK1\]([\s\S]*?)\[OBRAZEK2\]/i);
+                            const img2Match = cleanText.match(/\[OBRAZEK2\]([\s\S]*?)\[OBRAZEK3\]/i);
+                            const img3Match = cleanText.match(/\[OBRAZEK3\]([\s\S]*)$/i);
+
+                            if (textMatch) {
+                                finalHtmlText = textMatch[1].trim();
+                                if (img1Match && img2Match && img3Match) {
                                     imgPrompts = [
-                                        `2D Flat vector illustration, children's book style. ${parsed.prompt1}. NO TEXT, NO LETTERS.`,
-                                        `2D Flat vector illustration, children's book style. ${parsed.prompt2}. NO TEXT, NO LETTERS.`,
-                                        `2D Flat vector illustration, children's book style. ${parsed.prompt3}. NO TEXT, NO LETTERS.`
+                                        `A beautiful borderless 2D illustration for children. ${img1Match[1].trim()}. Minimalist, clean, NO TEXT, NO WORDS, NO LETTERS.`,
+                                        `A beautiful borderless 2D illustration for children. ${img2Match[1].trim()}. Minimalist, clean, NO TEXT, NO WORDS, NO LETTERS.`,
+                                        `A beautiful borderless 2D illustration for children. ${img3Match[1].trim()}. Minimalist, clean, NO TEXT, NO WORDS, NO LETTERS.`
                                     ];
                                 }
+                            } else {
+                                // Jeśli AI mimo zakazu zwróciło JSON (zabezpieczenie awaryjne)
+                                let jsonStr = cleanText.replace(/```json/gi, '').replace(/```/g, '').trim();
+                                if(jsonStr.startsWith('{')) {
+                                    const parsed = JSON.parse(jsonStr);
+                                    if(parsed.text) finalHtmlText = parsed.text;
+                                    if(parsed.prompt1) imgPrompts[0] = `A beautiful borderless 2D illustration for children. ${parsed.prompt1}. NO TEXT, NO WORDS.`;
+                                    if(parsed.prompt2) imgPrompts[1] = `A beautiful borderless 2D illustration for children. ${parsed.prompt2}. NO TEXT, NO WORDS.`;
+                                    if(parsed.prompt3) imgPrompts[2] = `A beautiful borderless 2D illustration for children. ${parsed.prompt3}. NO TEXT, NO WORDS.`;
+                                }
                             }
-                        } catch(e) { console.warn("Nie udało się sparsować JSONa z historyjki", e); }
+                        } catch(e) { console.warn("Błąd parsowania układu", e); }
                     }
 
                     if (activeModule === 'rymowanki') {
@@ -416,7 +406,7 @@ ZASADY KRYTYCZNE:
                     setGeneratedText(finalHtmlText);
                     setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
 
-                    // 2. GENEROWANIE OBRAZÓW (Tylko dla Historyjek!)
+                    // 2. GENEROWANIE OBRAZÓW (API/GENERATE - dla Leonadro/Fal)
                     if (activeModule === 'historyjki') {
                         try {
                             const newImages = [];
@@ -424,8 +414,6 @@ ZASADY KRYTYCZNE:
                             for (let i = 0; i < imgPrompts.length; i++) {
                                 setLoadingMsg(`Maluję precyzyjny obrazek ${i + 1} z 3...`);
                                 
-                                // Zmiana endpointu - kierujemy zapytanie do /api/generate zamiast /api/gemini
-                                // Większość skryptów np. z Fal.ai lub OpenAI oczekuje parametru 'prompt'
                                 const response = await fetch('/api/generate', {
                                     method: 'POST',
                                     headers: { 'Content-Type': 'application/json' },
@@ -433,14 +421,12 @@ ZASADY KRYTYCZNE:
                                 });
                                 
                                 if (!response.ok) {
-                                    // Jeśli jest błąd, pobieramy go, aby wiedzieć dlaczego /api/generate krzyczy
                                     const errData = await response.json().catch(() => ({}));
                                     throw new Error(`Błąd serwera obrazów: ${errData.error || response.statusText}`);
                                 }
 
                                 const res = await response.json();
 
-                                // Odbiór formatów w zależności od modelu API (bierzemy co daje, b64 lub URL)
                                 if (res.predictions && res.predictions[0] && res.predictions[0].bytesBase64Encoded) {
                                     newImages.push(`data:image/png;base64,${res.predictions[0].bytesBase64Encoded}`);
                                 } else if (res.isVercelUrl || res.url) {
@@ -452,18 +438,18 @@ ZASADY KRYTYCZNE:
                             
                             setGeneratedImages(newImages);
                             if (newImages.length === 0) {
-                                setError("Serwer nie zwrócił poprawnych danych graficznych z endpointu /api/generate. Ale tekst jest gotowy.");
+                                setError("Serwer nie zwrócił poprawnych danych graficznych (sprawdź /api/generate). Tekst jest gotowy.");
                             }
                         } catch(e) { 
                             console.error("Błąd grafiki:", e); 
-                            setError(`Problem z generatorem obrazów: ${e.message}. Tekst gotowy.`);
+                            setError(`Problem z generatorem obrazów: ${e.message}. Tekst został wygenerowany.`);
                         }
                     }
 
                 } catch (err) {
                     if (err.message === "LocalTest") {
                         setError('Tryb lokalny uruchomiony. (Użyto na komputerze)');
-                        setGeneratedText(`[WERSJA DEMONSTRACYJNY - TEST NA KOMPUTERZE LOKALNYM]\n\nAplikacja Asystent Pedagoga PRO działa świetnie!\n\nPrzechwyciłem Twoje wejście:\nTemat: ${genericInput || docType}\nZauważone objawy: ${diagnoza || 'brak'}\n\nGdy umieścisz ten plik na serwerze (eduboxpro.pl), połączy się on bez problemów z Twoim AI i wygeneruje poprawną diagnozę/tekst na podstawie wytycznych.\nLicznik zużyć działa i poprawnie obniżył Twój limit.`);
+                        setGeneratedText(`[WERSJA DEMONSTRACYJNA - TEST NA KOMPUTERZE LOKALNYM]\n\nAsystent Pedagoga działa!\n\nPrzechwyciłem wejście: ${genericInput || docType}\n\nGdy umieścisz ten plik na serwerze (eduboxpro.pl), połączy się on bez problemów z Twoim AI i wygeneruje poprawną diagnozę/tekst na podstawie wytycznych.`);
                     } else {
                         setError('Błąd serwera: ' + err.message);
                     }
