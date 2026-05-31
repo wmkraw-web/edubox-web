@@ -427,18 +427,21 @@ ZASADY KRYTYCZNE:
                                 const res = await secureApiCall({ 
                                     instances: [{ prompt: imgPrompts[i] }], 
                                     parameters: { sampleCount: 1 } 
-                                }, 'image', imgPrompts[i]);
+                                }, 'image', imgPrompts[i]); // DODANY PROMPT TUTAJ
                                 
                                 if (res.predictions && res.predictions[0] && res.predictions[0].bytesBase64Encoded) {
                                     newImages.push(`data:image/png;base64,${res.predictions[0].bytesBase64Encoded}`);
                                 } else if (res.isVercelUrl || res.url) {
-                                    newImages.push(res.url || res.isVercelUrl); // Zabezpieczenie dla Vercela
+                                    newImages.push(res.url || res.isVercelUrl);
+                                } else if (res.image) {
+                                    // Dodatkowe zabezpieczenie, gdyby serwer zwracał po prostu klucz "image"
+                                    newImages.push(res.image);
                                 }
                             }
                             
                             setGeneratedImages(newImages);
                             if (newImages.length === 0) {
-                                setError("Twój serwer nie zwrócił obrazków, ale tekst wygenerowano poprawnie.");
+                                setError("Twój serwer sztucznej inteligencji przetworzył tekst, ale nie był w stanie wygenerować obrazków (Sprawdź, czy masz podpięty działający model graficzny w Vercelu). Tekst jest gotowy poniżej.");
                             }
                         } catch(e) { 
                             console.error("Błąd grafiki:", e); 
