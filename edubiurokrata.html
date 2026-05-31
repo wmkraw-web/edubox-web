@@ -48,8 +48,10 @@
 
         const BUY_COFFEE_LINK = "https://buycoffee.to/magiccolor";
         const DAILY_LIMIT = 5;
+        
+        // TWOJE TAJNE KODY (Możesz tu dopisywać nowe w cudzysłowach)
+        const VALID_CODES = ['EDUBOX2026', 'KAWAPRO', 'NAUCZYCIEL123'];
 
-        // --- KONFIGURACJA AI - ROZBUDOWANA ---
         const PROMPTS = {
             zgoda: `Jesteś ekspertem prawno-oświatowym. Przekształć luźną notatkę nauczyciela na bezpieczny, oficjalny FORMULARZ ZGODY RODZICÓW na wycieczkę/wyjście. 
 Zadbaj o formułki: zgoda na udział, koszt, oświadczenie o braku przeciwwskazań zdrowotnych, zgoda na interwencję medyczną, sposób powrotu (odbiór/samodzielnie) oraz telefony kontaktowe. Używaj kropek ........... na dane do wpisania.`,
@@ -84,12 +86,25 @@ Ton pisma ma być oficjalny, kategoryczny, powołujący się na współpracę ze
             const [isGenerating, setIsGenerating] = useState(false);
             const [error, setError] = useState('');
             const [copyStatus, setCopyStatus] = useState('Skopiuj dokument');
+            
             const [limitData, setLimitData] = useState({ remaining: DAILY_LIMIT, showWarning: false });
+            
+            // Stany dla konta PRO
+            const [isPro, setIsPro] = useState(false);
+            const [showModal, setShowModal] = useState(false);
+            const [codeInput, setCodeInput] = useState('');
+            const [codeError, setCodeError] = useState('');
 
             const resultRef = useRef(null);
 
-            // Inicjalizacja limitów
             useEffect(() => {
+                // Sprawdzanie czy użytkownik ma status PRO w pamięci przeglądarki
+                const proStatus = localStorage.getItem('eduboxProStatus');
+                if (proStatus === 'active') {
+                    setIsPro(true);
+                }
+
+                // Inicjalizacja normalnych limitów
                 const today = new Date().toLocaleDateString();
                 const usage = JSON.parse(localStorage.getItem('eduboxUsage')) || { date: today, count: 0 };
                 if (usage.date !== today) {
@@ -100,14 +115,29 @@ Ton pisma ma być oficjalny, kategoryczny, powołujący się na współpracę ze
                 }
             }, []);
 
+            const verifyCode = () => {
+                const code = codeInput.trim().toUpperCase();
+                if (VALID_CODES.includes(code)) {
+                    localStorage.setItem('eduboxProStatus', 'active');
+                    setIsPro(true);
+                    setShowModal(false);
+                    setLimitData(prev => ({ ...prev, showWarning: false }));
+                    setCodeError('');
+                } else {
+                    setCodeError('Nieprawidłowy kod. Spróbuj ponownie.');
+                }
+            };
+
             const updateAndCheckLimit = () => {
+                if (isPro) return true; // PRO nie ma limitów!
+
                 const today = new Date().toLocaleDateString();
                 let usage = JSON.parse(localStorage.getItem('eduboxUsage')) || { date: today, count: 0 };
                 
                 if (usage.date !== today) usage = { date: today, count: 0 };
                 
                 if (usage.count >= DAILY_LIMIT) {
-                    setLimitData({ remaining: 0, showWarning: true });
+                    setLimitData(prev => ({ ...prev, remaining: 0, showWarning: true }));
                     return false;
                 }
 
@@ -163,8 +193,8 @@ Ton pisma ma być oficjalny, kategoryczny, powołujący się na współpracę ze
 
                 } catch (err) {
                     if (err.message === "LocalTest") {
-                        setError('Tryb lokalny. Aby wygenerować prawdziwy tekst, wrzuć plik na serwer Vercel.');
-                        setGeneratedText(`[Wersja demonstracyjna - Tryb Lokalny]\n\nTyp: ${TABS.find(t=>t.id===activeTab).title}\nNa podstawie: ${inputText}\n\nGdy umieścisz ten plik na serwerze eduboxpro.pl, połączy się on z AI i wygeneruje poprawny dokument. Licznik darmowych użyć działa prawidłowo.`);
+                        setError('Tryb lokalny. Wgraj na Vercel.');
+                        setGeneratedText(`[TEST LOKALNY]\nWygenerowano tekst pomyślnie. Licznik darmowych użyć został zaktualizowany.\n\nJeśli wpiszesz kod PRO, limity znikną.`);
                     } else {
                         setError('Wystąpił błąd serwera. Spróbuj ponownie.');
                     }
@@ -189,36 +219,74 @@ Ton pisma ma być oficjalny, kategoryczny, powołujący się na współpracę ze
                 <div className="relative flex flex-col min-h-screen">
                     <div className="hero-glow"></div>
 
-                    {/* NOWY, WBUDOWANY PASEK NAWIGACJI (Zastępuje plik menu.html) */}
-                    <nav className="fixed top-0 w-full z-50 glass-nav shadow-lg">
+                    {/* NOWY PASEK NAWIGACJI */}
+                    <nav className="fixed top-0 w-full z-40 glass-nav shadow-lg">
                         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-                            {/* Logo */}
                             <a href="index.html" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
                                 <span className="text-2xl font-black text-white tracking-tight">Edu<span className="text-amber-500">Box</span></span>
                                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest border border-slate-700 rounded px-1.5 py-0.5 ml-1">Pro</span>
                             </a>
                             
                             <div className="flex items-center gap-3 sm:gap-5">
-                                {/* Informacja o Limitach */}
+                                {/* Informacja o Limitach / Status PRO */}
                                 <div className="flex flex-col items-end">
-                                    <span className="text-[9px] sm:text-[10px] uppercase tracking-wider text-slate-400 font-bold">Limit Dzienny</span>
-                                    <span className={`text-xs sm:text-sm font-black ${limitData.remaining === 0 ? 'text-red-500 animate-pulse' : 'text-emerald-400'}`}>
-                                        {limitData.remaining} / {DAILY_LIMIT}
+                                    <span className="text-[9px] sm:text-[10px] uppercase tracking-wider text-slate-400 font-bold">
+                                        {isPro ? 'Twój Status' : 'Limit Dzienny'}
                                     </span>
+                                    {isPro ? (
+                                        <span className="text-xs sm:text-sm font-black text-amber-400 drop-shadow-[0_0_8px_rgba(251,191,36,0.5)]">
+                                            KONTO PRO 👑
+                                        </span>
+                                    ) : (
+                                        <span className={`text-xs sm:text-sm font-black ${limitData.remaining === 0 ? 'text-red-500 animate-pulse' : 'text-emerald-400'}`}>
+                                            {limitData.remaining} / {DAILY_LIMIT}
+                                        </span>
+                                    )}
                                 </div>
 
-                                {/* Guzik Kawy / PRO */}
+                                {/* Guziki akcji */}
+                                {!isPro && (
+                                    <button onClick={() => setShowModal(true)} className="text-xs sm:text-sm font-bold text-slate-300 hover:text-amber-400 transition-colors border border-slate-700 hover:border-amber-500/50 bg-slate-800/50 px-3 py-1.5 rounded-lg">
+                                        Masz kod?
+                                    </button>
+                                )}
+                                
                                 <a href={BUY_COFFEE_LINK} target="_blank" className="bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-slate-900 px-3 sm:px-4 py-1.5 rounded-lg text-xs sm:text-sm font-bold shadow-[0_0_15px_rgba(245,158,11,0.3)] transition-all btn-bounce flex items-center gap-1.5">
-                                    <span>☕</span> <span className="hidden sm:inline">Kawa / PRO</span>
-                                </a>
-
-                                {/* Wróć */}
-                                <a href="index.html" className="text-xs sm:text-sm font-bold text-slate-400 hover:text-white transition-colors bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-lg border border-slate-700">
-                                    Start
+                                    <span>☕</span> <span className="hidden sm:inline">{isPro ? 'Kawa dla Twórcy' : 'Kawa / PRO'}</span>
                                 </a>
                             </div>
                         </div>
                     </nav>
+
+                    {/* OKIENKO MODALNE (Wpisywanie Kodu) */}
+                    {showModal && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-slate-950/80 backdrop-blur-sm fade-in">
+                            <div className="bg-slate-900 border border-slate-700 p-6 sm:p-8 rounded-2xl shadow-2xl max-w-sm w-full relative">
+                                <button onClick={() => setShowModal(false)} className="absolute top-4 right-4 text-slate-500 hover:text-white">
+                                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                                </button>
+                                <h3 className="text-2xl font-black text-white mb-2">Aktywuj PRO 👑</h3>
+                                <p className="text-slate-400 text-sm mb-6">Wpisz kod otrzymany po postawieniu kawy, aby znieść dzienne limity.</p>
+                                
+                                <input 
+                                    type="text" 
+                                    value={codeInput}
+                                    onChange={(e) => setCodeInput(e.target.value)}
+                                    placeholder="Npisz tutaj swój kod..."
+                                    className="w-full bg-slate-800 border border-slate-600 text-white rounded-xl p-3 mb-2 focus:outline-none focus:border-amber-500 uppercase font-mono tracking-widest text-center"
+                                />
+                                {codeError && <p className="text-red-400 text-xs font-bold text-center mb-4">{codeError}</p>}
+                                
+                                <button onClick={verifyCode} className="w-full bg-amber-500 hover:bg-amber-400 text-slate-900 font-black py-3 rounded-xl shadow-lg btn-bounce mt-2">
+                                    Odblokuj Limity
+                                </button>
+                                
+                                <div className="mt-4 text-center text-xs text-slate-500">
+                                    Nie masz kodu? <a href={BUY_COFFEE_LINK} target="_blank" className="text-amber-500 hover:underline">Zdobądź go tutaj</a>.
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                     <div className="flex-grow pt-28 pb-20 px-4 sm:px-6">
                         <div className="max-w-4xl mx-auto">
@@ -232,21 +300,26 @@ Ton pisma ma być oficjalny, kategoryczny, powołujący się na współpracę ze
                                 </p>
                             </div>
 
-                            {/* OSTRZEŻENIE O LIMICIE */}
-                            {limitData.showWarning && (
-                                <div className="bg-red-900/40 border border-red-500/50 rounded-2xl p-6 text-center mb-8 shadow-lg fade-in">
+                            {/* OSTRZEŻENIE O LIMICIE (Tylko jeśli nie PRO) */}
+                            {limitData.showWarning && !isPro && (
+                                <div className="bg-red-900/40 border border-red-500/50 rounded-2xl p-6 text-center mb-8 shadow-lg fade-in relative overflow-hidden">
+                                    <div className="absolute top-0 right-0 w-24 h-24 bg-red-500/20 rounded-full blur-2xl"></div>
                                     <h3 className="text-xl sm:text-2xl font-black text-white mb-2">Limit dzienny osiągnięty (5/5)</h3>
                                     <p className="text-slate-300 mb-4 text-sm sm:text-base">
                                         Aby narzędzie mogło istnieć za darmo dla wszystkich, wprowadziliśmy limity. 
-                                        Jeśli podoba Ci się EduBox Pro, wesprzyj serwery stawiając wirtualną kawę!
+                                        Jeśli podoba Ci się EduBox Pro, wesprzyj serwery stawiając wirtualną kawę i odblokuj konto PRO bez limitów!
                                     </p>
-                                    <a href={BUY_COFFEE_LINK} target="_blank" className="inline-flex items-center justify-center gap-2 bg-amber-500 text-slate-900 px-6 py-3 rounded-xl font-bold shadow-lg hover:bg-amber-400 transition-colors btn-bounce">
-                                        ☕ Postaw kawę i odblokuj
-                                    </a>
+                                    <div className="flex flex-col sm:flex-row justify-center items-center gap-3">
+                                        <a href={BUY_COFFEE_LINK} target="_blank" className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-amber-500 text-slate-900 px-6 py-3 rounded-xl font-bold shadow-lg hover:bg-amber-400 transition-colors btn-bounce">
+                                            ☕ Postaw kawę i odblokuj
+                                        </a>
+                                        <button onClick={() => setShowModal(true)} className="w-full sm:w-auto px-6 py-3 text-white border border-slate-500 hover:bg-slate-800 rounded-xl font-bold transition-colors">
+                                            Mam już kod
+                                        </button>
+                                    </div>
                                 </div>
                             )}
 
-                            {/* Pasek Zakładek (Przewijany w poziomie na telefonach) */}
                             <div className="flex overflow-x-auto custom-scrollbar pb-4 gap-2 mb-6 fade-in" style={{animationDelay: '0.1s'}}>
                                 {TABS.map((tab) => (
                                     <button 
@@ -279,9 +352,9 @@ Ton pisma ma być oficjalny, kategoryczny, powołujący się na współpracę ze
 
                                 <button 
                                     onClick={generateResponse}
-                                    disabled={isGenerating || !inputText.trim() || limitData.remaining === 0}
+                                    disabled={isGenerating || !inputText.trim() || (!isPro && limitData.remaining === 0)}
                                     className={`w-full mt-6 py-4 rounded-xl font-bold text-white transition-all flex items-center justify-center gap-2 shadow-lg btn-bounce
-                                        ${isGenerating ? 'bg-slate-700 cursor-wait' : limitData.remaining === 0 ? 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700' : 'bg-gradient-to-r from-amber-600 to-red-600 hover:shadow-amber-500/25'}`}
+                                        ${isGenerating ? 'bg-slate-700 cursor-wait' : (!isPro && limitData.remaining === 0) ? 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700' : 'bg-gradient-to-r from-amber-600 to-red-600 hover:shadow-amber-500/25'}`}
                                 >
                                     {isGenerating ? (
                                         <span className="flex items-center gap-2">
@@ -314,10 +387,6 @@ Ton pisma ma być oficjalny, kategoryczny, powołujący się na współpracę ze
                                         <p className="text-black whitespace-pre-wrap font-serif text-sm sm:text-base leading-relaxed">
                                             {generatedText}
                                         </p>
-                                    </div>
-                                    
-                                    <div className="mt-6 text-center text-sm text-slate-400">
-                                        Podoba Ci się wynik? Pamiętaj, że możesz <a href={BUY_COFFEE_LINK} target="_blank" className="text-amber-500 hover:underline font-bold">postawić kawę</a>, by wspierać rozwój projektu!
                                     </div>
                                 </div>
                             )}
