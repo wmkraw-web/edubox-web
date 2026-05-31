@@ -15,7 +15,7 @@
                 <div class="ml-10 flex items-baseline space-x-2">
                     <a href="index.html" class="text-slate-300 hover:text-white hover:bg-slate-800 px-3 py-2 rounded-md text-sm font-medium transition-colors">Start</a>
                     
-                    <!-- Przykładowe kategorie (zamiast 46 osobnych linków) -->
+                    <!-- Rozwijane menu Dokumenty -->
                     <div class="relative group">
                         <button class="text-slate-300 hover:text-white hover:bg-slate-800 px-3 py-2 rounded-md text-sm font-medium transition-colors inline-flex items-center">
                             Dokumenty
@@ -38,16 +38,81 @@
 
             <!-- Prawa strona - Akcje użytkownika / Limity -->
             <div class="flex items-center gap-4">
-                <!-- Licznik limitów (zostanie zaktualizowany przez skrypt w pliku docelowym) -->
+                
+                <!-- Licznik limitów -->
                 <div class="hidden sm:flex flex-col items-end">
                     <span class="text-xs text-slate-400 font-medium">Pozostało użyć:</span>
-                    <span id="global-limit-display" class="text-sm font-bold text-emerald-400">Ładowanie...</span>
+                    <span id="global-limit-display" class="text-sm font-bold text-emerald-400">...</span>
                 </div>
 
+                <!-- Input na kod PRO wbudowany w menu -->
+                <div id="menu-pro-form" class="hidden items-center gap-2 bg-slate-800 rounded-lg p-1 border border-slate-700">
+                    <input id="menu-pro-input" type="text" placeholder="Kod PRO" class="bg-transparent text-xs w-20 px-2 outline-none font-medium text-white uppercase placeholder-slate-500" />
+                    <button onclick="activatePro()" class="px-2 py-1 text-white rounded bg-amber-600 hover:bg-amber-500 transition-colors text-xs font-bold">OK</button>
+                </div>
+
+                <!-- Przycisk Kawa -->
                 <a href="https://buycoffee.to/magiccolor" target="_blank" class="bg-amber-500 hover:bg-amber-400 text-slate-900 px-4 py-2 rounded-lg text-sm font-bold shadow-lg transition-all hover:-translate-y-0.5 flex items-center gap-2">
-                    ☕ <span class="hidden sm:inline">Wesprzyj projekt</span>
+                    ☕ <span class="hidden sm:inline">Kawa (PRO)</span>
                 </a>
             </div>
         </div>
     </div>
+
+    <!-- SKRYPT LOGIKI MENU (Limity i Autoryzacja PRO) -->
+    <script>
+        function initMenuLogic() {
+            // Sprawdź w przeglądarce czy uzytkownik wpisał już kiedyś kod PRO
+            const isPro = localStorage.getItem('eduboxProStatus') === 'active' || localStorage.getItem('eduAwansPremium') === 'active';
+            
+            const displayElement = document.getElementById('global-limit-display');
+            const proForm = document.getElementById('menu-pro-form');
+
+            if (isPro) {
+                // Jeśli ma PRO, zmieniamy napis i chowamy pole na wpisywanie kodu
+                if(displayElement) {
+                    displayElement.innerText = "KONTO PRO 👑";
+                    displayElement.className = "text-sm font-black text-amber-500 drop-shadow-[0_0_5px_rgba(245,158,11,0.5)]";
+                }
+                if(proForm) proForm.style.display = 'none';
+            } else {
+                // Jeśli NIE JEST PRO, pokazujemy pole na kod i wyliczamy uzycia z 5 darmowych
+                if(proForm) proForm.style.display = 'flex';
+                
+                const usageData = JSON.parse(localStorage.getItem('eduboxUsage'));
+                const dzisiaj = new Date().toLocaleDateString();
+
+                if (displayElement) {
+                    if (usageData && usageData.date === dzisiaj) {
+                        const remaining = Math.max(0, 5 - usageData.count);
+                        displayElement.innerText = remaining + " / 5";
+                        if(remaining === 0) displayElement.className = "text-sm font-black text-red-500 animate-pulse";
+                    } else {
+                        // Jeśli nie ma danych z dzisiaj, ma pełne 5/5
+                        displayElement.innerText = "5 / 5";
+                    }
+                }
+            }
+        }
+
+        // Funkcja weryfikująca kody promocyjne po wciśnięciu "OK"
+        function activatePro() {
+            const kod = document.getElementById('menu-pro-input').value.toUpperCase().trim();
+            // Baza prawidłowych kodów:
+            if (kod === 'EDUBOX2026' || kod === 'KAWA2024') {
+                localStorage.setItem('eduboxProStatus', 'active');
+                localStorage.setItem('eduAwansPremium', 'active'); 
+                alert('Konto PRO zostało aktywowane! Dziękujemy za wsparcie. Strona odświeży się aby zastosować zmiany.');
+                window.location.reload();
+            } else {
+                alert('Nieprawidłowy kod PRO. Spróbuj ponownie.');
+            }
+        }
+
+        // Uruchomienie skryptu natychmiast po załadowaniu menu w dowolnej aplikacji
+        initMenuLogic();
+        
+        // Zrobienie funkcji globalnej żeby React w innych plikach mógł wymusić odświeżenie licznika po kliknięciu "Generuj"
+        window.updateGlobalLimitDisplay = initMenuLogic;
+    </script>
 </nav>
