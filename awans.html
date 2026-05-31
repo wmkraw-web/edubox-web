@@ -27,10 +27,6 @@
         
         .print-only-footer { display: none; }
         
-        /* POPRAWA STYLÓW DLA MENU AWARYJNEGO, ABY NIE PSUŁO STRONY */
-        #wspolne-menu-kontener { position: relative; z-index: 50; }
-        #wspolne-menu-kontener nav { position: relative; } /* W menu.html może być sticky/fixed, ale dla kontenera ustawiamy relative by zachować flow strony */
-        
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: #0f172a; border-radius: 10px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #3b82f6; border-radius: 10px; }
@@ -84,7 +80,7 @@
             }
 
             try {
-                fetch('./menu.html')
+                fetch('/menu.html')
                     .then(response => {
                         if (!response.ok) throw new Error('Błąd ładowania menu');
                         return response.text();
@@ -106,7 +102,6 @@
         });
     </script>
 
-
     <div id="root" class="flex-grow flex flex-col relative z-10"></div>
 
     <script type="text/babel">
@@ -122,7 +117,8 @@
                 Coffee: <path d="M18 8h1a4 4 0 0 1 0 8h-1M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8zM7 2v3M11 2v3M15 2v3"/>,
                 Lock: <><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></>,
                 AlertCircle: <><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></>,
-                UserCheck: <><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><polyline points="16 11 18 13 22 9"/></>
+                UserCheck: <><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><polyline points="16 11 18 13 22 9"/></>,
+                Mentor: <><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></>
             };
             return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>{icons[name]}</svg>;
         };
@@ -140,7 +136,6 @@
         );
 
         function App() {
-            // SPRAWDZANIE STANU KONTRA PRO Z LOCALSTORAGE
             const [isPremium, setIsPremium] = useState(() => {
                 return localStorage.getItem('eduboxProStatus') === 'active' || localStorage.getItem('eduAwansPremium') === 'active';
             });
@@ -178,11 +173,10 @@
                 if (accessCode.toUpperCase() === 'KAWA2024' || accessCode.toUpperCase() === 'EDUBOX2026') { 
                     setIsPremium(true); 
                     localStorage.setItem('eduAwansPremium', 'active');
-                    localStorage.setItem('eduboxProStatus', 'active'); // dla pewnosci
+                    localStorage.setItem('eduboxProStatus', 'active');
                     setAccessCode(''); 
                     showToast('Kod aktywny! Witamy w Premium 🌟');
                     setBotMessage("Premium odblokowane! Możesz teraz wygenerować epicko rozbudowane dokumenty.");
-                    // Aktualizuj menu jesli tam jest
                     if(typeof window.updateGlobalLimitDisplay === 'function') window.updateGlobalLimitDisplay();
                 } else { 
                     showToast('Nieprawidłowy kod dostępu!'); 
@@ -190,8 +184,9 @@
             };
 
             useEffect(() => {
-                if(mode === 'opiekun') setBotMessage("Tryb Dyrektora/Opiekuna. Dokument zostanie zredagowany w 3-ciej osobie jako formalna ocena dla nauczyciela.");
-                else setBotMessage("Tryb Nauczyciela. Dokument zostanie zredagowany w 1-szej osobie jako Twoje osobiste sprawozdanie.");
+                if(mode === 'opiekun') setBotMessage("Tryb Dyrektora. Dokument zostanie zredagowany w 3-ciej osobie jako formalna ocena pracy dla nauczyciela.");
+                else if(mode === 'mentor') setBotMessage("Tryb Mentora. Dokument to oficjalna opinia o nauczycielu początkującym, napisana z perspektywy wspierającego mentora, zgodnie z nowymi przepisami.");
+                else setBotMessage("Tryb Nauczyciela. Dokument zostanie zredagowany w 1-szej osobie jako Twoje osobiste sprawozdanie z realizacji planu.");
             }, [mode]);
 
             const generateDocument = async () => {
@@ -203,7 +198,7 @@
                 setBotMessage("Analizuję Twoje notatki i dopasowuję odpowiednie paragrafy z NAJNOWSZYCH przepisów (po 2022r.). Chwileczkę...");
                 
                 let lengthInstruction = params.formatType === 'epic' 
-                    ? "Wymagam BARDZO ROZBUDOWANEGO i wyczerpującego dokumentu ('lany tekst'). Rozbuduj każdy podany punkt, używaj wyrafinowanego języka urzędowego, dodaj profesjonalne wnioski i podsumowania. Dokument musi wyglądać na profesjonalnie przygotowany esej."
+                    ? "Wymagam BARDZO ROZBUDOWANEGO i wyczerpującego dokumentu ('lany tekst'). Rozbuduj każdy podany punkt, używaj wyrafinowanego języka urzędowego/pedagogicznego, dodaj profesjonalne wnioski i podsumowania. Dokument musi wyglądać na profesjonalnie przygotowany esej."
                     : "Wymagam ZWIĘZŁEGO dokumentu. Używaj punktatorów i krótkich, konkretnych zdań. Tylko same fakty i profesjonalne podsumowanie.";
 
                 let systemPrompt = "";
@@ -216,8 +211,17 @@ ZASADY KRYTYCZNE:
 2. ${lengthInstruction}
 3. Dopasuj słownictwo do specyfiki zawodu: ${finalRole}. Używaj pojęć takich jak: kompetencje, warsztat pracy, metody aktywizujące, ewaluacja.
 4. Zwróć WYŁĄCZNIE format JSON: { "title": "...", "legal_basis": "Podstawa prawna z uwzględnieniem aktualnych przepisów KN i rozporządzeń z 2022/2023 r.", "document_body": "Używaj tu znaczników <br> oraz <b> do formatowania. Bez formatowania markdown." }`;
-                    userPrompt = `Imię: ${params.teacherName || '[Imię]'}\nStanowisko: ${finalRole}\nStopień: ${params.level}\nDziałania: ${params.achievements}\nNapisz pełną, aktualną opinię dyrektora/opiekuna do oceny dorobku lub oceny pracy za okres stażu.`;
+                    userPrompt = `Imię: ${params.teacherName || '[Imię]'}\nStanowisko: ${finalRole}\nStopień: ${params.level}\nDziałania: ${params.achievements}\nNapisz pełną, aktualną opinię dyrektora do oceny pracy za okres przygotowania do zawodu / stażu.`;
                 } 
+                else if (mode === 'mentor') {
+                    systemPrompt = `Jesteś doświadczonym nauczycielem mianowanym/dyplomowanym pełniącym funkcję MENTORA dla nauczyciela początkującego w Polsce. Znasz przepisy awansowe wprowadzone po 2022 roku (Karta Nauczyciela, przygotowanie do zawodu).
+ZASADY KRYTYCZNE:
+1. Pisz w 3 osobie liczby pojedynczej o obserwowanym nauczycielu, z perspektywy mentora (który obserwował zajęcia, wspierał, doradzał). Ton profesjonalny, wspierający i pedagogiczny.
+2. ${lengthInstruction}
+3. Dopasuj słownictwo do specyfiki zawodu: ${finalRole}. Używaj pojęć: obserwacja zajęć, doskonalenie warsztatu, współpraca z mentorem, adaptacja w szkole, omawianie lekcji.
+4. Zwróć WYŁĄCZNIE format JSON: { "title": "...", "legal_basis": "Podstawa prawna z uwzględnieniem aktualnych przepisów KN z 2022/2023 r. dot. opinii mentora", "document_body": "Używaj tu znaczników <br> oraz <b> do formatowania. Bez formatowania markdown." }`;
+                    userPrompt = `Imię i nazwisko nauczyciela: ${params.teacherName || '[Imię i nazwisko]'}\nStanowisko: ${finalRole}\nEtap: ${params.level}\nDziałania, postępy i sukcesy zauważone przeze mnie (mentora): ${params.achievements}\nNapisz pełną, aktualną opinię mentora o nauczycielu odbywającym przygotowanie do zawodu.`;
+                }
                 else if (mode === 'nauczyciel') {
                     systemPrompt = `Jesteś ekspertem prawa oświatowego w Polsce piszącym "Sprawozdanie z realizacji planu rozwoju zawodowego" dla nauczyciela. Znasz przepisy awansowe wprowadzone po 2022 roku.
 ZASADY KRYTYCZNE:
@@ -229,19 +233,29 @@ ZASADY KRYTYCZNE:
                 }
 
                 try {
-                    // Wyrzucamy test blokady lokalnej, żeby guzik zawsze coś generował
+                    if (window.location.hostname === '' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                         throw new Error("TestLocal");
+                    }
+
                     const payload = { system: systemPrompt, prompt: userPrompt, temperature: 0.4, format: "json", model: "gpt-4o-mini" };
                     const res = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
                     const data = await res.json();
                     if (!res.ok) throw new Error(data.details || data.message || "Błąd z serwera");
                     
                     let cleanText = data.text;
+                    if (cleanText.includes('"reasoning_content"')) {
+                        const startIdx = cleanText.indexOf('"content":"');
+                        if (startIdx !== -1) {
+                            let extracted = cleanText.substring(startIdx + 11).replace(/"\s*}\s*$/, '').replace(/"$/, ''); 
+                            cleanText = extracted.replace(/\\n/g, '\n').replace(/\\"/g, '"'); 
+                        }
+                    } else {
+                        try { const outerObj = JSON.parse(cleanText); if(outerObj.content) cleanText = outerObj.content; else if (outerObj.choices) cleanText = outerObj.choices[0].message.content; } catch(e){}
+                    }
                     
-                    // Bezpieczne usuwanie znaków markdown bez psucia edytora
                     cleanText = cleanText.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
                     let jsonStr = cleanText;
                     
-                    // Zamiast podawać w kodzie potrójne znaczki, uzywamy wyrazenia regularnego (RegExp) aby ominac błąd parsera
                     jsonStr = jsonStr.replace(new RegExp('`{3}json', 'gi'), '').replace(new RegExp('`{3}', 'g'), '').trim();
 
                     if(jsonStr.indexOf('{') !== -1) {
@@ -252,17 +266,23 @@ ZASADY KRYTYCZNE:
                     setGeneratedData(parsedData);
                     setBotMessage("Gotowe! Przepisy zaaktualizowane. Możesz go wydrukować lub pobrać do edycji w Wordzie.");
                 } catch (error) {
-                    // Nawet jeśli jest błąd (np. lokalny test), pokazujemy wersję demonstracyjną żeby żona mogła zobaczyć układ
-                    showToast(`Nie udało się połączyć z AI (błąd serwera lub tryb podglądu). Pokazuję wersję testową.`);
-                    setTimeout(() => {
-                        setGeneratedData({
-                            title: "DOKUMENT DEMONSTRACYJNY",
-                            legal_basis: "Podstawa prawna: Ustawa z dnia 26 stycznia 1982 r. – Karta Nauczyciela ze zmianami po 2022 roku (przykładowo art. 9c).",
-                            document_body: "Aplikacja <b>Kreator Awansu</b> zadziałała, ale napotkała błąd w łączeniu z serwerem.<br><br>Gdy umieścisz plik na poprawnie skonfigurowanym serwerze (eduboxpro.pl), połączy się ona z modelem AI i przetworzy Twoje dane w pełni prawidłowo za pomocą sztucznej inteligencji."
-                        });
-                        setBotMessage("Oto testowy podgląd. Wrzuć plik na serwer Vercel, by używać pełnej AI.");
+                    if (error.message === "TestLocal") {
+                        showToast(`Tryb testowy na komputerze. Dokument symulowany.`);
+                        setTimeout(() => {
+                            setGeneratedData({
+                                title: `OPINIA / SPRAWOZDANIE (${mode.toUpperCase()})`,
+                                legal_basis: "Podstawa prawna: Ustawa z dnia 26 stycznia 1982 r. – Karta Nauczyciela ze zmianami po 2022 roku.",
+                                document_body: "Twoja aplikacja <b>Kreator Awansu</b> zadziałała.<br><br>Testujesz ją na dysku, więc nie łączy się z serwerem kosztów.<br><br>Gdy umieścisz ją na serwerze (np. na eduboxpro.pl), połączy się ona z chmurą i wygeneruje poprawny dokument ze wskazanego trybu: " + mode.toUpperCase()
+                            });
+                            setBotMessage("Oto testowy podgląd. Wrzuć plik na serwer Vercel, by używać pełnej AI.");
+                            setIsGenerating(false);
+                        }, 1000);
+                    } else {
+                        console.error("Błąd AI:", error); 
+                        showToast(`Błąd: ${error.message}`); 
+                        setBotMessage("Coś poszło nie tak z połączeniem. Spróbuj ponownie!");
                         setIsGenerating(false);
-                    }, 1000);
+                    }
                 } finally { 
                     setIsGenerating(false); 
                 }
@@ -308,12 +328,16 @@ ZASADY KRYTYCZNE:
                                 </div>
                             )}
 
-                            <div className="glass-panel p-2 rounded-2xl flex gap-2">
-                                <button onClick={() => {setMode('opiekun'); setGeneratedData(null);}} className={`flex-1 py-4 px-2 rounded-xl flex flex-col items-center justify-center font-bold text-[10px] uppercase tracking-widest transition-all duration-300 ${mode === 'opiekun' ? 'bg-blue-600 text-white shadow-[0_0_20px_rgba(37,99,235,0.3)] border border-blue-500' : 'text-slate-400 hover:bg-slate-800'}`}>
-                                    <Icon name="FileSignature" size={24} className="mb-2 text-blue-300" /> Piszę Opinię <span className="text-[8px] font-normal opacity-70 mt-1">(Dyrektor)</span>
+                            {/* ZMIENIONE PRZYCISKI - 3 TRYBY */}
+                            <div className="glass-panel p-2 rounded-2xl flex flex-col sm:flex-row gap-2">
+                                <button onClick={() => {setMode('opiekun'); setGeneratedData(null);}} className={`flex-1 py-3 px-2 rounded-xl flex flex-col items-center justify-center font-bold text-[10px] uppercase tracking-widest transition-all duration-300 ${mode === 'opiekun' ? 'bg-blue-600 text-white shadow-[0_0_20px_rgba(37,99,235,0.3)] border border-blue-500' : 'text-slate-400 hover:bg-slate-800'}`}>
+                                    <Icon name="FileSignature" size={20} className="mb-2 text-blue-300" /> Opinia <span className="text-[8px] font-normal opacity-70 mt-1">(Dyrektor)</span>
                                 </button>
-                                <button onClick={() => {setMode('nauczyciel'); setGeneratedData(null);}} className={`flex-1 py-4 px-2 rounded-xl flex flex-col items-center justify-center font-bold text-[10px] uppercase tracking-widest transition-all duration-300 ${mode === 'nauczyciel' ? 'bg-indigo-600 text-white shadow-[0_0_20px_rgba(79,70,229,0.3)] border border-indigo-500' : 'text-slate-400 hover:bg-slate-800'}`}>
-                                    <Icon name="UserCheck" size={24} className="mb-2 text-indigo-300" /> Sprawozdanie <span className="text-[8px] font-normal opacity-70 mt-1">(Nauczyciel)</span>
+                                <button onClick={() => {setMode('mentor'); setGeneratedData(null);}} className={`flex-1 py-3 px-2 rounded-xl flex flex-col items-center justify-center font-bold text-[10px] uppercase tracking-widest transition-all duration-300 ${mode === 'mentor' ? 'bg-teal-600 text-white shadow-[0_0_20px_rgba(13,148,136,0.3)] border border-teal-500' : 'text-slate-400 hover:bg-slate-800'}`}>
+                                    <Icon name="Mentor" size={20} className="mb-2 text-teal-300" /> Opinia <span className="text-[8px] font-normal opacity-70 mt-1">(Mentor)</span>
+                                </button>
+                                <button onClick={() => {setMode('nauczyciel'); setGeneratedData(null);}} className={`flex-1 py-3 px-2 rounded-xl flex flex-col items-center justify-center font-bold text-[10px] uppercase tracking-widest transition-all duration-300 ${mode === 'nauczyciel' ? 'bg-indigo-600 text-white shadow-[0_0_20px_rgba(79,70,229,0.3)] border border-indigo-500' : 'text-slate-400 hover:bg-slate-800'}`}>
+                                    <Icon name="UserCheck" size={20} className="mb-2 text-indigo-300" /> Sprawozd. <span className="text-[8px] font-normal opacity-70 mt-1">(Nauczyciel)</span>
                                 </button>
                             </div>
 
@@ -336,14 +360,14 @@ ZASADY KRYTYCZNE:
                                 <div>
                                     <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">Cel Awansu</label>
                                     <select value={params.level} onChange={e => setParams({...params, level: e.target.value})} className="w-full p-4 bg-slate-900 border border-slate-700 rounded-xl outline-none text-white text-sm font-medium focus:border-blue-500 transition-colors appearance-none">
-                                        <option value="Nauczyciel początkujący (na mianowanego)" className="bg-slate-900">Na nauczyciela mianowanego</option>
+                                        <option value="Nauczyciel początkujący (przygotowanie do zawodu)" className="bg-slate-900">Nauczyciel początkujący (przygotowanie do zawodu)</option>
                                         <option value="Nauczyciel mianowany (na dyplomowanego)" className="bg-slate-900">Na nauczyciela dyplomowanego</option>
                                     </select>
                                 </div>
 
                                 <div>
                                     <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">Działania (Luźne notatki)</label>
-                                    <textarea value={params.achievements} onChange={e => setParams({...params, achievements: e.target.value})} placeholder="np. kółko szachowe, gazetki, pomoc w poradni, kursy..." className="w-full p-4 bg-slate-900 border border-slate-700 rounded-xl outline-none text-white font-medium text-sm resize-none focus:border-blue-500 transition-colors custom-scrollbar placeholder-slate-600" rows="5"/>
+                                    <textarea value={params.achievements} onChange={e => setParams({...params, achievements: e.target.value})} placeholder="np. kółko szachowe, gazetki, obserwacja zajęć, kursy..." className="w-full p-4 bg-slate-900 border border-slate-700 rounded-xl outline-none text-white font-medium text-sm resize-none focus:border-blue-500 transition-colors custom-scrollbar placeholder-slate-600" rows="5"/>
                                 </div>
 
                                 <div className="bg-blue-900/20 p-4 rounded-xl border border-blue-500/30">
@@ -374,7 +398,7 @@ ZASADY KRYTYCZNE:
                             <div className="p-5 rounded-3xl shadow-lg border flex items-start gap-4 animate-[reveal_0.3s_ease-out] transition-colors bg-blue-900/20 border-blue-500/30">
                                 <BotHelperAvatar />
                                 <div className="flex-1 pt-1">
-                                    <h4 className="font-black text-xs uppercase tracking-widest mb-1.5 text-blue-400">EduBot Prawny</h4>
+                                    <h4 className="font-black text-xs uppercase tracking-widest mb-1.5 text-blue-400">EduBot Ekspert</h4>
                                     <p className="text-sm font-medium leading-relaxed text-slate-300 bot-bubble" key={botMessage}>{botMessage}</p>
                                 </div>
                             </div>
