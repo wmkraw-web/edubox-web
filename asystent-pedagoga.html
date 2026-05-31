@@ -424,28 +424,39 @@ ZASADY KRYTYCZNE:
                             for (let i = 0; i < imgPrompts.length; i++) {
                                 setLoadingMsg(`Maluję precyzyjny obrazek ${i + 1} z 3...`);
                                 
-                                const res = await secureApiCall({ 
-                                    instances: [{ prompt: imgPrompts[i] }], 
-                                    parameters: { sampleCount: 1 } 
-                                }, 'image', imgPrompts[i]); // DODANY PROMPT TUTAJ
+                                // Zmiana endpointu - kierujemy zapytanie do /api/generate zamiast /api/gemini
+                                // Większość skryptów np. z Fal.ai lub OpenAI oczekuje parametru 'prompt'
+                                const response = await fetch('/api/generate', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ prompt: imgPrompts[i] })
+                                });
                                 
+                                if (!response.ok) {
+                                    // Jeśli jest błąd, pobieramy go, aby wiedzieć dlaczego /api/generate krzyczy
+                                    const errData = await response.json().catch(() => ({}));
+                                    throw new Error(`Błąd serwera obrazów: ${errData.error || response.statusText}`);
+                                }
+
+                                const res = await response.json();
+
+                                // Odbiór formatów w zależności od modelu API (bierzemy co daje, b64 lub URL)
                                 if (res.predictions && res.predictions[0] && res.predictions[0].bytesBase64Encoded) {
                                     newImages.push(`data:image/png;base64,${res.predictions[0].bytesBase64Encoded}`);
                                 } else if (res.isVercelUrl || res.url) {
                                     newImages.push(res.url || res.isVercelUrl);
-                                } else if (res.image) {
-                                    // Dodatkowe zabezpieczenie, gdyby serwer zwracał po prostu klucz "image"
-                                    newImages.push(res.image);
+                                } else if (res.image || res.imageUrl) {
+                                    newImages.push(res.image || res.imageUrl);
                                 }
                             }
                             
                             setGeneratedImages(newImages);
                             if (newImages.length === 0) {
-                                setError("Twój serwer sztucznej inteligencji przetworzył tekst, ale nie był w stanie wygenerować obrazków (Sprawdź, czy masz podpięty działający model graficzny w Vercelu). Tekst jest gotowy poniżej.");
+                                setError("Serwer nie zwrócił poprawnych danych graficznych z endpointu /api/generate. Ale tekst jest gotowy.");
                             }
                         } catch(e) { 
                             console.error("Błąd grafiki:", e); 
-                            setError(`Zignorowano błąd obrazków. Tekst gotowy.`);
+                            setError(`Problem z generatorem obrazów: ${e.message}. Tekst gotowy.`);
                         }
                     }
 
