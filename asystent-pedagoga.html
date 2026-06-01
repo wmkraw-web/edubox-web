@@ -84,7 +84,7 @@
         document.addEventListener("DOMContentLoaded", function() {
             function wstawMenuAwaryjne() {
                 document.getElementById('wspolne-menu-kontener').innerHTML = `
-                    <nav class="w-full z-50 glass-nav shadow-lg print-hidden bg-slate-900 border-b border-slate-800 p-4">
+                    <nav class="w-full z-50 glass-nav shadow-lg print-hidden bg-slate-900 border-b border-slate-800 p-4 fixed top-0">
                         <div class="max-w-7xl mx-auto flex items-center justify-between">
                             <span class="text-2xl font-black text-white">Edu<span class="text-amber-500">Box</span> <span class="text-xs text-slate-400">Pro</span></span>
                             <span class="text-xs text-amber-500 font-bold">Podgląd (Menu awaryjne)</span>
@@ -114,13 +114,12 @@
         });
     </script>
 
-    <div id="root" class="flex-grow flex flex-col relative z-10"></div>
+    <div id="root" class="flex-grow flex flex-col relative z-10 pt-16"></div>
 
     <script type="text/babel">
         const { useState, useRef, useEffect } = React;
 
         const DAILY_LIMIT = 5;
-        const BUY_COFFEE_LINK = "https://buycoffee.to/magiccolor";
 
         const DOC_TYPES = [
             { id: 'gotowosc', label: 'Informacja o gotowości do podjęcia nauki w szkole (Przedszkole)' },
@@ -158,10 +157,10 @@
                 return base;
             }
             if (module === 'historyjki') {
-                // NOWY, PANCERNY PROMPT - Twarde tagi zamiast JSONa
+                // PANCERNY PROMPT - Twarde tagi
                 return `Jesteś pedagogiem specjalnym. Napisz 'Historyjkę Społeczną' dla dziecka. Pisz w pierwszej osobie ("Ja"). Historyjka ma pomóc dziecku zrozumieć trudną sytuację.
         
-ZASADA ABSOLUTNA - MUSISZ ZWRÓCIĆ WYNIK DOKŁADNIE W TAKIM FORMACIE (użyj tych znaczników w nawiasach kwadratowych, nie dodawaj nic na początku ani na końcu!):
+ZASADA ABSOLUTNA - MUSISZ ZWRÓCIĆ WYNIK DOKŁADNIE W TAKIM FORMACIE (użyj tych znaczników w nawiasach kwadratowych):
 
 [TEKST]
 Tutaj napisz cały polski tekst historyjki. Zrób 3 akapity: 1. PROBLEM, 2. STRATEGIA, 3. EFEKT.
@@ -176,18 +175,13 @@ Tutaj napisz TYLKO JEDNO ZDANIE PO ANGIELSKU opisujące jak to samo dziecko radz
 Tutaj napisz TYLKO JEDNO ZDANIE PO ANGIELSKU opisujące szczęśliwe zakończenie dla tego samego dziecka. Np: The same young boy smiling, happy, minimalist flat vector illustration.`;
             }
             if (module === 'rymowanki') {
-                return `Jesteś wybitnym autorem bardzo prostych rymowanek dla dzieci w wieku przedszkolnym. 
-ZASADY KRYTYCZNE: 
-1. Pisz tylko i wyłącznie w układzie AABB lub ABAB. 
-2. Używaj najprostszych, bardzo dokładnych i dźwięcznych rymów. 
-3. Zachowaj równy, melodyjny rytm. Długość: max 2-3 zwrotki. 
-4. Zwróć SAM TEKST rymowanki. Absolutnie żadnych wstępów, propozycji metodycznych czy komentarzy. Żadnych referatów. Tylko wierszyk!`;
+                return `Jesteś wybitnym autorem bardzo prostych rymowanek dla dzieci w wieku przedszkolnym. Pisz w układzie AABB lub ABAB. Zachowaj melodyjny rytm. Długość: max 2-3 zwrotki. Zwróć SAM TEKST rymowanki. Absolutnie żadnych wstępów.`;
             }
             if (module === 'tus') {
-                return `Jesteś certyfikowanym trenerem TUS (Trening Umiejętności Społecznych). Na podstawie podanego problemu skonstruuj SZCZEGÓŁOWY i praktyczny scenariusz zajęć (ok. 30 minut). Struktura (użyj znaczników HTML <h2>, <p>, <ul>): 1. Powitanie i Rundka, 2. Psychoedukacja, 3. Scenki / Odgrywanie Ról, 4. Relaksacja, 5. Pożegnanie. Zwróć tylko gotowy sformatowany scenariusz. Żadnych wstępów.`;
+                return `Jesteś certyfikowanym trenerem TUS (Trening Umiejętności Społecznych). Skonstruuj SZCZEGÓŁOWY i praktyczny scenariusz zajęć (ok. 30 minut). Struktura (użyj znaczników HTML <h2>, <p>, <ul>): 1. Powitanie i Rundka, 2. Psychoedukacja, 3. Scenki, 4. Relaksacja, 5. Pożegnanie. Zwróć tylko sformatowany scenariusz.`;
             }
             if (module === 'rodzice') {
-                return `Jesteś empatycznym, asertywnym pedagogiem. Przetłumacz emocjonalny tekst na profesjonalną, formalną wiadomość e-dziennika do rodziców. Stosuj 'metodę kanapki' (pozytyw-problem-pozytyw). Zwróć tylko gotowy tekst, bez komentarza z Twojej strony.`;
+                return `Jesteś empatycznym pedagogiem. Przetłumacz emocjonalny tekst na profesjonalną, formalną wiadomość e-dziennika do rodziców. Stosuj 'metodę kanapki' (pozytyw-problem-pozytyw). Zwróć tylko gotowy tekst.`;
             }
             return "Jesteś ekspertem edukacyjnym.";
         };
@@ -271,17 +265,24 @@ ZASADY KRYTYCZNE:
                 return true;
             };
 
-            // BEZPIECZNY KONTROLER API DLA TEKSTU I OBRAZÓW (Vercel)
-            const secureApiCall = async (payload, type = 'text', customUrl = '') => {
+            // ==========================================
+            // KONTROLER API - Z DODANYM PARAMETREM PROMPT DLA VERCELA
+            // ==========================================
+            const secureApiCall = async (payload, type = 'text', customPrompt = '') => {
                 if (window.location.protocol === 'file:') throw new Error("LocalTest");
 
                 try {
                     // Wybór poprawnego endpointu na Vercelu
-                    const url = customUrl ? customUrl : (type === 'image' ? '/api/generate' : '/api/gemini');
+                    const url = type === 'image' ? '/api/generate' : '/api/gemini';
                     
+                    // KLUCZOWA ZMIANA: Dodajemy "prompt", żeby ominąć bramkę błędu w api/gemini.js
                     const requestBody = type === 'image' 
-                        ? { prompt: payload.prompt } // Uproszczony payload dla generatora grafiki
-                        : { payload: payload, type: type }; // Payload tekstowy dla Gemini
+                        ? { prompt: payload.prompt, type: 'image' } 
+                        : { 
+                            payload: payload, 
+                            type: type,
+                            prompt: customPrompt || "Generuj materiał edukacyjny" // <--- TO NAPRAWIA BŁĄD!
+                          };
 
                     const response = await fetch(url, {
                         method: 'POST',
@@ -354,12 +355,12 @@ ZASADY KRYTYCZNE:
                         finalPrompt = `Temat: ${genericInput}`;
                     }
 
-                    // 1. GENEROWANIE TEKSTU (API/GEMINI)
+                    // 1. GENEROWANIE TEKSTU (Przekazujemy finalPrompt żeby backend się nie złościł)
                     const textData = await secureApiCall({
                         contents: [{ parts: [{ text: finalPrompt }] }],
                         systemInstruction: { parts: [{ text: getSystemPrompt(activeModule, docType, naglowki, formatLength) }] },
                         generationConfig: { temperature: 0.4 }
-                    }, 'text');
+                    }, 'text', finalPrompt);
 
                     const story = textData.candidates?.[0]?.content?.parts?.[0]?.text;
                     if (!story) throw new Error("AI nie zwróciło tekstu. Spróbuj wygenerować jeszcze raz.");
@@ -367,28 +368,17 @@ ZASADY KRYTYCZNE:
                     let cleanText = story.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
                     let finalHtmlText = cleanText;
 
-                    // KULOODPORNE WYCIĄGANIE DANYCH "REŻYSERA" (Dla Historyjek)
                     let imgPrompts = [];
                     if (activeModule === 'historyjki') {
-                        // 1. Zabezpieczenie awaryjne - jeśli AI nie da tagów, używamy tych angielskich domyślnych
-                        imgPrompts = [
-                            `A beautiful borderless 2D illustration for children. A child facing a problem. Minimalist, clean, NO TEXT, NO WORDS.`,
-                            `A beautiful borderless 2D illustration for children. A child trying to cope with emotions. Minimalist, clean, NO TEXT, NO WORDS.`,
-                            `A beautiful borderless 2D illustration for children. A happy child. Minimalist, clean, NO TEXT, NO WORDS.`
-                        ];
-
-                        // 2. Parser odporny na błędy markdown
+                        // KULOODPORNE WYCIĄGANIE DANYCH (Tagi)
                         let tIdx = cleanText.indexOf('[TEKST]');
                         let i1Idx = cleanText.indexOf('[OBRAZEK1]');
                         let i2Idx = cleanText.indexOf('[OBRAZEK2]');
                         let i3Idx = cleanText.indexOf('[OBRAZEK3]');
 
                         if (tIdx !== -1 && i1Idx !== -1) {
-                            // Ekstrakcja polskiego tekstu
-                            finalHtmlText = cleanText.substring(tIdx + 7, i1Idx).trim();
-                            finalHtmlText = finalHtmlText.replace(/\n/g, '<br/>'); // dodanie przerw w HTML
+                            finalHtmlText = cleanText.substring(tIdx + 7, i1Idx).trim().replace(/\n/g, '<br/>');
                             
-                            // Ekstrakcja angielskich komend do rysowania
                             let p1 = cleanText.substring(i1Idx + 10, i2Idx !== -1 ? i2Idx : cleanText.length).trim();
                             if(p1.length > 5) imgPrompts[0] = `A beautiful borderless 2D illustration for children. ${p1}. Minimalist, clean, NO TEXT, NO WORDS.`;
                             
@@ -402,7 +392,6 @@ ZASADY KRYTYCZNE:
                                 if(p3.length > 5) imgPrompts[2] = `A beautiful borderless 2D illustration for children. ${p3}. Minimalist, clean, NO TEXT, NO WORDS.`;
                             }
                         } else {
-                            // Awaria modelu - nie dał tagów, więc traktujemy całość jako tekst
                             finalHtmlText = cleanText.replace(/\n/g, '<br/>');
                         }
                     } else if (activeModule === 'rymowanki') {
@@ -412,16 +401,15 @@ ZASADY KRYTYCZNE:
                     setGeneratedText(finalHtmlText);
                     setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
 
-                    // 2. GENEROWANIE OBRAZÓW (API/GENERATE - dla Leonadro/Fal)
-                    if (activeModule === 'historyjki') {
+                    // 2. GENEROWANIE OBRAZÓW
+                    if (activeModule === 'historyjki' && imgPrompts.length > 0) {
                         try {
                             const newImages = [];
                             for (let i = 0; i < imgPrompts.length; i++) {
-                                setLoadingMsg(`Maluję precyzyjny obrazek ${i + 1} z 3...`);
+                                setLoadingMsg(`Maluję precyzyjny obrazek ${i + 1} z ${imgPrompts.length}...`);
                                 
                                 const res = await secureApiCall({ prompt: imgPrompts[i] }, 'image');
                                 
-                                // Odbiór grafiki zalezy od tego co zwraca Twoje /api/generate
                                 if (res.predictions && res.predictions[0] && res.predictions[0].bytesBase64Encoded) {
                                     newImages.push(`data:image/png;base64,${res.predictions[0].bytesBase64Encoded}`);
                                 } else if (res.url || res.isVercelUrl) {
@@ -433,7 +421,7 @@ ZASADY KRYTYCZNE:
                             
                             setGeneratedImages(newImages);
                             if (newImages.length === 0) {
-                                setError("Serwer nie zwrócił poprawnych danych graficznych (upewnij się, że masz api/generate.js). Tekst został jednak wygenerowany.");
+                                setError("Serwer nie zwrócił poprawnych danych graficznych. Tekst został jednak wygenerowany.");
                             }
                         } catch(e) { 
                             console.error("Błąd grafiki:", e); 
@@ -444,7 +432,7 @@ ZASADY KRYTYCZNE:
                 } catch (err) {
                     if (err.message === "LocalTest") {
                         setError('Tryb lokalny uruchomiony. (Użyto na komputerze)');
-                        setGeneratedText(`[WERSJA DEMONSTRACYJNA - TEST LOKALNY]\n\nAsystent działa prawidłowo!\n\nPrzechwyciłem tekst: ${genericInput || docType}\n\nGdy umieścisz ten plik na serwerze (eduboxpro.pl), połączy się on z Twoim AI i wygeneruje poprawną treść oraz ewentualne obrazki.`);
+                        setGeneratedText(`[WERSJA DEMONSTRACYJNA - TEST LOKALNY]\n\nAsystent działa prawidłowo!\n\nGdy umieścisz ten plik na serwerze, połączy się on z Twoim AI i wygeneruje poprawną treść oraz obrazki.`);
                     } else {
                         setError('Błąd serwera głównego: ' + err.message);
                     }
@@ -462,7 +450,7 @@ ZASADY KRYTYCZNE:
             };
 
             return (
-                <div className="flex min-h-screen relative pt-16">
+                <div className="flex min-h-screen relative">
                     <div className="sidebar w-72 flex-shrink-0 flex flex-col h-[calc(100vh-4rem)] sticky top-16 print-hidden z-20">
                         <div className="p-6 border-b border-slate-800">
                             <h1 className="font-bold text-slate-300 text-sm tracking-widest uppercase">Asystent Pedagoga PRO</h1>
