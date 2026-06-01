@@ -87,7 +87,7 @@
                     <nav class="w-full z-50 glass-nav shadow-lg print-hidden bg-slate-900 border-b border-slate-800 p-4 fixed top-0">
                         <div class="max-w-7xl mx-auto flex items-center justify-between">
                             <span class="text-2xl font-black text-white">Edu<span class="text-amber-500">Box</span> <span class="text-xs text-slate-400">Pro</span></span>
-                            <span class="text-xs text-amber-500 font-bold">Podgląd (Menu awaryjne)</span>
+                            <span class="text-xs text-amber-500 font-bold">Podgląd (Brak pliku menu.html)</span>
                         </div>
                     </nav>
                 `;
@@ -146,7 +146,7 @@
                 let base = `Jesteś wybitnym pedagogiem specjalnym. Wygeneruj profesjonalny dokument urzędowy o typie: ${docType}. Używaj języka formalnego, pedagogicznego. Nie używaj gwiazdek **.\n${lengthInstruction}\n`;
                 
                 if (docType === 'gotowosc') {
-                    base += "WYTYCZNE DLA DOKUMENTU: Struktura musi BEZWZGLĘDNIE obejmować rozwój fizyczny, emocjonalno-społeczny, poznawczy (mowa, myślenie, uwaga), samodzielność oraz wskazówki dla rodziców.";
+                    base += "WYTYCZNE DLA DOKUMENTU: Struktura musi BEZWZGLĘDNIE obejmować rozwój fizyczny, emocjonalno-socialny, poznawczy (mowa, myślenie, uwaga), samodzielność oraz wskazówki dla rodziców.";
                 } else if (docType === 'ipet') {
                     base += "WYTYCZNE DLA DOKUMENTU: Struktura musi obejmować diagnozę, cele, metody, dostosowania oraz działania wspierające.";
                 }
@@ -157,22 +157,22 @@
                 return base;
             }
             if (module === 'historyjki') {
-                // PANCERNY PROMPT - Twarde tagi
+                // Nowy, PANCERNY PROMPT zapobiegający pominięciu obrazków
                 return `Jesteś pedagogiem specjalnym. Napisz 'Historyjkę Społeczną' dla dziecka. Pisz w pierwszej osobie ("Ja"). Historyjka ma pomóc dziecku zrozumieć trudną sytuację.
         
-ZASADA ABSOLUTNA - MUSISZ ZWRÓCIĆ WYNIK DOKŁADNIE W TAKIM FORMACIE (użyj tych znaczników w nawiasach kwadratowych):
+ZASADA ABSOLUTNA - MUSISZ ZWRÓCIĆ WYNIK UŻYWAJĄC TYCH ZNACZNIKÓW:
 
 [TEKST]
-Tutaj napisz cały polski tekst historyjki. Zrób 3 akapity: 1. PROBLEM, 2. STRATEGIA, 3. EFEKT.
+Tutaj napisz cały polski tekst historyjki (podzielony na akapity).
 
 [OBRAZEK1]
-Tutaj napisz TYLKO JEDNO ZDANIE PO ANGIELSKU opisujące wygląd dziecka i początkowy problem. Np: A 5 year old boy with blonde hair, crying, minimalist flat vector illustration.
+Opis po ANGIELSKU pierwszego obrazka (Problem). Opisz wiek, płeć i wygląd dziecka. Np: A 5 year old boy with blonde hair, crying. NO TEXT.
 
 [OBRAZEK2]
-Tutaj napisz TYLKO JEDNO ZDANIE PO ANGIELSKU opisujące jak to samo dziecko radzi sobie z problemem (strategia). Np: The same young boy taking a deep breath, calm, minimalist flat vector illustration.
+Opis po ANGIELSKU drugiego obrazka (Strategia radzenia sobie). Ten sam bohater co wcześniej. NO TEXT.
 
 [OBRAZEK3]
-Tutaj napisz TYLKO JEDNO ZDANIE PO ANGIELSKU opisujące szczęśliwe zakończenie dla tego samego dziecka. Np: The same young boy smiling, happy, minimalist flat vector illustration.`;
+Opis po ANGIELSKU trzeciego obrazka (Pozytywny Efekt). Ten sam bohater, uśmiechnięty i spokojny. NO TEXT.`;
             }
             if (module === 'rymowanki') {
                 return `Jesteś wybitnym autorem bardzo prostych rymowanek dla dzieci w wieku przedszkolnym. Pisz w układzie AABB lub ABAB. Zachowaj melodyjny rytm. Długość: max 2-3 zwrotki. Zwróć SAM TEKST rymowanki. Absolutnie żadnych wstępów.`;
@@ -212,7 +212,6 @@ Tutaj napisz TYLKO JEDNO ZDANIE PO ANGIELSKU opisujące szczęśliwe zakończeni
         function App() {
             const [activeModule, setActiveModule] = useState('dokumenty');
             
-            // GLOBALNE SPRAWDZANIE PRO
             const [isPro, setIsPro] = useState(() => {
                 return localStorage.getItem('eduboxProStatus') === 'active' || localStorage.getItem('eduAwansPremium') === 'active';
             });
@@ -265,23 +264,18 @@ Tutaj napisz TYLKO JEDNO ZDANIE PO ANGIELSKU opisujące szczęśliwe zakończeni
                 return true;
             };
 
-            // ==========================================
-            // KONTROLER API - Z DODANYM PARAMETREM PROMPT DLA VERCELA
-            // ==========================================
             const secureApiCall = async (payload, type = 'text', customPrompt = '') => {
                 if (window.location.protocol === 'file:') throw new Error("LocalTest");
 
                 try {
-                    // Wybór poprawnego endpointu na Vercelu
                     const url = type === 'image' ? '/api/generate' : '/api/gemini';
                     
-                    // KLUCZOWA ZMIANA: Dodajemy "prompt", żeby ominąć bramkę błędu w api/gemini.js
                     const requestBody = type === 'image' 
                         ? { prompt: payload.prompt, type: 'image' } 
                         : { 
                             payload: payload, 
                             type: type,
-                            prompt: customPrompt || "Generuj materiał edukacyjny" // <--- TO NAPRAWIA BŁĄD!
+                            prompt: customPrompt || "Generuj materiał edukacyjny"
                           };
 
                     const response = await fetch(url, {
@@ -292,7 +286,7 @@ Tutaj napisz TYLKO JEDNO ZDANIE PO ANGIELSKU opisujące szczęśliwe zakończeni
 
                     if (!response.ok) {
                         const errData = await response.json().catch(() => ({}));
-                        throw new Error(`Błąd Vercela (${type}): ${errData.error || response.statusText}`);
+                        throw new Error(`Błąd serwera Vercel (${type}): ${errData.error || response.statusText}`);
                     }
                     return await response.json();
                 } catch (err) {
@@ -355,7 +349,7 @@ Tutaj napisz TYLKO JEDNO ZDANIE PO ANGIELSKU opisujące szczęśliwe zakończeni
                         finalPrompt = `Temat: ${genericInput}`;
                     }
 
-                    // 1. GENEROWANIE TEKSTU (Przekazujemy finalPrompt żeby backend się nie złościł)
+                    // GENEROWANIE TEKSTU
                     const textData = await secureApiCall({
                         contents: [{ parts: [{ text: finalPrompt }] }],
                         systemInstruction: { parts: [{ text: getSystemPrompt(activeModule, docType, naglowki, formatLength) }] },
@@ -368,31 +362,42 @@ Tutaj napisz TYLKO JEDNO ZDANIE PO ANGIELSKU opisujące szczęśliwe zakończeni
                     let cleanText = story.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
                     let finalHtmlText = cleanText;
 
-                    let imgPrompts = [];
+                    // Domyślne prompty graficzne (awaryjne, jeśli AI nie użyje tagów)
+                    let imgPrompts = [
+                        `2D Flat vector illustration, children's book style. Scene showing the problem: ${genericInput}. Soft pastel colors. NO TEXT.`,
+                        `2D Flat vector illustration, children's book style. Scene showing coping strategy for: ${genericInput}. Soft blue colors. NO TEXT.`,
+                        `2D Flat vector illustration, children's book style. Scene showing success and happiness after overcoming: ${genericInput}. Bright colors. NO TEXT.`
+                    ];
+
+                    // KULOODPORNE WYCIĄGANIE DANYCH DO OBRAZKÓW
                     if (activeModule === 'historyjki') {
-                        // KULOODPORNE WYCIĄGANIE DANYCH (Tagi)
-                        let tIdx = cleanText.indexOf('[TEKST]');
                         let i1Idx = cleanText.indexOf('[OBRAZEK1]');
                         let i2Idx = cleanText.indexOf('[OBRAZEK2]');
                         let i3Idx = cleanText.indexOf('[OBRAZEK3]');
 
-                        if (tIdx !== -1 && i1Idx !== -1) {
-                            finalHtmlText = cleanText.substring(tIdx + 7, i1Idx).trim().replace(/\n/g, '<br/>');
+                        // Jeśli AI w ogóle użyło tagów, wycinamy je
+                        if (i1Idx !== -1) {
+                            // Bierzemy wszystko do pierwszego tagu jako tekst główny
+                            finalHtmlText = cleanText.substring(0, i1Idx).replace(/\[TEKST\]/g, '').trim().replace(/\n/g, '<br/>');
+                            
+                            // Resetujemy i podmieniamy na własne z AI
+                            imgPrompts = [];
                             
                             let p1 = cleanText.substring(i1Idx + 10, i2Idx !== -1 ? i2Idx : cleanText.length).trim();
-                            if(p1.length > 5) imgPrompts[0] = `A beautiful borderless 2D illustration for children. ${p1}. Minimalist, clean, NO TEXT, NO WORDS.`;
+                            if(p1.length > 5) imgPrompts.push(`A beautiful borderless 2D illustration for children. ${p1}. Minimalist, clean, NO TEXT, NO WORDS.`);
                             
                             if (i2Idx !== -1) {
                                 let p2 = cleanText.substring(i2Idx + 10, i3Idx !== -1 ? i3Idx : cleanText.length).trim();
-                                if(p2.length > 5) imgPrompts[1] = `A beautiful borderless 2D illustration for children. ${p2}. Minimalist, clean, NO TEXT, NO WORDS.`;
+                                if(p2.length > 5) imgPrompts.push(`A beautiful borderless 2D illustration for children. ${p2}. Minimalist, clean, NO TEXT, NO WORDS.`);
                             }
                             
                             if (i3Idx !== -1) {
                                 let p3 = cleanText.substring(i3Idx + 10).trim();
-                                if(p3.length > 5) imgPrompts[2] = `A beautiful borderless 2D illustration for children. ${p3}. Minimalist, clean, NO TEXT, NO WORDS.`;
+                                if(p3.length > 5) imgPrompts.push(`A beautiful borderless 2D illustration for children. ${p3}. Minimalist, clean, NO TEXT, NO WORDS.`);
                             }
                         } else {
-                            finalHtmlText = cleanText.replace(/\n/g, '<br/>');
+                            // Fallback gdy AI zapomniało tagów - czyścimy ewentualny tag TEKST i zostawiamy prompty domyślne
+                            finalHtmlText = cleanText.replace(/\[TEKST\]/g, '').replace(/\n/g, '<br/>');
                         }
                     } else if (activeModule === 'rymowanki') {
                         finalHtmlText = finalHtmlText.replace(/\n/g, '<br/>');
@@ -401,7 +406,6 @@ Tutaj napisz TYLKO JEDNO ZDANIE PO ANGIELSKU opisujące szczęśliwe zakończeni
                     setGeneratedText(finalHtmlText);
                     setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
 
-                    // 2. GENEROWANIE OBRAZÓW
                     if (activeModule === 'historyjki' && imgPrompts.length > 0) {
                         try {
                             const newImages = [];
@@ -410,31 +414,39 @@ Tutaj napisz TYLKO JEDNO ZDANIE PO ANGIELSKU opisujące szczęśliwe zakończeni
                                 
                                 const res = await secureApiCall({ prompt: imgPrompts[i] }, 'image');
                                 
+                                // Tolerancyjne sprawdzanie odpowiedzi z różnych modeli (DALL-E, Leonardo, Fal)
                                 if (res.predictions && res.predictions[0] && res.predictions[0].bytesBase64Encoded) {
                                     newImages.push(`data:image/png;base64,${res.predictions[0].bytesBase64Encoded}`);
-                                } else if (res.url || res.isVercelUrl) {
-                                    newImages.push(res.url || res.isVercelUrl);
-                                } else if (res.image || res.imageUrl) {
-                                    newImages.push(res.image || res.imageUrl);
+                                } else if (res.url) {
+                                    newImages.push(res.url);
+                                } else if (res.isVercelUrl) {
+                                    newImages.push(res.isVercelUrl);
+                                } else if (res.image) {
+                                    newImages.push(res.image);
+                                } else if (res.imageUrl) {
+                                    newImages.push(res.imageUrl);
+                                } else if (res.images && res.images[0] && res.images[0].url) {
+                                    newImages.push(res.images[0].url);
+                                } else if (res.data && res.data[0] && res.data[0].url) {
+                                    newImages.push(res.data[0].url); // Format DALL-E (OpenAI)
+                                } else {
+                                    throw new Error("Nie znaleziono linku do obrazka w odpowiedzi serwera.");
                                 }
                             }
                             
                             setGeneratedImages(newImages);
-                            if (newImages.length === 0) {
-                                setError("Serwer nie zwrócił poprawnych danych graficznych. Tekst został jednak wygenerowany.");
-                            }
                         } catch(e) { 
                             console.error("Błąd grafiki:", e); 
-                            setError(`Ostrzeżenie generatora grafiki: ${e.message}. Sam tekst został poprawnie wygenerowany.`);
+                            setError(`Ostrzeżenie: Nie udało się narysować obrazków (${e.message}). Sam tekst został jednak wygenerowany poprawnie poniżej.`);
                         }
                     }
 
                 } catch (err) {
                     if (err.message === "LocalTest") {
-                        setError('Tryb lokalny uruchomiony. (Użyto na komputerze)');
-                        setGeneratedText(`[WERSJA DEMONSTRACYJNA - TEST LOKALNY]\n\nAsystent działa prawidłowo!\n\nGdy umieścisz ten plik na serwerze, połączy się on z Twoim AI i wygeneruje poprawną treść oraz obrazki.`);
+                        setError('Tryb lokalny uruchomiony. (Użyto na komputerze z dysku)');
+                        setGeneratedText(`[WERSJA DEMONSTRACYJNA - TEST LOKALNY]\n\nAsystent działa prawidłowo!\n\nGdy umieścisz ten plik na serwerze (eduboxpro.pl), połączy się on z Twoim AI i wygeneruje poprawną treść oraz obrazki.\n\nTwoje darmowe użycia na dziś uległy zmniejszeniu, abyś mógł sprawdzić jak to działa.`);
                     } else {
-                        setError('Błąd serwera głównego: ' + err.message);
+                        setError('Błąd aplikacji: ' + err.message);
                     }
                 } finally {
                     setIsGenerating(false);
@@ -463,7 +475,7 @@ Tutaj napisz TYLKO JEDNO ZDANIE PO ANGIELSKU opisujące szczęśliwe zakończeni
                                 
                                 {!isPro ? (
                                     <div className="bg-slate-800/50 border border-slate-700 p-4 rounded-xl text-center">
-                                        <div className="text-xs text-slate-400 mb-2">Brak statusu PRO. Zużywasz darmowe limity. Wpisz kod na górnym pasku, aby odblokować.</div>
+                                        <div className="text-xs text-slate-400 mb-2">Brak statusu PRO. Zużywasz darmowe limity. Wpisz kod na górnym pasku w menu, aby odblokować.</div>
                                     </div>
                                 ) : (
                                     <div className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 p-4 rounded-xl flex items-center gap-4 shadow-inner">
@@ -493,7 +505,7 @@ Tutaj napisz TYLKO JEDNO ZDANIE PO ANGIELSKU opisujące szczęśliwe zakończeni
                             <div className="bg-red-900/40 border border-red-500/50 rounded-2xl p-6 text-center mb-8 shadow-lg fade-in">
                                 <h3 className="text-xl sm:text-2xl font-black text-white mb-2">Limit dzienny osiągnięty (5/5)</h3>
                                 <p className="text-slate-300 mb-4 text-sm sm:text-base">
-                                    Wykorzystałeś darmowe użycia. Aby korzystać dalej, wpisz kod PRO na górnym pasku.
+                                    Wykorzystałeś darmowe użycia. Aby korzystać dalej, wesprzyj projekt i wpisz kod PRO na górnym pasku.
                                 </p>
                             </div>
                         )}
