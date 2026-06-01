@@ -161,7 +161,7 @@
                 return base;
             }
             if (module === 'historyjki') {
-                return `Jesteś pedagogiem specjalnym. Napisz 'Historyjkę Społeczną' dla dziecka na podany temat. Pisz w pierwszej osobie ("Ja"). Podziel tekst na 3 akapity: 1. PROBLEM, 2. STRATEGIA (jak sobie radzić), 3. POZYTYWNY EFEKT. Zwróć tylko i wyłącznie sam tekst, bez uwag dla ilustratora.`;
+                return `Jesteś pedagogiem specjalnym. Napisz 'Historyjkę Społeczną' dla dziecka na podany temat. Pisz w pierwszej osobie ("Ja"). Podziel tekst na 3 akapity: 1. PROBLEM, 2. STRATEGIA (jak sobie radzić), 3. POZYTYWNY EFEKT. Zwróć tylko i wyłącznie sam tekst w języku polskim, bez uwag dla ilustratora.`;
             }
             if (module === 'rymowanki') {
                 return `Jesteś wybitnym autorem bardzo prostych rymowanek dla dzieci w wieku przedszkolnym. Pisz w układzie AABB lub ABAB. Zachowaj melodyjny rytm. Długość: max 2-3 zwrotki. Zwróć SAM TEKST rymowanki. Absolutnie żadnych wstępów.`;
@@ -253,62 +253,6 @@
                 return true;
             };
 
-            const secureTextCall = async (payload, customPrompt = '') => {
-                if (window.location.protocol === 'file:') throw new Error("LocalTest");
-
-                try {
-                    const response = await fetch('/api/gemini', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ 
-                            payload: payload, 
-                            type: 'text',
-                            prompt: customPrompt || "Zignoruj mnie"
-                        })
-                    });
-
-                    if (!response.ok) {
-                        const errData = await response.json().catch(() => ({}));
-                        throw new Error(`Błąd serwera Vercel (text): ${errData.error || response.statusText}`);
-                    }
-                    return await response.json();
-                } catch (err) {
-                    throw new Error(`${err.message}`);
-                }
-            };
-
-            const secureImageCall = async (prompt) => {
-                if (window.location.protocol === 'file:') throw new Error("LocalTest");
-
-                try {
-                    // Kierujemy się do Twojego sprawdzonego pliku od Fal.ai, tak jak w EduKomiks
-                    const response = await fetch('/api/generate', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ 
-                            prompt: prompt,
-                            aspect_ratio: '1:1' 
-                        })
-                    });
-
-                    if (!response.ok) {
-                        const errData = await response.json().catch(() => ({}));
-                        throw new Error(`Błąd generatora obrazów: ${errData.message || response.statusText}`);
-                    }
-                    
-                    const data = await response.json();
-                    
-                    if (data.imageUrl) {
-                        return data.imageUrl;
-                    } else {
-                        throw new Error("Pusta odpowiedź z serwera wizualnego.");
-                    }
-                } catch (err) {
-                    throw new Error(`${err.message}`);
-                }
-            };
-
-
             const handleFileUpload = async (e) => {
                 const files = Array.from(e.target.files);
                 if (files.length === 0) return;
@@ -338,6 +282,11 @@
             };
 
             const handleGenerate = async () => {
+                if (window.location.hostname === '' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                    setError("Testujesz aplikację na dysku lokalnym. Mechanizmy AI działają tylko po wgraniu plików na serwer Vercel.");
+                    return;
+                }
+
                 if (activeModule !== 'dokumenty' && !genericInput.trim()) { setError("Wpisz temat lub problem w puste pole!"); return; }
                 
                 if (!updateAndCheckLimit()) return;
@@ -346,7 +295,7 @@
                 setError(''); 
                 setGeneratedText(''); 
                 setGeneratedImages([]);
-                setLoadingMsg('Analizuję zapytanie i przygotowuję treść...');
+                setLoadingMsg('Analizuję zapytanie i piszę treść...');
 
                 try {
                     let finalPrompt = "";
@@ -364,17 +313,24 @@
                         finalPrompt = `Temat: ${genericInput}`;
                     }
 
-                    // 1. ZAPYTANIE GŁÓWNE (PISANIE TEKSTU PRZEZ GEMINI)
-                    const textData = await secureApiCall({
-                        contents: [{ parts: [{ text: finalPrompt }] }],
-                        systemInstruction: { parts: [{ text: getSystemPrompt(activeModule, docType, naglowki, formatLength) }] },
-                        generationConfig: { temperature: 0.4 }
-                    }, 'text');
+                    // 1. ZAPYTANIE GŁÓWNE (PISANIE TEKSTU PRZEZ TWOJE API CHAT.JS z OpenAI)
+                    const textPayload = {
+                        system: getSystemPrompt(activeModule, docType, naglowki, formatLength),
+                        prompt: finalPrompt,
+                        temperature: 0.4
+                    };
 
-                    const story = textData.candidates?.[0]?.content?.parts?.[0]?.text;
-                    if (!story) throw new Error("AI nie zwróciło tekstu. Spróbuj wygenerować jeszcze raz.");
+                    const textRes = await fetch('/api/chat', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(textPayload)
+                    });
                     
-                    let cleanText = story.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+                    if (!textRes.ok) throw new Error("Błąd podczas generowania tekstu.");
+                    const textData = await textRes.json();
+
+                    let cleanText = textData.text || "";
+                    cleanText = cleanText.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
                     
                     if (activeModule === 'rymowanki' || activeModule === 'historyjki') {
                         cleanText = cleanText.replace(/\n/g, '<br/>');
@@ -383,28 +339,34 @@
                     setGeneratedText(cleanText);
                     setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
 
-                    // 2. NOWY, NIEZALEŻNY OBIEG DLA OBRAZKÓW (Tylko dla Historyjek)
+                    // 2. NIEZALEŻNY OBIEG DLA OBRAZKÓW W HISTORYJKACH
                     if (activeModule === 'historyjki') {
                         setLoadingMsg('Opracowuję precyzyjne instrukcje dla ilustratora...');
                         
                         try {
-                            // Pytamy Gemini, żeby wymyśliło czyste, ANGIELSKIE prompty, OPARTE NA 3 ETAPACH (Problem, Strategia, Efekt) i narzuciło stałego bohatera.
-                            const imagePromptsInstruction = `Based on the topic "${genericInput}", write 3 English descriptions for an illustrator drawing a children's book. 
+                            // Pytamy API chat.js, żeby wymyśliło czyste, ANGIELSKIE prompty i zwróciło JSON.
+                            const promptPayload = {
+                                system: "You are an expert prompt engineer for an illustrator. Follow instructions exactly.",
+                                prompt: `Based on the children's story topic "${genericInput}", write 3 English descriptions for an illustrator drawing a children's book. 
 CRITICAL RULES:
 - The illustrations must follow a sequence: [1. The Problem], [2. The Coping Strategy], [3. The Positive Effect].
-- You MUST define ONE specific character (e.g. "a 5-year-old girl with brown hair") and use this exact same character description in ALL THREE prompts to maintain consistency.
-- NO dialogue, NO quotes, NO names, NO speech bubbles.
-- Keep it simple, e.g. "Scene 1: A 5-year-old girl with brown hair looking scared out the window at a storm".
-Format output as a JSON array of 3 strings: ["prompt1", "prompt2", "prompt3"]`;
+- You MUST define ONE specific character at the beginning (e.g. "a 5-year-old girl with brown hair wearing a blue shirt") and use this EXACT SAME character description in ALL THREE prompts to maintain visual consistency.
+- DO NOT use names. DO NOT include any text, speech bubbles, or dialogue in the image descriptions.
+Format output strictly as a JSON array of 3 strings: ["prompt1", "prompt2", "prompt3"]`,
+                                format: "json",
+                                temperature: 0.2
+                            };
 
-                            const promptsData = await secureApiCall({
-                                contents: [{ parts: [{ text: imagePromptsInstruction }] }],
-                                generationConfig: { temperature: 0.2 }
-                            }, 'text');
+                            const promptRes = await fetch('/api/chat', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(promptPayload)
+                            });
 
-                            let promptsText = promptsData.candidates?.[0]?.content?.parts?.[0]?.text || "[]";
+                            if (!promptRes.ok) throw new Error("Błąd tworzenia promptów dla grafiki.");
+                            const promptData = await promptRes.json();
                             
-                            // Wycinamy ewentualne otoczki markdown
+                            let promptsText = promptData.text || "[]";
                             promptsText = promptsText.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
                             if(promptsText.startsWith('```json')) promptsText = promptsText.substring(7);
                             if(promptsText.endsWith('```')) promptsText = promptsText.substring(0, promptsText.length - 3);
@@ -414,31 +376,29 @@ Format output as a JSON array of 3 strings: ["prompt1", "prompt2", "prompt3"]`;
                             
                             if (Array.isArray(parsedPrompts) && parsedPrompts.length === 3) {
                                 const newImages = [];
-                                // Do każdego z promptów dodajemy żelazną klauzulę o braku tekstu dla modelu Flux
-                                const antiTextClause = ", ABSOLUTELY NO TEXT, NO LETTERS, NO WORDS, NO BUBBLES.";
-                                const styleClause = "High quality 2D flat vector illustration, colorful children's book style. ";
+                                // Do każdego z promptów dodajemy żelazną klauzulę o braku tekstu i narzucamy styl ilustracji dziecięcej 2D
+                                const antiTextClause = ", ABSOLUTELY NO TEXT, NO LETTERS, NO WORDS, NO SPEECH BUBBLES, flat 2d children book vector illustration.";
                                 
                                 for (let i = 0; i < 3; i++) {
                                     setLoadingMsg(`Maluję obrazek (${i + 1} z 3) - ${i === 0 ? 'Problem' : i === 1 ? 'Strategia' : 'Efekt'}...`);
-                                    const finalImagePrompt = styleClause + parsedPrompts[i] + antiTextClause;
+                                    const finalImagePrompt = parsedPrompts[i] + antiTextClause;
                                     
-                                    // Uderzamy bezpośrednio do Twojego endpointu na fal.run, tak jak w EduKomiksie!
-                                    const res = await fetch('/api/generate', {
+                                    // Uderzamy prosto do działającego u Ciebie pliku /api/generate (który pod spodem ma Fal.ai flux/schnell)
+                                    const imgRes = await fetch('/api/generate', {
                                         method: 'POST',
                                         headers: { 'Content-Type': 'application/json' },
                                         body: JSON.stringify({ 
                                             prompt: finalImagePrompt,
-                                            aspect_ratio: '1:1' // Wymuszenie kwadratu
+                                            aspect_ratio: '1:1' 
                                         })
                                     });
 
-                                    if (!res.ok) {
-                                        const errData = await res.json().catch(() => ({}));
-                                        throw new Error(errData.message || "Błąd serwera wizualnego");
+                                    if (!imgRes.ok) {
+                                        const errData = await imgRes.json().catch(() => ({}));
+                                        throw new Error(errData.message || "Błąd serwera wizualnego fal.ai");
                                     }
 
-                                    const imgData = await res.json();
-                                    
+                                    const imgData = await imgRes.json();
                                     if (imgData.imageUrl) {
                                         newImages.push(imgData.imageUrl);
                                     }
@@ -452,12 +412,7 @@ Format output as a JSON array of 3 strings: ["prompt1", "prompt2", "prompt3"]`;
                     }
 
                 } catch (err) {
-                    if (err.message === "LocalTest") {
-                        setError('Tryb lokalny.');
-                        setGeneratedText(`[TEST LOKALNY]\n\nTestujesz lokalnie. Po wgraniu na serwer wszystko zadziała.`);
-                    } else {
-                        setError('Błąd: ' + err.message);
-                    }
+                    setError('Błąd: ' + err.message);
                 } finally {
                     setIsGenerating(false);
                     setLoadingMsg('');
