@@ -161,7 +161,6 @@
                 return base;
             }
             if (module === 'historyjki') {
-                // Całkowita likwidacja JSON-a i wymuszenie znaczników, aby nie zepsuć strony "chińskimi napisami"
                 return `Jesteś pedagogiem specjalnym. Napisz 'Historyjkę Społeczną' dla dziecka. Pisz w pierwszej osobie ("Ja"). Historyjka ma pomóc dziecku zrozumieć trudną sytuację.
         
 ZASADA ABSOLUTNA - MUSISZ ZWRÓCIĆ WYNIK UŻYWAJĄC TYCH ZNACZNIKÓW. NIE UŻYWAJ JSONA.
@@ -268,31 +267,62 @@ Tutaj napisz cały polski tekst historyjki (podzielony na akapity).
                 return true;
             };
 
-            // INTELELIGENTNE API - TŁUMACZ DLA OBRAZKÓW W LOCIE W VERCELU (api/gemini) LUB api/generate
-            const secureApiCall = async (payload, type = 'text', customPrompt = '') => {
+            const secureTextCall = async (payload, customPrompt = '') => {
                 if (window.location.protocol === 'file:') throw new Error("LocalTest");
 
                 try {
-                    // Kierujemy obrazki do api/gemini tak jak chciał Vercel, ALE z parametrem prompt, aby przejsc przez ich zaporę i użyć translatora, który tam wczoraj stworzyliśmy
                     const response = await fetch('/api/gemini', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ 
                             payload: payload, 
-                            type: type,
-                            prompt: customPrompt || "Zignoruj mnie, to tylko by przejsc przez firewalla na vercelu"
+                            type: 'text',
+                            prompt: customPrompt || "Zignoruj mnie"
                         })
                     });
 
                     if (!response.ok) {
                         const errData = await response.json().catch(() => ({}));
-                        throw new Error(`Błąd serwera Vercel (${type}): ${errData.error || response.statusText}`);
+                        throw new Error(`Błąd serwera Vercel (text): ${errData.error || response.statusText}`);
                     }
                     return await response.json();
                 } catch (err) {
                     throw new Error(`${err.message}`);
                 }
             };
+
+            // ZUPEŁNIE NOWA FUNKCJA DO GRAFIKI - KORZYSTA Z API/GENERATE I FAL.AI (Zgodnie z Twoim plikiem)
+            const secureImageCall = async (prompt) => {
+                if (window.location.protocol === 'file:') throw new Error("LocalTest");
+
+                try {
+                    // Kierujemy ruch do /api/generate - tego samego pliku, który tak wspaniale obsługuje EduKomiks!
+                    const response = await fetch('/api/generate', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                            prompt: prompt,
+                            aspect_ratio: '1:1' // Wymuszenie kwadratu
+                        })
+                    });
+
+                    if (!response.ok) {
+                        const errData = await response.json().catch(() => ({}));
+                        throw new Error(`Błąd Fal.ai: ${errData.message || response.statusText}`);
+                    }
+                    
+                    const data = await response.json();
+                    
+                    if (data.imageUrl) {
+                        return data.imageUrl;
+                    } else {
+                        throw new Error("Pusta odpowiedź z serwera graficznego.");
+                    }
+                } catch (err) {
+                    throw new Error(`${err.message}`);
+                }
+            };
+
 
             const handleFileUpload = async (e) => {
                 const files = Array.from(e.target.files);
@@ -349,12 +379,12 @@ Tutaj napisz cały polski tekst historyjki (podzielony na akapity).
                         finalPrompt = `Temat: ${genericInput}`;
                     }
 
-                    // 1. GENEROWANIE TEKSTU
-                    const textData = await secureApiCall({
+                    // 1. GENEROWANIE TEKSTU PRZEZ GEMINI
+                    const textData = await secureTextCall({
                         contents: [{ parts: [{ text: finalPrompt }] }],
                         systemInstruction: { parts: [{ text: getSystemPrompt(activeModule, docType, naglowki, formatLength) }] },
                         generationConfig: { temperature: 0.4 }
-                    }, 'text', finalPrompt);
+                    }, finalPrompt);
 
                     const story = textData.candidates?.[0]?.content?.parts?.[0]?.text;
                     if (!story) throw new Error("AI nie zwróciło tekstu. Spróbuj wygenerować jeszcze raz.");
@@ -362,14 +392,12 @@ Tutaj napisz cały polski tekst historyjki (podzielony na akapity).
                     let cleanText = story.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
                     let finalHtmlText = cleanText;
 
-                    // Domyślne, puste prompty dla grafiki
                     let imgPrompts = [
                         `2D vector illustration, children's book style. Scene showing a sad child facing the problem: ${genericInput}. Soft pastel colors. NO TEXT, NO LETTERS.`,
                         `2D vector illustration, children's book style. Scene showing a child calming down and using coping strategy for: ${genericInput}. Soft blue colors. NO TEXT, NO LETTERS.`,
                         `2D vector illustration, children's book style. Scene showing success and a happy child after overcoming: ${genericInput}. Bright colors. NO TEXT, NO LETTERS.`
                     ];
 
-                    // KULOODPORNE WYCIĄGANIE DANYCH Z TAGÓW (Bez JSONa)
                     if (activeModule === 'historyjki') {
                         let i1Idx = cleanText.indexOf('[OBRAZEK1]');
                         let i2Idx = cleanText.indexOf('[OBRAZEK2]');
@@ -404,28 +432,21 @@ Tutaj napisz cały polski tekst historyjki (podzielony na akapity).
                     setGeneratedText(finalHtmlText);
                     setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
 
-                    // 2. GENEROWANIE OBRAZÓW (Tylko dla Historyjek) - z Tłumaczeniem na Vercelu
+                    // 2. GENEROWANIE OBRAZÓW (Tylko dla Historyjek) - PODŁĄCZONE DO FAL.AI
                     if (activeModule === 'historyjki' && imgPrompts.length > 0) {
                         try {
                             const newImages = [];
                             for (let i = 0; i < imgPrompts.length; i++) {
-                                setLoadingMsg(`Maluję precyzyjny obrazek ${i + 1} z ${imgPrompts.length}...`);
+                                setLoadingMsg(`Maluję obrazek za pomocą Fal.ai (${i + 1} z ${imgPrompts.length})...`);
                                 
-                                // WYSYŁAMY BEZPOŚREDNIO DO api/gemini (tam jest wbudowany silnik Stability)
-                                const res = await secureApiCall({ prompt: imgPrompts[i] }, 'image', imgPrompts[i]);
-                                
-                                if (res.predictions && res.predictions[0] && res.predictions[0].bytesBase64Encoded) {
-                                    newImages.push(`data:image/png;base64,${res.predictions[0].bytesBase64Encoded}`);
-                                } else if (res.url) {
-                                    newImages.push(res.url);
-                                } else {
-                                    throw new Error("Pusta odpowiedź serwera wizualnego.");
-                                }
+                                // Wywołujemy naszą nową, niezawodną metodę
+                                const imageUrl = await secureImageCall(imgPrompts[i]);
+                                newImages.push(imageUrl);
                             }
                             
                             setGeneratedImages(newImages);
                         } catch(e) { 
-                            console.error("Błąd grafiki:", e); 
+                            console.error("Błąd grafiki (Fal.ai):", e); 
                             setError(`Zignorowano błąd obrazków: ${e.message}. Sam tekst został wygenerowany poprawnie poniżej.`);
                         }
                     }
