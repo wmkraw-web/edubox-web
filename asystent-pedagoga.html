@@ -157,7 +157,6 @@
                 return base;
             }
             if (module === 'historyjki') {
-                // Nowy, PANCERNY PROMPT zapobiegający pominięciu obrazków
                 return `Jesteś pedagogiem specjalnym. Napisz 'Historyjkę Społeczną' dla dziecka. Pisz w pierwszej osobie ("Ja"). Historyjka ma pomóc dziecku zrozumieć trudną sytuację.
         
 ZASADA ABSOLUTNA - MUSISZ ZWRÓCIĆ WYNIK UŻYWAJĄC TYCH ZNACZNIKÓW:
@@ -166,13 +165,13 @@ ZASADA ABSOLUTNA - MUSISZ ZWRÓCIĆ WYNIK UŻYWAJĄC TYCH ZNACZNIKÓW:
 Tutaj napisz cały polski tekst historyjki (podzielony na akapity).
 
 [OBRAZEK1]
-Opis po ANGIELSKU pierwszego obrazka (Problem). Opisz wiek, płeć i wygląd dziecka. Np: A 5 year old boy with blonde hair, crying. NO TEXT.
+(ENGLISH ONLY) English description of the FIRST scene (The Problem). Example: A 5 year old boy with blonde hair, crying in classroom. NO TEXT.
 
 [OBRAZEK2]
-Opis po ANGIELSKU drugiego obrazka (Strategia radzenia sobie). Ten sam bohater co wcześniej. NO TEXT.
+(ENGLISH ONLY) English description of the SECOND scene (Coping strategy). Same character. NO TEXT.
 
 [OBRAZEK3]
-Opis po ANGIELSKU trzeciego obrazka (Pozytywny Efekt). Ten sam bohater, uśmiechnięty i spokojny. NO TEXT.`;
+(ENGLISH ONLY) English description of the THIRD scene (Positive Effect). Same character, smiling. NO TEXT.`;
             }
             if (module === 'rymowanki') {
                 return `Jesteś wybitnym autorem bardzo prostych rymowanek dla dzieci w wieku przedszkolnym. Pisz w układzie AABB lub ABAB. Zachowaj melodyjny rytm. Długość: max 2-3 zwrotki. Zwróć SAM TEKST rymowanki. Absolutnie żadnych wstępów.`;
@@ -362,11 +361,11 @@ Opis po ANGIELSKU trzeciego obrazka (Pozytywny Efekt). Ten sam bohater, uśmiech
                     let cleanText = story.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
                     let finalHtmlText = cleanText;
 
-                    // Domyślne prompty graficzne (awaryjne, jeśli AI nie użyje tagów)
+                    // Domyślne prompty graficzne (awaryjne, czysty angielski bez polskich wstawek)
                     let imgPrompts = [
-                        `2D Flat vector illustration, children's book style. Scene showing the problem: ${genericInput}. Soft pastel colors. NO TEXT.`,
-                        `2D Flat vector illustration, children's book style. Scene showing coping strategy for: ${genericInput}. Soft blue colors. NO TEXT.`,
-                        `2D Flat vector illustration, children's book style. Scene showing success and happiness after overcoming: ${genericInput}. Bright colors. NO TEXT.`
+                        `2D Flat vector illustration, children's book style. Scene showing a sad child facing a problem. Soft pastel colors. ABSOLUTELY NO TEXT, NO LETTERS, NO WORDS.`,
+                        `2D Flat vector illustration, children's book style. Scene showing a child calming down. Soft blue colors. ABSOLUTELY NO TEXT, NO LETTERS, NO WORDS.`,
+                        `2D Flat vector illustration, children's book style. Scene showing success and a happy child. Bright colors. ABSOLUTELY NO TEXT, NO LETTERS, NO WORDS.`
                     ];
 
                     // KULOODPORNE WYCIĄGANIE DANYCH DO OBRAZKÓW
@@ -382,21 +381,23 @@ Opis po ANGIELSKU trzeciego obrazka (Pozytywny Efekt). Ten sam bohater, uśmiech
                             
                             // Resetujemy i podmieniamy na własne z AI
                             imgPrompts = [];
+                            const baseStyle = "High quality 2D children's book illustration. ";
+                            const noText = ". ABSOLUTELY NO TEXT, NO LETTERS, NO WORDS, NO SPEECH BUBBLES.";
                             
-                            let p1 = cleanText.substring(i1Idx + 10, i2Idx !== -1 ? i2Idx : cleanText.length).trim();
-                            if(p1.length > 5) imgPrompts.push(`A beautiful borderless 2D illustration for children. ${p1}. Minimalist, clean, NO TEXT, NO WORDS.`);
+                            let p1 = cleanText.substring(i1Idx + 10, i2Idx !== -1 ? i2Idx : cleanText.length).replace(/\(ENGLISH ONLY\)/g, '').trim();
+                            if(p1.length > 5) imgPrompts.push(baseStyle + p1 + noText);
                             
                             if (i2Idx !== -1) {
-                                let p2 = cleanText.substring(i2Idx + 10, i3Idx !== -1 ? i3Idx : cleanText.length).trim();
-                                if(p2.length > 5) imgPrompts.push(`A beautiful borderless 2D illustration for children. ${p2}. Minimalist, clean, NO TEXT, NO WORDS.`);
+                                let p2 = cleanText.substring(i2Idx + 10, i3Idx !== -1 ? i3Idx : cleanText.length).replace(/\(ENGLISH ONLY\)/g, '').trim();
+                                if(p2.length > 5) imgPrompts.push(baseStyle + p2 + noText);
                             }
                             
                             if (i3Idx !== -1) {
-                                let p3 = cleanText.substring(i3Idx + 10).trim();
-                                if(p3.length > 5) imgPrompts.push(`A beautiful borderless 2D illustration for children. ${p3}. Minimalist, clean, NO TEXT, NO WORDS.`);
+                                let p3 = cleanText.substring(i3Idx + 10).replace(/\(ENGLISH ONLY\)/g, '').trim();
+                                if(p3.length > 5) imgPrompts.push(baseStyle + p3 + noText);
                             }
                         } else {
-                            // Fallback gdy AI zapomniało tagów - czyścimy ewentualny tag TEKST i zostawiamy prompty domyślne
+                            // Fallback gdy AI zapomniało tagów
                             finalHtmlText = cleanText.replace(/\[TEKST\]/g, '').replace(/\n/g, '<br/>');
                         }
                     } else if (activeModule === 'rymowanki') {
