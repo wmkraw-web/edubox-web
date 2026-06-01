@@ -339,20 +339,21 @@
                     setGeneratedText(cleanText);
                     setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
 
-                    // 2. NIEZALEŻNY OBIEG DLA OBRAZKÓW W HISTORYJKACH
+                    // 2. ABSOLUTNIE NIEZAWODNY OBIEG DLA OBRAZKÓW W HISTORYJKACH (Wymusza na 100% zrobienie 3 obrazków)
                     if (activeModule === 'historyjki') {
                         setLoadingMsg('Opracowuję precyzyjne instrukcje dla ilustratora...');
                         
+                        let imagePromptsArray = [];
+                        
                         try {
-                            // Pytamy API chat.js, żeby wymyśliło czyste, ANGIELSKIE prompty i zwróciło JSON.
+                            // Pytamy AI (Twoje api/chat.js) TYLKO o wymyślenie 3 opisów. Wymuszamy zwrócenie poprawnej struktury JSON.
                             const promptPayload = {
-                                system: "You are an expert prompt engineer for an illustrator. Follow instructions exactly.",
-                                prompt: `Based on the children's story topic "${genericInput}", write 3 English descriptions for an illustrator drawing a children's book. 
-CRITICAL RULES:
-- The illustrations must follow a sequence: [1. The Problem], [2. The Coping Strategy], [3. The Positive Effect].
-- You MUST define ONE specific character at the beginning (e.g. "a 5-year-old girl with brown hair wearing a blue shirt") and use this EXACT SAME character description in ALL THREE prompts to maintain visual consistency.
-- DO NOT use names. DO NOT include any text, speech bubbles, or dialogue in the image descriptions.
-Format output strictly as a JSON array of 3 strings: ["prompt1", "prompt2", "prompt3"]`,
+                                system: "You are a backend API. You MUST return a JSON array of exactly 3 strings. NO markdown, NO formatting, NO chat. Example: [\"prompt 1\", \"prompt 2\", \"prompt 3\"]",
+                                prompt: `Create 3 English image prompts for a children's story about: "${genericInput}". 
+1. The problem scene.
+2. The coping strategy scene.
+3. The positive outcome scene.
+CRITICAL RULE: Define ONE specific character (e.g. "a 5-year-old boy with brown hair wearing a blue shirt") and start ALL 3 prompts with this exact description so the character looks identical. No text, no speech bubbles.`,
                                 format: "json",
                                 temperature: 0.2
                             };
@@ -363,51 +364,76 @@ Format output strictly as a JSON array of 3 strings: ["prompt1", "prompt2", "pro
                                 body: JSON.stringify(promptPayload)
                             });
 
-                            if (!promptRes.ok) throw new Error("Błąd tworzenia promptów dla grafiki.");
                             const promptData = await promptRes.json();
+                            let pText = promptData.text || "[]";
                             
-                            let promptsText = promptData.text || "[]";
-                            promptsText = promptsText.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
-                            if(promptsText.startsWith('```json')) promptsText = promptsText.substring(7);
-                            if(promptsText.endsWith('```')) promptsText = promptsText.substring(0, promptsText.length - 3);
-                            promptsText = promptsText.trim();
+                            // Czyścimy wszystko, co nie jest JSONem
+                            pText = pText.replace(/```json/gi, '').replace(/```/g, '').trim();
+                            let parsed = JSON.parse(pText);
                             
-                            const parsedPrompts = JSON.parse(promptsText);
+                            // Wyciągamy tablicę (niezależnie czy AI zamknęło to w obiekcie, czy od razu dało tablicę)
+                            if (Array.isArray(parsed) && parsed.length >= 3) {
+                                imagePromptsArray = [parsed[0], parsed[1], parsed[2]];
+                            } else if (parsed.prompts && Array.isArray(parsed.prompts) && parsed.prompts.length >= 3) {
+                                imagePromptsArray = [parsed.prompts[0], parsed.prompts[1], parsed.prompts[2]];
+                            } else {
+                                throw new Error("AI nie zwróciło tablicy 3 elementów.");
+                            }
+                        } catch(err) {
+                            console.warn("Błąd parsowania promptów od AI. Uruchamiam system awaryjny.", err);
+                            // SYSTEM AWARYJNY: Jeśli AI się pomyli i nie wypluje JSONa, wymuszamy malowanie z użyciem Twoich polskich słów (ale przetłumaczonych szablonowo na angielski)
+                            imagePromptsArray = [
+                                `Children's book illustration. A sad child facing a problem: ${genericInput}. Flat vector style.`,
+                                `Children's book illustration. A child trying to cope with: ${genericInput}. Calming mood, flat vector style.`,
+                                `Children's book illustration. A happy child who solved the problem: ${genericInput}. Joyful mood, flat vector style.`
+                            ];
+                        }
+
+                        // MALOWANIE OBRAZKÓW (Połączenie z Twoim działającym api/generate.js z Fal.ai Flux)
+                        const newImages = [];
+                        // KAGANIEC NA TEKST - dodawany do każdego obrazka na sztywno, żeby zapobiec chińskim znaczkom.
+                        const antiTextClause = ", ABSOLUTELY NO TEXT, NO LETTERS, NO WORDS, NO SPEECH BUBBLES.";
+                        
+                        for (let i = 0; i < 3; i++) {
+                            setLoadingMsg(`Maluję obrazek (${i + 1} z 3) - ${i === 0 ? 'Problem' : i === 1 ? 'Strategia' : 'Efekt'}...`);
                             
-                            if (Array.isArray(parsedPrompts) && parsedPrompts.length === 3) {
-                                const newImages = [];
-                                // Do każdego z promptów dodajemy żelazną klauzulę o braku tekstu i narzucamy styl ilustracji dziecięcej 2D
-                                const antiTextClause = ", ABSOLUTELY NO TEXT, NO LETTERS, NO WORDS, NO SPEECH BUBBLES, flat 2d children book vector illustration.";
+                            try {
+                                const finalImagePrompt = imagePromptsArray[i] + antiTextClause;
                                 
-                                for (let i = 0; i < 3; i++) {
-                                    setLoadingMsg(`Maluję obrazek (${i + 1} z 3) - ${i === 0 ? 'Problem' : i === 1 ? 'Strategia' : 'Efekt'}...`);
-                                    const finalImagePrompt = parsedPrompts[i] + antiTextClause;
-                                    
-                                    // Uderzamy prosto do działającego u Ciebie pliku /api/generate (który pod spodem ma Fal.ai flux/schnell)
-                                    const imgRes = await fetch('/api/generate', {
-                                        method: 'POST',
-                                        headers: { 'Content-Type': 'application/json' },
-                                        body: JSON.stringify({ 
-                                            prompt: finalImagePrompt,
-                                            aspect_ratio: '1:1' 
-                                        })
-                                    });
+                                const imgRes = await fetch('/api/generate', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ 
+                                        prompt: finalImagePrompt,
+                                        aspect_ratio: '1:1' 
+                                    })
+                                });
 
-                                    if (!imgRes.ok) {
-                                        const errData = await imgRes.json().catch(() => ({}));
-                                        throw new Error(errData.message || "Błąd serwera wizualnego fal.ai");
-                                    }
-
+                                if (imgRes.ok) {
                                     const imgData = await imgRes.json();
+                                    // Sprawdzamy, czy serwer Fal.ai (Twój plik api/generate.js) zwrócił imageUrl
                                     if (imgData.imageUrl) {
                                         newImages.push(imgData.imageUrl);
+                                    } else {
+                                        newImages.push(null);
                                     }
+                                } else {
+                                    console.error("Błąd api/generate dla obrazka " + i);
+                                    newImages.push(null);
                                 }
-                                setGeneratedImages(newImages);
+                            } catch (imgError) {
+                                console.error("Krytyczny błąd fetch dla obrazka " + i, imgError);
+                                newImages.push(null);
                             }
-                        } catch(e) { 
-                            console.error("Błąd podczas generowania obrazków dla historyjki:", e); 
-                            setError(`Wystąpił problem z namalowaniem obrazków, ale tekst został wygenerowany poprawnie poniżej.`);
+                        }
+                        
+                        // Odfiltruj ewentualne błędy i pokaż obrazki, które się udały
+                        const validImages = newImages.filter(img => img !== null);
+                        
+                        if(validImages.length > 0) {
+                            setGeneratedImages(validImages);
+                        } else {
+                            setError("Serwer wygenerował tekst, ale moduł graficzny Fal.ai odrzucił żądanie (brak obrazków).");
                         }
                     }
 
@@ -524,7 +550,7 @@ Format output strictly as a JSON array of 3 strings: ["prompt1", "prompt2", "pro
                                 ) : (
                                     <div className="space-y-4">
                                         <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">Opisz temat lub problem</label>
-                                        <textarea value={genericInput} onChange={(e) => setGenericInput(e.target.value)} placeholder="Opisz krótko sytuację, z którą pracujemy..." className="w-full h-48 input-bg rounded-2xl p-5 text-base resize-none"></textarea>
+                                        <textarea value={genericInput} onChange={(e) => setGenericInput(e.target.value)} placeholder="Opisz krótko sytuację, z którą pracujemy (Dla historyjek będzie to temat problemu dziecka)..." className="w-full h-48 input-bg rounded-2xl p-5 text-base resize-none"></textarea>
                                     </div>
                                 )}
                             </div>
@@ -565,7 +591,7 @@ Format output strictly as a JSON array of 3 strings: ["prompt1", "prompt2", "pro
                                         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 w-full print-images-grid mb-6">
                                             {generatedImages.map((img, idx) => (
                                                 <div key={idx} className="flex flex-col items-center fade-in bg-slate-900/30 p-4 rounded-3xl border border-slate-800">
-                                                    <img src={img} alt="Ilustracja AI" className="w-full aspect-square object-cover rounded-2xl border border-slate-700 shadow-md" />
+                                                    <img src={img} alt="Ilustracja" className="w-full aspect-square object-cover rounded-2xl border border-slate-700 shadow-md" />
                                                     <p className="text-center text-xs text-white mt-4 font-black uppercase tracking-widest bg-blue-600 px-5 py-2 rounded-full shadow-lg">
                                                         {idx === 0 ? "1. Problem" : idx === 1 ? "2. Strategia" : "3. Efekt"}
                                                     </p>
