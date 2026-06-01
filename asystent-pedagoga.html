@@ -150,7 +150,7 @@
                 let base = `Jesteś wybitnym pedagogiem specjalnym. Wygeneruj profesjonalny dokument urzędowy o typie: ${docType}. Używaj języka formalnego, pedagogicznego. Nie używaj gwiazdek **.\n${lengthInstruction}\n`;
                 
                 if (docType === 'gotowosc') {
-                    base += "WYTYCZNE DLA DOKUMENTU: Struktura musi BEZWZGLĘDNIE obejmować rozwój fizyczny, emocjonalno-socialny, poznawczy (mowa, myślenie, uwaga), samodzielność oraz wskazówki dla rodziców.";
+                    base += "WYTYCZNE DLA DOKUMENTU: Struktura musi BEZWZGLĘDNIE obejmować rozwój fizyczny, emocjonalno-społeczny, poznawczy (mowa, myślenie, uwaga), samodzielność oraz wskazówki dla rodziców.";
                 } else if (docType === 'ipet') {
                     base += "WYTYCZNE DLA DOKUMENTU: Struktura musi obejmować diagnozę, cele, metody, dostosowania oraz działania wspierające.";
                 }
@@ -161,21 +161,7 @@
                 return base;
             }
             if (module === 'historyjki') {
-                return `Jesteś pedagogiem specjalnym. Napisz 'Historyjkę Społeczną' dla dziecka. Pisz w pierwszej osobie ("Ja"). Historyjka ma pomóc dziecku zrozumieć trudną sytuację.
-        
-ZASADA ABSOLUTNA - MUSISZ ZWRÓCIĆ WYNIK UŻYWAJĄC TYCH ZNACZNIKÓW. NIE UŻYWAJ JSONA.
-
-[TEKST]
-Tutaj napisz cały polski tekst historyjki (podzielony na akapity).
-
-[OBRAZEK1]
-(ENGLISH ONLY) Scene 1: The problem. Focus strictly on the main character (e.g. a 5 year old girl with blonde hair) and the action (e.g. looking scared of thunder). Absolutely no words, no text, no letters.
-
-[OBRAZEK2]
-(ENGLISH ONLY) Scene 2: The coping strategy. The same main character doing something helpful (e.g. hiding under a blanket, hugging a toy). Absolutely no words, no text, no letters.
-
-[OBRAZEK3]
-(ENGLISH ONLY) Scene 3: The positive resolution. The same main character looking happy and successful. Absolutely no words, no text, no letters.`;
+                return `Jesteś pedagogiem specjalnym. Napisz 'Historyjkę Społeczną' dla dziecka na podany temat. Pisz w pierwszej osobie ("Ja"). Podziel tekst na 3 akapity: 1. PROBLEM, 2. STRATEGIA (jak sobie radzić), 3. POZYTYWNY EFEKT. Zwróć tylko i wyłącznie sam tekst, bez uwag dla ilustratora.`;
             }
             if (module === 'rymowanki') {
                 return `Jesteś wybitnym autorem bardzo prostych rymowanek dla dzieci w wieku przedszkolnym. Pisz w układzie AABB lub ABAB. Zachowaj melodyjny rytm. Długość: max 2-3 zwrotki. Zwróć SAM TEKST rymowanki. Absolutnie żadnych wstępów.`;
@@ -291,24 +277,23 @@ Tutaj napisz cały polski tekst historyjki (podzielony na akapity).
                 }
             };
 
-            // ZUPEŁNIE NOWA FUNKCJA DO GRAFIKI - KORZYSTA Z API/GENERATE I FAL.AI (Zgodnie z Twoim plikiem)
             const secureImageCall = async (prompt) => {
                 if (window.location.protocol === 'file:') throw new Error("LocalTest");
 
                 try {
-                    // Kierujemy ruch do /api/generate - tego samego pliku, który tak wspaniale obsługuje EduKomiks!
+                    // Kierujemy się do Twojego sprawdzonego pliku od Fal.ai, tak jak w EduKomiks
                     const response = await fetch('/api/generate', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ 
                             prompt: prompt,
-                            aspect_ratio: '1:1' // Wymuszenie kwadratu
+                            aspect_ratio: '1:1' 
                         })
                     });
 
                     if (!response.ok) {
                         const errData = await response.json().catch(() => ({}));
-                        throw new Error(`Błąd Fal.ai: ${errData.message || response.statusText}`);
+                        throw new Error(`Błąd generatora obrazów: ${errData.message || response.statusText}`);
                     }
                     
                     const data = await response.json();
@@ -316,7 +301,7 @@ Tutaj napisz cały polski tekst historyjki (podzielony na akapity).
                     if (data.imageUrl) {
                         return data.imageUrl;
                     } else {
-                        throw new Error("Pusta odpowiedź z serwera graficznego.");
+                        throw new Error("Pusta odpowiedź z serwera wizualnego.");
                     }
                 } catch (err) {
                     throw new Error(`${err.message}`);
@@ -379,7 +364,7 @@ Tutaj napisz cały polski tekst historyjki (podzielony na akapity).
                         finalPrompt = `Temat: ${genericInput}`;
                     }
 
-                    // 1. GENEROWANIE TEKSTU PRZEZ GEMINI
+                    // 1. ZAPYTANIE GŁÓWNE (PISANIE TEKSTU PRZEZ GEMINI)
                     const textData = await secureTextCall({
                         contents: [{ parts: [{ text: finalPrompt }] }],
                         systemInstruction: { parts: [{ text: getSystemPrompt(activeModule, docType, naglowki, formatLength) }] },
@@ -390,71 +375,65 @@ Tutaj napisz cały polski tekst historyjki (podzielony na akapity).
                     if (!story) throw new Error("AI nie zwróciło tekstu. Spróbuj wygenerować jeszcze raz.");
                     
                     let cleanText = story.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
-                    let finalHtmlText = cleanText;
-                    // Domyślne, puste prompty dla grafiki (gdyby parsowanie tekstu zawiodło)
-                    let imgPrompts = [
-                        `High quality 2D vector illustration, children's book style. Scene showing a sad child facing a problem: ${genericInput}. Soft pastel colors. ABSOLUTELY NO TEXT, NO LETTERS, NO WORDS.`,
-                        `High quality 2D vector illustration, children's book style. Scene showing a child calming down and using a coping strategy for: ${genericInput}. Soft blue colors. ABSOLUTELY NO TEXT, NO LETTERS, NO WORDS.`,
-                        `High quality 2D vector illustration, children's book style. Scene showing a happy and successful child after overcoming: ${genericInput}. Bright colors. ABSOLUTELY NO TEXT, NO LETTERS, NO WORDS.`
-                    ];
-
-                    if (activeModule === 'historyjki') {
-                        let i1Idx = cleanText.indexOf('[OBRAZEK1]');
-                        let i2Idx = cleanText.indexOf('[OBRAZEK2]');
-                        let i3Idx = cleanText.indexOf('[OBRAZEK3]');
-
-                        if (i1Idx !== -1) {
-                            finalHtmlText = cleanText.substring(0, i1Idx).replace(/\[TEKST\]/g, '').trim().replace(/\n/g, '<br/>');
-                            
-                            imgPrompts = [];
-                            const baseStyle = "High quality 2D children's book illustration. ";
-                            const noText = ", ABSOLUTELY NO TEXT, NO LETTERS, NO WORDS.";
-                            
-                            let p1 = cleanText.substring(i1Idx + 10, i2Idx !== -1 ? i2Idx : cleanText.length).replace(/\(ENGLISH ONLY\)/g, '').trim();
-                            if(p1.length > 5) imgPrompts.push(baseStyle + p1 + noText);
-                            
-                            if (i2Idx !== -1) {
-                                let p2 = cleanText.substring(i2Idx + 10, i3Idx !== -1 ? i3Idx : cleanText.length).replace(/\(ENGLISH ONLY\)/g, '').trim();
-                                if(p2.length > 5) imgPrompts.push(baseStyle + p2 + noText);
-                            }
-                            
-                            if (i3Idx !== -1) {
-                                let p3 = cleanText.substring(i3Idx + 10).replace(/\(ENGLISH ONLY\)/g, '').trim();
-                                if(p3.length > 5) imgPrompts.push(baseStyle + p3 + noText);
-                            }
-                        } else {
-                            finalHtmlText = cleanText.replace(/\[TEKST\]/g, '').replace(/\n/g, '<br/>');
-                        }
-                    } else if (activeModule === 'rymowanki') {
-                        finalHtmlText = finalHtmlText.replace(/\n/g, '<br/>');
+                    
+                    if (activeModule === 'rymowanki' || activeModule === 'historyjki') {
+                        cleanText = cleanText.replace(/\n/g, '<br/>');
                     }
-
-                    setGeneratedText(finalHtmlText);
+                    
+                    setGeneratedText(cleanText);
                     setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
 
-                    // 2. GENEROWANIE OBRAZÓW (Tylko dla Historyjek) - PODŁĄCZONE DO FAL.AI
-                    if (activeModule === 'historyjki' && imgPrompts.length > 0) {
+                    // 2. NOWY, NIEZALEŻNY OBIEG DLA OBRAZKÓW (Tylko dla Historyjek)
+                    if (activeModule === 'historyjki') {
+                        setLoadingMsg('Opracowuję instrukcje dla ilustratora...');
+                        
                         try {
-                            const newImages = [];
-                            for (let i = 0; i < imgPrompts.length; i++) {
-                                setLoadingMsg(`Maluję obrazek za pomocą Fal.ai (${i + 1} z ${imgPrompts.length})...`);
-                                
-                                // Wywołujemy naszą nową, niezawodną metodę
-                                const imageUrl = await secureImageCall(imgPrompts[i]);
-                                newImages.push(imageUrl);
-                            }
+                            // Pytamy Gemini, żeby wymyśliło czyste, ANGIELSKIE prompty graficzne BEZ cytatów.
+                            const imagePromptsInstruction = `Based on the topic "${genericInput}", write 3 English descriptions for an illustrator drawing a children's book. 
+Rules:
+- NO dialogue, NO quotes, NO names, NO speech bubbles.
+- Keep it simple, e.g. "Scene 1: A little boy looking scared".
+Format output as a JSON array of 3 strings: ["prompt1", "prompt2", "prompt3"]`;
+
+                            const promptsData = await secureTextCall({
+                                contents: [{ parts: [{ text: imagePromptsInstruction }] }],
+                                generationConfig: { temperature: 0.2 }
+                            }, imagePromptsInstruction);
+
+                            let promptsText = promptsData.candidates?.[0]?.content?.parts?.[0]?.text || "[]";
                             
-                            setGeneratedImages(newImages);
+                            // Wycinamy ewentualne otoczki markdown
+                            promptsText = promptsText.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+                            if(promptsText.startsWith('```json')) promptsText = promptsText.substring(7);
+                            if(promptsText.endsWith('```')) promptsText = promptsText.substring(0, promptsText.length - 3);
+                            promptsText = promptsText.trim();
+                            
+                            const parsedPrompts = JSON.parse(promptsText);
+                            
+                            if (Array.isArray(parsedPrompts) && parsedPrompts.length === 3) {
+                                const newImages = [];
+                                // Do każdego z promptów dodajemy żelazną klauzulę o braku tekstu dla modelu Flux
+                                const antiTextClause = ", ABSOLUTELY NO TEXT, NO LETTERS, NO WORDS, NO BUBBLES.";
+                                const styleClause = "High quality 2D flat vector illustration, colorful children's book style. ";
+                                
+                                for (let i = 0; i < 3; i++) {
+                                    setLoadingMsg(`Maluję obrazek (${i + 1} z 3)...`);
+                                    const finalImagePrompt = styleClause + parsedPrompts[i] + antiTextClause;
+                                    const imageUrl = await secureImageCall(finalImagePrompt);
+                                    newImages.push(imageUrl);
+                                }
+                                setGeneratedImages(newImages);
+                            }
                         } catch(e) { 
-                            console.error("Błąd grafiki (Fal.ai):", e); 
-                            setError(`Zignorowano błąd obrazków: ${e.message}. Sam tekst został wygenerowany poprawnie poniżej.`);
+                            console.error("Błąd podczas generowania obrazków dla historyjki:", e); 
+                            setError(`Wystąpił problem z namalowaniem obrazków, ale tekst został wygenerowany poprawnie poniżej.`);
                         }
                     }
 
                 } catch (err) {
                     if (err.message === "LocalTest") {
-                        setError('Tryb lokalny. Wgraj na Vercel.');
-                        setGeneratedText(`[TEST LOKALNY]\n\nAsystent działa prawidłowo! Gdy umieścisz ten plik na serwerze eduboxpro.pl, połączy się z AI i wygeneruje poprawną treść oraz obrazki. Twoje darmowe użycia na dziś uległy zmniejszeniu.`);
+                        setError('Tryb lokalny.');
+                        setGeneratedText(`[TEST LOKALNY]\n\nTestujesz lokalnie. Po wgraniu na serwer wszystko zadziała.`);
                     } else {
                         setError('Błąd: ' + err.message);
                     }
