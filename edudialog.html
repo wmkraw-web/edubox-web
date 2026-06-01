@@ -118,7 +118,6 @@
 
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
-        const BUY_COFFEE_LINK = "https://buycoffee.to/magiccolor";
         const DAILY_LIMIT = 5;
 
         // --- KONFIGURACJA AI ---
@@ -144,7 +143,7 @@ Zasady:
 4. Nie dodawaj wstępów. Zwróć tylko gotowy tekst, podzielony na czytelne akapity (np. Funkcjonowanie emocjonalno-społeczne, Funkcjonowanie poznawcze).`;
 
         function App() {
-            const [activeTab, setActiveTab] = useState('nvc');
+            const [activeTab, setActiveTab] = useState('nvc'); 
             const [inputText, setInputText] = useState('');
             const [generatedText, setGeneratedText] = useState('');
             const [isGenerating, setIsGenerating] = useState(false);
@@ -203,46 +202,46 @@ Zasady:
 
                 try {
                     const systemInstruction = activeTab === 'nvc' ? SYSTEM_PROMPT_NVC : SYSTEM_PROMPT_PPP;
-                    const finalPrompt = `Przekształć poniższe notatki zgodnie z instrukcją systemową.\n\nNotatki nauczyciela:\n"""\n${inputText}\n"""`;
-
-                    const payload = {
-                        contents: [{ parts: [{ text: finalPrompt }] }],
-                        systemInstruction: { parts: [{ text: systemInstruction }] },
-                        generationConfig: { temperature: 0.3 }
-                    };
+                    const finalPrompt = `Przekształć poniższe notatki. Notatki nauczyciela:\n"""\n${inputText}\n"""`;
 
                     if (window.location.hostname === '' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-                         throw new Error("TestLocal");
+                        throw new Error("LocalTest");
                     }
 
-                    const response = await fetch('/api/gemini', {
+                    // POŁĄCZENIE Z TWOIM CHAT.JS (OpenAI)
+                    const response = await fetch('/api/chat', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ payload, type: 'text' })
+                        body: JSON.stringify({ 
+                            prompt: finalPrompt,
+                            system: systemInstruction,
+                            temperature: 0.3
+                        })
                     });
                     
-                    if (!response.ok) throw new Error(`Błąd serwera API: ${response.status}`);
                     const data = await response.json();
 
-                    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-                    
-                    if (text) {
-                        setGeneratedText(text);
-                        setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
+                    if (!response.ok) {
+                        throw new Error(data.message || data.error || `Błąd serwera API: ${response.status}`);
+                    }
+
+                    if (data.text) {
+                        setGeneratedText(data.text);
+                        setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
                     } else {
-                        throw new Error("Pusta odpowiedź z API.");
+                        throw new Error("Pusta odpowiedź z API OpenAI.");
                     }
 
                 } catch (err) {
-                    if (err.message === "TestLocal") {
-                        setError('Jesteś w trybie lokalnym. Aby użyć AI, uruchom stronę z serwera Vercel.');
+                    if (err.message === "LocalTest") {
+                        setError('Tryb lokalny. Aby wygenerować prawdziwy tekst, uruchom z serwera Vercel.');
                         setTimeout(() => {
-                            setGeneratedText(`[WERSJA LOKALNA / OFFLINE]\n\nDo aplikacji wpisano:\n"${inputText}"\n\nNarzędzie i limity działają poprawnie.`);
+                            setGeneratedText(`[WERSJA LOKALNA / OFFLINE]\n\nDo aplikacji wpisano:\n"${inputText}"\n\nGdy umieścisz ten plik na serwerze eduboxpro.pl, połączy się on z OpenAI i wygeneruje poprawny dokument. Lincznik darmowych użyć został zaktualizowany.`);
                             setIsGenerating(false);
                         }, 800);
                     } else {
                         console.error("Błąd generowania:", err);
-                        setError('Przepraszamy, wystąpił błąd podczas łączenia z serwerem. Spróbuj ponownie.');
+                        setError(`Błąd: ${err.message}. Spróbuj ponownie.`);
                     }
                 } finally {
                     setIsGenerating(false);
@@ -251,6 +250,7 @@ Zasady:
 
             const copyToClipboard = () => {
                 if (!generatedText) return;
+                
                 try {
                     if (navigator.clipboard && window.isSecureContext) {
                         navigator.clipboard.writeText(generatedText).then(() => {
@@ -272,6 +272,7 @@ Zasady:
                     }
                 } catch (err) {
                     setCopyStatus('Błąd kopiowania');
+                    console.error('Failed to copy!', err);
                 }
             };
 
@@ -355,7 +356,7 @@ Zasady:
                                         onClick={generateResponse}
                                         disabled={isGenerating || !inputText.trim() || (!isPro && limitData.remaining === 0)}
                                         className={`px-8 py-4 rounded-xl font-bold text-white transition-all flex items-center gap-2 shadow-lg
-                                            ${isGenerating ? 'bg-slate-700 cursor-wait' : (!isPro && limitData.remaining === 0) ? 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700' : activeTab === 'nvc' ? 'bg-blue-600 hover:bg-blue-500 hover:shadow-blue-500/25 active:scale-95' : 'bg-purple-600 hover:bg-purple-500 hover:shadow-purple-500/25 active:scale-95'}
+                                            ${isGenerating ? 'bg-slate-700 cursor-not-allowed' : (!isPro && limitData.remaining === 0) ? 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700' : activeTab === 'nvc' ? 'bg-blue-600 hover:bg-blue-500 hover:shadow-blue-500/25 active:scale-95' : 'bg-purple-600 hover:bg-purple-500 hover:shadow-purple-500/25 active:scale-95'}
                                             disabled:opacity-50 disabled:active:scale-100`}
                                     >
                                         {isGenerating ? (
