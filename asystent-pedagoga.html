@@ -365,11 +365,11 @@
                     }
 
                     // 1. ZAPYTANIE GŁÓWNE (PISANIE TEKSTU PRZEZ GEMINI)
-                    const textData = await secureTextCall({
+                    const textData = await secureApiCall({
                         contents: [{ parts: [{ text: finalPrompt }] }],
                         systemInstruction: { parts: [{ text: getSystemPrompt(activeModule, docType, naglowki, formatLength) }] },
                         generationConfig: { temperature: 0.4 }
-                    }, finalPrompt);
+                    }, 'text');
 
                     const story = textData.candidates?.[0]?.content?.parts?.[0]?.text;
                     if (!story) throw new Error("AI nie zwróciło tekstu. Spróbuj wygenerować jeszcze raz.");
@@ -385,20 +385,22 @@
 
                     // 2. NOWY, NIEZALEŻNY OBIEG DLA OBRAZKÓW (Tylko dla Historyjek)
                     if (activeModule === 'historyjki') {
-                        setLoadingMsg('Opracowuję instrukcje dla ilustratora...');
+                        setLoadingMsg('Opracowuję precyzyjne instrukcje dla ilustratora...');
                         
                         try {
-                            // Pytamy Gemini, żeby wymyśliło czyste, ANGIELSKIE prompty graficzne BEZ cytatów.
+                            // Pytamy Gemini, żeby wymyśliło czyste, ANGIELSKIE prompty, OPARTE NA 3 ETAPACH (Problem, Strategia, Efekt) i narzuciło stałego bohatera.
                             const imagePromptsInstruction = `Based on the topic "${genericInput}", write 3 English descriptions for an illustrator drawing a children's book. 
-Rules:
+CRITICAL RULES:
+- The illustrations must follow a sequence: [1. The Problem], [2. The Coping Strategy], [3. The Positive Effect].
+- You MUST define ONE specific character (e.g. "a 5-year-old girl with brown hair") and use this exact same character description in ALL THREE prompts to maintain consistency.
 - NO dialogue, NO quotes, NO names, NO speech bubbles.
-- Keep it simple, e.g. "Scene 1: A little boy looking scared".
+- Keep it simple, e.g. "Scene 1: A 5-year-old girl with brown hair looking scared out the window at a storm".
 Format output as a JSON array of 3 strings: ["prompt1", "prompt2", "prompt3"]`;
 
-                            const promptsData = await secureTextCall({
+                            const promptsData = await secureApiCall({
                                 contents: [{ parts: [{ text: imagePromptsInstruction }] }],
                                 generationConfig: { temperature: 0.2 }
-                            }, imagePromptsInstruction);
+                            }, 'text');
 
                             let promptsText = promptsData.candidates?.[0]?.content?.parts?.[0]?.text || "[]";
                             
@@ -417,10 +419,29 @@ Format output as a JSON array of 3 strings: ["prompt1", "prompt2", "prompt3"]`;
                                 const styleClause = "High quality 2D flat vector illustration, colorful children's book style. ";
                                 
                                 for (let i = 0; i < 3; i++) {
-                                    setLoadingMsg(`Maluję obrazek (${i + 1} z 3)...`);
+                                    setLoadingMsg(`Maluję obrazek (${i + 1} z 3) - ${i === 0 ? 'Problem' : i === 1 ? 'Strategia' : 'Efekt'}...`);
                                     const finalImagePrompt = styleClause + parsedPrompts[i] + antiTextClause;
-                                    const imageUrl = await secureImageCall(finalImagePrompt);
-                                    newImages.push(imageUrl);
+                                    
+                                    // Uderzamy bezpośrednio do Twojego endpointu na fal.run, tak jak w EduKomiksie!
+                                    const res = await fetch('/api/generate', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ 
+                                            prompt: finalImagePrompt,
+                                            aspect_ratio: '1:1' // Wymuszenie kwadratu
+                                        })
+                                    });
+
+                                    if (!res.ok) {
+                                        const errData = await res.json().catch(() => ({}));
+                                        throw new Error(errData.message || "Błąd serwera wizualnego");
+                                    }
+
+                                    const imgData = await res.json();
+                                    
+                                    if (imgData.imageUrl) {
+                                        newImages.push(imgData.imageUrl);
+                                    }
                                 }
                                 setGeneratedImages(newImages);
                             }
