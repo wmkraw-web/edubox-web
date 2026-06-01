@@ -65,6 +65,7 @@
         .upload-box:hover { border-color: #ef4444; background: rgba(225, 29, 72, 0.05); }
 
         #wspolne-menu-kontener { position: relative; z-index: 50; }
+        #wspolne-menu-kontener nav { position: relative; }
 
         @media print {
             body { background-color: white !important; color: black !important; }
@@ -159,19 +160,19 @@
             if (module === 'historyjki') {
                 return `Jesteś pedagogiem specjalnym. Napisz 'Historyjkę Społeczną' dla dziecka. Pisz w pierwszej osobie ("Ja"). Historyjka ma pomóc dziecku zrozumieć trudną sytuację.
         
-ZASADA ABSOLUTNA - MUSISZ ZWRÓCIĆ WYNIK UŻYWAJĄC TYCH ZNACZNIKÓW:
+ZASADA ABSOLUTNA - MUSISZ ZWRÓCIĆ WYNIK UŻYWAJĄC TYCH ZNACZNIKÓW. NIE UŻYWAJ JSONA.
 
 [TEKST]
 Tutaj napisz cały polski tekst historyjki (podzielony na akapity).
 
 [OBRAZEK1]
-(ENGLISH ONLY) English description of the FIRST scene (The Problem). Example: A 5 year old boy with blonde hair, crying in classroom. NO TEXT.
+(ENGLISH ONLY) Scene 1: The problem. Focus strictly on the main character (e.g. a 5 year old girl with blonde hair) and the action (e.g. looking scared of thunder). Absolutely no words, no text, no letters.
 
 [OBRAZEK2]
-(ENGLISH ONLY) English description of the SECOND scene (Coping strategy). Same character. NO TEXT.
+(ENGLISH ONLY) Scene 2: The coping strategy. The same main character doing something helpful (e.g. hiding under a blanket, hugging a toy). Absolutely no words, no text, no letters.
 
 [OBRAZEK3]
-(ENGLISH ONLY) English description of the THIRD scene (Positive Effect). Same character, smiling. NO TEXT.`;
+(ENGLISH ONLY) Scene 3: The positive resolution. The same main character looking happy and successful. Absolutely no words, no text, no letters.`;
             }
             if (module === 'rymowanki') {
                 return `Jesteś wybitnym autorem bardzo prostych rymowanek dla dzieci w wieku przedszkolnym. Pisz w układzie AABB lub ABAB. Zachowaj melodyjny rytm. Długość: max 2-3 zwrotki. Zwróć SAM TEKST rymowanki. Absolutnie żadnych wstępów.`;
@@ -361,11 +362,11 @@ Tutaj napisz cały polski tekst historyjki (podzielony na akapity).
                     let cleanText = story.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
                     let finalHtmlText = cleanText;
 
-                    // Domyślne prompty graficzne (awaryjne, czysty angielski bez polskich wstawek)
+                    // Domyślne prompty graficzne
                     let imgPrompts = [
-                        `2D Flat vector illustration, children's book style. Scene showing a sad child facing a problem. Soft pastel colors. ABSOLUTELY NO TEXT, NO LETTERS, NO WORDS.`,
-                        `2D Flat vector illustration, children's book style. Scene showing a child calming down. Soft blue colors. ABSOLUTELY NO TEXT, NO LETTERS, NO WORDS.`,
-                        `2D Flat vector illustration, children's book style. Scene showing success and a happy child. Bright colors. ABSOLUTELY NO TEXT, NO LETTERS, NO WORDS.`
+                        `2D vector illustration, children's book style. Scene showing a sad child facing the problem: ${genericInput}. Soft pastel colors. NO TEXT, NO LETTERS.`,
+                        `2D vector illustration, children's book style. Scene showing a child calming down and using coping strategy for: ${genericInput}. Soft blue colors. NO TEXT, NO LETTERS.`,
+                        `2D vector illustration, children's book style. Scene showing success and a happy child after overcoming: ${genericInput}. Bright colors. NO TEXT, NO LETTERS.`
                     ];
 
                     // KULOODPORNE WYCIĄGANIE DANYCH DO OBRAZKÓW
@@ -382,7 +383,7 @@ Tutaj napisz cały polski tekst historyjki (podzielony na akapity).
                             // Resetujemy i podmieniamy na własne z AI
                             imgPrompts = [];
                             const baseStyle = "High quality 2D children's book illustration. ";
-                            const noText = ". ABSOLUTELY NO TEXT, NO LETTERS, NO WORDS, NO SPEECH BUBBLES.";
+                            const noText = ", ABSOLUTELY NO TEXT, NO LETTERS, NO WORDS.";
                             
                             let p1 = cleanText.substring(i1Idx + 10, i2Idx !== -1 ? i2Idx : cleanText.length).replace(/\(ENGLISH ONLY\)/g, '').trim();
                             if(p1.length > 5) imgPrompts.push(baseStyle + p1 + noText);
@@ -407,6 +408,7 @@ Tutaj napisz cały polski tekst historyjki (podzielony na akapity).
                     setGeneratedText(finalHtmlText);
                     setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
 
+                    // GENEROWANIE OBRAZÓW (Tylko dla Historyjek)
                     if (activeModule === 'historyjki' && imgPrompts.length > 0) {
                         try {
                             const newImages = [];
@@ -415,7 +417,7 @@ Tutaj napisz cały polski tekst historyjki (podzielony na akapity).
                                 
                                 const res = await secureApiCall({ prompt: imgPrompts[i] }, 'image');
                                 
-                                // Tolerancyjne sprawdzanie odpowiedzi z różnych modeli (DALL-E, Leonardo, Fal)
+                                // Sprawdzanie odpowiedzi
                                 if (res.predictions && res.predictions[0] && res.predictions[0].bytesBase64Encoded) {
                                     newImages.push(`data:image/png;base64,${res.predictions[0].bytesBase64Encoded}`);
                                 } else if (res.url) {
