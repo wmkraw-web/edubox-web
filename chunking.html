@@ -5,14 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EduChunk AI - Asystent Skupienia (ADHD/Dysleksja)</title>
     <!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-3RQ9R0N0K8"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-
-  gtag('config', 'G-3RQ9R0N0K8');
-</script>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-3RQ9R0N0K8"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-3RQ9R0N0K8');
+    </script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -43,6 +42,7 @@
         @media print {
             body { background: white; color: black; }
             .print-hidden { display: none !important; }
+            #wspolne-menu-kontener { display: none !important; }
             #print-container { border: none !important; box-shadow: none !important; padding: 0 !important; margin: 0 !important; width: 100% !important; max-width: 100% !important; }
             .chunk-card { break-inside: avoid; page-break-inside: avoid; border: 2px solid #e2e8f0 !important; background-color: #f8fafc !important; }
             .dyslexia-mode .chunk-card { background-color: #ffffff !important; border: 2px solid #fde68a !important; }
@@ -65,11 +65,61 @@
         .bot-eye { animation: blink 4s infinite; transform-origin: center; }
     </style>
 </head>
-<body>
-    <div id="root"></div>
+<body class="min-h-screen flex flex-col">
 
+    <!-- 1. KONTENER NA WSPÓLNE MENU -->
+    <div id="wspolne-menu-kontener"></div>
+
+    <!-- 2. GŁÓWNA ZAWARTOŚĆ APLIKACJI -->
+    <div id="root" class="flex-grow flex flex-col relative z-10"></div>
+
+    <!-- 3. SKRYPT ŁADUJĄCY MENU -->
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            function wstawMenuAwaryjne() {
+                document.getElementById('wspolne-menu-kontener').innerHTML = `
+                    <nav class="w-full z-50 glass-nav shadow-lg print-hidden">
+                        <div class="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+                            <a href="index.html" class="flex items-center gap-2 hover:opacity-80 transition-opacity">
+                                <span class="text-2xl font-black text-white tracking-tight">Edu<span class="text-teal-500">Box</span></span>
+                                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest border border-slate-700 rounded px-1.5 py-0.5 ml-1">Pro</span>
+                            </a>
+                            <div class="flex items-center gap-4">
+                                <span class="text-[10px] sm:text-xs text-amber-500 font-bold bg-amber-900/30 px-3 py-1.5 rounded-lg border border-amber-500/50">
+                                    Podgląd (Menu awaryjne)
+                                </span>
+                            </div>
+                        </div>
+                    </nav>
+                `;
+            }
+
+            try {
+                fetch('/menu.html')
+                    .then(response => {
+                        if (!response.ok) throw new Error('Błąd ładowania menu');
+                        return response.text();
+                    })
+                    .then(data => {
+                        document.getElementById('wspolne-menu-kontener').innerHTML = data;
+                        if (typeof window.initMenuLogic === 'function') {
+                            window.initMenuLogic();
+                        }
+                    })
+                    .catch(error => {
+                        wstawMenuAwaryjne();
+                    });
+            } catch (error) {
+                wstawMenuAwaryjne();
+            }
+        });
+    </script>
+
+    <!-- 4. GŁÓWNY SKRYPT REACT -->
     <script type="text/babel">
         const { useState, useEffect } = React;
+
+        const DAILY_LIMIT = 5;
 
         const Icon = ({ name, size = 20, className = "" }) => {
             const icons = {
@@ -101,8 +151,14 @@
         );
 
         function App() {
-            const [isPremium, setIsPremium] = useState(false);
-            const [accessCode, setAccessCode] = useState('');
+            // Zmiana: Status PRO pobierany globalnie
+            const [isPremium, setIsPremium] = useState(() => {
+                return localStorage.getItem('eduboxProStatus') === 'active' || localStorage.getItem('eduAwansPremium') === 'active';
+            });
+            
+            // Nowy system limitów (5/5)
+            const [limitData, setLimitData] = useState({ remaining: DAILY_LIMIT, showWarning: false });
+            
             const [isGenerating, setIsGenerating] = useState(false);
             const [toastMessage, setToastMessage] = useState('');
             const [botMessage, setBotMessage] = useState("Cześć! Wklej tutaj długi, zawiły tekst z podręcznika, a ja podzielę go na przyjazne i czytelne 'fiszki' dla dzieci z dysleksją lub ADHD.");
@@ -119,21 +175,21 @@
 
             const [chunkedData, setChunkedData] = useState(null);
 
+            useEffect(() => {
+                // Inicjalizacja limitów z pamięci przeglądarki
+                const today = new Date().toLocaleDateString();
+                const usage = JSON.parse(localStorage.getItem('eduboxUsage')) || { date: today, count: 0 };
+                if (usage.date !== today) {
+                    localStorage.setItem('eduboxUsage', JSON.stringify({ date: today, count: 0 }));
+                    setLimitData({ remaining: DAILY_LIMIT, showWarning: false });
+                } else {
+                    setLimitData({ remaining: Math.max(0, DAILY_LIMIT - usage.count), showWarning: usage.count >= DAILY_LIMIT });
+                }
+            }, []);
+
             const showToast = (msg) => {
                 setToastMessage(msg);
                 setTimeout(() => setToastMessage(''), 4000);
-            };
-
-            const handleVerifyCode = () => {
-                if (accessCode.toUpperCase() === 'KAWA2024') { 
-                    setIsPremium(true); 
-                    setAccessCode(''); 
-                    showToast('Kod aktywny! Witamy w Premium 🌟');
-                    setBotMessage("Hura! Masz Premium! Uruchomiłem prywatne serwery, teksty będą ładować się błyskawicznie.");
-                } 
-                else {
-                    showToast('Nieprawidłowy kod dostępu!');
-                }
             };
 
             const toggleDyslexiaMode = () => {
@@ -150,6 +206,27 @@
                 setBotMessage("Świetny przykład! Ten naukowy bełkot za chwilę zamieni się w piękną i prostą notatkę. Kliknij 'Zmień w mikro-lekcję'.");
             };
 
+            const updateAndCheckLimit = () => {
+                if (isPremium) return true;
+                const today = new Date().toLocaleDateString();
+                let usage = JSON.parse(localStorage.getItem('eduboxUsage')) || { date: today, count: 0 };
+                
+                if (usage.date !== today) usage = { date: today, count: 0 };
+                
+                if (usage.count >= DAILY_LIMIT) {
+                    setLimitData({ remaining: 0, showWarning: true });
+                    return false;
+                }
+
+                usage.count += 1;
+                localStorage.setItem('eduboxUsage', JSON.stringify(usage));
+                setLimitData({ remaining: DAILY_LIMIT - usage.count, showWarning: false });
+                
+                // Odświeżenie globalnego menu na górze
+                if(typeof window.updateGlobalLimitDisplay === 'function') window.updateGlobalLimitDisplay();
+                return true;
+            };
+
             const generateChunks = async () => {
                 if (!sourceText.trim()) {
                     showToast('Wklej tekst, który chcesz uprościć!');
@@ -157,6 +234,12 @@
                 }
                 if (sourceText.length < 50) {
                     showToast('Tekst jest za krótki. Wklej co najmniej jeden pełny akapit.');
+                    return;
+                }
+                
+                // Sprawdzanie limitów z nowego wspólnego systemu
+                if (!updateAndCheckLimit()) {
+                    showToast('Wykorzystano dzienny limit darmowych użyć.');
                     return;
                 }
                 
@@ -188,7 +271,12 @@
                 const userPrompt = `Tekst źródłowy: "${sourceText}". \nWiek ucznia: ${params.age}. \nRozmiar porcji: ${params.chunkSize}. \nProszę o przetworzenie tekstu zgodnie z zasadami chunkingu.`;
 
                 try {
-                    // Łączymy się z prywatnym Vercel API (Niezawodność i Szybkość)
+                    // Blokada i tryb demonstracyjny, gdy plik odpalamy bezpośrednio na dysku
+                    if (window.location.protocol === 'file:' || window.location.hostname === '' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                        throw new Error("TestLocal");
+                    }
+
+                    // Łączymy się z Vercel API (OpenAI)
                     const payload = { 
                         system: systemPrompt,
                         prompt: userPrompt,
@@ -240,9 +328,27 @@
                     setBotMessage("Gotowe! Rozbiłem ten tekst na proste kawałki. Zobacz podgląd po prawej stronie, dyrekcja będzie dumna!");
                     
                 } catch (error) {
-                    console.error("Błąd AI:", error); 
-                    showToast(`Błąd: ${error.message}`);
-                    setBotMessage("Serwer jest obciążony. Odczekaj chwilę i spróbuj jeszcze raz.");
+                    if (error.message === "TestLocal") {
+                        // Demo fallback offline
+                        setTimeout(() => {
+                            setChunkedData({
+                                title: "Fotosynteza w pigułce (Wersja Demo)",
+                                chunks: [
+                                    { icon: "☀️", heading: "Energia ze Słońca", content: "Rośliny działają jak małe fabryki. Potrzebują światła słonecznego, aby stworzyć dla siebie jedzenie.", keywords_to_bold: ["światła słonecznego", "jedzenie"] },
+                                    { icon: "🍃", heading: "Magiczny Chlorofil", content: "Ta magia dzieje się w zielonych liściach. Mają w sobie specjalny barwnik zwany chlorofilem.", keywords_to_bold: ["liściach", "chlorofilem"] },
+                                    { icon: "💨", heading: "Oddychamy dzięki nim", content: "Rośliny produkują glukozę, którą zjadają. Ale wypuszczają też do atmosfery tlen, którym my oddychamy!", keywords_to_bold: ["glukozę", "tlen"] }
+                                ],
+                                summary: "Rośliny używają słońca, wody i powietrza, aby zrobić jedzenie i dać nam tlen.",
+                                quiz: ["Skąd roślina czerpie energię?", "Jak nazywa się zielony barwnik w liściach?"]
+                            });
+                            setBotMessage("To jest wersja demonstracyjna offline. Gdy wrzucisz ten plik na serwer eduboxpro.pl połączy się on bezproblemowo z AI!");
+                            setIsGenerating(false);
+                        }, 1200);
+                    } else {
+                        console.error("Błąd AI:", error); 
+                        showToast(`Błąd: ${error.message}`);
+                        setBotMessage("Serwer jest obciążony. Odczekaj chwilę i spróbuj jeszcze raz.");
+                    }
                 } finally { 
                     setIsGenerating(false); 
                 }
@@ -291,7 +397,7 @@
             };
 
             return (
-                <div className="min-h-screen flex flex-col relative overflow-x-hidden">
+                <div className="flex flex-col relative overflow-x-hidden flex-grow">
                     
                     {/* POWIADOMIENIA TOAST */}
                     {toastMessage && (
@@ -314,36 +420,35 @@
                         </div>
                     )}
 
-                    {/* GÓRNA NAWIGACJA */}
-                    <nav className="fixed top-0 w-full z-50 glass-nav py-4 px-6 print-hidden">
-                        <div className="max-w-7xl mx-auto flex justify-between items-center">
-                            <div className="flex items-center space-x-3 font-extrabold text-xl tracking-tight cursor-pointer" onClick={() => window.scrollTo(0,0)}>
-                                <div className={`bg-gradient-to-br from-teal-500 to-indigo-600 p-2 rounded-xl text-white shadow-lg`}>
-                                    <Icon name="Brain" size={22}/>
-                                </div>
-                                <span>Edu<span className="text-teal-400">Chunk</span> AI</span>
-                            </div>
-                            
-                            <div className="flex items-center space-x-4">
-                                {!isPremium && (
-                                    <div className="hidden md:flex items-center space-x-2 bg-slate-900 p-1.5 rounded-xl border border-slate-700">
-                                        <input value={accessCode} onChange={e => setAccessCode(e.target.value)} placeholder="Kod Premium..." className="p-2 bg-transparent text-sm w-32 outline-none font-medium text-white placeholder-slate-500"/>
-                                        <button onClick={handleVerifyCode} className="p-2 text-white rounded-lg bg-teal-600 hover:bg-teal-500 transition-colors shadow-md"><Icon name="Lock" size={16}/></button>
-                                    </div>
-                                )}
-                                <button onClick={() => window.open('https://buycoffee.to/magiccolor')} className="flex items-center space-x-2 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white px-5 py-2.5 rounded-xl font-bold transition-all active:scale-95 text-sm shadow-md">
-                                    <Icon name="Coffee" size={18} className="text-amber-400"/><span>Postaw Kawę</span>
-                                </button>
-                            </div>
-                        </div>
-                    </nav>
-
                     {/* GŁÓWNY WIDOK APLIKACJI */}
-                    <div className="max-w-7xl mx-auto px-4 pt-32 pb-24 grid grid-cols-1 lg:grid-cols-12 gap-8 w-full print:block print:p-0 relative z-10">
+                    <div className="max-w-7xl mx-auto px-4 pt-10 sm:pt-24 pb-24 grid grid-cols-1 lg:grid-cols-12 gap-8 w-full print:block print:p-0 relative z-10">
                         
                         {/* PANEL LEWY - KONFIGURACJA */}
                         <div className="lg:col-span-4 space-y-6 print-hidden">
                             
+                            <div className="text-center md:text-left mb-6">
+                                <h1 className="text-4xl font-extrabold tracking-tight text-white flex items-center justify-center md:justify-start gap-3">
+                                    <div className="bg-gradient-to-br from-teal-500 to-indigo-600 p-2.5 rounded-xl shadow-lg">
+                                        <Icon name="Brain" size={26}/>
+                                    </div>
+                                    Edu<span className="text-teal-400">Chunk</span>
+                                </h1>
+                                <p className="text-slate-400 text-sm mt-3 font-medium">Podziel niezrozumiałą ścianę tekstu na czytelne "fiszki" dopasowane do ADHD/Dysleksji.</p>
+                            </div>
+
+                            {/* OSTRZEŻENIE O LIMICIE DLA NIE-PRO */}
+                            {limitData.showWarning && !isPremium && (
+                                <div className="bg-red-900/40 border border-red-500/50 rounded-2xl p-6 text-center shadow-lg fade-in">
+                                    <h3 className="text-xl sm:text-2xl font-black text-white mb-2">Limit dzienny osiągnięty</h3>
+                                    <p className="text-slate-300 mb-4 text-sm sm:text-base">
+                                        Wykorzystałeś dzisiejsze 5 darmowych generowań. Odblokuj pełen potencjał kodem na górnym pasku.
+                                    </p>
+                                    <a href="https://buycoffee.to/magiccolor" target="_blank" className="w-full inline-flex items-center justify-center gap-2 bg-amber-500 text-slate-900 px-6 py-3 rounded-xl font-bold shadow-lg hover:bg-amber-400 transition-colors">
+                                        ☕ Postaw Kawę
+                                    </a>
+                                </div>
+                            )}
+
                             <div className="glass-panel p-6 md:p-8 rounded-[2rem] space-y-6">
                                 <div className="flex justify-between items-center border-b border-slate-700/50 pb-4">
                                     <h2 className={`font-bold text-sm uppercase tracking-widest text-teal-400 flex items-center gap-2`}>
@@ -407,19 +512,15 @@
                                     </div>
                                 </div>
 
-                                {!isPremium ? (
-                                    <div className="p-6 rounded-xl border-2 border-dashed border-slate-700 flex flex-col items-center justify-center text-center gap-3 bg-slate-900/50">
-                                        <div className="p-3 bg-slate-800 rounded-full"><Icon name="Lock" size={24} className="text-slate-400"/></div>
-                                        <div>
-                                            <span className="text-sm font-bold text-slate-300 block mb-1">Funkcja zablokowana</span>
-                                            <span className="text-xs text-slate-500">Wpisz kod Premium na górnym pasku.</span>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <button onClick={generateChunks} disabled={isGenerating} className={`w-full bg-gradient-to-r from-teal-500 to-indigo-600 text-white py-4 rounded-xl font-black text-sm tracking-widest shadow-[0_0_20px_rgba(45,212,191,0.3)] flex justify-center items-center gap-2 transition-all active:scale-95 uppercase disabled:opacity-50`}>
-                                        <Icon name="Sparkles" size={20}/> Zmień w Mikro-lekcję
-                                    </button>
-                                )}
+                                <button 
+                                    onClick={generateChunks} 
+                                    disabled={isGenerating || !sourceText.trim() || (!isPremium && limitData.remaining === 0)} 
+                                    className={`w-full py-4 rounded-xl font-black text-sm tracking-widest flex justify-center items-center gap-2 transition-all uppercase 
+                                        ${isGenerating ? 'bg-slate-700 cursor-wait' : (!isPremium && limitData.remaining === 0) ? 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700' : 'bg-gradient-to-r from-teal-500 to-indigo-600 text-white shadow-[0_0_20px_rgba(45,212,191,0.3)] active:scale-95'}`}
+                                >
+                                    <Icon name="Sparkles" size={20}/> Zmień w Mikro-lekcję
+                                </button>
+                                
                             </div>
 
                             {/* AGENT EDU-BOT (POMOCNIK) */}
