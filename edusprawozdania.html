@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="pl" translate="no" class="notranslate">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduSprawozdawca PRO - Generator Sprawozdań Szkolnych i Przedszkolnych</title>
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-3RQ9R0N0K8"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-3RQ9R0N0K8');
+    </script>
+    
+    <!-- Biblioteki -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- PDF.js do odczytu plików -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';</script>
+
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+    <style>
+        body { 
+            font-family: 'Plus Jakarta Sans', sans-serif; 
+            background-color: #020617; 
+            color: #f8fafc; 
+            overflow-x: hidden;
+            min-height: 100vh;
+        }
+        
+        .glass-panel { background: rgba(30, 41, 59, 0.4); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.05); }
+        .glass-nav { background: rgba(2, 6, 23, 0.9); backdrop-filter: blur(20px); border-bottom: 1px solid rgba(255, 255, 255, 0.1); }
+        
+        .hero-glow { position: fixed; top: -10%; left: 50%; transform: translateX(-50%); width: 800px; height: 600px; background: radial-gradient(circle, rgba(14, 165, 233, 0.15) 0%, rgba(2, 6, 23, 0) 60%); z-index: -1; pointer-events: none; }
+        
+        .btn-bounce:active { transform: scale(0.95); transition: transform 0.1s; }
+        .fade-in { animation: fadeIn 0.4s ease-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #0f172a; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #0ea5e9; }
+
+        .upload-box { border: 2px dashed #334155; transition: all 0.3s; }
+        .upload-box:hover { border-color: #0ea5e9; background: rgba(14, 165, 233, 0.05); }
+
+        #wspolne-menu-kontener { position: relative; z-index: 100; }
+
+        /* Style wydruku */
+        @media print {
+            body { background: white !important; color: black !important; font-family: 'Times New Roman', Times, serif; }
+            .print-hidden, #wspolne-menu-kontener { display: none !important; }
+            .print-container { width: 100% !important; max-width: none !important; margin: 0 !important; padding: 0 !important; box-shadow: none !important; border: none !important; }
+            h1, h2 { color: black !important; page-break-after: avoid; }
+            p { text-align: justify; font-size: 12pt; line-height: 1.5; }
+        }
+        
+        @keyframes slide-up { 0% { opacity: 0; transform: translate(-50%, 20px); } 100% { opacity: 1; transform: translate(-50%, 0); } }
+        .animate-toast { animation: slide-up 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+    </style>
+</head>
+<body class="flex flex-col">
+
+    <div id="wspolne-menu-kontener"></div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            function wstawMenuAwaryjne() {
+                document.getElementById('wspolne-menu-kontener').innerHTML = `
+                    <nav class="w-full z-50 glass-nav shadow-lg print-hidden">
+                        <div class="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+                            <a href="index.html" class="flex items-center gap-2 hover:opacity-80 transition-opacity">
+                                <span class="text-2xl font-black text-white tracking-tight">Edu<span class="text-sky-500">Box</span></span>
+                                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest border border-slate-700 rounded px-1.5 py-0.5 ml-1">Pro</span>
+                            </a>
+                        </div>
+                    </nav>
+                `;
+            }
+            try {
+                fetch('/menu.html')
+                    .then(response => { if (!response.ok) throw new Error('Error'); return response.text(); })
+                    .then(data => {
+                        document.getElementById('wspolne-menu-kontener').innerHTML = data;
+                        if (typeof window.initMenuLogic === 'function') window.initMenuLogic();
+                    })
+                    .catch(() => wstawMenuAwaryjne());
+            } catch (e) { wstawMenuAwaryjne(); }
+        });
+    </script>
+
+    <div id="root" class="flex-grow flex flex-col relative z-10"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+        const DAILY_LIMIT = 5;
+
+        // --- IKONY ---
+        const Icon = ({ name, size = 20, className = "" }) => {
+            const icons = {
+                FileText: <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></>,
+                Upload: <><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></>,
+                CheckCircle: <><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></>,
+                Sparkles: <path d="m12 3 1.912 5.813a2 2 0 0 0 1.275 1.275L21 12l-5.813 1.912a2 2 0 0 0-1.275 1.275L12 21l-1.912-5.813a2 2 0 0 0-1.275-1.275L3 12l5.813-1.912a2 2 0 0 0 1.275-1.275L12 3Z"/>,
+                Printer: <path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6z"/>,
+                Download: <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>,
+                School: <><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></>,
+                Baby: <><path d="M9 12h.01M15 12h.01M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z"/><path d="M8.5 15.5a5 5 0 0 0 7 0"/></>
+            };
+            return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>{icons[name]}</svg>;
+        };
+
+        const extractTextFromPDF = async (file) => {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = async function(e) {
+                    try {
+                        const typedarray = new Uint8Array(e.target.result);
+                        const pdf = await pdfjsLib.getDocument(typedarray).promise;
+                        let text = "";
+                        for (let i = 1; i <= pdf.numPages; i++) {
+                            const page = await pdf.getPage(i);
+                            const content = await page.getTextContent();
+                            const strings = content.items.map(item => item.str);
+                            text += strings.join(" ") + "\n";
+                        }
+                        resolve(text);
+                    } catch (err) { reject(err); }
+                };
+                reader.readAsArrayBuffer(file);
+            });
+        };
+
+        function App() {
+            const [isPro, setIsPro] = useState(() => {
+                return localStorage.getItem('eduboxProStatus') === 'active' || localStorage.getItem('eduAwansPremium') === 'active';
+            });
+            const [limitData, setLimitData] = useState({ remaining: DAILY_LIMIT, showWarning: false });
+
+            // Formularz
+            const [role, setRole] = useState('szkola'); // szkola | przedszkole
+            const [reportType, setReportType] = useState('polroczne'); // polroczne | roczne | inne
+            const [notes, setNotes] = useState('');
+            const [customTemplate, setCustomTemplate] = useState('');
+            const [uploadedFilesText, setUploadedFilesText] = useState('');
+            
+            // Statusy
+            const [isGenerating, setIsGenerating] = useState(false);
+            const [loadingMsg, setLoadingMsg] = useState('');
+            const [toastMessage, setToastMessage] = useState('');
+            const [generatedReport, setGeneratedReport] = useState('');
+            const resultRef = useRef(null);
+
+            const schoolPills = ["Niska frekwencja", "Problemy z zachowaniem", "Realizacja podstawy programowej", "Integracja zespołu", "Wycieczki szkolne"];
+            const kinderPills = ["Rozwój motoryki małej", "Zabawy swobodne", "Samoobsługa w szatni", "Zaburzenia SI", "Adaptacja grupowa"];
+
+            useEffect(() => {
+                const today = new Date().toLocaleDateString();
+                let usage = JSON.parse(localStorage.getItem('eduboxUsage')) || { date: today, count: 0 };
+                if (usage.date !== today) {
+                    localStorage.setItem('eduboxUsage', JSON.stringify({ date: today, count: 0 }));
+                    setLimitData({ remaining: DAILY_LIMIT, showWarning: false });
+                } else {
+                    setLimitData({ remaining: Math.max(0, DAILY_LIMIT - usage.count), showWarning: usage.count >= DAILY_LIMIT });
+                }
+            }, []);
+
+            const showToast = (msg) => { setToastMessage(msg); setTimeout(() => setToastMessage(''), 3000); };
+
+            const updateAndCheckLimit = () => {
+                if (isPro) return true;
+                const today = new Date().toLocaleDateString();
+                let usage = JSON.parse(localStorage.getItem('eduboxUsage')) || { date: today, count: 0 };
+                if (usage.date !== today) usage = { date: today, count: 0 };
+                
+                if (usage.count >= DAILY_LIMIT) {
+                    setLimitData({ remaining: 0, showWarning: true });
+                    return false;
+                }
+                usage.count += 1;
+                localStorage.setItem('eduboxUsage', JSON.stringify(usage));
+                setLimitData({ remaining: DAILY_LIMIT - usage.count, showWarning: false });
+                if(typeof window.updateGlobalLimitDisplay === 'function') window.updateGlobalLimitDisplay();
+                return true;
+            };
+
+            const handleFileUpload = async (e) => {
+                const files = Array.from(e.target.files);
+                if (files.length === 0) return;
+                setLoadingMsg('Analizuję pliki...'); setIsGenerating(true);
+                let combinedText = "";
+                try {
+                    for (const file of files) {
+                        if (file.type === "text/plain") {
+                            combinedText += `\n[PLIK: ${file.name}]\n${await file.text()}\n`;
+                        } else if (file.type === "application/pdf") {
+                            combinedText += `\n[PLIK: ${file.name}]\n${await extractTextFromPDF(file)}\n`;
+                        }
+                    }
+                    setUploadedFilesText(combinedText);
+                    showToast('✅ Pliki wczytane poprawnie!');
+                } catch(err) { showToast(`Błąd odczytu: ${err.message}`); } 
+                finally { setIsGenerating(false); setLoadingMsg(''); }
+            };
+
+            const generateReport = async () => {
+                if (!notes.trim() && !uploadedFilesText) {
+                    showToast('Wpisz notatki lub wgraj pliki z danymi!');
+                    return;
+                }
+                if (!updateAndCheckLimit()) return;
+
+                setIsGenerating(true);
+                setLoadingMsg('Analizuję dane i układam urzędowe akapity...');
+                setGeneratedReport('');
+
+                try {
+                    let roleDesc = role === 'przedszkole' 
+                        ? "wychowawcą i nauczycielem wychowania przedszkolnego. Analizujesz rozwój psychofizyczny dzieci, samoobsługę, motorykę oraz gotowość szkolną." 
+                        : "nauczycielem wychowawcą w szkole. Zwracasz uwagę na realizację podstawy programowej, wyniki w nauce, frekwencję oraz problemy wychowawcze w klasie.";
+                    
+                    let typeDesc = reportType === 'polroczne' ? "Sprawozdanie Półroczne z pracy wychowawczo-dydaktycznej" : 
+                                   reportType === 'roczne' ? "Sprawozdanie Roczne (podsumowujące)" : "Sprawozdanie z realizacji zadań edukacyjnych";
+
+                    let systemPrompt = `Jesteś perfekcyjnym szkolnym biurokratą i wybitnym pedagogiem. Twoim zadaniem jest napisanie oficjalnego dokumentu: "${typeDesc}". \nDziałasz jako: ${roleDesc}.
+ZASADY KRYTYCZNE:
+1. Używaj wysoce sformalizowanego, profesjonalnego żargonu pedagogicznego i urzędowego.
+2. Pisz konkretnie, układaj tekst w logiczne akapity. Używaj formy pierwszej osoby (np. "W minionym semestrze zrealizowałem/am...").
+3. Nie owijaj w bawełnę, wymień konkrety na podstawie notatek.`;
+
+                    if (customTemplate.trim()) {
+                        systemPrompt += `\n\nUWAGA: Użytkownik podał własny "Wzór placówki". MUSISZ ułożyć sprawozdanie dokładnie pod te nagłówki/punkty, wypełniając je merytoryczną treścią:\n"""${customTemplate}"""`;
+                    }
+
+                    const finalPrompt = `Stwórz kompletne sprawozdanie. \nNotatki własne wychowawcy/nauczyciela:\n${notes}\n\nDane dodatkowe z plików (np. e-dziennik, frekwencja, uwagi):\n${uploadedFilesText}`;
+
+                    if (window.location.protocol === 'file:') throw new Error("LocalTest");
+
+                    const res = await fetch('/api/chat', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ system: systemPrompt, prompt: finalPrompt, temperature: 0.3 })
+                    });
+                    
+                    const data = await res.json();
+                    if (!res.ok) throw new Error(data.message || "Błąd serwera");
+
+                    let text = data.text;
+                    text = text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+                    // Zmiana markdown na czystszy tekst (usuwanie gwiazdek z nagłówków do eksportu)
+                    text = text.replace(/\*\*(.*?)\*\*/g, '$1'); 
+                    
+                    setGeneratedReport(text);
+                    setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
+
+                } catch (err) {
+                    if (err.message === "LocalTest") {
+                        setGeneratedReport("To jest wersja demonstracyjna (Offline). Wrzuć plik na Vercel (eduboxpro.pl), aby system AI połączył się z API i wygenerował pełnoprawne, profesjonalne sprawozdanie półroczne lub roczne.");
+                        showToast("Tryb podglądu lokalnego.");
+                    } else {
+                        showToast(`Błąd: ${err.message}`);
+                    }
+                } finally {
+                    setIsGenerating(false);
+                    setLoadingMsg('');
+                }
+            };
+
+            const exportToWord = () => {
+                if(!generatedReport) return;
+                
+                const header = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>Sprawozdanie</title><style>body {font-family: 'Times New Roman', Times, serif; font-size: 12pt; line-height: 1.5; color: #000; text-align: justify;}</style></head><body>`;
+                const footer = `</body></html>`;
+                
+                // Konwersja znaków nowej linii na akapity Worda
+                const formattedText = generatedReport.split('\n').map(para => `<p>${para}</p>`).join('');
+
+                const blob = new Blob(['\ufeff', header + formattedText + footer], { type: 'application/msword' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = `Sprawozdanie_${reportType}.doc`;
+                link.click();
+            };
+
+            const activePills = role === 'szkola' ? schoolPills : kinderPills;
+
+            return (
+                <div className="flex flex-col relative overflow-x-hidden flex-grow pt-10 pb-20">
+                    <div className="hero-glow"></div>
+
+                    {toastMessage && (
+                        <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[200] bg-sky-600 text-white px-6 py-3 rounded-full font-bold shadow-[0_10px_40px_rgba(14,165,233,0.5)] animate-toast flex items-center gap-2">
+                            <Icon name="CheckCircle" size={18} /> {toastMessage}
+                        </div>
+                    )}
+
+                    <div className="max-w-7xl mx-auto px-4 sm:px-6 w-full">
+                        
+                        <div className="text-center mb-10 fade-in print-hidden">
+                            <h1 className="text-4xl md:text-5xl font-black text-white mb-4 tracking-tight">
+                                Edu<span className="text-sky-500">Sprawozdawca</span> AI
+                            </h1>
+                            <p className="text-slate-400 text-lg max-w-2xl mx-auto">
+                                Zostaw biurokrację sztucznej inteligencji. Wgraj oceny i wpisz luźne notatki z półrocza, a otrzymasz gotowe do wydruku sprawozdanie.
+                            </p>
+                        </div>
+
+                        {limitData.showWarning && !isPro && (
+                            <div className="bg-red-900/40 border border-red-500/50 rounded-2xl p-6 text-center shadow-lg fade-in mb-8 print-hidden">
+                                <h3 className="text-xl sm:text-2xl font-black text-white mb-2">Limit dzienny osiągnięty (5/5)</h3>
+                                <p className="text-slate-300 mb-4 text-sm sm:text-base">Odblokuj pełen potencjał kodem na górnym pasku.</p>
+                            </div>
+                        )}
+
+                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 print-hidden">
+                            
+                            {/* LEWA KOLUMNA: Konfiguracja */}
+                            <div className="lg:col-span-5 space-y-6 fade-in" style={{animationDelay: '0.1s'}}>
+                                
+                                <div className="glass-panel p-6 md:p-8 rounded-[2rem]">
+                                    <h2 className="text-lg font-black text-sky-400 mb-4 uppercase tracking-widest flex items-center gap-2">
+                                        <Icon name="FileText" /> 1. Konfiguracja
+                                    </h2>
+
+                                    <div className="space-y-5">
+                                        <div>
+                                            <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Działam jako:</label>
+                                            <div className="flex bg-slate-900/50 p-1 rounded-xl border border-slate-700">
+                                                <button onClick={() => setRole('szkola')} className={`flex-1 py-3 text-sm font-bold rounded-lg flex items-center justify-center gap-2 transition-all ${role === 'szkola' ? 'bg-sky-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}><Icon name="School" size={16}/> Szkoła</button>
+                                                <button onClick={() => setRole('przedszkole')} className={`flex-1 py-3 text-sm font-bold rounded-lg flex items-center justify-center gap-2 transition-all ${role === 'przedszkole' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}><Icon name="Baby" size={16}/> Przedszkole</button>
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Rodzaj sprawozdania:</label>
+                                            <select value={reportType} onChange={(e) => setReportType(e.target.value)} className="w-full bg-slate-900 border border-slate-700 text-white rounded-xl p-3 focus:outline-none focus:border-sky-500 font-medium">
+                                                <option value="polroczne">Sprawozdanie Półroczne (Semestr I)</option>
+                                                <option value="roczne">Sprawozdanie Roczne (Koniec Roku)</option>
+                                                <option value="inne">Inne (Dostosowane w notatkach)</option>
+                                            </select>
+                                        </div>
+
+                                        <div>
+                                            <label className="text-xs font-bold text-amber-400 uppercase mb-2 block flex items-center justify-between">
+                                                <span>Szkolny Szablon (Opcjonalnie)</span>
+                                            </label>
+                                            <textarea 
+                                                value={customTemplate} onChange={(e) => setCustomTemplate(e.target.value)}
+                                                placeholder="Wklej tu puste nagłówki / formularz z Worda wymagany w Twojej placówce. AI wypełni go treścią."
+                                                className="w-full h-24 bg-slate-900/80 border border-slate-700 text-slate-300 rounded-xl p-3 focus:outline-none focus:border-amber-500 custom-scrollbar resize-y text-sm"
+                                            ></textarea>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* PRAWA KOLUMNA: Wkład */}
+                            <div className="lg:col-span-7 space-y-6 fade-in" style={{animationDelay: '0.2s'}}>
+                                
+                                <div className="glass-panel p-6 md:p-8 rounded-[2rem] border-sky-500/30">
+                                    <h2 className="text-lg font-black text-white mb-4 flex items-center gap-2">
+                                        <Icon name="Upload" className="text-sky-400" /> 2. Zasilanie AI Danymi
+                                    </h2>
+                                    
+                                    <div className="space-y-6">
+                                        <div>
+                                            <div className="upload-box relative bg-slate-900/50 rounded-2xl p-6 text-center cursor-pointer">
+                                                <input type="file" multiple accept=".pdf,.txt" onChange={handleFileUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+                                                <div className="flex flex-col items-center gap-2 pointer-events-none">
+                                                    <div className="w-12 h-12 bg-slate-800 rounded-full flex items-center justify-center text-slate-400 border border-slate-700"><Icon name="Upload" size={24}/></div>
+                                                    <span className="text-sm font-bold text-white mt-2">Przeciągnij lub kliknij, aby wgrać pliki</span>
+                                                    <span className="text-xs text-slate-400">PDF z e-dziennika (Oceny, Frekwencja, Uwagi)</span>
+                                                </div>
+                                            </div>
+                                            {uploadedFilesText && <div className="mt-3 text-xs font-bold text-emerald-400 bg-emerald-900/20 p-2 rounded-lg text-center border border-emerald-500/30">Wczytano dokumenty - gotowe do analizy!</div>}
+                                        </div>
+
+                                        <div>
+                                            <label className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 block">Twoje luźne notatki / obserwacje</label>
+                                            <textarea 
+                                                value={notes} onChange={(e) => setNotes(e.target.value)}
+                                                placeholder="Wpisz np. 'Zorganizowałem 3 wycieczki, klasa ma problem z matematyką, ale chłopcy zintegrowali się na wf-ie...'"
+                                                className="w-full h-32 bg-slate-900/80 border border-slate-700 text-slate-100 rounded-xl p-4 focus:outline-none focus:border-sky-500 custom-scrollbar resize-y text-sm leading-relaxed"
+                                            ></textarea>
+                                            
+                                            <div className="flex flex-wrap gap-2 mt-3">
+                                                {activePills.map(pill => (
+                                                    <button key={pill} onClick={() => setNotes(prev => prev + (prev ? ', ' : '') + pill)} className="text-[10px] uppercase font-bold tracking-wider bg-slate-800 hover:bg-sky-900 text-slate-400 hover:text-sky-300 px-3 py-1.5 rounded-full border border-slate-700 transition-colors">
+                                                        + {pill}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        <button 
+                                            onClick={generateReport} disabled={isGenerating || (!isPro && limitData.remaining === 0)}
+                                            className="w-full bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white py-4 rounded-xl font-black text-sm uppercase tracking-widest flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(14,165,233,0.3)] btn-bounce transition-all disabled:opacity-50"
+                                        >
+                                            {isGenerating ? (
+                                                <><svg className="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> {loadingMsg}</>
+                                            ) : <><Icon name="Sparkles" /> Ułóż Profesjonalne Sprawozdanie</>}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* WYNIK - EDYTOR I WYDRUK */}
+                        {generatedReport && (
+                            <div ref={resultRef} className="mt-8 glass-panel p-6 sm:p-10 rounded-[2rem] border-emerald-500/30 fade-in shadow-2xl bg-slate-900/90">
+                                
+                                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 pb-4 border-b border-slate-700 print-hidden gap-4">
+                                    <div>
+                                        <h2 className="text-2xl font-black text-white">Gotowe Sprawozdanie</h2>
+                                        <p className="text-sm text-slate-400">Tekst jest edytowalny. Wprowadź poprawki i pobierz do Worda.</p>
+                                    </div>
+                                    <div className="flex gap-2 w-full sm:w-auto">
+                                        <button onClick={exportToWord} className="flex-1 sm:flex-none bg-sky-600 hover:bg-sky-500 text-white px-5 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg btn-bounce text-sm">
+                                            <Icon name="Download" size={18} /> Pobierz WORD
+                                        </button>
+                                        <button onClick={() => window.print()} className="flex-1 sm:flex-none bg-slate-700 hover:bg-slate-600 text-white px-5 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 btn-bounce text-sm border border-slate-600">
+                                            <Icon name="Printer" size={18} /> Drukuj PDF
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Pole tekstowe w stylu kartki A4 */}
+                                <div className="w-full max-w-[210mm] mx-auto bg-white rounded-lg shadow-xl print-container">
+                                    <textarea 
+                                        value={generatedReport} 
+                                        onChange={(e) => setGeneratedReport(e.target.value)}
+                                        className="w-full min-h-[297mm] bg-transparent text-black font-serif text-[12pt] leading-relaxed p-10 md:p-16 resize-y focus:outline-none"
+                                    ></textarea>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
