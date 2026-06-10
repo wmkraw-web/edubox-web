@@ -264,26 +264,24 @@ Ton pisma ma być oficjalny, kategoryczny, powołujący się na współpracę ze
                     const systemInstruction = PROMPTS[activeTab];
                     const finalPrompt = `Stwórz dokument na podstawie tych informacji. Pamiętaj aby usunąć z niego wrażliwe dane ucznia i zastąpić je inicjałami lub wykropkowaniem:\n\n"""\n${inputText}\n"""`;
 
-                    const payload = {
-                        contents: [{ parts: [{ text: finalPrompt }] }],
-                        systemInstruction: { parts: [{ text: systemInstruction }] },
-                        generationConfig: { temperature: 0.2 } 
-                    };
-
-                    let data;
-                    if (window.location.hostname !== '' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-                        const response = await fetch('/api/gemini', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ payload, type: 'text' })
-                        });
-                        if (!response.ok) throw new Error(`Błąd serwera API: ${response.status}`);
-                        data = await response.json();
-                    } else {
+                    if (window.location.hostname === '' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
                         throw new Error("LocalTest");
                     }
 
-                    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                    const response = await fetch('/api/chat', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                            system: systemInstruction,
+                            prompt: finalPrompt,
+                            temperature: 0.2
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    if (!response.ok) throw new Error(data.message || data.error || `Błąd serwera API: ${response.status}`);
+
+                    let text = data.text;
                     if (text) {
                         setGeneratedText(text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim());
                         setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
