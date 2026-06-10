@@ -300,7 +300,8 @@
                     textFormats, titleBoxWidth, titleBoxOpacity, titleBoxOffset, boxWidth, boxOpacity, boxOffset,
                     bgImageOpacity, diplomaTextColor, diplomaBgColor, diplomaBorderColor, borderStyle, borderWidth,
                     selectedThemeId, selectedFont, artStyle, graphicLayout, diplomaOrientation,
-                    garlandText, garlandTextColor, garlandLetterSize, garlandLetterOffset, garlandShape
+                    garlandText, garlandTextColor, garlandLetterSize, garlandLetterOffset, garlandShape,
+                    customImage
                 };
                 
                 try {
@@ -308,13 +309,20 @@
                     const appId = window.__app_id || 'eduboxpro';
                     const publicRef = collection(db, 'artifacts', appId, 'public', 'data', 'gielda_wzorow_edugenerator');
                     
-                    await addDoc(publicRef, {
+                    const payload = {
                         userId: user.uid,
                         createdAt: serverTimestamp(),
                         type: activeTab === 'garland' ? 'Girlanda' : 'Dyplom',
                         name: `${activeTab === 'garland' ? 'Girlanda' : 'Dyplom'} - ${THEMES.find(t=>t.id===selectedThemeId)?.name || 'Własny'}`,
                         config: currentConfig
-                    });
+                    };
+
+                    if (JSON.stringify(payload).length > 950000) {
+                        showToast("🚨 Użyta grafika jest za duża by zapisać ją w chmurze (Max ~1MB)!");
+                        return;
+                    }
+
+                    await addDoc(publicRef, payload);
                     showToast("✨ Zapisano w Giełdzie Wzorów!");
                 } catch (e) {
                     console.error(e);
@@ -357,8 +365,9 @@
                 if (c.garlandLetterSize) setGarlandLetterSize(c.garlandLetterSize);
                 if (c.garlandLetterOffset !== undefined) setGarlandLetterOffset(c.garlandLetterOffset);
                 if (c.garlandShape) setGarlandShape(c.garlandShape);
+                if (c.customImage !== undefined) setCustomImage(c.customImage);
+                else setCustomImage(null);
                 
-                setCustomImage(null); // Brak wsparcia dla b64 we wzorach z uwagi na optymalizację DB
                 showToast("✨ Wzór z Giełdy wczytany!");
             };
 
@@ -520,7 +529,7 @@
                     <style>{`
                         @media print {
                             @page { 
-                                size: ${isLandscape ? '297mm 210mm' : '210mm 297mm'} !important; 
+                                size: ${isLandscape ? 'A4 landscape' : 'A4 portrait'} !important; 
                                 margin: 0 !important; 
                             }
                             body, html { 
@@ -541,8 +550,8 @@
                                 position: absolute !important; 
                                 left: 0 !important; 
                                 top: 0 !important; 
-                                width: 100% !important; 
-                                height: 100% !important; 
+                                width: ${isLandscape ? '297mm' : '210mm'} !important; 
+                                height: ${isLandscape ? '210mm' : '297mm'} !important; 
                                 margin: 0 !important; 
                                 padding: 15mm !important; 
                                 box-shadow: none !important; 
@@ -1025,9 +1034,14 @@
                                 )}
                             </div>
 
-                            <button onClick={() => checkLimitAndExecute(() => window.print())} className="absolute -bottom-6 md:-bottom-12 left-1/2 -translate-x-1/2 bg-indigo-600 hover:bg-indigo-500 text-white px-10 py-5 rounded-2xl font-black text-sm md:text-base tracking-widest flex items-center justify-center gap-3 shadow-[0_10px_40px_rgba(99,102,241,0.5)] transition-all btn-bounce uppercase print-hidden z-50 whitespace-nowrap">
-                                <i className="ph-bold ph-printer text-2xl"></i><span>Drukuj (PDF)</span>
-                            </button>
+                            <div className="absolute -bottom-6 md:-bottom-12 left-1/2 -translate-x-1/2 flex items-center justify-center gap-2 sm:gap-4 print-hidden z-50 w-[95%] sm:w-auto">
+                                <button onClick={() => checkLimitAndExecute(sharePattern)} className="bg-fuchsia-600 hover:bg-fuchsia-500 text-white px-4 sm:px-8 py-4 sm:py-5 rounded-2xl font-black text-[10px] sm:text-sm md:text-base tracking-widest flex items-center justify-center gap-2 shadow-[0_10px_40px_rgba(192,38,211,0.4)] transition-all btn-bounce uppercase whitespace-nowrap flex-1 sm:flex-none">
+                                    <i className="ph-bold ph-cloud-arrow-up text-xl md:text-2xl"></i><span>Do Biblioteki</span>
+                                </button>
+                                <button onClick={() => checkLimitAndExecute(() => window.print())} className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 sm:px-10 py-4 sm:py-5 rounded-2xl font-black text-[10px] sm:text-sm md:text-base tracking-widest flex items-center justify-center gap-2 md:gap-3 shadow-[0_10px_40px_rgba(99,102,241,0.5)] transition-all btn-bounce uppercase whitespace-nowrap flex-1 sm:flex-none">
+                                    <i className="ph-bold ph-printer text-xl md:text-2xl"></i><span>Drukuj (PDF)</span>
+                                </button>
+                            </div>
                         </div>
 
                     </div>
