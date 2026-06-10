@@ -165,7 +165,24 @@
 
             // --- FETCH LIBRARY ---
             useEffect(() => {
-                if (!user || !db) return;
+                if (!user || !db) {
+                    // Tryb awaryjny - wgranie przykładowych wzorów do pamięci
+                    setLibraryItems([
+                        {
+                            id: 'mock1',
+                            title: 'Za humor i uśmiech',
+                            type: 'dyplomy',
+                            content: 'Za żarty, uśmiechy i psoty na przerwie,\nZa to, że z Tobą nikt w klasie nie ziewnie!\nChoć czasem na lekcji za dużo gadasz,\nTo uśmiech na twarzach codziennie układasz!'
+                        },
+                        {
+                            id: 'mock2',
+                            title: 'Oficjalne Podziękowanie (Sponsor)',
+                            type: 'podziekowania',
+                            content: 'Szanowny Panie,\n\nDyrekcja oraz Grono Pedagogiczne pragną złożyć najserdeczniejsze wyrazy podziękowania za bezinteresowną pomoc i wsparcie naszej placówki.\n\nPańska hojność i otwarte serce pozwoliły nam zrealizować cele, które przyniosły wiele radości naszym uczniom.'
+                        }
+                    ]);
+                    return;
+                }
                 const libRef = collection(db, 'artifacts', appId, 'public', 'data', 'diplomas_and_thanks');
                 const unsubscribe = onSnapshot(libRef, (snapshot) => {
                     const items = [];
@@ -220,15 +237,15 @@
                     let userPrompt = "";
 
                     if (type === 'dyplomy') {
-                        systemPrompt = `Jesteś wybitnym polskim poetą dziecięcym (w stylu Jana Brzechwy czy Juliana Tuwima). Piszesz radosne, wpadające w ucho rymowanki na dyplomy przedszkolne i szkolne.
-ZASADY KRYTYCZNE:
-1. Wierszyk musi brzmieć w 100% naturalnie po polsku, jak klasyczna polska literatura dziecięca.
-2. Zachowaj idealny, melodyjny rytm (równa liczba sylab w wersach, tzw. sylabotonizm).
-3. Rymy muszą być DOKŁADNE, polskie i dźwięczne (AABB lub ABAB).
-4. Długość: od 4 do 8 wersów.
-5. Ton: wesoły, z przymrużeniem oka, chwalący ucznia za jego specyficzną cechę.
-6. Zwróć TYLKO SAM TEKST wierszyka, bez tytułów, bez powitań i bez znaków markdown.`;
-                        userPrompt = `Ułóż mistrzowską rymowankę na dyplom.\nImię ucznia: ${childName || 'Uczeń'}\nNagroda za cechę/tytuł: ${childTrait}`;
+                        systemPrompt = `Jesteś wybitnym polskim poetą dziecięcym (w stylu Jana Brzechwy i Juliana Tuwima). 
+ZASADY KRYTYCZNE (ZŁAMIESZ JE = ZAWODZISZ):
+1. Język polski: Wierszyk musi brzmieć w 100% naturalnie, z idealnym polskim rytmem. 
+2. Sylabotonizm: Każdy wers MUSI mieć DOKŁADNIE taką samą liczbę sylab (np. dokładnie 8 sylab w każdym wersie).
+3. Rymy: Używaj DOKŁADNYCH, dźwięcznych polskich rymów (AABB lub ABAB).
+4. Długość: 4 do 8 wersów.
+5. Ton: Bardzo wesoły, z przymrużeniem oka, chwalący ucznia za podaną cechę.
+6. Zwróć TYLKO sam tekst wierszyka, bez tytułów, bez powitań, bez znaków markdown.`;
+                        userPrompt = `Ułóż wesołą, rytmiczną rymowankę na dyplom.\nImię ucznia: ${childName || 'Uczeń'}\nCecha/Tytuł: ${childTrait}`;
                     } else {
                         systemPrompt = `Jesteś mistrzem szkolnej dyplomacji i savoir-vivre'u. Twoim zadaniem jest napisanie oficjalnego, pięknego i wzruszającego podziękowania dla osoby dorosłej lub instytucji. Użyj podniosłego, eleganckiego języka (np. "Składamy serdeczne wyrazy podziękowania..."). Nie pisz wstępów, tylko gotowy tekst dokumentu.`;
                         userPrompt = `Napisz oficjalne podziękowanie.\nDla kogo: ${recipient}\nZa co dziękujemy: ${reason}`;
@@ -296,19 +313,31 @@ ZASADY KRYTYCZNE:
             };
 
             const handlePublishToLibrary = async () => {
-                if (!user || !db) return showToast("Błąd połączenia z bazą danych.");
                 if (!publishTitle.trim()) return showToast("Podaj tytuł, np. 'Dyplom dla gaduły'");
 
                 setIsPublishing(true);
                 try {
-                    const libRef = collection(db, 'artifacts', appId, 'public', 'data', 'diplomas_and_thanks');
-                    await addDoc(libRef, {
+                    const newItem = {
+                        id: Date.now().toString(),
                         title: publishTitle,
                         content: generatedText,
                         type: type,
-                        createdAt: serverTimestamp(),
-                        userId: user.uid
-                    });
+                        createdAt: new Date()
+                    };
+
+                    if (db && user) {
+                        const libRef = collection(db, 'artifacts', appId, 'public', 'data', 'diplomas_and_thanks');
+                        await addDoc(libRef, {
+                            title: publishTitle,
+                            content: generatedText,
+                            type: type,
+                            createdAt: serverTimestamp(),
+                            userId: user.uid
+                        });
+                    } else {
+                        // Tryb awaryjny (zapis w pamięci)
+                        setLibraryItems(prev => [newItem, ...prev]);
+                    }
                     
                     showToast("🎉 Opublikowano w Bibliotece!");
                     setShowPublishModal(false);
