@@ -163,9 +163,10 @@
             const [toastMessage, setToastMessage] = useState('');
             const fileInputRef = useRef(null);
 
-            // FIREBASE & GIEŁDA WZORÓW
+            // FIREBASE, GIEŁDA WZORÓW & LIMITY
             const [user, setUser] = useState(null);
             const [patterns, setPatterns] = useState([]);
+            const [usageCount, setUsageCount] = useState(0);
 
             const [diplomaTitle, setDiplomaTitle] = useState('DYPLOM');
             const [diplomaSubtitle, setDiplomaSubtitle] = useState('ZA WYBITNE OSIĄGNIĘCIA');
@@ -259,6 +260,20 @@
                 return () => unsubscribe();
             }, [user]);
 
+            // ŁADOWANIE STANU LICZNIKA
+            useEffect(() => {
+                const today = new Date().toISOString().split('T')[0];
+                let usageStr = localStorage.getItem('eduboxUsage');
+                if (usageStr) {
+                    try {
+                        const parsed = JSON.parse(usageStr);
+                        if (parsed.date === today) {
+                            setUsageCount(parsed.count);
+                        }
+                    } catch(e) {}
+                }
+            }, []);
+
             // OBSŁUGA LIMITÓW
             const checkLimitAndExecute = (actionFn) => {
                 const status = localStorage.getItem('eduboxProStatus');
@@ -267,25 +282,17 @@
                     return;
                 }
                 
-                const today = new Date().toISOString().split('T')[0];
-                let usageStr = localStorage.getItem('eduboxUsage');
-                let usage = { date: today, count: 0 };
-                
-                if (usageStr) {
-                    try {
-                        const parsed = JSON.parse(usageStr);
-                        if (parsed.date === today) usage = parsed;
-                    } catch(e) {}
-                }
-                
-                if (usage.count >= 5) {
-                    showToast("⚠️ Dzienny limit użyć (5/5) wyczerpany. Wymagane konto PRO!");
+                if (usageCount >= 5) {
+                    showToast("⚠️ Dzienny limit użyć (5/5) wyczerpany. Wpisz kod odblokowujący na górze!");
                     return;
                 }
                 
-                usage.count += 1;
-                localStorage.setItem('eduboxUsage', JSON.stringify(usage));
-                showToast(`Wykorzystano ${usage.count}/5 darmowych działań`);
+                const newCount = usageCount + 1;
+                setUsageCount(newCount);
+                const today = new Date().toISOString().split('T')[0];
+                localStorage.setItem('eduboxUsage', JSON.stringify({ date: today, count: newCount }));
+                
+                showToast(`Wykorzystano ${newCount}/5 darmowych działań`);
                 actionFn();
             };
 
@@ -529,7 +536,7 @@
                     <style>{`
                         @media print {
                             @page { 
-                                size: ${isLandscape ? 'A4 landscape' : 'A4 portrait'}; 
+                                size: ${isLandscape && activeTab === 'diploma' ? 'A4 landscape' : 'A4 portrait'}; 
                                 margin: 0; 
                             }
                             
@@ -537,33 +544,36 @@
                                 background: white !important; 
                                 margin: 0 !important; 
                                 padding: 0 !important; 
+                                width: auto !important;
+                                height: auto !important;
                                 -webkit-print-color-adjust: exact !important; 
                                 print-color-adjust: exact !important; 
                             }
 
-                            /* Prawidłowe ukrywanie elementów (lepsze niż visibility: hidden) */
-                            .print-hidden, nav, #wspolne-menu-kontener, .dark-grid-bg { 
+                            /* Prawidłowe ukrywanie elementów */
+                            .print-hidden, nav, #wspolne-menu-kontener, .dark-grid-bg, .xl\\:col-span-4 { 
                                 display: none !important; 
                             }
                             
-                            /* Resetowanie kontenerów, aby ucięte ramy czy marginesy nie psuły kartki */
-                            #root, #root > div, .max-w-\\[90rem\\], .xl\\:col-span-8 {
+                            /* Resetowanie kontenerów, by nie tworzyły pustych stron */
+                            #root, #root > div, .max-w-\\[90rem\\], .xl\\:col-span-8, .grid, .flex-grow, .min-h-screen {
                                 display: block !important;
                                 margin: 0 !important;
                                 padding: 0 !important;
                                 width: 100% !important;
                                 max-width: none !important;
+                                height: auto !important;
+                                min-height: 0 !important;
                                 position: static !important;
                                 transform: none !important;
                             }
 
                             ${activeTab === 'diploma' ? `
                             #print-area { 
-                                /* Wymuszenie proporcji A4 w pikselach (96 DPI) naprawia ucięty/ogromny tekst */
-                                width: ${isLandscape ? '1122px' : '794px'} !important; 
-                                height: ${isLandscape ? '794px' : '1122px'} !important; 
+                                width: ${isLandscape ? '297mm' : '210mm'} !important; 
+                                height: ${isLandscape ? '210mm' : '297mm'} !important; 
                                 margin: 0 auto !important; 
-                                padding: 60px !important; 
+                                padding: 15mm !important; 
                                 box-shadow: none !important; 
                                 border-radius: 0 !important; 
                                 box-sizing: border-box !important;
@@ -583,8 +593,8 @@
                             .page-break { 
                                 page-break-after: always;
                                 break-after: page;
-                                width: 794px !important; 
-                                height: 1122px !important; 
+                                width: 210mm !important; 
+                                height: 297mm !important; 
                                 display: flex !important; 
                                 align-items: center !important; 
                                 justify-content: center !important; 
@@ -618,6 +628,19 @@
                         {appMode === 'editor' ? (
                             <div className="xl:col-span-4 flex flex-col gap-6 print-hidden">
                                 
+                                {!isPremium && (
+                                    <div className="glass-panel p-4 rounded-2xl flex flex-col gap-2 border border-indigo-500/30 bg-indigo-950/20">
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-[10px] font-bold text-indigo-300 uppercase tracking-widest">Darmowe użycia: {Math.max(0, 5 - usageCount)}/5</span>
+                                            <span className="text-[10px] text-slate-400">Wersja Free</span>
+                                        </div>
+                                        <div className="flex items-center gap-2 mt-1">
+                                            <input value={accessCode} onChange={e => setAccessCode(e.target.value)} placeholder="Kod odblokowujący..." className="flex-1 px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs outline-none text-white focus:border-indigo-500 transition-colors"/>
+                                            <button onClick={handleVerifyCode} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold transition-all shadow-md">OK</button>
+                                        </div>
+                                    </div>
+                                )}
+
                                 <button onClick={() => setAppMode('gielda')} className="w-full bg-slate-800 border border-slate-700 text-white p-3 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-fuchsia-900/30 hover:border-fuchsia-500/50 transition-all shadow-md btn-bounce flex items-center justify-center gap-2">
                                     <i className="ph-bold ph-cloud text-lg text-fuchsia-400"></i> Giełda Wzorów (Współdzielone)
                                 </button>
@@ -792,12 +815,7 @@
                                                             <i className="ph-bold ph-lock-key text-2xl"></i>
                                                         </div>
                                                         <h3 className="font-bold text-white text-sm uppercase tracking-widest">Funkcja Premium</h3>
-                                                        <p className="text-xs text-slate-400">Rysowanie zaawansowanych grafik AI wymaga konta PRO lub kodu dostępu.</p>
-                                                        
-                                                        <div className="flex items-center gap-2 mt-4 bg-slate-800 p-1.5 rounded-xl border border-slate-700 mx-auto w-full max-w-[200px]">
-                                                            <input value={accessCode} onChange={e => setAccessCode(e.target.value)} placeholder="Kod Premium..." className="px-3 py-1.5 bg-transparent text-sm w-full outline-none font-medium text-white placeholder-slate-500"/>
-                                                            <button onClick={handleVerifyCode} className="p-2 text-white rounded-lg bg-indigo-600 hover:bg-indigo-500 transition-colors shadow-md btn-bounce"><i className="ph-bold ph-key"></i></button>
-                                                        </div>
+                                                        <p className="text-xs text-slate-400">Rysowanie zaawansowanych grafik AI wymaga odblokowania. Wpisz kod Premium w okienku na górze panelu.</p>
                                                     </div>
                                                 ) : (
                                                     <div className="space-y-5">
@@ -951,7 +969,7 @@
                             
                             <div className="absolute inset-0 dark-grid-bg -z-10 rounded-[3rem] opacity-30 print-hidden"></div>
 
-                            <div className="w-full h-full flex flex-col items-center justify-center relative sm:py-6">
+                            <div className="w-full h-full flex flex-col items-center justify-center relative sm:py-6 print:block print:p-0 print:h-auto">
                                 {activeTab !== 'garland' ? (
                                     /* WIDOK: DYPLOM */
                                     <div 
@@ -1035,7 +1053,7 @@
                                         </div>
                                         
                                         {garlandText.split('').map((letter, idx) => (
-                                            <div key={idx} className={`${idx === 0 ? 'block' : 'hidden'} print:block page-break relative aspect-[0.707] h-full sm:h-auto sm:w-[60%] mx-auto flex items-center justify-center bg-transparent`}>
+                                            <div key={idx} className={`${idx === 0 ? 'block' : 'hidden'} print:block page-break relative aspect-[0.707] h-full sm:h-auto sm:w-[60%] mx-auto flex items-center justify-center bg-transparent print:w-[210mm] print:h-[297mm]`}>
                                                 {renderGarlandShape(letter)}
                                             </div>
                                         ))}
@@ -1048,7 +1066,7 @@
                                     <i className="ph-bold ph-cloud-arrow-up text-xl md:text-2xl"></i><span>Do Biblioteki</span>
                                 </button>
                                 <button onClick={() => checkLimitAndExecute(() => window.print())} className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 sm:px-10 py-4 sm:py-5 rounded-2xl font-black text-[10px] sm:text-sm md:text-base tracking-widest flex items-center justify-center gap-2 md:gap-3 shadow-[0_10px_40px_rgba(99,102,241,0.5)] transition-all btn-bounce uppercase whitespace-nowrap flex-1 sm:flex-none">
-                                    <i className="ph-bold ph-printer text-xl md:text-2xl"></i><span>Drukuj (PDF)</span>
+                                    <i className="ph-bold ph-printer text-xl md:text-2xl"></i><span>Drukuj {!isPremium && `(${Math.max(0, 5 - usageCount)})`}</span>
                                 </button>
                             </div>
                         </div>
