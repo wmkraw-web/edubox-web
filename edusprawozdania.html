@@ -64,6 +64,8 @@
         
         @keyframes slide-up { 0% { opacity: 0; transform: translate(-50%, 20px); } 100% { opacity: 1; transform: translate(-50%, 0); } }
         .animate-toast { animation: slide-up 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        
+        .line-clamp-4 { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
     </style>
 </head>
 <body class="flex flex-col">
@@ -98,9 +100,25 @@
 
     <div id="root" class="flex-grow flex flex-col relative z-10"></div>
 
-    <script type="text/babel">
+    <script type="text/babel" data-type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
         const { useState, useEffect, useRef } = React;
         const DAILY_LIMIT = 5;
+
+        // INICJALIZACJA BAZY DANYCH CHMUROWEJ
+        let app, auth, db, appId;
+        try {
+            const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+            app = initializeApp(firebaseConfig);
+            auth = getAuth(app);
+            db = getFirestore(app);
+            appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        } catch (e) {
+            console.warn("Brak konfiguracji Firebase. Biblioteka w chmurze może być niedostępna lokalnie.");
+        }
 
         // --- IKONY ---
         const Icon = ({ name, size = 20, className = "" }) => {
@@ -112,9 +130,12 @@
                 Printer: <path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6z"/>,
                 Download: <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>,
                 School: <><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></>,
-                Baby: <><path d="M9 12h.01M15 12h.01M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z"/><path d="M8.5 15.5a5 5 0 0 0 7 0"/></>
+                Baby: <><path d="M9 12h.01M15 12h.01M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z"/><path d="M8.5 15.5a5 5 0 0 0 7 0"/></>,
+                Library: <><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></>,
+                Share: <><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></>,
+                Copy: <><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></>
             };
-            return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>{icons[name]}</svg>;
+            return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>{icons[name] || icons.FileText}</svg>;
         };
 
         const extractTextFromPDF = async (file) => {
@@ -139,27 +160,77 @@
         };
 
         function App() {
+            // Firebase Auth
+            const [user, setUser] = useState(null);
+
             const [isPro, setIsPro] = useState(() => {
                 return localStorage.getItem('eduboxProStatus') === 'active' || localStorage.getItem('eduAwansPremium') === 'active';
             });
             const [limitData, setLimitData] = useState({ remaining: DAILY_LIMIT, showWarning: false });
 
-            // Formularz
+            // Widoki
+            const [viewMode, setViewMode] = useState('kreator'); // 'kreator' | 'biblioteka'
+
+            // Formularz Kreatora
             const [role, setRole] = useState('szkola'); // szkola | przedszkole
             const [reportType, setReportType] = useState('polroczne'); // polroczne | roczne | inne
             const [notes, setNotes] = useState('');
             const [customTemplate, setCustomTemplate] = useState('');
             const [uploadedFilesText, setUploadedFilesText] = useState('');
             
-            // Statusy
+            // Statusy Generowania
             const [isGenerating, setIsGenerating] = useState(false);
             const [loadingMsg, setLoadingMsg] = useState('');
             const [toastMessage, setToastMessage] = useState('');
             const [generatedReport, setGeneratedReport] = useState('');
+            
+            // Publikacja i Biblioteka
+            const [libraryReports, setLibraryReports] = useState([]);
+            const [showPublishModal, setShowPublishModal] = useState(false);
+            const [publishTitle, setPublishTitle] = useState('');
+            const [publishAuthor, setPublishAuthor] = useState('');
+            const [isPublishing, setIsPublishing] = useState(false);
+            const [expandedReportId, setExpandedReportId] = useState(null); // Akordeon w bibliotece
+
             const resultRef = useRef(null);
 
             const schoolPills = ["Niska frekwencja", "Problemy z zachowaniem", "Realizacja podstawy programowej", "Integracja zespołu", "Wycieczki szkolne"];
             const kinderPills = ["Rozwój motoryki małej", "Zabawy swobodne", "Samoobsługa w szatni", "Zaburzenia SI", "Adaptacja grupowa"];
+
+            // --- FIREBASE INIT ---
+            useEffect(() => {
+                if (!auth) return;
+                const initAuth = async () => {
+                    try {
+                        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                            await signInWithCustomToken(auth, __initial_auth_token);
+                        } else {
+                            await signInAnonymously(auth);
+                        }
+                    } catch(e) { console.error("Auth err", e); }
+                };
+                initAuth();
+                const unsubscribe = onAuthStateChanged(auth, setUser);
+                return () => unsubscribe();
+            }, []);
+
+            // --- FETCH LIBRARY ---
+            useEffect(() => {
+                if (!user || !db) return;
+                const reportsRef = collection(db, 'artifacts', appId, 'public', 'data', 'reports');
+                const unsubscribe = onSnapshot(reportsRef, (snapshot) => {
+                    const reports = [];
+                    snapshot.forEach(doc => {
+                        reports.push({ id: doc.id, ...doc.data() });
+                    });
+                    // Sortowanie po dacie (od najnowszych w pamięci lokalnej - spełnienie reguł)
+                    reports.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
+                    setLibraryReports(reports);
+                }, (err) => {
+                    console.error("Firestore error:", err);
+                });
+                return () => unsubscribe();
+            }, [user]);
 
             useEffect(() => {
                 const today = new Date().toLocaleDateString();
@@ -239,7 +310,7 @@ ZASADY KRYTYCZNE:
                         systemPrompt += `\n\nUWAGA: Użytkownik podał własny "Wzór placówki". MUSISZ ułożyć sprawozdanie dokładnie pod te nagłówki/punkty, wypełniając je merytoryczną treścią:\n"""${customTemplate}"""`;
                     }
 
-                    const finalPrompt = `Stwórz kompletne sprawozdanie. \nNotatki własne wychowawcy/nauczyciela:\n${notes}\n\nDane dodatkowe z plików (np. e-dziennik, frekwencja, uwagi):\n${uploadedFilesText}`;
+                    const finalPrompt = `Stwórz kompletne sprawozdanie. PAMIĘTAJ: To sprawozdanie na koniec może trafić do bazy publicznej. Nie używaj Prawdziwych IMIEN i NAZWISK (użyj inicjałów np. J.K. lub po prostu 'uczeń'). \nNotatki własne wychowawcy/nauczyciela:\n${notes}\n\nDane dodatkowe z plików (np. e-dziennik, frekwencja, uwagi):\n${uploadedFilesText}`;
 
                     if (window.location.protocol === 'file:') throw new Error("LocalTest");
 
@@ -254,7 +325,6 @@ ZASADY KRYTYCZNE:
 
                     let text = data.text;
                     text = text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
-                    // Zmiana markdown na czystszy tekst (usuwanie gwiazdek z nagłówków do eksportu)
                     text = text.replace(/\*\*(.*?)\*\*/g, '$1'); 
                     
                     setGeneratedReport(text);
@@ -273,20 +343,59 @@ ZASADY KRYTYCZNE:
                 }
             };
 
-            const exportToWord = () => {
-                if(!generatedReport) return;
+            const exportToWord = (textContent = generatedReport, customName = '') => {
+                if(!textContent) return;
                 
                 const header = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>Sprawozdanie</title><style>body {font-family: 'Times New Roman', Times, serif; font-size: 12pt; line-height: 1.5; color: #000; text-align: justify;}</style></head><body>`;
                 const footer = `</body></html>`;
                 
-                // Konwersja znaków nowej linii na akapity Worda
-                const formattedText = generatedReport.split('\n').map(para => `<p>${para}</p>`).join('');
+                const formattedText = textContent.split('\n').map(para => `<p>${para}</p>`).join('');
 
                 const blob = new Blob(['\ufeff', header + formattedText + footer], { type: 'application/msword' });
                 const link = document.createElement('a');
                 link.href = URL.createObjectURL(blob);
-                link.download = `Sprawozdanie_${reportType}.doc`;
+                link.download = customName ? `${customName}.doc` : `Sprawozdanie_${reportType}.doc`;
                 link.click();
+            };
+
+            const copyToClipboard = (text) => {
+                const textArea = document.createElement("textarea");
+                textArea.value = text;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                textArea.remove();
+                showToast("✅ Skopiowano do schowka!");
+            };
+
+            // --- PUBLIKACJA DO BAZY FIREBASE ---
+            const handlePublishToLibrary = async () => {
+                if (!user || !db) return showToast("Błąd połączenia z serwerem bazy danych.");
+                if (!publishTitle.trim()) return showToast("Musisz podać tytuł, aby inni wiedzieli o czym to jest!");
+
+                setIsPublishing(true);
+                try {
+                    const reportsRef = collection(db, 'artifacts', appId, 'public', 'data', 'reports');
+                    await addDoc(reportsRef, {
+                        title: publishTitle,
+                        author: publishAuthor.trim() || 'Nauczyciel z EduBox Pro',
+                        content: generatedReport,
+                        type: reportType,
+                        role: role,
+                        createdAt: serverTimestamp(),
+                        userId: user.uid
+                    });
+                    
+                    showToast("🎉 Opublikowano w Bibliotece!");
+                    setShowPublishModal(false);
+                    setPublishTitle('');
+                    setViewMode('biblioteka'); // Przełącz od razu do biblioteki
+                } catch(e) {
+                    showToast("Wystąpił błąd podczas publikacji.");
+                    console.error(e);
+                } finally {
+                    setIsPublishing(false);
+                }
             };
 
             const activePills = role === 'szkola' ? schoolPills : kinderPills;
@@ -301,144 +410,236 @@ ZASADY KRYTYCZNE:
                         </div>
                     )}
 
+                    {/* MODAL PUBLIKACJI */}
+                    {showPublishModal && (
+                        <div className="fixed inset-0 z-[150] flex items-center justify-center px-4 bg-slate-950/80 backdrop-blur-sm fade-in">
+                            <div className="bg-slate-900 border border-amber-500/50 p-6 sm:p-8 rounded-2xl shadow-2xl max-w-md w-full relative">
+                                <button onClick={() => setShowPublishModal(false)} className="absolute top-4 right-4 text-slate-500 hover:text-white">✕</button>
+                                <h3 className="text-2xl font-black text-amber-500 mb-2 flex items-center gap-2"><Icon name="Share" /> Udostępnij jako Wzór</h3>
+                                <p className="text-slate-400 text-sm mb-6">Podziel się swoją pracą z innymi nauczycielami na platformie EduBox. Zanim opublikujesz upewnij się, że tekst <strong className="text-white">nie zawiera prawdziwych nazwisk uczniów.</strong></p>
+                                
+                                <label className="text-xs font-bold text-slate-400 uppercase tracking-widest block mb-1">Jak nazwiesz ten wzór?</label>
+                                <input type="text" value={publishTitle} onChange={(e) => setPublishTitle(e.target.value)} placeholder="np. Wychowawca Klasy 2 - Roczne" className="w-full bg-slate-800 border border-slate-700 text-white rounded-xl p-3 mb-4 focus:outline-none focus:border-amber-500" />
+                                
+                                <label className="text-xs font-bold text-slate-400 uppercase tracking-widest block mb-1">Autor (Opcjonalnie)</label>
+                                <input type="text" value={publishAuthor} onChange={(e) => setPublishAuthor(e.target.value)} placeholder="np. Pani Ania / Anonimowy Nauczyciel" className="w-full bg-slate-800 border border-slate-700 text-white rounded-xl p-3 mb-6 focus:outline-none focus:border-amber-500" />
+                                
+                                <button onClick={handlePublishToLibrary} disabled={isPublishing} className="w-full bg-amber-500 hover:bg-amber-400 text-slate-900 font-black py-3 rounded-xl shadow-lg btn-bounce flex justify-center items-center gap-2">
+                                    {isPublishing ? 'Publikowanie...' : 'Opublikuj w Bibliotece'}
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 w-full">
                         
-                        <div className="text-center mb-10 fade-in print-hidden">
+                        <div className="text-center mb-8 fade-in print-hidden">
                             <h1 className="text-4xl md:text-5xl font-black text-white mb-4 tracking-tight">
                                 Edu<span className="text-sky-500">Sprawozdawca</span> AI
                             </h1>
                             <p className="text-slate-400 text-lg max-w-2xl mx-auto">
-                                Zostaw biurokrację sztucznej inteligencji. Wgraj oceny i wpisz luźne notatki z półrocza, a otrzymasz gotowe do wydruku sprawozdanie.
+                                Zostaw biurokrację sztucznej inteligencji lub skopiuj wzory od innych nauczycieli z całej Polski.
                             </p>
                         </div>
 
-                        {limitData.showWarning && !isPro && (
-                            <div className="bg-red-900/40 border border-red-500/50 rounded-2xl p-6 text-center shadow-lg fade-in mb-8 print-hidden">
-                                <h3 className="text-xl sm:text-2xl font-black text-white mb-2">Limit dzienny osiągnięty (5/5)</h3>
-                                <p className="text-slate-300 mb-4 text-sm sm:text-base">Odblokuj pełen potencjał kodem na górnym pasku.</p>
-                            </div>
-                        )}
-
-                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 print-hidden">
-                            
-                            {/* LEWA KOLUMNA: Konfiguracja */}
-                            <div className="lg:col-span-5 space-y-6 fade-in" style={{animationDelay: '0.1s'}}>
-                                
-                                <div className="glass-panel p-6 md:p-8 rounded-[2rem]">
-                                    <h2 className="text-lg font-black text-sky-400 mb-4 uppercase tracking-widest flex items-center gap-2">
-                                        <Icon name="FileText" /> 1. Konfiguracja
-                                    </h2>
-
-                                    <div className="space-y-5">
-                                        <div>
-                                            <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Działam jako:</label>
-                                            <div className="flex bg-slate-900/50 p-1 rounded-xl border border-slate-700">
-                                                <button onClick={() => setRole('szkola')} className={`flex-1 py-3 text-sm font-bold rounded-lg flex items-center justify-center gap-2 transition-all ${role === 'szkola' ? 'bg-sky-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}><Icon name="School" size={16}/> Szkoła</button>
-                                                <button onClick={() => setRole('przedszkole')} className={`flex-1 py-3 text-sm font-bold rounded-lg flex items-center justify-center gap-2 transition-all ${role === 'przedszkole' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}><Icon name="Baby" size={16}/> Przedszkole</button>
-                                            </div>
-                                        </div>
-
-                                        <div>
-                                            <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Rodzaj sprawozdania:</label>
-                                            <select value={reportType} onChange={(e) => setReportType(e.target.value)} className="w-full bg-slate-900 border border-slate-700 text-white rounded-xl p-3 focus:outline-none focus:border-sky-500 font-medium">
-                                                <option value="polroczne">Sprawozdanie Półroczne (Semestr I)</option>
-                                                <option value="roczne">Sprawozdanie Roczne (Koniec Roku)</option>
-                                                <option value="inne">Inne (Dostosowane w notatkach)</option>
-                                            </select>
-                                        </div>
-
-                                        <div>
-                                            <label className="text-xs font-bold text-amber-400 uppercase mb-2 block flex items-center justify-between">
-                                                <span>Szkolny Szablon (Opcjonalnie)</span>
-                                            </label>
-                                            <textarea 
-                                                value={customTemplate} onChange={(e) => setCustomTemplate(e.target.value)}
-                                                placeholder="Wklej tu puste nagłówki / formularz z Worda wymagany w Twojej placówce. AI wypełni go treścią."
-                                                className="w-full h-24 bg-slate-900/80 border border-slate-700 text-slate-300 rounded-xl p-3 focus:outline-none focus:border-amber-500 custom-scrollbar resize-y text-sm"
-                                            ></textarea>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* PRAWA KOLUMNA: Wkład */}
-                            <div className="lg:col-span-7 space-y-6 fade-in" style={{animationDelay: '0.2s'}}>
-                                
-                                <div className="glass-panel p-6 md:p-8 rounded-[2rem] border-sky-500/30">
-                                    <h2 className="text-lg font-black text-white mb-4 flex items-center gap-2">
-                                        <Icon name="Upload" className="text-sky-400" /> 2. Zasilanie AI Danymi
-                                    </h2>
-                                    
-                                    <div className="space-y-6">
-                                        <div>
-                                            <div className="upload-box relative bg-slate-900/50 rounded-2xl p-6 text-center cursor-pointer">
-                                                <input type="file" multiple accept=".pdf,.txt" onChange={handleFileUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
-                                                <div className="flex flex-col items-center gap-2 pointer-events-none">
-                                                    <div className="w-12 h-12 bg-slate-800 rounded-full flex items-center justify-center text-slate-400 border border-slate-700"><Icon name="Upload" size={24}/></div>
-                                                    <span className="text-sm font-bold text-white mt-2">Przeciągnij lub kliknij, aby wgrać pliki</span>
-                                                    <span className="text-xs text-slate-400">PDF z e-dziennika (Oceny, Frekwencja, Uwagi)</span>
-                                                </div>
-                                            </div>
-                                            {uploadedFilesText && <div className="mt-3 text-xs font-bold text-emerald-400 bg-emerald-900/20 p-2 rounded-lg text-center border border-emerald-500/30">Wczytano dokumenty - gotowe do analizy!</div>}
-                                        </div>
-
-                                        <div>
-                                            <label className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 block">Twoje luźne notatki / obserwacje</label>
-                                            <textarea 
-                                                value={notes} onChange={(e) => setNotes(e.target.value)}
-                                                placeholder="Wpisz np. 'Zorganizowałem 3 wycieczki, klasa ma problem z matematyką, ale chłopcy zintegrowali się na wf-ie...'"
-                                                className="w-full h-32 bg-slate-900/80 border border-slate-700 text-slate-100 rounded-xl p-4 focus:outline-none focus:border-sky-500 custom-scrollbar resize-y text-sm leading-relaxed"
-                                            ></textarea>
-                                            
-                                            <div className="flex flex-wrap gap-2 mt-3">
-                                                {activePills.map(pill => (
-                                                    <button key={pill} onClick={() => setNotes(prev => prev + (prev ? ', ' : '') + pill)} className="text-[10px] uppercase font-bold tracking-wider bg-slate-800 hover:bg-sky-900 text-slate-400 hover:text-sky-300 px-3 py-1.5 rounded-full border border-slate-700 transition-colors">
-                                                        + {pill}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </div>
-
-                                        <button 
-                                            onClick={generateReport} disabled={isGenerating || (!isPro && limitData.remaining === 0)}
-                                            className="w-full bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white py-4 rounded-xl font-black text-sm uppercase tracking-widest flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(14,165,233,0.3)] btn-bounce transition-all disabled:opacity-50"
-                                        >
-                                            {isGenerating ? (
-                                                <><svg className="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> {loadingMsg}</>
-                                            ) : <><Icon name="Sparkles" /> Ułóż Profesjonalne Sprawozdanie</>}
-                                        </button>
-                                    </div>
-                                </div>
+                        {/* TOGGLE WIDOKÓW */}
+                        <div className="flex justify-center mb-10 print-hidden fade-in">
+                            <div className="flex bg-slate-900/80 p-1.5 rounded-full border border-slate-700/50 shadow-lg">
+                                <button onClick={() => setViewMode('kreator')} className={`px-6 py-2.5 text-sm font-bold rounded-full transition-all flex items-center gap-2 ${viewMode === 'kreator' ? 'bg-sky-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}>
+                                    <Icon name="Sparkles" size={16} /> Kreator AI
+                                </button>
+                                <button onClick={() => setViewMode('biblioteka')} className={`px-6 py-2.5 text-sm font-bold rounded-full transition-all flex items-center gap-2 relative ${viewMode === 'biblioteka' ? 'bg-amber-500 text-slate-900 shadow-[0_0_15px_rgba(245,158,11,0.4)]' : 'text-slate-400 hover:text-white'}`}>
+                                    <Icon name="Library" size={16} /> Biblioteka Wzorów 
+                                    <span className="bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-full animate-pulse ml-1">{libraryReports.length}</span>
+                                </button>
                             </div>
                         </div>
 
-                        {/* WYNIK - EDYTOR I WYDRUK */}
-                        {generatedReport && (
-                            <div ref={resultRef} className="mt-8 glass-panel p-6 sm:p-10 rounded-[2rem] border-emerald-500/30 fade-in shadow-2xl bg-slate-900/90">
-                                
-                                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 pb-4 border-b border-slate-700 print-hidden gap-4">
-                                    <div>
-                                        <h2 className="text-2xl font-black text-white">Gotowe Sprawozdanie</h2>
-                                        <p className="text-sm text-slate-400">Tekst jest edytowalny. Wprowadź poprawki i pobierz do Worda.</p>
+                        {/* WIDOK: KREATOR */}
+                        {viewMode === 'kreator' && (
+                            <div className="animate-[fadeIn_0.3s_ease-out]">
+                                {limitData.showWarning && !isPro && (
+                                    <div className="bg-red-900/40 border border-red-500/50 rounded-2xl p-6 text-center shadow-lg mb-8 print-hidden">
+                                        <h3 className="text-xl sm:text-2xl font-black text-white mb-2">Limit dzienny osiągnięty (5/5)</h3>
+                                        <p className="text-slate-300 mb-4 text-sm sm:text-base">Odblokuj pełen potencjał kodem na górnym pasku.</p>
                                     </div>
-                                    <div className="flex gap-2 w-full sm:w-auto">
-                                        <button onClick={exportToWord} className="flex-1 sm:flex-none bg-sky-600 hover:bg-sky-500 text-white px-5 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg btn-bounce text-sm">
-                                            <Icon name="Download" size={18} /> Pobierz WORD
-                                        </button>
-                                        <button onClick={() => window.print()} className="flex-1 sm:flex-none bg-slate-700 hover:bg-slate-600 text-white px-5 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 btn-bounce text-sm border border-slate-600">
-                                            <Icon name="Printer" size={18} /> Drukuj PDF
-                                        </button>
+                                )}
+
+                                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 print-hidden">
+                                    <div className="lg:col-span-5 space-y-6">
+                                        <div className="glass-panel p-6 md:p-8 rounded-[2rem]">
+                                            <h2 className="text-lg font-black text-sky-400 mb-4 uppercase tracking-widest flex items-center gap-2">
+                                                <Icon name="FileText" /> 1. Konfiguracja
+                                            </h2>
+                                            <div className="space-y-5">
+                                                <div>
+                                                    <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Działam jako:</label>
+                                                    <div className="flex bg-slate-900/50 p-1 rounded-xl border border-slate-700">
+                                                        <button onClick={() => setRole('szkola')} className={`flex-1 py-3 text-sm font-bold rounded-lg flex items-center justify-center gap-2 transition-all ${role === 'szkola' ? 'bg-sky-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}><Icon name="School" size={16}/> Szkoła</button>
+                                                        <button onClick={() => setRole('przedszkole')} className={`flex-1 py-3 text-sm font-bold rounded-lg flex items-center justify-center gap-2 transition-all ${role === 'przedszkole' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}><Icon name="Baby" size={16}/> Przedszkole</button>
+                                                    </div>
+                                                </div>
+
+                                                <div>
+                                                    <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Rodzaj sprawozdania:</label>
+                                                    <select value={reportType} onChange={(e) => setReportType(e.target.value)} className="w-full bg-slate-900 border border-slate-700 text-white rounded-xl p-3 focus:outline-none focus:border-sky-500 font-medium">
+                                                        <option value="polroczne">Sprawozdanie Półroczne (Semestr I)</option>
+                                                        <option value="roczne">Sprawozdanie Roczne (Koniec Roku)</option>
+                                                        <option value="inne">Inne (Dostosowane w notatkach)</option>
+                                                    </select>
+                                                </div>
+
+                                                <div>
+                                                    <label className="text-xs font-bold text-amber-400 uppercase mb-2 block flex items-center justify-between">
+                                                        <span>Szkolny Szablon (Opcjonalnie)</span>
+                                                    </label>
+                                                    <textarea 
+                                                        value={customTemplate} onChange={(e) => setCustomTemplate(e.target.value)}
+                                                        placeholder="Wklej tu puste nagłówki / formularz z Worda wymagany w Twojej placówce. AI wypełni go treścią."
+                                                        className="w-full h-24 bg-slate-900/80 border border-slate-700 text-slate-300 rounded-xl p-3 focus:outline-none focus:border-amber-500 custom-scrollbar resize-y text-sm"
+                                                    ></textarea>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="lg:col-span-7 space-y-6">
+                                        <div className="glass-panel p-6 md:p-8 rounded-[2rem] border-sky-500/30">
+                                            <h2 className="text-lg font-black text-white mb-4 flex items-center gap-2">
+                                                <Icon name="Upload" className="text-sky-400" /> 2. Zasilanie AI Danymi
+                                            </h2>
+                                            <div className="space-y-6">
+                                                <div>
+                                                    <div className="upload-box relative bg-slate-900/50 rounded-2xl p-6 text-center cursor-pointer">
+                                                        <input type="file" multiple accept=".pdf,.txt" onChange={handleFileUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+                                                        <div className="flex flex-col items-center gap-2 pointer-events-none">
+                                                            <div className="w-12 h-12 bg-slate-800 rounded-full flex items-center justify-center text-slate-400 border border-slate-700"><Icon name="Upload" size={24}/></div>
+                                                            <span className="text-sm font-bold text-white mt-2">Przeciągnij lub kliknij, aby wgrać pliki</span>
+                                                            <span className="text-xs text-slate-400">PDF z e-dziennika (Oceny, Frekwencja, Uwagi)</span>
+                                                        </div>
+                                                    </div>
+                                                    {uploadedFilesText && <div className="mt-3 text-xs font-bold text-emerald-400 bg-emerald-900/20 p-2 rounded-lg text-center border border-emerald-500/30">Wczytano dokumenty - gotowe do analizy!</div>}
+                                                </div>
+
+                                                <div>
+                                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 block">Twoje luźne notatki / obserwacje</label>
+                                                    <textarea 
+                                                        value={notes} onChange={(e) => setNotes(e.target.value)}
+                                                        placeholder="Wpisz np. 'Zorganizowałem 3 wycieczki, klasa ma problem z matematyką, ale chłopcy zintegrowali się na wf-ie...'"
+                                                        className="w-full h-32 bg-slate-900/80 border border-slate-700 text-slate-100 rounded-xl p-4 focus:outline-none focus:border-sky-500 custom-scrollbar resize-y text-sm leading-relaxed"
+                                                    ></textarea>
+                                                    <div className="flex flex-wrap gap-2 mt-3">
+                                                        {activePills.map(pill => (
+                                                            <button key={pill} onClick={() => setNotes(prev => prev + (prev ? ', ' : '') + pill)} className="text-[10px] uppercase font-bold tracking-wider bg-slate-800 hover:bg-sky-900 text-slate-400 hover:text-sky-300 px-3 py-1.5 rounded-full border border-slate-700 transition-colors">
+                                                                + {pill}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                </div>
+
+                                                <button 
+                                                    onClick={generateReport} disabled={isGenerating || (!isPro && limitData.remaining === 0)}
+                                                    className="w-full bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white py-4 rounded-xl font-black text-sm uppercase tracking-widest flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(14,165,233,0.3)] btn-bounce transition-all disabled:opacity-50"
+                                                >
+                                                    {isGenerating ? (
+                                                        <><svg className="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> {loadingMsg}</>
+                                                    ) : <><Icon name="Sparkles" /> Ułóż Profesjonalne Sprawozdanie</>}
+                                                </button>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
 
-                                {/* Pole tekstowe w stylu kartki A4 */}
-                                <div className="w-full max-w-[210mm] mx-auto bg-white rounded-lg shadow-xl print-container">
-                                    <textarea 
-                                        value={generatedReport} 
-                                        onChange={(e) => setGeneratedReport(e.target.value)}
-                                        className="w-full min-h-[297mm] bg-transparent text-black font-serif text-[12pt] leading-relaxed p-10 md:p-16 resize-y focus:outline-none"
-                                    ></textarea>
+                                {generatedReport && (
+                                    <div ref={resultRef} className="mt-8 glass-panel p-6 sm:p-10 rounded-[2rem] border-emerald-500/30 shadow-2xl bg-slate-900/90">
+                                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 pb-4 border-b border-slate-700 print-hidden gap-4">
+                                            <div>
+                                                <h2 className="text-2xl font-black text-white">Gotowe Sprawozdanie</h2>
+                                                <p className="text-sm text-slate-400">Możesz pobrać ten plik, albo podzielić się nim z całą Polską!</p>
+                                            </div>
+                                            <div className="flex flex-wrap gap-2 w-full md:w-auto">
+                                                <button onClick={() => setShowPublishModal(true)} className="flex-1 md:flex-none bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-900 px-5 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(245,158,11,0.4)] btn-bounce text-sm">
+                                                    <Icon name="Share" size={18} /> Podziel się jako Wzór
+                                                </button>
+                                                <button onClick={() => exportToWord(generatedReport, '')} className="flex-1 md:flex-none bg-sky-600 hover:bg-sky-500 text-white px-5 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg btn-bounce text-sm">
+                                                    <Icon name="Download" size={18} /> Pobierz WORD
+                                                </button>
+                                                <button onClick={() => window.print()} className="flex-1 md:flex-none bg-slate-700 hover:bg-slate-600 text-white px-5 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 btn-bounce text-sm border border-slate-600">
+                                                    <Icon name="Printer" size={18} /> Drukuj
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <div className="w-full max-w-[210mm] mx-auto bg-white rounded-lg shadow-xl print-container">
+                                            <textarea 
+                                                value={generatedReport} 
+                                                onChange={(e) => setGeneratedReport(e.target.value)}
+                                                className="w-full min-h-[297mm] bg-transparent text-black font-serif text-[12pt] leading-relaxed p-10 md:p-16 resize-y focus:outline-none"
+                                            ></textarea>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* WIDOK: BIBLIOTEKA SPOŁECZNOŚCI */}
+                        {viewMode === 'biblioteka' && (
+                            <div className="animate-[fadeIn_0.3s_ease-out]">
+                                <div className="text-center max-w-3xl mx-auto mb-10">
+                                    <h2 className="text-3xl font-black text-amber-500 mb-2">Prawdziwe materiały od Nauczycieli</h2>
+                                    <p className="text-slate-400">Skorzystaj z ogromnej bazy udostępnionych, zanonimizowanych wzorów. Przeglądaj, kopiuj i oszczędzaj czas.</p>
                                 </div>
+
+                                {libraryReports.length === 0 ? (
+                                    <div className="glass-panel p-10 text-center rounded-[2rem] border-slate-700">
+                                        <div className="text-5xl mb-4">📚</div>
+                                        <h3 className="text-xl font-bold text-white mb-2">Biblioteka ładuje zasoby...</h3>
+                                        <p className="text-slate-400">Jeśli nic się nie pojawia, bądź pierwszą osobą, która wygeneruje i udostępni swoje sprawozdanie!</p>
+                                    </div>
+                                ) : (
+                                    <div className="columns-1 md:columns-2 lg:columns-3 gap-6 space-y-6">
+                                        {libraryReports.map((report) => {
+                                            const isExpanded = expandedReportId === report.id;
+                                            return (
+                                                <div key={report.id} className="break-inside-avoid glass-panel rounded-2xl p-5 border border-slate-700/50 hover:border-amber-500/30 transition-all hover:-translate-y-1 shadow-lg bg-slate-800/20">
+                                                    <div className="flex justify-between items-start mb-3">
+                                                        <div className="flex flex-wrap gap-2">
+                                                            <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded ${report.role === 'przedszkole' ? 'bg-indigo-500/20 text-indigo-400' : 'bg-sky-500/20 text-sky-400'}`}>
+                                                                {report.role}
+                                                            </span>
+                                                            <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-slate-700 text-slate-300">
+                                                                {report.type}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <h3 className="text-lg font-bold text-white mb-1">{report.title}</h3>
+                                                    <p className="text-xs text-slate-400 mb-4">Autor: <span className="font-bold text-slate-300">{report.author}</span></p>
+
+                                                    <div className={`text-sm text-slate-300 font-serif leading-relaxed mb-4 ${!isExpanded ? 'line-clamp-4' : ''}`}>
+                                                        {report.content}
+                                                    </div>
+
+                                                    <div className="flex items-center gap-2 pt-4 border-t border-slate-700">
+                                                        <button 
+                                                            onClick={() => setExpandedReportId(isExpanded ? null : report.id)}
+                                                            className="text-xs font-bold text-amber-500 hover:text-amber-400 transition-colors"
+                                                        >
+                                                            {isExpanded ? 'Zwiń tekst' : 'Czytaj całość'}
+                                                        </button>
+                                                        <div className="flex-grow"></div>
+                                                        <button onClick={() => copyToClipboard(report.content)} className="p-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-white transition-colors" title="Kopiuj do schowka">
+                                                            <Icon name="Copy" size={16} />
+                                                        </button>
+                                                        <button onClick={() => exportToWord(report.content, report.title)} className="p-2 bg-sky-600 hover:bg-sky-500 rounded-lg text-white transition-colors" title="Pobierz jako Word">
+                                                            <Icon name="Download" size={16} />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>
