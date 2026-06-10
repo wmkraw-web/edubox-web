@@ -13,6 +13,19 @@
       gtag('config', 'G-3RQ9R0N0K8');
     </script>
     
+    <!-- TWOJA BAZA FIREBASE -->
+    <script>
+      window.__firebase_config = JSON.stringify({
+        apiKey: "AIzaSyDL_mvepNJjMmZYQzifN2cXzoKwCE8jNd0",
+        authDomain: "edubox-pro.firebaseapp.com",
+        projectId: "edubox-pro",
+        storageBucket: "edubox-pro.firebasestorage.app",
+        messagingSenderId: "570263845714",
+        appId: "1:570263845714:web:0b029211f7af071b66988b"
+      });
+      window.__app_id = "eduboxpro";
+    </script>
+
     <!-- Biblioteki -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
@@ -72,6 +85,11 @@
             animation: spin 1s linear infinite;
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        @keyframes slide-up { 0% { opacity: 0; transform: translate(-50%, 20px); } 100% { opacity: 1; transform: translate(-50%, 0); } }
+        .animate-toast { animation: slide-up 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        .fade-in { animation: fadeIn 0.4s ease-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
         /* Ustawienia do wydruku */
         @media print {
@@ -174,10 +192,26 @@
     <!-- KONTENER APLIKACJI -->
     <div id="root" class="flex-grow flex flex-col relative z-10"></div>
 
-    <script type="text/babel">
+    <script type="text/babel" data-type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
         const { useState, useEffect } = React;
 
         const DAILY_LIMIT = 5;
+
+        // INICJALIZACJA BAZY DANYCH CHMUROWEJ
+        let app, auth, db, appId;
+        try {
+            const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+            app = initializeApp(firebaseConfig);
+            auth = getAuth(app);
+            db = getFirestore(app);
+            appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        } catch (e) {
+            console.warn("Brak konfiguracji Firebase.");
+        }
 
         // ==========================================
         // POTĘŻNA BAZA DANYCH WYMAGAŃ I GOTOWCÓW
@@ -297,7 +331,21 @@
             ]
         };
 
+        const BotHelperAvatar = () => (
+            <svg viewBox="0 0 100 100" className="w-14 h-14 drop-shadow-md flex-shrink-0" xmlns="http://www.w3.org/2000/svg">
+                <path d="M50 30 V15" stroke="#94a3b8" strokeWidth="4" strokeLinecap="round"/>
+                <circle cx="50" cy="12" r="5" fill="#3b82f6"/>
+                <rect x="25" y="30" width="50" height="40" rx="12" fill="#1e40af"/>
+                <rect x="32" y="38" width="36" height="22" rx="6" fill="#ffffff"/>
+                <circle cx="40" cy="49" r="3.5" fill="#1e40af" className="bot-eye"/>
+                <circle cx="60" cy="49" r="3.5" fill="#1e40af" className="bot-eye"/>
+                <path d="M 45 56 Q 50 60 55 56" stroke="#1e40af" strokeWidth="2.5" fill="none" strokeLinecap="round"/>
+            </svg>
+        );
+
         function EduAwansApp() {
+            const [user, setUser] = useState(null);
+
             // --- LIMITS & PRO STATUS ---
             const [isPro, setIsPro] = useState(() => {
                 return localStorage.getItem('eduboxProStatus') === 'active' || localStorage.getItem('eduAwansPremium') === 'active';
@@ -305,7 +353,7 @@
             const [limitData, setLimitData] = useState({ remaining: DAILY_LIMIT, showWarning: false });
 
             // --- STATE APLIKACJI ---
-            const [activeTab, setActiveTab] = useState('kreator');
+            const [activeTab, setActiveTab] = useState('kreator'); // kreator | dokument | biblioteka
             const [selectedPath, setSelectedPath] = useState('mianowany');
             const [expandedReqId, setExpandedReqId] = useState('m1');
             const [checkedTasks, setCheckedTasks] = useState([]);
@@ -319,6 +367,42 @@
             const [aiCategory, setAiCategory] = useState('sprawozdanie');
             const [isGenerating, setIsGenerating] = useState(false);
             const [toastMessage, setToastMessage] = useState('');
+
+            // --- BIBLIOTEKA ---
+            const [libraryItems, setLibraryItems] = useState([]);
+            const [showPublishModal, setShowPublishModal] = useState(false);
+            const [publishTitle, setPublishTitle] = useState('');
+            const [isPublishing, setIsPublishing] = useState(false);
+
+            // --- FIREBASE INIT ---
+            useEffect(() => {
+                if (!auth) return;
+                const initAuth = async () => {
+                    try {
+                        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                            await signInWithCustomToken(auth, __initial_auth_token);
+                        } else {
+                            await signInAnonymously(auth);
+                        }
+                    } catch(e) { console.error("Auth err", e); }
+                };
+                initAuth();
+                const unsubscribe = onAuthStateChanged(auth, setUser);
+                return () => unsubscribe();
+            }, []);
+
+            // --- FETCH LIBRARY ---
+            useEffect(() => {
+                if (!user || !db) return;
+                const libRef = collection(db, 'artifacts', appId, 'public', 'data', 'eduawans_docs');
+                const unsubscribe = onSnapshot(libRef, (snapshot) => {
+                    const items = [];
+                    snapshot.forEach(doc => items.push({ id: doc.id, ...doc.data() }));
+                    items.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
+                    setLibraryItems(items);
+                });
+                return () => unsubscribe();
+            }, [user]);
 
             // --- FUNKCJE ---
             useEffect(() => {
@@ -381,15 +465,68 @@
                 }
             };
 
-            // Kopiowanie całego dokumentu do schowka
-            const copyEntireDocument = () => {
-                if(docItems.length === 0) return showToast("⚠️ Dokument jest pusty!");
-                let textToCopy = `SPRAWOZDANIE Z REALIZACJI PLANU ROZWOJU ZAWODOWEGO\nŚcieżka: Nauczyciel ${selectedPath === 'mianowany' ? 'Mianowany' : 'Dyplomowany'}\n\n`;
-                docItems.forEach((item, index) => {
+            // Kopiowanie dokumentu
+            const getPlainTextFromItems = (itemsList) => {
+                let textToCopy = `SPRAWOZDANIE Z REALIZACJI PLANU ROZWOJU ZAWODOWEGO\n\n`;
+                itemsList.forEach((item, index) => {
                     textToCopy += `${index + 1}. ${item.section}\n${item.text}\n\n`;
                 });
-                navigator.clipboard.writeText(textToCopy);
+                return textToCopy;
+            };
+
+            const copyEntireDocument = () => {
+                if(docItems.length === 0) return showToast("⚠️ Dokument jest pusty!");
+                navigator.clipboard.writeText(getPlainTextFromItems(docItems));
                 showToast("✅ Cały dokument skopiowany do schowka!");
+            };
+
+            const copyLibraryItemToClipboard = (itemsList) => {
+                navigator.clipboard.writeText(getPlainTextFromItems(itemsList));
+                showToast("✅ Skopiowano zawartość wzoru!");
+            };
+
+            const exportToWord = (itemsList, customTitle) => {
+                if(!itemsList || itemsList.length === 0) return showToast("Dokument jest pusty!");
+                
+                const title = customTitle || `Sprawozdanie Awansowe - ${selectedPath}`;
+                const header = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>${title}</title><style>body { font-family: 'Times New Roman', serif; font-size: 12pt; line-height: 1.5; color: #000; text-align: justify; } h1 { font-size: 16pt; text-align: center; text-transform: uppercase; margin-bottom: 20px; } h2 { font-size: 14pt; font-weight: bold; margin-top: 20px; } p { margin-bottom: 10px; }</style></head><body>`;
+                const footer = `<br><br><br><div style="display:flex; justify-content:space-between; width:100%;"><div style="width:200px; text-align:center; border-top:1px solid black; padding-top:5px; font-size:12px;">Miejscowość, data</div><div style="width:200px; text-align:center; border-top:1px solid black; padding-top:5px; font-size:12px;">Podpis</div></div></body></html>`;
+                
+                let content = `<h1>SPRAWOZDANIE Z REALIZACJI PLANU ROZWOJU ZAWODOWEGO</h1>`;
+                itemsList.forEach((item, index) => {
+                    content += `<h2>${index + 1}. ${item.section}</h2>`;
+                    content += `<p>${item.text.replace(/\\n/g, '<br>')}</p>`;
+                });
+                
+                const blob = new Blob(['\ufeff', header + content + footer], { type: 'application/msword' });
+                const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = `${title.replace(/\\s+/g, '_')}.doc`; link.click();
+            };
+
+            // Publikacja w bibliotece
+            const handlePublishToLibrary = async () => {
+                if (!publishTitle.trim()) return showToast("Zanim udostępnisz, podaj tytuł!");
+                if (docItems.length === 0) return showToast("Twój dokument jest pusty!");
+                setIsPublishing(true);
+                try {
+                    if (db && user) {
+                        const libRef = collection(db, 'artifacts', appId, 'public', 'data', 'eduawans_docs');
+                        await addDoc(libRef, {
+                            title: publishTitle,
+                            path: selectedPath,
+                            items: docItems,
+                            createdAt: serverTimestamp(),
+                            userId: user.uid
+                        });
+                    }
+                    showToast("🎉 Opublikowano w Bibliotece!");
+                    setShowPublishModal(false);
+                    setPublishTitle('');
+                    setActiveTab('biblioteka');
+                } catch(e) {
+                    showToast("Wystąpił błąd podczas publikacji.");
+                } finally {
+                    setIsPublishing(false);
+                }
             };
 
             // --- POŁĄCZENIE Z AI PRZEZ VERCEL (OPENAI BACKEND) ---
@@ -466,16 +603,37 @@
                         <i className="ph-bold ph-check-circle text-xl"></i> {toastMessage}
                     </div>
 
-                    {/* LOKALNA NAWIGACJA ZAKŁADEK (Kreator vs Dokument) */}
+                    {/* MODAL PUBLIKACJI */}
+                    {showPublishModal && (
+                        <div className="fixed inset-0 z-[150] flex items-center justify-center px-4 bg-slate-950/80 backdrop-blur-sm fade-in print-hidden">
+                            <div className="bg-slate-900 border border-amber-500/50 p-6 sm:p-8 rounded-2xl shadow-2xl max-w-md w-full relative">
+                                <button onClick={() => setShowPublishModal(false)} className="absolute top-4 right-4 text-slate-500 hover:text-white">✕</button>
+                                <h3 className="text-2xl font-black text-amber-500 mb-2 flex items-center gap-2"><i className="ph-bold ph-share-network"></i> Podziel się wzorem</h3>
+                                <div className="bg-red-500/10 border border-red-500/30 text-red-400 p-3 rounded-lg text-xs font-bold mb-4">
+                                    ⚠️ PAMIĘTAJ: Zanim opublikujesz ten materiał, upewnij się, że usunąłeś z niego wszystkie prawdziwe imiona i nazwiska (swoje oraz uczniów)!
+                                </div>
+                                <label className="text-xs font-bold text-slate-400 uppercase tracking-widest block mb-1">Krótki tytuł dla Twojego sprawozdania</label>
+                                <input type="text" value={publishTitle} onChange={(e) => setPublishTitle(e.target.value)} placeholder="np. Sprawozdanie Nauczyciel Świetlicy" className="w-full bg-slate-800 border border-slate-700 text-white rounded-xl p-3 mb-6 focus:outline-none focus:border-amber-500" />
+                                <button onClick={handlePublishToLibrary} disabled={isPublishing} className="w-full bg-amber-500 hover:bg-amber-400 text-slate-900 font-black py-3 rounded-xl shadow-lg btn-bounce flex justify-center items-center gap-2">
+                                    {isPublishing ? 'Publikowanie...' : 'Opublikuj w Bibliotece'}
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* LOKALNA NAWIGACJA ZAKŁADEK (Kreator vs Dokument vs Biblioteka) */}
                     <div className="w-full max-w-[90rem] mx-auto px-4 sm:px-6 pt-6 print-hidden">
                         <div className="flex justify-center md:justify-start">
-                            <div className="flex bg-slate-900/80 p-1.5 rounded-full border border-slate-700/50 shadow-lg">
+                            <div className="flex bg-slate-900/80 p-1.5 rounded-full border border-slate-700/50 shadow-lg flex-wrap">
                                 <button onClick={() => setActiveTab('kreator')} className={`px-6 py-2 text-sm font-bold rounded-full transition-all flex items-center gap-2 ${activeTab === 'kreator' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}>
                                     <i className="ph-bold ph-magic-wand"></i> Baza & AI
                                 </button>
                                 <button onClick={() => setActiveTab('dokument')} className={`px-6 py-2 text-sm font-bold rounded-full transition-all flex items-center gap-2 relative ${activeTab === 'dokument' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}>
                                     <i className="ph-bold ph-file-text"></i> Twój Dokument
                                     {docItems.length > 0 && <span className="absolute -top-1 -right-1 bg-emerald-500 text-white text-[10px] w-5 h-5 flex items-center justify-center rounded-full animate-bounce">{docItems.length}</span>}
+                                </button>
+                                <button onClick={() => setActiveTab('biblioteka')} className={`px-6 py-2 text-sm font-bold rounded-full transition-all flex items-center gap-2 relative ${activeTab === 'biblioteka' ? 'bg-amber-500 text-slate-900 shadow-[0_0_15px_rgba(245,158,11,0.4)]' : 'text-slate-400 hover:text-white'}`}>
+                                    <i className="ph-bold ph-books"></i> Biblioteka Wzorów
                                 </button>
                             </div>
                         </div>
@@ -682,11 +840,14 @@
                                 </div>
                                 
                                 <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+                                    <button onClick={() => setShowPublishModal(true)} className="bg-amber-500 hover:bg-amber-400 text-slate-900 px-6 py-3 rounded-xl font-bold transition-all shadow-[0_0_15px_rgba(245,158,11,0.3)] btn-bounce text-sm flex items-center justify-center gap-2">
+                                        <i className="ph-bold ph-share-network text-xl"></i> Jako Wzór
+                                    </button>
                                     <button onClick={copyEntireDocument} className="bg-slate-800 hover:bg-slate-700 text-white px-6 py-3 rounded-xl font-bold transition-all border border-slate-600 btn-bounce text-sm flex items-center justify-center gap-2">
                                         <i className="ph-bold ph-copy text-xl"></i> Kopiuj Całość
                                     </button>
-                                    <button onClick={() => window.print()} className="bg-emerald-600 hover:bg-emerald-500 text-white px-8 py-3 rounded-xl font-bold transition-all shadow-[0_0_20px_rgba(16,185,129,0.4)] btn-bounce text-sm uppercase tracking-wider flex items-center justify-center gap-2">
-                                        <i className="ph-bold ph-printer text-xl"></i> Drukuj PDF
+                                    <button onClick={() => exportToWord(docItems)} className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-3 rounded-xl font-bold transition-all shadow-[0_0_15px_rgba(37,99,235,0.4)] btn-bounce text-sm flex items-center justify-center gap-2">
+                                        <i className="ph-bold ph-download-simple text-xl"></i> Word
                                     </button>
                                 </div>
                             </div>
@@ -742,6 +903,57 @@
                                     <i className="ph-bold ph-plus"></i> Dodaj pusty blok tekstowy
                                 </button>
                             </div>
+                        </main>
+                    )}
+
+                    {/* ================================================================= */}
+                    {/* ZAKŁADKA 3: BIBLIOTEKA WZORÓW                                     */}
+                    {/* ================================================================= */}
+                    {activeTab === 'biblioteka' && (
+                        <main className="flex-grow w-full max-w-7xl mx-auto px-4 sm:px-6 py-8 relative z-10 print-hidden animate-[reveal_0.4s_ease-out]">
+                            <div className="text-center mb-10">
+                                <h2 className="text-3xl font-black text-amber-500 mb-2">Baza Gotowych Wzorów</h2>
+                                <p className="text-slate-400">Przeglądaj ułożone przez innych dokumenty awansowe. Skopiuj i przerób pod siebie!</p>
+                            </div>
+
+                            {libraryItems.length === 0 ? (
+                                <div className="glass-panel p-10 text-center rounded-[2rem] border-slate-700 w-full">
+                                    <i className="ph-duotone ph-books text-6xl mb-4 text-slate-400"></i>
+                                    <h3 className="text-xl font-bold text-white mb-2">Baza jest pusta...</h3>
+                                    <p className="text-slate-400">Ułóż własny dokument i opublikuj go jako pierwszy!</p>
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 w-full">
+                                    {libraryItems.map((item) => (
+                                        <div key={item.id} className="glass-panel rounded-2xl p-6 border transition-all hover:-translate-y-1 shadow-lg bg-slate-800/30 flex flex-col max-h-[500px] border-amber-500/30 hover:border-amber-500/60">
+                                            <div className="flex justify-between items-start mb-3">
+                                                <span className="text-[10px] font-black uppercase px-2 py-1 rounded-md bg-amber-500/20 text-amber-400">
+                                                    Nauczyciel {item.path === 'mianowany' ? 'Mianowany' : 'Dyplomowany'}
+                                                </span>
+                                            </div>
+                                            <h3 className="text-lg font-bold text-white mb-4 leading-tight">{item.title}</h3>
+                                            
+                                            <div className="text-sm text-slate-300 bg-slate-900/50 p-4 rounded-xl border border-slate-800 mb-4 flex-grow overflow-y-auto custom-scrollbar font-serif text-justify space-y-4">
+                                                {item.items && item.items.map((docItem, i) => (
+                                                    <div key={i} className="mb-2">
+                                                        <strong className="text-white block mb-1">{i + 1}. {docItem.section}</strong>
+                                                        <span className="text-slate-400 text-xs">{docItem.text}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+
+                                            <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-700 mt-auto">
+                                                <button onClick={() => copyLibraryItemToClipboard(item.items)} className="p-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-white transition-colors" title="Kopiuj całość do schowka">
+                                                    <i className="ph-bold ph-copy text-lg"></i>
+                                                </button>
+                                                <button onClick={() => exportToWord(item.items, item.title)} className="p-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-white transition-colors" title="Pobierz jako Word">
+                                                    <i className="ph-bold ph-download-simple text-lg"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </main>
                     )}
 
