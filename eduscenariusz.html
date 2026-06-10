@@ -1,625 +1,682 @@
 <!DOCTYPE html>
-<html lang="pl">
+<html lang="pl" translate="no" class="notranslate">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EduScenariusz PRO - EduBox AI</title>
+    <meta name="google" content="notranslate">
+    <title>EduScenariusz AI - Kreator Konspektów Lekcji</title>
     
-    <!-- Wymuszenie HTTPS dla bezpieczeństwa (likwiduje komunikat "Niebezpieczna") -->
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-3RQ9R0N0K8"></script>
     <script>
-        if (window.location.protocol === 'http:' && window.location.hostname !== 'localhost') {
-            window.location.href = window.location.href.replace('http:', 'https:');
-        }
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-3RQ9R0N0K8');
     </script>
 
-    <!-- React & ReactDOM (z dodanym anonymous dla bezpieczeństwa CORS) -->
-    <script crossorigin="anonymous" src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script crossorigin="anonymous" src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    
-    <!-- Babel -->
-    <script crossorigin="anonymous" src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    
-    <!-- Tailwind CSS -->
+    <!-- TWOJA BAZA FIREBASE -->
+    <script>
+      window.__firebase_config = JSON.stringify({
+        apiKey: "AIzaSyDL_mvepNJjMmZYQzifN2cXzoKwCE8jNd0",
+        authDomain: "edubox-pro.firebaseapp.com",
+        projectId: "edubox-pro",
+        storageBucket: "edubox-pro.firebasestorage.app",
+        messagingSenderId: "570263845714",
+        appId: "1:570263845714:web:0b029211f7af071b66988b"
+      });
+      window.__app_id = "eduboxpro";
+    </script>
+
+    <!-- Biblioteki -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     
-    <!-- Phosphor Icons -->
-    <script src="https://unpkg.com/@phosphor-icons/web"></script>
-
-    <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Lora:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
-
-    <!-- Tailwind Config -->
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    fontFamily: {
-                        sans: ['"Plus Jakarta Sans"', 'sans-serif'],
-                        serif: ['Lora', 'serif'],
-                    },
-                    colors: {
-                        slate: { 950: '#020617' }
-                    }
-                }
-            }
-        }
-    </script>
-
     <style>
         body { 
+            font-family: 'Plus Jakarta Sans', sans-serif; 
             background-color: #020617; 
             color: #f8fafc; 
-            background-image: 
-                radial-gradient(at 0% 0%, rgba(16, 185, 129, 0.15) 0px, transparent 50%),
-                radial-gradient(at 100% 100%, rgba(20, 184, 166, 0.1) 0px, transparent 50%);
-            background-attachment: fixed;
+            scroll-behavior: smooth; 
+            overflow-x: hidden;
             min-height: 100vh;
         }
-
-        .glass-panel {
-            background: rgba(30, 41, 59, 0.4);
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
-            border: 1px solid rgba(255, 255, 255, 0.05);
-            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+        
+        .glass-panel { 
+            background: rgba(30, 41, 59, 0.4); 
+            backdrop-filter: blur(16px); 
+            -webkit-backdrop-filter: blur(16px); 
+            border: 1px solid rgba(255, 255, 255, 0.05); 
+        }
+        .glass-nav { 
+            background: rgba(2, 6, 23, 0.9); 
+            backdrop-filter: blur(20px); 
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1); 
+        }
+        
+        .text-gradient { 
+            background: linear-gradient(135deg, #a855f7 0%, #3b82f6 100%); 
+            -webkit-background-clip: text; 
+            -webkit-text-fill-color: transparent; 
         }
 
-        /* Custom Scrollbar */
-        ::-webkit-scrollbar { width: 8px; }
-        ::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.5); }
-        ::-webkit-scrollbar-thumb { background: rgba(16, 185, 129, 0.5); border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: rgba(16, 185, 129, 0.8); }
-
-        .scenario-page { 
-            color: #1e293b; 
+        .hero-glow {
+            position: absolute;
+            top: -20%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100vw;
+            height: 800px;
+            background: radial-gradient(circle, rgba(168, 85, 247, 0.15) 0%, rgba(2, 6, 23, 0) 70%);
+            z-index: -1;
+            pointer-events: none;
         }
 
-        /* Animations */
+        .fade-in { animation: fadeIn 0.5s ease-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes slide-up { 0% { opacity: 0; transform: translate(-50%, 20px); } 100% { opacity: 1; transform: translate(-50%, 0); } }
         .animate-toast { animation: slide-up 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-        @keyframes pop { 0% { transform: scale(0.9); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
-        .bot-bubble { animation: pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
-        @keyframes blink { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(0.1); } }
-        .bot-eye { animation: blink 4s infinite; transform-origin: center; }
 
-        /* --- PRINT STYLES --- */
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #0f172a; border-radius: 8px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #a855f7; border-radius: 8px; }
+        
+        .btn-bounce:active { transform: scale(0.95); transition: transform 0.1s; }
+
+        #wspolne-menu-kontener { position: relative; z-index: 50; }
+
+        /* Stylizacja wygenerowanego dokumentu i wydruku */
+        .scenariusz-content h2 { font-size: 1.5rem; font-weight: 800; color: #1e293b; margin-top: 1.5rem; margin-bottom: 0.75rem; border-bottom: 2px solid #e2e8f0; padding-bottom: 0.5rem; }
+        .scenariusz-content h3 { font-size: 1.25rem; font-weight: 700; color: #334155; margin-top: 1rem; margin-bottom: 0.5rem; }
+        .scenariusz-content ul { list-style-type: disc; margin-left: 1.5rem; margin-bottom: 1rem; color: #334155; }
+        .scenariusz-content li { margin-bottom: 0.25rem; }
+        .scenariusz-content p { margin-bottom: 1rem; color: #334155; line-height: 1.6; }
+        .scenariusz-content strong { color: #0f172a; font-weight: 700; }
+
         @media print {
-            body { background: white; color: black; background-image: none; }
-            .no-print { display: none !important; }
-            #scenario-container { border: none !important; box-shadow: none !important; padding: 0 !important; margin: 0 !important; width: 100% !important; max-width: 100% !important; background: white !important; }
-            .page-break-inside-avoid { page-break-inside: avoid; }
-            @page { margin: 1.5cm; }
+            body { background-color: white !important; color: black !important; }
+            .print-hidden, #wspolne-menu-kontener { display: none !important; }
+            .glass-panel { border: none !important; background: transparent !important; filter: none !important; padding: 0 !important; box-shadow: none !important; }
+            .hero-glow { display: none !important; }
+            .scenariusz-content h2 { color: black !important; border-bottom: 1px solid black !important; page-break-after: avoid; }
+            .scenariusz-content h3, .scenariusz-content p, .scenariusz-content li, .scenariusz-content strong { color: black !important; }
+            .scenariusz-content { font-family: 'Times New Roman', serif !important; font-size: 12pt !important; }
         }
     </style>
 </head>
-<body>
-    <div id="root"></div>
+<body class="flex flex-col">
 
-    <script type="text/babel">
-        const { useState, useEffect } = React;
+    <!-- KONTENER NA WSPÓLNE MENU -->
+    <div id="wspolne-menu-kontener"></div>
 
-        const SAMPLES = {
-            wiosna: { title: "Wiosna budzi się do życia", duration: "45-50 minut", group: "5-6 latki", methods: "Aktywizująca i ruchowa", main_goal: "Rozwijanie wrażliwości na zmiany w przyrodzie oraz integracja grupy.", custom_goal: "Kształtowanie umiejętności uważnej obserwacji otoczenia.", phases: [ { step_name: "1. Powitanie i krąg poranny", time: "5-6 min", details: "Nauczyciel: 'Dzień dobry, moje małe ptaszki! Czy widzieliście dziś słońce?'\nUczniowie: Dzieci siadają w kręgu na dywanie i odpowiadają na powitanie." }, { step_name: "2. Burza mózgów", time: "10 min", details: "Nauczyciel: Rozkłada na dywanie ilustracje wiosennych kwiatów. 'Po czym poznajemy wiosnę?'\nUczniowie: Wskazują kwiaty i wymyślają skojarzenia." } ], materials: ["Kredki", "Szary papier", "Ilustracje kwiatów", "Głośnik bluetooth"], integration: "Język, Przyroda, Muzyka", weather_alternative: "Jeśli pada deszcz, zamiast spaceru robimy wiosenny kącik sensoryczny w sali z zebranych wcześniej liści i mchu.", adjustments: "Dla Jasia (Spektrum autyzmu): Zapewnienie słuchawek wyciszających podczas głośniejszej piosenki powitalnej. Wcześniejsze uprzedzenie o zmianie aktywności." }
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            function wstawMenuAwaryjne() {
+                document.getElementById('wspolne-menu-kontener').innerHTML = `
+                    <nav class="w-full z-50 glass-nav shadow-lg print-hidden">
+                        <div class="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+                            <a href="index.html" class="flex items-center gap-2 hover:opacity-80 transition-opacity">
+                                <span class="text-2xl font-black text-white tracking-tight">Edu<span class="text-purple-500">Box</span></span>
+                                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest border border-slate-700 rounded px-1.5 py-0.5 ml-1">Pro</span>
+                            </a>
+                        </div>
+                    </nav>
+                `;
+            }
+
+            try {
+                fetch('/menu.html')
+                    .then(response => {
+                        if (!response.ok) throw new Error('Błąd ładowania menu');
+                        return response.text();
+                    })
+                    .then(data => {
+                        document.getElementById('wspolne-menu-kontener').innerHTML = data;
+                        if (typeof window.initMenuLogic === 'function') {
+                            window.initMenuLogic();
+                        }
+                    })
+                    .catch(error => wstawMenuAwaryjne());
+            } catch (error) { wstawMenuAwaryjne(); }
+        });
+    </script>
+
+    <div id="root" class="flex-grow flex flex-col relative z-10"></div>
+
+    <script type="text/babel" data-type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        const { useState, useRef, useEffect } = React;
+
+        const DAILY_LIMIT = 5;
+
+        // INICJALIZACJA BAZY DANYCH CHMUROWEJ
+        let app, auth, db, appId;
+        try {
+            const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+            app = initializeApp(firebaseConfig);
+            auth = getAuth(app);
+            db = getFirestore(app);
+            appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        } catch (e) {
+            console.warn("Brak konfiguracji Firebase.");
+        }
+
+        const Icon = ({ name, size = 20, className = "" }) => {
+            const icons = {
+                Library: <><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></>,
+                Share: <><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></>,
+                Sparkles: <path d="m12 3 1.912 5.813a2 2 0 0 0 1.275 1.275L21 12l-5.813 1.912a2 2 0 0 0-1.275 1.275L12 21l-1.912-5.813a2 2 0 0 0-1.275-1.275L3 12l5.813-1.912a2 2 0 0 0 1.275-1.275L12 3Z"/>,
+                Copy: <><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></>,
+                Word: <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>,
+                Printer: <path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6z"/>,
+                AlertCircle: <><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></>,
+                CheckCircle: <><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></>
+            };
+            return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>{icons[name]}</svg>;
         };
 
-        const BotHelperAvatar = () => (
-            <svg viewBox="0 0 100 100" className="w-14 h-14 drop-shadow-md flex-shrink-0" xmlns="http://www.w3.org/2000/svg">
-                <path d="M50 30 V15" stroke="#94a3b8" strokeWidth="4" strokeLinecap="round"/>
-                <circle cx="50" cy="12" r="5" fill="#10b981"/>
-                <rect x="25" y="30" width="50" height="40" rx="12" fill="#047857"/>
-                <rect x="32" y="38" width="36" height="22" rx="6" fill="#ffffff"/>
-                <circle cx="40" cy="49" r="3.5" fill="#047857" className="bot-eye"/>
-                <circle cx="60" cy="49" r="3.5" fill="#047857" className="bot-eye"/>
-                <path d="M 45 56 Q 50 60 55 56" stroke="#047857" strokeWidth="2.5" fill="none" strokeLinecap="round"/>
-            </svg>
-        );
+        const SUBJECTS = [
+            'Edukacja wczesnoszkolna', 'Język polski', 'Matematyka', 'Język angielski', 'Język niemiecki',
+            'Historia', 'Geografia', 'Biologia', 'Przyroda', 'Fizyka', 'Chemia', 'Informatyka', 'Wychowanie fizyczne', 'Godzina wychowawcza', 'Muzyka', 'Plastyka', 'Inny przedmiot'
+        ];
 
-        const App = () => {
-            // Freemium State
-            const [isPremium, setIsPremium] = useState(false);
-            const [usagesLeft, setUsagesLeft] = useState(2);
-            const [showPremiumModal, setShowPremiumModal] = useState(false);
-            const [accessCode, setAccessCode] = useState('');
-            const [toastMessage, setToastMessage] = useState('');
+        const GRADES = [
+            'Przedszkole', 'Klasa 1', 'Klasa 2', 'Klasa 3', 'Klasa 4', 'Klasa 5', 'Klasa 6', 'Klasa 7', 'Klasa 8', 'Szkoła Ponadpodstawowa'
+        ];
+
+        const METHODS = [
+            'Metody podające (pogadanka, wykład)',
+            'Metody aktywizujące (burza mózgów, projekt, grywalizacja)',
+            'Metody eksponujące (film, pokaz)',
+            'Metody praktyczne (ćwiczenia przedmiotowe, eksperymenty)'
+        ];
+
+        const SYSTEM_PROMPT = `Jesteś wybitnym polskim metodykiem i nauczycielem dyplomowanym z 20-letnim stażem. 
+Twoim zadaniem jest napisanie profesjonalnego, szczegółowego Konspektu/Scenariusza Lekcji, gotowego do oddania dyrekcji lub wizytatorowi z kuratorium.
+
+Wymagana struktura dokumentu:
+<h2>1. Metryczka lekcji</h2>
+<ul>
+  <li><strong>Temat:</strong> [Twój piękny temat]</li>
+  <li><strong>Klasa:</strong> [Klasa]</li>
+  <li><strong>Czas trwania:</strong> 45 minut</li>
+  <li><strong>Cele ogólne:</strong> [2-3 cele]</li>
+  <li><strong>Cele operacyjne (uczeń wie/potrafi):</strong> [3-5 celów z czasownikami operacyjnymi]</li>
+  <li><strong>Metody pracy:</strong> [wybrane metody]</li>
+  <li><strong>Formy pracy:</strong> (indywidualna, grupowa, zbiorowa)</li>
+  <li><strong>Środki dydaktyczne:</strong> [podręcznik, tablica interaktywna, karty pracy itp.]</li>
+</ul>
+
+<h2>2. Przebieg lekcji</h2>
+<h3>Faza wstępna (ok. 5-7 min)</h3>
+[Szczegółowy opis czynności organizacyjnych, zaciekawienia tematem (haczyk), podania celów]
+
+<h3>Faza realizacyjna (ok. 30 min)</h3>
+[Bardzo szczegółowy opis głównych aktywności. Krok po kroku, co robi nauczyciel, a co robią uczniowie. Podział na 2-3 zadania/ćwiczenia.]
+
+<h3>Faza podsumowująca (ok. 8 min)</h3>
+[Utrwalenie wiadomości, ocena pracy uczniów, praca domowa (jeśli jest), pożegnanie.]
+
+ZASADY: 
+Zwróć wynik formowany przy pomocy tagów HTML (<h2>, <h3>, <ul>, <li>, <strong>, <p>) dla idealnej czytelności.
+NIE używaj znaczników markdown (\`\`\`). NIE używaj nagłówka <html> czy <body>. Zwróć sam czysty kod HTML zawartości scenariusza.
+Zadbaj o profesjonalny, metodyczny język.`;
+
+        function App() {
+            const [user, setUser] = useState(null);
+            const [viewMode, setViewMode] = useState('kreator');
+
+            const [subject, setSubject] = useState('');
+            const [grade, setGrade] = useState('');
+            const [topic, setTopic] = useState('');
+            const [methods, setMethods] = useState('');
             
-            // App State
+            const [generatedText, setGeneratedText] = useState('');
             const [isGenerating, setIsGenerating] = useState(false);
-            const [isAnalyzing, setIsAnalyzing] = useState(false);
-            const [botQuickPrompt, setBotQuickPrompt] = useState('');
-            const [botMessage, setBotMessage] = useState("Cześć! Napisz mi jedno zdanie, np. 'Lekcja o dinozaurach dla 6 latków na 30 minut', a ja sam ustawię odpowiednie parametry!");
+            const [error, setError] = useState('');
+            const [toastMessage, setToastMessage] = useState('');
 
-            const [params, setParams] = useState({
-                topic: '',
-                age: '5-6 latki',
-                duration: '45-50 min',
-                methods: 'Aktywizująca i ruchowa',
-                needs: '',
-                formatType: 'detailed',
-                customGoal: ''
+            const [isPro, setIsPro] = useState(() => {
+                return localStorage.getItem('eduboxProStatus') === 'active' || localStorage.getItem('eduAwansPremium') === 'active';
             });
+            const [limitData, setLimitData] = useState({ remaining: DAILY_LIMIT, showWarning: false });
 
-            const [scenario, setScenario] = useState(null);
+            // Biblioteka
+            const [libraryItems, setLibraryItems] = useState([]);
+            const [showPublishModal, setShowPublishModal] = useState(false);
+            const [publishTitle, setPublishTitle] = useState('');
+            const [isPublishing, setIsPublishing] = useState(false);
 
-            // Load Freemium status on mount
+            const resultRef = useRef(null);
+
+            // --- FIREBASE INIT ---
             useEffect(() => {
-                const premiumStatus = localStorage.getItem('edubox_premium_unlocked');
-                const storedUsages = localStorage.getItem('eduscenariusz_usages');
+                if (!auth) return;
+                const initAuth = async () => {
+                    try {
+                        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                            await signInWithCustomToken(auth, __initial_auth_token);
+                        } else {
+                            await signInAnonymously(auth);
+                        }
+                    } catch(e) { console.error("Auth err", e); }
+                };
+                initAuth();
+                const unsubscribe = onAuthStateChanged(auth, setUser);
+                return () => unsubscribe();
+            }, []);
 
-                if (premiumStatus === 'true') {
-                    setIsPremium(true);
+            // --- FETCH LIBRARY ---
+            useEffect(() => {
+                if (!user || !db) return;
+                const libRef = collection(db, 'artifacts', appId, 'public', 'data', 'eduscenariusz_docs');
+                const unsubscribe = onSnapshot(libRef, (snapshot) => {
+                    const items = [];
+                    snapshot.forEach(doc => items.push({ id: doc.id, ...doc.data() }));
+                    items.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
+                    setLibraryItems(items);
+                });
+                return () => unsubscribe();
+            }, [user]);
+
+            useEffect(() => {
+                const today = new Date().toLocaleDateString();
+                const usage = JSON.parse(localStorage.getItem('eduboxUsage')) || { date: today, count: 0 };
+                if (usage.date !== today) {
+                    localStorage.setItem('eduboxUsage', JSON.stringify({ date: today, count: 0 }));
+                    setLimitData({ remaining: DAILY_LIMIT, showWarning: false });
                 } else {
-                    if (storedUsages !== null) {
-                        setUsagesLeft(parseInt(storedUsages, 10));
-                    } else {
-                        localStorage.setItem('eduscenariusz_usages', '2');
-                    }
+                    setLimitData({ remaining: Math.max(0, DAILY_LIMIT - usage.count), showWarning: usage.count >= DAILY_LIMIT });
                 }
             }, []);
 
-            const showToast = (msg) => { setToastMessage(msg); setTimeout(() => setToastMessage(''), 4000); };
-
-            const handleVerifyCode = (e) => {
-                e?.preventDefault();
-                if (accessCode.trim().toUpperCase() === 'KAWA2024') { 
-                    localStorage.setItem('edubox_premium_unlocked', 'true');
-                    setIsPremium(true); 
-                    setShowPremiumModal(false);
-                    setAccessCode(''); 
-                    showToast('Odblokowano Premium! 🌟'); 
-                    setBotMessage("Świetnie! Dzięki Premium możesz generować nieograniczoną ilość epickich, wielostronicowych konspektów."); 
-                } else {
-                    showToast('Błędny kod dostępu!');
-                }
+            const showToast = (msg) => {
+                setToastMessage(msg);
+                setTimeout(() => setToastMessage(''), 3000);
             };
 
-            const handleBotAutoFill = async (e) => {
-                if (e) e.preventDefault();
+            const updateAndCheckLimit = () => {
+                if (isPro) return true; 
+
+                const today = new Date().toLocaleDateString();
+                let usage = JSON.parse(localStorage.getItem('eduboxUsage')) || { date: today, count: 0 };
                 
-                // Zapisujemy wartość natychmiast na sztywno, aby uniknąć ucieczki stanu
-                const promptText = botQuickPrompt;
+                if (usage.date !== today) usage = { date: today, count: 0 };
                 
-                if (!promptText || !promptText.trim()) {
-                    showToast('Wpisz najpierw tekst do analizy!');
-                    return;
+                if (usage.count >= DAILY_LIMIT) {
+                    setLimitData(prev => ({ ...prev, remaining: 0, showWarning: true }));
+                    return false;
                 }
-                
-                setIsAnalyzing(true);
-                
-                try {
-                    // Bezpieczne, asynchroniczne opóźnienie UX (zamiast awaryjnego setTimeout)
-                    await new Promise(resolve => setTimeout(resolve, 600));
 
-                    const text = promptText.toLowerCase();
-                    
-                    // Używamy bezpiecznej, funkcyjnej aktualizacji stanu (prev)
-                    setParams(prev => {
-                        let newParams = { ...prev };
-                        let extractedTopic = promptText;
-
-                        // Elastyczna logika rozpoznawania NLP
-                        if (/3.*lat|4.*lat|3-4/i.test(text)) newParams.age = '3-4 latki';
-                        else if (/5.*lat|6.*lat|5-6/i.test(text)) newParams.age = '5-6 latki';
-                        else if (/klas.*1|klas.*2|klas.*3|klas.*i|pierwsz|drug|trzeci/i.test(text)) newParams.age = 'Klasy I-III';
-                        else if (/klas.*4|klas.*5|klas.*6|klas.*7|klas.*8|czwart|piąt|szóst|starsz/i.test(text)) newParams.age = 'Klasy IV-VIII';
-
-                        if (/15|20/.test(text)) newParams.duration = '15-20 min';
-                        else if (/30|40/.test(text)) newParams.duration = '30-40 min';
-                        else if (/90|półtorej|dwie/.test(text)) newParams.duration = '90 min';
-                        else if (/45|50/.test(text)) newParams.duration = '45-50 min';
-
-                        if (/ruch|zabaw|aktyw|gr/i.test(text)) newParams.methods = 'Aktywizująca i ruchowa';
-                        else if (/pokaz|ogląd|obraz|film|prezenta/i.test(text)) newParams.methods = 'Pokazowa / Obrazowa';
-                        else if (/projekt|badacz/i.test(text)) newParams.methods = 'Metoda projektowa';
-                        else if (/praktycz|doświadcz|eksperymen/i.test(text)) newParams.methods = 'Praktyczne działanie';
-                        else if (/opowiad|czyt|wykład/i.test(text)) newParams.methods = 'Podająca (opowiadanie)';
-
-                        if (/autyzm|asperger|spektrum/i.test(text)) newParams.needs = 'Spektrum autyzmu';
-                        else if (/adhd|nadpobudli/i.test(text)) newParams.needs = 'ADHD (Nadpobudliwość)';
-
-                        // Czyszczenie tematu z parametrów (wzmocnione regexy z dużymi polskimi znakami)
-                        extractedTopic = extractedTopic
-                            .replace(/dla\s*\d+\s*lat[a-zA-ZąćęłńóśźżĄĆĘŁŃÓŚŹŻ]*/gi, '')
-                            .replace(/dla\s*(dzieci|klas[y|a]?|uczniów)\s*[a-zA-Z0-9-IVX]*/gi, '')
-                            .replace(/(przez\s*|na\s*)?\d+\s*min[a-zA-ZąćęłńóśźżĄĆĘŁŃÓŚŹŻ]*/gi, '')
-                            .replace(/metod[a-zA-ZąćęłńóśźżĄĆĘŁŃÓŚŹŻ]*\s*[a-zA-ZąćęłńóśźżĄĆĘŁŃÓŚŹŻ]+/gi, '')
-                            .replace(/[,.]/g, '')
-                            .replace(/\s+/g, ' ')
-                            .trim();
-                        
-                        if(extractedTopic) {
-                            extractedTopic = extractedTopic.charAt(0).toUpperCase() + extractedTopic.slice(1);
-                        }
-
-                        newParams.topic = extractedTopic || 'Zajęcia ogólne';
-                        return newParams;
-                    });
-
-                    setBotQuickPrompt('');
-                    setBotMessage('Bum! 💥 Przeanalizowałem Twój tekst i perfekcyjnie poustawiałem suwaki w konfiguratorze. Zobacz poniżej!');
-                } catch (error) {
-                    console.error('Błąd podczas analizy NLP:', error);
-                    showToast('Wystąpił błąd analizy!');
-                } finally {
-                    setIsAnalyzing(false);
-                }
+                usage.count += 1;
+                localStorage.setItem('eduboxUsage', JSON.stringify(usage));
+                setLimitData({ remaining: DAILY_LIMIT - usage.count, showWarning: false });
+                if(typeof window.updateGlobalLimitDisplay === 'function') window.updateGlobalLimitDisplay();
+                return true;
             };
 
-            const generateScenario = async () => {
-                if (!isPremium && usagesLeft <= 0) {
-                    setShowPremiumModal(true);
+            const generateDocument = async () => {
+                if (!subject || !grade || !topic.trim()) {
+                    setError('Proszę wypełnić wszystkie pola (Przedmiot, Klasa, Temat).');
                     return;
                 }
 
-                if (!params.topic.trim()) return showToast('Wpisz najpierw temat zajęć!');
-                
+                if (!updateAndCheckLimit()) return;
+
                 setIsGenerating(true);
-                setBotMessage("Przeszukuję bazę metodyczną, tworzę haki na uwagę (hooks) i piszę dokładne skrypty. Chwileczkę...");
-                
-                let detailInstruction = params.formatType === 'detailed' 
-                    ? "Wymagam BARDZO ROZBUDOWANEGO konspektu. W sekcji 'phases' -> 'details' napisz dokładnie, wręcz z podziałem ról: co mówi Nauczyciel i co odpowiada Uczeń. Opisz dokładnie przebieg zabaw. Ten dokument ma być gotowcem kopiuj-wklej na zajęcia." 
-                    : "Wymagam ZWIĘZŁEGO konspektu (tylko główne, krótkie punkty). Bez długich opisów.";
-
-                const systemPrompt = `Jesteś wybitnym polskim metodykiem edukacji. Odpowiadaj WYŁĄCZNIE w poprawnym formacie JSON.
-                ${detailInstruction}
-                Struktura JSON:
-                { 
-                    "title": "...", 
-                    "duration": "...", 
-                    "group": "...", 
-                    "methods": "...", 
-                    "main_goal": "...", 
-                    "custom_goal": "...", 
-                    "phases": [{ "step_name": "...", "time": "...", "details": "..." }], 
-                    "materials": ["..."], 
-                    "integration": "...", 
-                    "weather_alternative": "...", 
-                    "adjustments": "..." 
-                }`;
-
-                const userPrompt = `Temat: ${params.topic}. Grupa: ${params.age}. Czas: ${params.duration}. Metoda: ${params.methods}. Potrzeby SPE: ${params.needs || 'Brak'}. Cel dodatkowy: ${params.customGoal || 'Brak'}. Zbuduj profesjonalny scenariusz.`;
+                setError('');
+                setGeneratedText('');
 
                 try {
-                    const res = await fetch('/api/chat', {
-                        method: 'POST', 
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ prompt: userPrompt, system: systemPrompt, temperature: 0.4, format: "json", model: "gpt-4o-mini" })
-                    });
-                    
-                    const data = await res.json();
-                    if (!res.ok) throw new Error(data.details || data.message || "Błąd z serwera");
+                    const finalPrompt = `Przedmiot: ${subject}\nKlasa/Etap: ${grade}\nTemat lekcji: "${topic}"\nPreferowane metody/uwagi: ${methods || 'Zrób ciekawą, aktywizującą lekcję'}`;
 
-                    let cleanText = data.text;
-                    let jsonStr = cleanText.replace(/```json/gi, '').replace(/```/g, '').trim();
-                    if(jsonStr.indexOf('{') !== -1) jsonStr = jsonStr.substring(jsonStr.indexOf('{'), jsonStr.lastIndexOf('}') + 1);
-
-                    setScenario(JSON.parse(jsonStr));
-                    setBotMessage("Gotowe! Masz przed sobą genialny scenariusz. Kliknij pobierz do Worda, by go zapisać!");
-
-                    if (!isPremium) {
-                        const newUsages = usagesLeft - 1;
-                        setUsagesLeft(newUsages);
-                        localStorage.setItem('eduscenariusz_usages', newUsages.toString());
+                    if (window.location.hostname === '' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                        throw new Error("LocalTest");
                     }
 
-                } catch (error) {
-                    console.error(error); 
-                    showToast(`Błąd połączenia z AI. Spróbuj ponownie.`);
-                    setBotMessage("Ojej, serwer chwilowo odrzucił zapytanie. Spróbuj kliknąć wygeneruj jeszcze raz!");
-                } finally { 
-                    setIsGenerating(false); 
+                    const response = await fetch('/api/chat', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                            system: SYSTEM_PROMPT,
+                            prompt: finalPrompt,
+                            temperature: 0.5
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    if (!response.ok) throw new Error(data.message || data.error || `Błąd serwera API: ${response.status}`);
+
+                    let text = data.text;
+                    if (text) {
+                        // Oczyść ze znaczników przemyśleń i niepotrzebnych bloków markdown
+                        text = text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+                        text = text.replace(/```html/gi, '').replace(/```/g, '').trim();
+                        setGeneratedText(text);
+                        setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+                    } else {
+                        throw new Error("Pusta odpowiedź z API.");
+                    }
+
+                } catch (err) {
+                    if (err.message === "LocalTest") {
+                        setError('Tryb lokalny. Symulacja.');
+                        setTimeout(() => {
+                            const demoText = `<h2>1. Metryczka lekcji</h2><ul><li><strong>Temat:</strong> ${topic}</li><li><strong>Klasa:</strong> ${grade}</li><li><strong>Czas trwania:</strong> 45 minut</li><li><strong>Cele ogólne:</strong> Zapoznanie z nowym materiałem.</li><li><strong>Cele operacyjne:</strong> Uczeń potrafi zdefiniować pojęcie, uczeń potrafi pracować w grupie.</li><li><strong>Metody pracy:</strong> Aktywizujące.</li></ul><h2>2. Przebieg lekcji</h2><h3>Faza wstępna (5 min)</h3><p>Powitanie klasy, podanie tematu i celów lekcji.</p><h3>Faza realizacyjna (30 min)</h3><p>Praca w grupach nad zadaniem głównym. Nauczyciel nadzoruje pracę i udziela wskazówek.</p><h3>Faza podsumowująca (10 min)</h3><p>Wspólne omówienie wyników pracy, ocena aktywności, zadanie pracy domowej.</p>`;
+                            setGeneratedText(demoText);
+                            setIsGenerating(false);
+                        }, 1500);
+                    } else {
+                        setError('Wystąpił błąd serwera. Spróbuj ponownie.');
+                    }
+                } finally {
+                    setIsGenerating(false);
                 }
             };
 
-            const exportToWord = () => {
-                if(!scenario) return;
-                const content = document.getElementById('scenario-render-area').innerHTML;
-                const header = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>${scenario.title}</title><style>body {font-family: 'Times New Roman', serif; font-size: 11pt; line-height: 1.5;} h1 {font-size: 18pt; color: #047857; text-align: center; text-transform: uppercase; margin-bottom: 20px;} h2 {font-size: 14pt; border-bottom: 2px solid #10b981; padding-bottom: 5px; margin-top: 20px; color: #047857;} h3 {font-size: 12pt; color: #334155; margin-top: 15px;} b {color: #1e293b;} .box {background-color: #f8fafc; padding: 15px; border: 1px solid #cbd5e1; margin-bottom: 15px;}</style></head><body>`;
+            const copyToClipboard = () => {
+                if (!generatedText) return;
+                // Pobranie czystego tekstu z HTML'a na potrzeby schowka
+                const tempDiv = document.createElement("div");
+                tempDiv.innerHTML = generatedText;
+                const plainText = tempDiv.innerText || tempDiv.textContent;
+                
+                const textArea = document.createElement("textarea");
+                textArea.value = plainText;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                textArea.remove();
+                showToast('✅ Skopiowano do schowka!');
+            };
+
+            const exportToWord = (htmlContent, title) => {
+                if (!htmlContent) return;
+                const header = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>${title}</title><style>body { font-family: 'Times New Roman', serif; font-size: 12pt; line-height: 1.5; color: #000; text-align: justify; } h2 { font-size: 14pt; color: #000; margin-top: 20pt; border-bottom: 1px solid #000; } h3 { font-size: 12pt; font-weight: bold; margin-top: 10pt; } ul { margin-left: 20px; } li { margin-bottom: 5px; }</style></head><body>`;
                 const footer = `</body></html>`;
-                const blob = new Blob(['\ufeff', header + content + footer], { type: 'application/msword' });
-                const link = document.createElement('a');
-                link.href = URL.createObjectURL(blob);
-                link.download = `Scenariusz_${scenario.title.replace(/\s+/g, '_')}.doc`;
-                link.click();
+                const blob = new Blob(['\ufeff', header + htmlContent + footer], { type: 'application/msword' });
+                const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = `${title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.doc`; link.click();
+            };
+
+            const handlePublishToLibrary = async () => {
+                if (!publishTitle.trim()) return showToast("Zanim udostępnisz, podaj krótki tytuł!");
+                setIsPublishing(true);
+                try {
+                    if (db && user) {
+                        const libRef = collection(db, 'artifacts', appId, 'public', 'data', 'eduscenariusz_docs');
+                        await addDoc(libRef, {
+                            title: publishTitle,
+                            content: generatedText,
+                            subject: subject,
+                            grade: grade,
+                            createdAt: serverTimestamp(),
+                            userId: user.uid
+                        });
+                    }
+                    showToast("🎉 Opublikowano w Bibliotece!");
+                    setShowPublishModal(false);
+                    setPublishTitle('');
+                    setViewMode('biblioteka');
+                } catch(e) {
+                    showToast("Wystąpił błąd podczas publikacji.");
+                } finally {
+                    setIsPublishing(false);
+                }
+            };
+
+            const printDocument = () => {
+                window.print();
             };
 
             return (
-                <div className="min-h-screen flex flex-col font-sans">
-                    {/* Toast Notification */}
+                <div className="relative flex flex-col min-h-screen print:bg-white">
+                    <div className="hero-glow print-hidden"></div>
+
                     {toastMessage && (
-                        <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[200] bg-emerald-600 text-white px-6 py-3 rounded-2xl shadow-lg font-bold text-sm animate-toast flex items-center gap-2">
-                            <i className="ph-fill ph-info"></i> {toastMessage}
+                        <div className={`fixed bottom-10 left-1/2 -translate-x-1/2 z-[200] bg-purple-600 text-white px-6 py-3 rounded-2xl shadow-[0_0_30px_rgba(168,85,247,0.4)] font-bold text-sm animate-toast flex items-center gap-3 border border-purple-400 print-hidden`}>
+                            <Icon name="CheckCircle" size={18} /> {toastMessage}
                         </div>
                     )}
 
-                    {/* Loading Overlay */}
-                    {isGenerating && (
-                        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-[100] flex flex-col items-center justify-center text-white no-print">
-                            <div className="glass-panel p-10 rounded-3xl flex flex-col items-center space-y-6 max-w-sm border border-emerald-500/20">
-                                <i className="ph ph-spinner-gap animate-spin text-5xl text-emerald-500"></i>
-                                <div className="text-center">
-                                    <h3 className="text-xl font-bold mb-2">AI układa metodykę...</h3>
-                                    <p className="text-xs text-slate-400 font-medium">To potrwa kilkanaście sekund.</p>
+                    {/* MODAL PUBLIKACJI */}
+                    {showPublishModal && (
+                        <div className="fixed inset-0 z-[150] flex items-center justify-center px-4 bg-slate-950/80 backdrop-blur-sm fade-in print-hidden">
+                            <div className="bg-slate-900 border border-purple-500/50 p-6 sm:p-8 rounded-2xl shadow-2xl max-w-md w-full relative">
+                                <button onClick={() => setShowPublishModal(false)} className="absolute top-4 right-4 text-slate-500 hover:text-white">✕</button>
+                                <h3 className="text-2xl font-black text-purple-500 mb-2 flex items-center gap-2"><Icon name="Share" /> Zapisz w Bazie</h3>
+                                <div className="bg-blue-500/10 border border-blue-500/30 text-blue-400 p-3 rounded-lg text-xs font-bold mb-4">
+                                    Podziel się swoim super scenariuszem z innymi nauczycielami na platformie!
                                 </div>
+                                <label className="text-xs font-bold text-slate-400 uppercase tracking-widest block mb-1">Tytuł Twojego Scenariusza</label>
+                                <input type="text" value={publishTitle} onChange={(e) => setPublishTitle(e.target.value)} placeholder={`np. ${topic.substring(0,25)}...`} className="w-full bg-slate-800 border border-slate-700 text-white rounded-xl p-3 mb-6 focus:outline-none focus:border-purple-500" />
+                                <button onClick={handlePublishToLibrary} disabled={isPublishing} className="w-full bg-purple-500 hover:bg-purple-400 text-white font-black py-3 rounded-xl shadow-lg btn-bounce flex justify-center items-center gap-2">
+                                    {isPublishing ? 'Publikowanie...' : 'Opublikuj w Giełdzie'}
+                                </button>
                             </div>
                         </div>
                     )}
 
-                    {/* Navbar */}
-                    <header className="w-full z-50 glass-panel border-b-0 border-slate-800/50 py-4 px-6 no-print sticky top-0">
-                        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
-                            <div className="flex items-center space-x-3">
-                                <div className="bg-emerald-500/20 p-2 rounded-xl text-emerald-400">
-                                    <i className="ph-fill ph-books text-2xl"></i>
-                                </div>
-                                <div>
-                                    <h1 className="text-xl font-extrabold tracking-tight">EduScenariusz <span className="text-emerald-500">PRO</span></h1>
-                                </div>
-                            </div>
+                    <main className="flex-grow pt-10 pb-20 px-4 sm:px-6 z-10 print:p-0">
+                        <div className="max-w-5xl mx-auto">
                             
-                            <div className="flex items-center gap-4 flex-wrap justify-center">
-                                {!isPremium && (
-                                    <div className="text-sm px-4 py-2 rounded-xl border border-slate-700 bg-slate-900 flex items-center gap-2">
-                                        <i className="ph-fill ph-lightning text-yellow-400"></i>
-                                        <span className="hidden sm:inline">Darmowe próby:</span>
-                                        <strong className={usagesLeft > 0 ? "text-emerald-400" : "text-red-400"}>{usagesLeft}</strong>
-                                    </div>
-                                )}
-                                
-                                {/* RESTORED: Postaw Kawę */}
-                                <button onClick={() => window.open('https://buycoffee.to/magiccolor')} className="flex items-center space-x-2 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white px-5 py-2.5 rounded-xl font-bold transition-all active:scale-95 text-sm shadow-md">
-                                    <i className="ph-fill ph-coffee text-amber-400 text-lg"></i>
-                                    <span className="hidden sm:inline">Postaw Kawę</span>
-                                </button>
-                                
-                                <a href="index.html" className="flex items-center gap-2 text-slate-300 hover:text-white transition-colors text-sm font-medium bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-xl border border-slate-700">
-                                    <i className="ph-bold ph-arrow-left text-lg"></i> <span className="hidden sm:inline">Portfolio</span>
-                                </a>
+                            {/* Nagłówek */}
+                            <div className="text-center mb-10 fade-in print-hidden">
+                                <h1 className="text-4xl md:text-5xl font-black text-white mb-4 tracking-tight">
+                                    Edu<span className="text-gradient">Scenariusz</span>
+                                </h1>
+                                <p className="text-slate-400 text-lg max-w-2xl mx-auto">
+                                    Wpisz temat lekcji, a sztuczna inteligencja wygeneruje profesjonalny, pełny konspekt z celami, metodami i podziałem czasowym gotowy dla dyrekcji.
+                                </p>
                             </div>
-                        </div>
-                    </header>
 
-                    <div className="max-w-7xl mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-12 gap-8 w-full">
-                        
-                        {/* LEFT COLUMN: Input Form */}
-                        <div className="lg:col-span-4 space-y-6 no-print">
-                            
-                            {/* EduBot Auto-Fill */}
-                            <div className="glass-panel p-6 rounded-2xl space-y-4 relative overflow-hidden border border-emerald-500/20">
-                                <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 blur-3xl rounded-full"></div>
-                                <h2 className="font-bold flex items-center text-emerald-400 text-sm uppercase tracking-widest border-b border-slate-700/50 pb-4">
-                                    <i className="ph-bold ph-magic-wand mr-2 text-lg"></i> Auto-Wypełnianie
-                                </h2>
-                                <div className="flex bg-slate-900/80 p-1.5 rounded-xl border border-slate-700 focus-within:border-emerald-500 transition-colors">
-                                    <input 
-                                        type="text" 
-                                        value={botQuickPrompt} 
-                                        onChange={(e) => setBotQuickPrompt(e.target.value)} 
-                                        onKeyDown={(e) => { if(e.key === 'Enter') handleBotAutoFill(e); }} 
-                                        disabled={isAnalyzing}
-                                        placeholder="np. Lekcja o dinozaurach dla 5 lat..." 
-                                        className="flex-1 bg-transparent px-3 text-sm outline-none font-medium text-white placeholder-slate-500 disabled:opacity-50"
-                                    />
-                                    <button 
-                                        onClick={handleBotAutoFill} 
-                                        disabled={isAnalyzing}
-                                        className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-4 py-2 rounded-lg transition-all flex items-center gap-2 disabled:opacity-70"
-                                    >
-                                        {isAnalyzing ? <><i className="ph-bold ph-spinner animate-spin text-sm"></i> Myślę...</> : "Analizuj"}
+                            {/* TOGGLE WIDOKÓW */}
+                            <div className="flex justify-center mb-8 print-hidden fade-in">
+                                <div className="flex bg-slate-900/80 p-1.5 rounded-full border border-slate-700/50 shadow-lg w-full max-w-md">
+                                    <button onClick={() => setViewMode('kreator')} className={`flex-1 py-2 text-sm font-bold rounded-full transition-all flex items-center justify-center gap-2 ${viewMode === 'kreator' ? 'bg-purple-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}>
+                                        <Icon name="Sparkles" size={16} /> Kreator Konspektów
+                                    </button>
+                                    <button onClick={() => setViewMode('biblioteka')} className={`flex-1 py-2 text-sm font-bold rounded-full transition-all flex items-center justify-center gap-2 relative ${viewMode === 'biblioteka' ? 'bg-blue-600 text-white shadow-[0_0_15px_rgba(59,130,246,0.4)]' : 'text-slate-400 hover:text-white'}`}>
+                                        <Icon name="Library" size={16} /> Giełda Scenariuszy
                                     </button>
                                 </div>
                             </div>
 
-                            {/* EduBot Dialogue */}
-                            <div className="p-5 rounded-2xl border border-emerald-500/30 flex items-start gap-4 bg-emerald-900/10">
-                                <BotHelperAvatar />
-                                <div className="flex-1 pt-1">
-                                    <h4 className="font-black text-xs uppercase tracking-widest mb-1 text-emerald-500">EduBot Metodyk</h4>
-                                    <p className="text-sm font-medium leading-relaxed text-slate-300 bot-bubble" key={botMessage}>{botMessage}</p>
-                                </div>
-                            </div>
-
-                            {/* Konfigurator */}
-                            <div className="glass-panel p-6 rounded-2xl space-y-5">
-                                <h2 className="font-bold flex items-center text-slate-200 text-sm uppercase tracking-widest border-b border-slate-700/50 pb-4">
-                                    <i className="ph-bold ph-sliders-horizontal mr-2 text-emerald-500 text-lg"></i> Parametry Lekcji
-                                </h2>
-                                
-                                <div className="space-y-4">
-                                    <div>
-                                        <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Temat zajęć *</label>
-                                        <input type="text" value={params.topic} onChange={e => setParams({...params, topic: e.target.value})} placeholder="np. Przyczyny I wojny światowej" className="w-full p-3 bg-slate-900/80 border border-slate-700 rounded-xl outline-none text-white text-sm focus:border-emerald-500 transition-colors" />
-                                    </div>
+                            {viewMode === 'kreator' && (
+                                <div className="animate-[fadeIn_0.3s_ease-out]">
                                     
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <div>
-                                            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Wiek</label>
-                                            <select value={params.age} onChange={e => setParams({...params, age: e.target.value})} className="w-full p-3 bg-slate-900/80 border border-slate-700 rounded-xl outline-none text-white text-sm focus:border-emerald-500">
-                                                <option value="3-4 latki">3-4 latki</option>
-                                                <option value="5-6 latki">5-6 latki</option>
-                                                <option value="Klasy I-III">Klasy I-III</option>
-                                                <option value="Klasy IV-VIII">Klasy IV-VIII</option>
-                                            </select>
+                                    {limitData.showWarning && !isPro && (
+                                        <div className="bg-red-900/40 border border-red-500/50 rounded-2xl p-6 text-center mb-8 shadow-lg fade-in relative overflow-hidden">
+                                            <h3 className="text-xl sm:text-2xl font-black text-white mb-2">Limit dzienny osiągnięty (5/5)</h3>
+                                            <p className="text-slate-300 mb-4 text-sm sm:text-base">
+                                                Aby korzystać z modułu AI bez limitów, wpisz kod PRO na górnym pasku w menu.
+                                            </p>
                                         </div>
-                                        <div>
-                                            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Czas</label>
-                                            <select value={params.duration} onChange={e => setParams({...params, duration: e.target.value})} className="w-full p-3 bg-slate-900/80 border border-slate-700 rounded-xl outline-none text-white text-sm focus:border-emerald-500">
-                                                <option value="15-20 min">15-20 min</option>
-                                                <option value="30-40 min">30-40 min</option>
-                                                <option value="45-50 min">45-50 min</option>
-                                                <option value="90 min">90 min</option>
-                                            </select>
-                                        </div>
-                                    </div>
+                                    )}
 
-                                    <div>
-                                        <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Metoda główna</label>
-                                        <select value={params.methods} onChange={e => setParams({...params, methods: e.target.value})} className="w-full p-3 bg-slate-900/80 border border-slate-700 rounded-xl outline-none text-white text-sm focus:border-emerald-500">
-                                            <option value="Aktywizująca i ruchowa">Aktywizująca i ruchowa</option>
-                                            <option value="Pokazowa / Obrazowa">Pokazowa / Obrazowa</option>
-                                            <option value="Metoda projektowa">Metoda projektowa</option>
-                                            <option value="Praktyczne działanie">Praktyczne działanie</option>
-                                            <option value="Podająca (opowiadanie)">Podająca (opowiadanie)</option>
-                                        </select>
-                                    </div>
-
-                                    <div>
-                                        <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Dostosowanie (SPE) - opcjonalnie</label>
-                                        <input type="text" value={params.needs} onChange={e => setParams({...params, needs: e.target.value})} placeholder="np. dziecko ze spektrum autyzmu" className="w-full p-3 bg-slate-900/80 border border-slate-700 rounded-xl outline-none text-white text-sm focus:border-emerald-500 transition-colors" />
-                                    </div>
-                                    
-                                    <div>
-                                        <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Format Generowania</label>
-                                        <select value={params.formatType} onChange={e => setParams({...params, formatType: e.target.value})} className="w-full p-3 bg-emerald-900/20 border border-emerald-500/50 rounded-xl outline-none text-emerald-300 font-bold text-sm focus:border-emerald-500">
-                                            <option value="detailed" className="bg-slate-900">📜 Epicki (Kopiuj-Wklej, szczegółowy)</option>
-                                            <option value="concise" className="bg-slate-900">📝 Zwięzły Szkic (Tylko punkty)</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                
-                                <button 
-                                    onClick={generateScenario} 
-                                    className="w-full mt-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white py-3.5 rounded-xl font-bold text-sm tracking-wide shadow-lg flex justify-center items-center gap-2 transition-all active:scale-95"
-                                >
-                                    <i className="ph-bold ph-sparkle text-lg"></i> Generuj Konspekt
-                                </button>
-                                
-                                {!isPremium && usagesLeft <= 0 && (
-                                    <p className="text-center text-xs text-slate-400 mt-2 cursor-pointer hover:text-emerald-400 transition-colors" onClick={() => setShowPremiumModal(true)}>
-                                        Brak prób. Kliknij, aby odblokować kodem.
-                                    </p>
-                                )}
-                            </div>
-
-                            {/* Demo Buttons */}
-                            <div className="flex gap-2">
-                                <button onClick={() => setScenario(SAMPLES.wiosna)} className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold py-3 px-3 rounded-xl transition-colors border border-slate-700 flex items-center justify-center gap-2"><i className="ph-fill ph-flower-tulip text-pink-400"></i> Demo: Wiosna</button>
-                            </div>
-                        </div>
-
-                        {/* RIGHT COLUMN: Output / Render Area */}
-                        <div className="lg:col-span-8 flex justify-center items-start overflow-x-auto pb-10 print:block">
-                            <div className="w-full max-w-[210mm] print:max-w-full">
-                                
-                                {/* Export Controls */}
-                                <div className={`flex justify-end gap-3 mb-4 no-print transition-opacity duration-300 ${scenario ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
-                                    <button onClick={exportToWord} className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-all text-sm shadow-lg active:scale-95">
-                                        <i className="ph-bold ph-file-doc text-lg"></i> Pobierz .docx
-                                    </button>
-                                    <button onClick={() => window.print()} className="bg-slate-700 hover:bg-slate-600 text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-all text-sm active:scale-95">
-                                        <i className="ph-bold ph-printer text-lg"></i> PDF / Drukuj
-                                    </button>
-                                </div>
-
-                                {/* A4 Document Container */}
-                                <div id="scenario-container" className="bg-white shadow-2xl p-10 md:p-14 scenario-page text-slate-900 rounded-sm min-h-[297mm] font-serif border border-slate-200">
-                                    
-                                    {!scenario ? (
-                                        <div className="h-full flex flex-col items-center justify-center text-slate-400 opacity-60 no-print mt-32">
-                                            <i className="ph-thin ph-file-dashed text-7xl mb-4"></i>
-                                            <p className="font-sans text-center">Wypełnij formularz po lewej stronie,<br/>aby wygenerować gotowy do wydruku dokument.</p>
-                                        </div>
-                                    ) : (
-                                        <div id="scenario-render-area">
-                                            {/* Header */}
-                                            <div className="border-b-2 border-emerald-600 pb-6 mb-8 text-center">
-                                                <div className="text-xs font-sans font-black uppercase tracking-widest mb-2 opacity-60 text-emerald-800">Scenariusz Lekcji</div>
-                                                <h1 className="text-2xl md:text-3xl font-bold text-slate-900 mb-4 uppercase leading-tight">{scenario.title}</h1>
-                                                <div className="flex justify-center gap-8 border-t border-slate-200 pt-3 font-sans">
-                                                    <div className="text-xs font-bold text-slate-500 uppercase flex flex-col items-center"><span>Grupa:</span><span className="text-emerald-700 text-sm">{scenario.group}</span></div>
-                                                    <div className="text-xs font-bold text-slate-500 uppercase flex flex-col items-center"><span>Czas:</span><span className="text-emerald-700 text-sm">{scenario.duration}</span></div>
-                                                </div>
+                                    {/* Panel Sterowania */}
+                                    <div className="glass-panel p-6 sm:p-8 rounded-[2rem] fade-in border border-slate-700/50 print-hidden" style={{animationDelay: '0.1s'}}>
+                                        
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 mb-6">
+                                            <div>
+                                                <label className="block text-white font-bold mb-3 text-sm uppercase tracking-wider">
+                                                    Przedmiot
+                                                </label>
+                                                <select 
+                                                    value={subject} 
+                                                    onChange={(e) => setSubject(e.target.value)}
+                                                    className="w-full bg-slate-900 border border-slate-600 text-white rounded-xl p-4 focus:ring-2 focus:ring-purple-500 outline-none"
+                                                >
+                                                    <option value="" disabled>Wybierz z listy...</option>
+                                                    {SUBJECTS.map(s => <option key={s} value={s}>{s}</option>)}
+                                                </select>
                                             </div>
+                                            <div>
+                                                <label className="block text-white font-bold mb-3 text-sm uppercase tracking-wider">
+                                                    Klasa / Poziom
+                                                </label>
+                                                <select 
+                                                    value={grade} 
+                                                    onChange={(e) => setGrade(e.target.value)}
+                                                    className="w-full bg-slate-900 border border-slate-600 text-white rounded-xl p-4 focus:ring-2 focus:ring-purple-500 outline-none"
+                                                >
+                                                    <option value="" disabled>Wybierz klasę...</option>
+                                                    {GRADES.map(s => <option key={s} value={s}>{s}</option>)}
+                                                </select>
+                                            </div>
+                                        </div>
+
+                                        <div className="mb-6">
+                                            <label className="block text-white font-bold mb-3 text-sm uppercase tracking-wider">
+                                                Temat lekcji
+                                            </label>
+                                            <input 
+                                                type="text"
+                                                value={topic}
+                                                onChange={(e) => setTopic(e.target.value)}
+                                                placeholder="Np. Budowa i funkcje liścia, Cechy fraszki, Past simple w opowiadaniach..."
+                                                className="w-full bg-slate-900 border border-slate-700 text-white rounded-xl p-4 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors"
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-white font-bold mb-3 text-sm uppercase tracking-wider">
+                                                Oczekiwane Metody i formy pracy (Opcjonalnie)
+                                            </label>
+                                            <textarea 
+                                                value={methods}
+                                                onChange={(e) => setMethods(e.target.value)}
+                                                placeholder="Możesz zostawić puste (AI dobierze optymalne) lub wskazać np.: Praca w grupach 4 os., metoda stacji zadaniowych, wykorzystanie kahoot..."
+                                                className="w-full h-24 bg-slate-900/50 border border-slate-700 text-slate-200 rounded-xl p-4 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 custom-scrollbar resize-y text-sm"
+                                            ></textarea>
                                             
-                                            <div className="space-y-8 text-[15px] leading-relaxed">
-                                                {/* Section 1: Goals */}
-                                                <section>
-                                                    <h2 className="text-lg font-bold font-sans text-emerald-700 uppercase border-l-4 border-emerald-500 pl-3 mb-4 bg-emerald-50/50 py-1">I. Cele i założenia</h2>
-                                                    <div className="pl-4 space-y-2">
-                                                        <div><span className="font-bold">Cel główny: </span>{scenario.main_goal}</div>
-                                                        {scenario.custom_goal && scenario.custom_goal !== 'Brak' && <div><span className="font-bold">Cel dodatkowy: </span>{scenario.custom_goal}</div>}
-                                                        <div><span className="font-bold">Metody i formy pracy: </span>{scenario.methods}</div>
-                                                    </div>
-                                                </section>
+                                            <div className="flex flex-wrap gap-2 mt-3">
+                                                {METHODS.map(m => (
+                                                    <button key={m} onClick={() => setMethods(prev => prev + (prev ? ', ' : '') + m)} className="text-[10px] uppercase font-bold tracking-wider bg-slate-800 hover:bg-purple-900 text-slate-400 hover:text-purple-300 px-3 py-1.5 rounded-full border border-slate-700 transition-colors">
+                                                        + {m.split('(')[0].trim()}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        {error && <div className="mt-6 p-4 bg-red-900/30 border border-red-500/50 rounded-xl text-red-400 text-sm font-medium text-center">{error}</div>}
+
+                                        <div className="mt-8 flex justify-center">
+                                            <button 
+                                                onClick={generateDocument}
+                                                disabled={isGenerating || !subject || !grade || !topic.trim() || (!isPro && limitData.remaining === 0)}
+                                                className={`w-full sm:w-auto px-10 py-5 rounded-2xl font-black text-white text-lg transition-all flex items-center justify-center gap-3 shadow-[0_0_20px_rgba(168,85,247,0.2)] btn-bounce
+                                                    ${(isGenerating || !subject || !grade || !topic.trim() || (!isPro && limitData.remaining === 0)) ? 'bg-slate-700 cursor-not-allowed border border-slate-600' : 'bg-gradient-to-r from-purple-500 to-blue-600 hover:scale-105'}`}
+                                            >
+                                                {isGenerating ? (
+                                                    <><svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Wymyślam przebieg lekcji...</>
+                                                ) : 'Wygeneruj Konspekt Lekcji'}
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Sekcja Wyników */}
+                                    {generatedText && (
+                                        <div ref={resultRef} className="mt-12 fade-in print:mt-0">
+
+                                            <div className="glass-panel p-8 sm:p-12 rounded-[2.5rem] border border-purple-500/30 shadow-[0_0_40px_rgba(168,85,247,0.15)] relative overflow-hidden bg-white print:shadow-none print:border-none print:p-0 print:rounded-none print:bg-white">
+                                                <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-purple-400 to-blue-600 print-hidden"></div>
                                                 
-                                                {/* Section 2: Script */}
-                                                <section>
-                                                    <h2 className="text-lg font-bold font-sans text-emerald-700 uppercase border-l-4 border-emerald-500 pl-3 mb-6 bg-emerald-50/50 py-1">II. Przebieg zajęć</h2>
-                                                    <div className="space-y-5">
-                                                        {scenario.phases?.map((phase, idx) => (
-                                                            <div key={idx} className="page-break-inside-avoid">
-                                                                <div className="flex items-baseline gap-2 mb-2">
-                                                                    <h3 className="font-bold text-slate-900 font-sans">{phase.step_name}</h3>
-                                                                    <span className="text-[11px] font-sans font-bold text-white bg-slate-700 px-2 py-0.5 rounded-md">~{phase.time}</span>
-                                                                </div>
-                                                                <div className="pl-4 border-l-2 border-slate-200 whitespace-pre-wrap text-slate-800">
-                                                                    {phase.details}
-                                                                </div>
-                                                            </div>
-                                                        ))}
+                                                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8 print-hidden border-b border-slate-200 pb-4">
+                                                    <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                                                        <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                                                        Konspekt Zajęć
+                                                    </h3>
+                                                    <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+                                                        <button onClick={() => setShowPublishModal(true)} className="flex-1 sm:flex-none bg-amber-500 hover:bg-amber-400 text-slate-900 px-4 py-2 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all btn-bounce shadow-md">
+                                                            <Icon name="Share" size={16}/> Do Giełdy
+                                                        </button>
+                                                        <button onClick={() => exportToWord(generatedText, `Scenariusz_${topic}`)} className="flex-1 sm:flex-none bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 px-4 py-2 rounded-xl text-sm font-bold transition-all btn-bounce flex items-center justify-center gap-2">
+                                                            <Icon name="Word" size={16}/> Word (.doc)
+                                                        </button>
+                                                        <button onClick={copyToClipboard} className="flex-1 sm:flex-none bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 px-4 py-2 rounded-xl text-sm font-bold transition-all btn-bounce flex items-center justify-center gap-2">
+                                                            <Icon name="Copy" size={16}/> Kopiuj
+                                                        </button>
+                                                        <button onClick={printDocument} className="flex-1 sm:flex-none bg-purple-600 hover:bg-purple-500 text-white px-5 py-2 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all btn-bounce shadow-md shadow-purple-500/30">
+                                                            <Icon name="Printer" size={16}/> Drukuj
+                                                        </button>
                                                     </div>
-                                                </section>
+                                                </div>
 
-                                                {/* Section 3: Additions */}
-                                                {(scenario.materials?.length > 0 || scenario.integration || scenario.weather_alternative || scenario.adjustments) && (
-                                                    <section className="mt-10 border-t border-slate-300 pt-6 page-break-inside-avoid font-sans text-sm">
-                                                        <h2 className="text-base font-bold text-slate-800 uppercase mb-4">Informacje Dodatkowe</h2>
-                                                        <div className="space-y-2 bg-slate-50 p-4 rounded-lg border border-slate-200">
-                                                            {scenario.materials?.length > 0 && <div><span className="font-bold text-slate-700">Materiały: </span> {Array.isArray(scenario.materials) ? scenario.materials.join(', ') : scenario.materials}</div>}
-                                                            {scenario.integration && scenario.integration !== 'Brak' && <div><span className="font-bold text-slate-700">Korelacja: </span> {scenario.integration}</div>}
-                                                            {scenario.weather_alternative && scenario.weather_alternative !== 'Brak' && <div><span className="font-bold text-slate-700">Alternatywa: </span> {scenario.weather_alternative}</div>}
-                                                        </div>
-
-                                                        {scenario.adjustments && scenario.adjustments !== "Brak" && (
-                                                            <div className="bg-yellow-50 rounded-lg p-4 border border-yellow-200 mt-4">
-                                                                <h3 className="text-xs font-bold text-yellow-800 uppercase mb-1">Dostosowanie (SPE)</h3>
-                                                                <p className="text-yellow-900">{scenario.adjustments}</p>
-                                                            </div>
-                                                        )}
-                                                    </section>
-                                                )}
+                                                <div className="scenariusz-content text-black print-content">
+                                                    <div dangerouslySetInnerHTML={{ __html: generatedText }} />
+                                                </div>
                                             </div>
                                         </div>
                                     )}
                                 </div>
-                            </div>
-                        </div>
-                    </div>
+                            )}
 
-                    {/* FREEMIUM MODAL */}
-                    {showPremiumModal && (
-                        <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm no-print">
-                            <div className="glass-panel p-8 rounded-3xl max-w-md w-full border border-emerald-500/30 relative shadow-2xl">
-                                <button onClick={() => setShowPremiumModal(false)} className="absolute top-4 right-4 text-slate-400 hover:text-white transition-colors">
-                                    <i className="ph-bold ph-x text-xl"></i>
-                                </button>
-                                
-                                <div className="text-center mb-6">
-                                    <div className="w-16 h-16 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-emerald-500/50">
-                                        <i className="ph-fill ph-lock-key text-3xl text-emerald-400"></i>
+                            {/* WIDOK BIBLIOTEKI ZESTAWÓW */}
+                            {viewMode === 'biblioteka' && (
+                                <div className="animate-[fadeIn_0.3s_ease-out] w-full print-hidden">
+                                    <div className="text-center max-w-3xl mx-auto mb-10">
+                                        <h2 className="text-3xl font-black text-blue-400 mb-2">Giełda Scenariuszy EduBox</h2>
+                                        <p className="text-slate-400">Przeglądaj, pobieraj i inspiruj się gotowymi scenariuszami udostępnionymi przez polską społeczność nauczycieli!</p>
                                     </div>
-                                    <h3 className="text-xl font-bold text-white mb-2">Odblokuj EduScenariusz PRO</h3>
-                                    <p className="text-sm text-slate-300">Wyczerpałeś darmowe pakiety startowe. Wprowadź kod <span className="text-emerald-400 font-mono font-bold px-1 bg-slate-800 rounded">KAWA2024</span>, aby generować pliki do Worda bez limitu.</p>
+                                    
+                                    {libraryItems.length === 0 ? (
+                                        <div className="glass-panel p-10 text-center rounded-[2rem] border-slate-700 w-full max-w-4xl mx-auto">
+                                            <div className="text-5xl mb-4">📖</div>
+                                            <h3 className="text-xl font-bold text-white mb-2">Baza jest pusta...</h3>
+                                            <p className="text-slate-400">Bądź pierwszy! Wygeneruj piękny konspekt i wrzuć go do bazy dla innych.</p>
+                                        </div>
+                                    ) : (
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                            {libraryItems.map((item) => (
+                                                <div key={item.id} className="glass-panel rounded-2xl p-6 border transition-all hover:-translate-y-1 shadow-lg bg-slate-800/30 flex flex-col max-h-[600px] border-blue-500/30 hover:border-blue-500/60">
+                                                    <div className="flex justify-between items-start mb-3 flex-wrap gap-2">
+                                                        <span className="text-[10px] font-black uppercase px-2 py-1 rounded-md bg-purple-500/20 text-purple-400">
+                                                            {item.subject}
+                                                        </span>
+                                                        <span className="text-[10px] font-black uppercase px-2 py-1 rounded-md bg-blue-500/20 text-blue-400">
+                                                            {item.grade}
+                                                        </span>
+                                                    </div>
+                                                    <h3 className="text-lg font-bold text-white mb-4 leading-tight">{item.title}</h3>
+                                                    <div className="text-sm text-slate-300 bg-slate-900/50 p-4 rounded-xl border border-slate-800 mb-4 flex-grow overflow-y-auto custom-scrollbar scenariusz-content">
+                                                        <div dangerouslySetInnerHTML={{ __html: item.content }} />
+                                                    </div>
+                                                    <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-700 mt-auto">
+                                                        <button onClick={() => {
+                                                            const tempDiv = document.createElement("div");
+                                                            tempDiv.innerHTML = item.content;
+                                                            const plainText = tempDiv.innerText || tempDiv.textContent;
+                                                            navigator.clipboard.writeText(plainText);
+                                                            showToast("✅ Skopiowano do schowka!");
+                                                        }} className="p-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-white transition-colors" title="Kopiuj tekst do schowka">
+                                                            <Icon name="Copy" size={16} />
+                                                        </button>
+                                                        <button onClick={() => exportToWord(item.content, item.title)} className="p-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-white transition-colors" title="Pobierz jako Word">
+                                                            <Icon name="Word" size={16} />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
+                            )}
 
-                                <form onSubmit={handleVerifyCode}>
-                                    <input 
-                                        type="text" 
-                                        value={accessCode} 
-                                        onChange={e => setAccessCode(e.target.value)}
-                                        placeholder="Wpisz kod tutaj..." 
-                                        className="w-full bg-slate-900/80 border border-slate-700 rounded-xl px-4 py-3 text-center text-lg font-mono text-white mb-4 focus:outline-none focus:border-emerald-500 uppercase tracking-widest"
-                                    />
-                                    <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3.5 rounded-xl transition-colors shadow-lg">
-                                        Aktywuj Dostęp
-                                    </button>
-                                </form>
-                            </div>
                         </div>
-                    )}
+                    </main>
+
+                    <footer className="py-6 border-t border-slate-800/50 text-center text-xs font-bold text-slate-500 uppercase tracking-widest mt-auto print-hidden">
+                        Część potężnego systemu EduBox Pro
+                    </footer>
                 </div>
             );
-        };
+        }
 
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
