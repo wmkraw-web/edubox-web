@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google" content="notranslate">
-    <title>EduKasia PRO - Osobisty Asystent SPE</title>
+    <title>EduKasia PRO - Osobisty Asystent SPE (V3 PRO MAX)</title>
     <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-3RQ9R0N0K8"></script>
     <script>
@@ -21,6 +21,19 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     
+    <!-- FIREBASE CONFIG V3 PRO MAX -->
+    <script>
+        window.__firebase_config = JSON.stringify({
+            apiKey: "AIzaSyDL_mvepNJjMmZYQzifN2cXzoKwCE8jNd0",
+            authDomain: "edubox-pro.firebaseapp.com",
+            projectId: "edubox-pro",
+            storageBucket: "edubox-pro.firebasestorage.app",
+            messagingSenderId: "570263845714",
+            appId: "1:570263845714:web:0b029211f7af071b66988b"
+        });
+        window.__app_id = "eduboxpro";
+    </script>
+
     <style>
         body { 
             font-family: 'Plus Jakarta Sans', sans-serif; 
@@ -28,9 +41,10 @@
             color: #f8fafc; 
             scroll-behavior: smooth; 
             overflow-x: hidden;
+            min-height: 100vh;
         }
         
-        .aura-blob { position: absolute; border-radius: 50%; filter: blur(100px); opacity: 0.4; z-index: -1; animation: float 15s infinite ease-in-out alternate; pointer-events: none; }
+        .aura-blob { position: fixed; border-radius: 50%; filter: blur(100px); opacity: 0.4; z-index: -1; animation: float 15s infinite ease-in-out alternate; pointer-events: none; }
         .aura-1 { top: -10%; left: -10%; width: 60vw; height: 600px; background: radial-gradient(circle, #f43f5e, transparent 70%); }
         .aura-2 { top: 40%; right: -10%; width: 50vw; height: 600px; background: radial-gradient(circle, #8b5cf6, transparent 70%); animation-delay: -5s; }
         .aura-3 { bottom: -10%; left: 20%; width: 60vw; height: 600px; background: radial-gradient(circle, #3b82f6, transparent 70%); animation-delay: -10s; }
@@ -38,21 +52,26 @@
         @keyframes float { 0% { transform: translate(0, 0) scale(1); } 50% { transform: translate(30px, -50px) scale(1.05); } 100% { transform: translate(-30px, 30px) scale(0.95); } }
 
         .glass-panel { background: rgba(30, 27, 75, 0.6); backdrop-filter: blur(24px); border: 1px solid rgba(255, 255, 255, 0.1); }
-        .glass-nav { background: rgba(30, 27, 75, 0.85); backdrop-filter: blur(24px); border-bottom: 1px solid rgba(255, 255, 255, 0.1); }
         .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: #1e1b4b; border-radius: 8px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #f43f5e; border-radius: 8px; }
-        .btn-bounce:active { transform: scale(0.95); }
+        .btn-bounce:active { transform: scale(0.95); transition: transform 0.1s; }
         .fade-in { animation: fadeIn 0.4s ease-out forwards; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
         .success-card { background: linear-gradient(135deg, #ffffff 0%, #fdf2f8 100%); border: 8px solid #fbcfe8; box-shadow: 0 25px 50px -12px rgba(244, 63, 94, 0.25); color: #4c1d95; position: relative; overflow: hidden; }
 
+        @keyframes slide-up { 0% { opacity: 0; transform: translate(-50%, 20px); } 100% { opacity: 1; transform: translate(-50%, 0); } }
+        .animate-toast { animation: slide-up 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+
+        /* --- STYLE WYDRUKU V3 PRO MAX --- */
         @media print {
-            body { background-color: white !important; color: black !important; }
-            .print-hidden { display: none !important; }
-            #wspolne-menu-kontener { display: none !important; }
-            .glass-panel { background: transparent !important; border: none !important; box-shadow: none !important; backdrop-filter: none !important; }
+            @page { margin: 15mm; size: portrait; }
+            body, html { background-color: white !important; color: black !important; min-height: auto !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+            .print-hidden, #wspolne-menu-kontener, .aura-blob { display: none !important; }
+            .glass-panel { background: transparent !important; border: none !important; box-shadow: none !important; backdrop-filter: none !important; padding: 0 !important; margin: 0 !important; }
+            main { padding: 0 !important; margin: 0 !important; }
+            
             .success-card { border: 4px solid #fbcfe8 !important; box-shadow: none !important; transform: scale(1.1); margin: 2cm auto; }
             * { text-shadow: none !important; }
 
@@ -68,59 +87,130 @@
         }
     </style>
 </head>
-<body class="min-h-screen flex flex-col">
+<body class="min-h-screen flex flex-col relative">
 
-    <!-- 1. KONTENER NA WSPÓLNE MENU -->
-    <div id="wspolne-menu-kontener"></div>
+    <!-- KONTENER NA WSPÓLNE MENU V3 PRO MAX -->
+    <div id="wspolne-menu-kontener" class="print-hidden"></div>
 
-    <!-- 2. GŁÓWNA ZAWARTOŚĆ APLIKACJI (KONTENER REACT) -->
-    <div id="root" class="flex-grow flex flex-col relative z-10"></div>
+    <!-- ========================================================= -->
+    <!-- MODUŁ EDUBOX CORE (Wspólny silnik dla wszystkich apek)    -->
+    <!-- ========================================================= -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
+        import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
+        import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
 
-    <!-- 3. SKRYPT WSTRZYKUJĄCY MENU -->
-    <script>
-        document.addEventListener("DOMContentLoaded", function() {
-            function wstawMenuAwaryjne() {
-                document.getElementById('wspolne-menu-kontener').innerHTML = `
-                    <nav class="w-full z-50 glass-nav shadow-lg print-hidden">
-                        <div class="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-                            <a href="index.html" class="flex items-center gap-2 hover:opacity-80 transition-opacity">
-                                <span class="text-2xl font-black text-white tracking-tight">Edu<span class="text-amber-500">Box</span></span>
-                                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest border border-slate-700 rounded px-1.5 py-0.5 ml-1">Pro</span>
-                            </a>
-                            <div class="flex items-center gap-4">
-                                <span class="text-[10px] sm:text-xs text-rose-500 font-bold bg-rose-900/30 px-3 py-1.5 rounded-lg border border-rose-500/50">
-                                    Podgląd (Menu awaryjne)
-                                </span>
-                            </div>
-                        </div>
-                    </nav>
-                `;
-            }
+        const FIREBASE_CONFIG = typeof window.__firebase_config !== 'undefined' ? JSON.parse(window.__firebase_config) : {};
+        const APP_ID = window.__app_id || "eduboxpro";
 
-            try {
-                fetch('/menu.html')
-                    .then(response => {
-                        if (!response.ok) throw new Error('Network response was not ok');
-                        return response.text();
-                    })
-                    .then(data => {
-                        document.getElementById('wspolne-menu-kontener').innerHTML = data;
-                        if (typeof updateGlobalLimitDisplay === 'function') {
-                            updateGlobalLimitDisplay();
-                        }
-                    })
-                    .catch(error => {
-                        console.warn('Wczytywanie menu z pliku zawiodło. Wstawiam menu awaryjne.', error);
-                        wstawMenuAwaryjne();
+        let app, auth, db, currentUser = null;
+        let isInitialized = false;
+
+        window.EduBoxCore = {
+            init: (onUserLoad) => {
+                if (!isInitialized && FIREBASE_CONFIG.apiKey) {
+                    app = initializeApp(FIREBASE_CONFIG);
+                    auth = getAuth(app);
+                    db = getFirestore(app);
+                    signInAnonymously(auth).catch(e => console.error("Firebase Auth Error:", e));
+                    isInitialized = true;
+                    
+                    window.EduBoxCore.loadMenu();
+                }
+                
+                if (auth) {
+                    onAuthStateChanged(auth, (user) => {
+                        currentUser = user;
+                        if(onUserLoad) onUserLoad(user);
                     });
-            } catch (error) {
-                console.warn('CORS Error. Wstawiam menu awaryjne.', error);
-                wstawMenuAwaryjne();
+                }
+            },
+
+            loadMenu: () => {
+                const container = document.getElementById('wspolne-menu-kontener');
+                if (container) {
+                    fetch('/menu.html')
+                        .then(r => r.text())
+                        .then(html => { container.innerHTML = html; })
+                        .catch(err => console.log('Brak pliku menu lokalnie.', err));
+                }
+            },
+
+            getUsageCount: () => {
+                const today = new Date().toISOString().split('T')[0];
+                let usageStr = localStorage.getItem('eduboxUsage');
+                if (usageStr) {
+                    try {
+                        const parsed = JSON.parse(usageStr);
+                        if (parsed.date === today) return parsed.count;
+                    } catch(e) {}
+                }
+                return 0;
+            },
+
+            executeWithLimitCheck: (isPremium, onSuccess, onLimitReached, onToastUpdate) => {
+                const status = localStorage.getItem('eduboxProStatus');
+                if (status === 'PRO' || isPremium) {
+                    onSuccess(window.EduBoxCore.getUsageCount());
+                    return;
+                }
+                
+                let currentCount = window.EduBoxCore.getUsageCount();
+                if (currentCount >= 5) {
+                    onLimitReached("⚠️ Dzienny limit użyć (5/5) wyczerpany. Wpisz kod odblokowujący na górze!");
+                    return;
+                }
+                
+                const newCount = currentCount + 1;
+                const today = new Date().toISOString().split('T')[0];
+                localStorage.setItem('eduboxUsage', JSON.stringify({ date: today, count: newCount }));
+                
+                onToastUpdate(`Wykorzystano ${newCount}/5 darmowych działań`);
+                onSuccess(newCount);
+            },
+
+            verifyPremiumCode: (code) => {
+                return code.toUpperCase() === 'KAWA2024';
+            },
+
+            saveToGielda: async (collectionName, appType, itemName, config) => {
+                if (!currentUser) throw new Error("Brak połączenia z chmurą. Odśwież stronę.");
+                
+                const publicRef = collection(db, 'artifacts', APP_ID, 'public', 'data', collectionName);
+                const payload = {
+                    userId: currentUser.uid,
+                    createdAt: serverTimestamp(),
+                    type: appType,
+                    name: itemName,
+                    config: config
+                };
+
+                if (JSON.stringify(payload).length > 950000) {
+                    throw new Error("🚨 Zapisane dane są zbyt duże (max 1MB)!");
+                }
+
+                await addDoc(publicRef, payload);
+            },
+
+            subscribeToGielda: (collectionName, onDataLoaded, onError) => {
+                if (!db) return () => {};
+                
+                const publicRef = collection(db, 'artifacts', APP_ID, 'public', 'data', collectionName);
+                return onSnapshot(publicRef, (snapshot) => {
+                    const loaded = [];
+                    snapshot.forEach(doc => loaded.push({ id: doc.id, ...doc.data() }));
+                    loaded.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
+                    onDataLoaded(loaded);
+                }, onError);
             }
-        });
+        };
+
+        window.dispatchEvent(new Event('EduBoxCoreReady'));
     </script>
 
-    <!-- 4. GŁÓWNY SKRYPT APLIKACJI -->
+    <!-- 2. GŁÓWNA ZAWARTOŚĆ APLIKACJI -->
+    <div id="root" class="flex-grow flex flex-col relative z-10"></div>
+
     <script type="text/babel">
         const { useState, useRef, useEffect } = React;
 
@@ -133,7 +223,10 @@
                 Trash: <><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></>,
                 Image: <><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></>,
                 Printer: <><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect width="12" height="8" x="6" y="14"/></>,
-                Compass: <><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></>
+                Compass: <><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></>,
+                AlertCircle: <><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></>,
+                CloudArrowUp: <><path d="M20 16.2A5 5 0 0 0 18 7h-1.26a8 8 0 1 0-11.62 9"/><polyline points="16 12 12 8 8 12"/><line x1="12" y1="8" x2="12" y2="21"/></>,
+                Cloud: <><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></>
             };
             return (
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
@@ -175,12 +268,16 @@
         ];
 
         function App() {
-            // Zmieniono logikę autoryzacji: Aplikacja sprawdza status PRO globalnie (ustawiony w menu)
-            // lub pozwala na wpisanie kodu dedykowanego lokalnie.
-            const [isAuthenticated, setIsAuthenticated] = useState(() => {
-                return localStorage.getItem('eduboxProStatus') === 'active';
-            });
-            const [passwordInput, setPasswordInput] = useState('');
+            // --- V3 PRO MAX STATES (CORE) ---
+            const [coreReady, setCoreReady] = useState(!!window.EduBoxCore);
+            const [isPremium, setIsPremium] = useState(false);
+            const [accessCode, setAccessCode] = useState('');
+            const [user, setUser] = useState(null);
+            const [patterns, setPatterns] = useState([]);
+            const [usageCount, setUsageCount] = useState(0);
+
+            // --- LOCAL STATES ---
+            const [toastMessage, setToastMessage] = useState('');
             const [activeTab, setActiveTab] = useState('sos'); 
             const resultRef = useRef(null);
 
@@ -220,11 +317,56 @@
             const [selectedRzepySet, setSelectedRzepySet] = useState(RZEPY_SETS[0]);
             const [searchQuery, setSearchQuery] = useState('');
 
+            // --- INICJALIZACJA EDUBOX CORE ---
+            useEffect(() => {
+                if (!coreReady) {
+                    const handleReady = () => setCoreReady(true);
+                    window.addEventListener('EduBoxCoreReady', handleReady);
+                    return () => window.removeEventListener('EduBoxCoreReady', handleReady);
+                }
+            }, [coreReady]);
+
+            useEffect(() => {
+                if (coreReady && window.EduBoxCore) {
+                    window.EduBoxCore.init((loadedUser) => setUser(loadedUser));
+                    setUsageCount(window.EduBoxCore.getUsageCount());
+                    
+                    const status = localStorage.getItem('eduboxProStatus');
+                    if(status === 'PRO') setIsPremium(true);
+                }
+            }, [coreReady]);
+
+            // Nasłuchiwanie Giełdy
+            useEffect(() => {
+                if (!user || !coreReady || !window.EduBoxCore) return;
+                const unsubscribe = window.EduBoxCore.subscribeToGielda('gielda_wzorow_edukasia', 
+                    (loadedData) => setPatterns(loadedData),
+                    (error) => console.error("Błąd odczytu Giełdy:", error)
+                );
+                return () => unsubscribe();
+            }, [user, coreReady]);
+
             useEffect(() => {
                 if ('speechSynthesis' in window) {
                     window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
                 }
             }, []);
+
+            const showToast = (msg) => {
+                setToastMessage(msg);
+                setTimeout(() => setToastMessage(''), 4000);
+            };
+
+            const handleVerifyCode = () => {
+                if (window.EduBoxCore.verifyPremiumCode(accessCode)) {
+                    setIsPremium(true); 
+                    setAccessCode(''); 
+                    localStorage.setItem('eduboxProStatus', 'PRO');
+                    showToast('Kod aktywny! Witamy w Premium 🌟');
+                } else {
+                    showToast('Nieprawidłowy kod dostępu!');
+                }
+            };
 
             const speakText = (text) => {
                 if ('speechSynthesis' in window) {
@@ -261,6 +403,35 @@
             const removePecsCard = (id) => setPecsCards(pecsCards.filter(c => c.id !== id));
             const updatePecsCard = (id, field, value) => setPecsCards(pecsCards.map(c => c.id === id ? { ...c, [field]: value } : c));
 
+            // --- GIEŁDA WZORÓW ACTIONS ---
+            const sharePattern = async () => {
+                window.EduBoxCore.executeWithLimitCheck(isPremium, 
+                    async (newCount) => {
+                        setUsageCount(newCount);
+                        try {
+                            const name = `Zestaw Kart PECS (${pecsCards.length} szt.)`;
+                            const config = { pecsCards };
+                            
+                            await window.EduBoxCore.saveToGielda('gielda_wzorow_edukasia', 'Karty PECS', name, config);
+                            showToast("✨ Udostępniono zestaw w Giełdzie Wzorów!");
+                        } catch (e) {
+                            showToast(e.message || "🚨 Błąd podczas zapisu w chmurze.");
+                        }
+                    },
+                    (msg) => showToast(msg),
+                    (msg) => showToast(msg)
+                );
+            };
+
+            const loadPattern = (pattern) => {
+                const c = pattern.config;
+                if(c && c.pecsCards) {
+                    setPecsCards(c.pecsCards);
+                    setActiveTab('pecs');
+                    showToast("✨ Załadowano Zestaw PECS z Giełdy!");
+                }
+            };
+
             // FUNKCJA RATUNKOWA W PRZYPADKU BRAKU API
             const setDemoSOS = () => {
                 setTimeout(() => {
@@ -269,13 +440,22 @@
                 }, 1000);
             }
 
-            const generateSos = async () => {
+            const generateSosWithLimit = () => {
                 if (!sosInput.trim()) { setSosError('Opisz krótko sytuację w klasie.'); return; }
+                window.EduBoxCore.executeWithLimitCheck(isPremium,
+                    (newCount) => {
+                        setUsageCount(newCount);
+                        generateSos();
+                    },
+                    showToast, showToast
+                );
+            };
+
+            const generateSos = async () => {
                 setIsGeneratingSos(true); setSosError(''); setSosResult('');
                 try {
                     const fullText = `SYSTEM: ${PROMPTS[`sos_${sosMode}`]}\n\nPROBLEM DO ROZWIĄZANIA: ${sosInput}`;
                     
-                    // Zabezpieczenie przed działaniem lokalnie
                     if (window.location.protocol === 'file:') { throw new Error("Local"); }
 
                     const response = await fetch('/api/chat', {
@@ -285,7 +465,6 @@
                     });
                     
                     if (!response.ok) throw new Error("Błąd serwera");
-                    
                     const data = await response.json();
                     
                     let text = data.text;
@@ -304,9 +483,18 @@
                 }
             };
 
-            const handleSuccessGenerate = async () => {
+            const handleSuccessGenerateWithLimit = () => {
                 if (!successName.trim() || !successAction.trim()) return;
-                
+                window.EduBoxCore.executeWithLimitCheck(isPremium,
+                    (newCount) => {
+                        setUsageCount(newCount);
+                        handleSuccessGenerate();
+                    },
+                    showToast, showToast
+                );
+            };
+
+            const handleSuccessGenerate = async () => {
                 setIsGeneratingSuccess(true); setShowSuccessCard(false); setSuccessText('');
                 try {
                     if (window.location.protocol === 'file:') { throw new Error("Local"); }
@@ -344,17 +532,23 @@
                 }
             };
 
-            // OSTATECZNA WERSJA GENEROWANIA BAJKI (Podwójne wywołanie chat.js + fal.ai generate.js)
-            const generateStoryAndImage = async () => {
+            const generateStoryAndImageWithLimit = () => {
                 if (!storyProblem.trim()) { setStoryError('Wpisz lęk lub problem dziecka.'); return; }
-                
+                window.EduBoxCore.executeWithLimitCheck(isPremium,
+                    (newCount) => {
+                        setUsageCount(newCount);
+                        generateStoryAndImage();
+                    },
+                    showToast, showToast
+                );
+            };
+
+            const generateStoryAndImage = async () => {
                 setIsGeneratingStory(true); setStoryError(''); setGeneratedPanels([]);
 
                 try {
-                    // BLOKADA LOKALNA
                     if (window.location.protocol === 'file:') { throw new Error("Local"); }
 
-                    // KROK 1: Piszemy tekst (Tylko polska bajka - bez myślenia o obrazkach)
                     const storyPrompt = `Napisz najprostszą, dosłowną 4-częściową historyjkę obrazkową dla 4-latka z autyzmem.
 Problem dziecka: ${storyProblem}
 
@@ -371,19 +565,16 @@ ZASADY:
                     if (!storyRes.ok) throw new Error("Błąd podczas generowania tekstu bajki.");
                     const storyData = await storyRes.json();
                     
-                    // Rozbijanie tekstu na 4 fragmenty
                     const rawStory = storyData.text;
                     const storyParts = rawStory.split('[KADR]').map(p => p.trim()).filter(p => p.length > 5);
                     
                     if(storyParts.length < 4) {
-                        // Awaryjne uzupełnienie jeśli AI się pomyli i nie da "[KADR]"
                         const lines = rawStory.split('\n').filter(l => l.trim().length > 0);
                         for(let i=0; i<4; i++) {
                             if(!storyParts[i]) storyParts[i] = lines[i] || "Bohater poradził sobie z problemem.";
                         }
                     }
 
-                    // KROK 2: Generujemy opisy dla malarza (Po cichu, osobne zapytanie)
                     const imageInstPrompt = `Dla historii o problemie: "${storyProblem}" stwórz 4 angielskie prompty dla generatora obrazów (1 dla każdej sceny bajki).
 CRITICAL RULES:
 1. MUSISZ opisać fizycznie głównego bohatera raz (np. "A 5-year-old girl with blonde hair wearing a blue dress") i wkleić ten SAM OPIS na sam początek każdego z 4 promptów! Postać musi wyglądać identycznie.
@@ -421,14 +612,12 @@ IMG4: [prompt 4]`;
                         if(p4 && p4[1]) imagePrompts[3] = p4[1].trim();
                     }
 
-                    // INICJALIZACJA PUSTYCH KADRÓW NA EKRANIE
                     let currentPanels = [];
                     for(let i=0; i<4; i++) {
                         currentPanels.push({ text: storyParts[i], image: null, isLoading: true });
                     }
                     setGeneratedPanels([...currentPanels]);
 
-                    // KROK 3: Bezpieczna pętla generująca jeden obrazek po drugim w Fal.ai
                     for (let i = 0; i < 4; i++) {
                         try {
                             const finalImagePrompt = `${imagePrompts[i]}, children's book illustration, flat vector style. ABSOLUTELY NO TEXT, NO LETTERS, NO WORDS.`;
@@ -450,14 +639,12 @@ IMG4: [prompt 4]`;
 
                         } catch (imgError) {
                             console.error(`Błąd obrazka ${i+1}:`, imgError);
-                            // Fallback na obrazek błędu
                             currentPanels[i].image = `https://placehold.co/512x512/1e293b/f8fafc?text=Blad+Obrazka`;
                         }
                         
                         currentPanels[i].isLoading = false;
                         setGeneratedPanels([...currentPanels]); 
                         
-                        // ZŁOTA ZASADA: 2.5 sekundy opóźnienia dla Fal.ai
                         await new Promise(r => setTimeout(r, 2500)); 
                     }
 
@@ -472,67 +659,52 @@ IMG4: [prompt 4]`;
                 }
             };
 
-            const handlePrint = () => { window.print(); };
+            const handlePrintWithLimit = () => { 
+                window.EduBoxCore.executeWithLimitCheck(isPremium,
+                    (newCount) => {
+                        setUsageCount(newCount);
+                        window.print();
+                    },
+                    showToast, showToast
+                );
+            };
 
             const filteredApps = ALL_APPS.filter(app => 
                 app.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
                 app.desc.toLowerCase().includes(searchQuery.toLowerCase())
             );
 
-            // GŁÓWNY EKRAN BLOKADY (Widoczny jeśli użytkownik nie wpisał kodu w menu głównym ani tutaj)
-            if (!isAuthenticated) {
-                return (
-                    <div className="min-h-screen relative flex items-center justify-center p-4">
-                        <div className="aura-blob aura-1"></div><div className="aura-blob aura-2"></div>
-                        <div className="glass-panel p-10 rounded-3xl max-w-md w-full text-center shadow-[0_0_50px_rgba(244,63,94,0.2)] border border-rose-500/30 fade-in relative z-10">
-                            <div className="w-24 h-24 bg-rose-500/20 text-rose-400 rounded-full flex items-center justify-center mx-auto mb-6 text-5xl border border-rose-500/50">👩‍🏫</div>
-                            <h2 className="text-4xl font-black text-white mb-2">EduKasia <span className="text-rose-400">PRO MAX</span></h2>
-                            <p className="text-slate-300 text-sm mb-6">Wszystkie narzędzia w jednym miejscu.</p>
-                            
-                            <div className="space-y-4">
-                                <a href="https://buycoffee.to/magiccolor" target="_blank" className="flex items-center justify-center gap-2 w-full bg-amber-600 hover:bg-amber-500 text-white font-bold py-3 rounded-xl transition-all btn-bounce text-sm shadow-md mt-6 mb-4">
-                                    ☕ Postaw Kawę, by otrzymać kod dostępu
-                                </a>
-                                <p className="text-slate-400 text-sm mb-4 font-medium">Masz już kod dostępu? Wpisz go poniżej, aby odblokować system.</p>
-                                <div className="relative">
-                                    <input 
-                                        type="password" value={passwordInput} onChange={(e) => setPasswordInput(e.target.value)}
-                                        onKeyPress={(e) => { 
-                                            if (e.key === 'Enter' && (passwordInput.toUpperCase() === SECRET_PIN || passwordInput.toUpperCase() === 'EDUBOX2026')) {
-                                                localStorage.setItem('eduboxProStatus', 'active');
-                                                setIsAuthenticated(true);
-                                                window.location.reload(); // Odśwież, by menu górne też się odblokowało
-                                            }
-                                        }}
-                                        placeholder="Wpisz kod dostępu..."
-                                        className="w-full bg-slate-900 border border-slate-600 text-center text-white rounded-xl px-5 py-4 focus:ring-2 focus:ring-rose-500 outline-none mb-6 text-xl tracking-[0.3em] font-bold uppercase"
-                                    />
-                                </div>
-                            </div>
-                            
-                            <button onClick={() => { 
-                                if (passwordInput.toUpperCase() === SECRET_PIN || passwordInput.toUpperCase() === 'EDUBOX2026') {
-                                    localStorage.setItem('eduboxProStatus', 'active');
-                                    setIsAuthenticated(true);
-                                    window.location.reload(); 
-                                } else {
-                                    alert('Nieprawidłowy kod dostępu!'); 
-                                }
-                            }} className="w-full bg-gradient-to-r from-rose-600 to-fuchsia-600 hover:from-rose-500 hover:to-fuchsia-500 text-white font-black py-4 rounded-xl transition-all transform hover:scale-105 btn-bounce text-lg shadow-[0_10px_20px_rgba(244,63,94,0.3)]">
-                                Odblokuj System
-                            </button>
-                        </div>
-                    </div>
-                );
+            if (!coreReady) {
+                return <div className="min-h-screen flex items-center justify-center text-white">Trwa ładowanie silnika EduBoxCore...</div>;
             }
 
             return (
                 <div className="min-h-screen relative flex flex-col pt-16">
                     <div className="aura-blob aura-1"></div><div className="aura-blob aura-2"></div><div className="aura-blob aura-3"></div>
 
+                    {toastMessage && (
+                        <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[200] bg-rose-600 text-white px-6 py-3 rounded-2xl shadow-2xl font-bold text-sm animate-toast flex items-center gap-3 border border-rose-400 print-hidden">
+                            <Icon name="AlertCircle" className="w-5 h-5" /> {toastMessage}
+                        </div>
+                    )}
+
                     <main className="flex-grow pt-10 pb-20 px-4 sm:px-6 print:pt-0 print:pb-0 print:px-0">
                         <div className="max-w-6xl mx-auto">
                             
+                            {/* PANEL LIMITÓW V3 PRO MAX */}
+                            {!isPremium && (
+                                <div className="glass-panel p-4 rounded-2xl flex flex-col sm:flex-row justify-between items-center gap-4 border border-rose-500/30 bg-rose-950/20 mb-6 print-hidden">
+                                    <div className="flex flex-col">
+                                        <span className="text-xs font-bold text-rose-300 uppercase tracking-widest">Darmowe użycia: {Math.max(0, 5 - usageCount)}/5</span>
+                                        <span className="text-[10px] text-slate-400">Konto Free</span>
+                                    </div>
+                                    <div className="flex items-center gap-2 w-full sm:w-auto">
+                                        <input value={accessCode} onChange={e => setAccessCode(e.target.value)} placeholder="Kod odblokowujący..." className="flex-1 sm:w-48 px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs outline-none text-white focus:border-rose-500 transition-colors"/>
+                                        <button onClick={handleVerifyCode} className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-xs font-bold transition-all shadow-md btn-bounce">OK</button>
+                                    </div>
+                                </div>
+                            )}
+
                             {/* Pasek Zakładek */}
                             <div className="flex overflow-x-auto gap-3 pb-4 mb-6 custom-scrollbar print-hidden">
                                 {[
@@ -542,6 +714,7 @@ IMG4: [prompt 4]`;
                                     { id: 'bajka', label: 'Bajki AI', icon: '🎨', color: 'amber' },
                                     { id: 'pecs', label: 'Karty PECS', icon: '🔲', color: 'emerald' },
                                     { id: 'rzepy', label: 'Rzepy', icon: '🧩', color: 'purple' },
+                                    { id: 'gielda', label: 'Baza Wzorów', icon: '☁️', color: 'fuchsia' },
                                     { id: 'portfolio', label: 'Inne Aplikacje', icon: '🧭', color: 'slate' }
                                 ].map(tab => (
                                     <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`min-w-[120px] p-3 rounded-2xl font-bold flex flex-col items-center gap-2 border-2 transition-all whitespace-nowrap ${activeTab === tab.id ? `bg-${tab.color}-600/30 border-${tab.color}-500 text-white shadow-[0_0_15px_rgba(255,255,255,0.1)]` : 'glass-panel border-slate-700/50 text-slate-400 hover:border-slate-500 hover:text-white'}`}>
@@ -559,8 +732,8 @@ IMG4: [prompt 4]`;
                                         <button onClick={() => setSosMode('rodzic')} className={`flex-1 py-3 rounded-xl font-bold transition-all ${sosMode === 'rodzic' ? 'bg-fuchsia-600 text-white' : 'bg-slate-800 text-slate-400'}`}>Trudny Rodzic</button>
                                     </div>
                                     <textarea value={sosInput} onChange={(e) => setSosInput(e.target.value)} placeholder="Opisz problem..." className="w-full h-32 bg-slate-900 border border-slate-600 text-white rounded-2xl p-5 focus:ring-2 focus:ring-blue-500 outline-none mb-4 custom-scrollbar"></textarea>
-                                    <button onClick={generateSos} disabled={isGeneratingSos || !sosInput} className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-black py-4 rounded-xl shadow-lg btn-bounce disabled:opacity-50">
-                                        {isGeneratingSos ? 'Szukam rozwiązania...' : 'Ratuj Sytuację!'}
+                                    <button onClick={generateSosWithLimit} disabled={isGeneratingSos || !sosInput} className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-black py-4 rounded-xl shadow-lg btn-bounce disabled:opacity-50 flex items-center justify-center gap-2">
+                                        {isGeneratingSos ? 'Szukam rozwiązania...' : `Ratuj Sytuację! ${!isPremium ? '(' + Math.max(0, 5 - usageCount) + ')' : ''}`}
                                     </button>
                                     {sosResult && (
                                         <div ref={resultRef} className="mt-8 bg-slate-900 p-6 rounded-2xl border border-blue-500/30 text-slate-200 whitespace-pre-wrap leading-relaxed">{sosResult}</div>
@@ -595,7 +768,9 @@ IMG4: [prompt 4]`;
                                         <input type="text" value={successAction} onChange={(e) => {setSuccessAction(e.target.value); setShowSuccessCard(false);}} placeholder="Co się udało?" className="flex-[2] bg-slate-900 border border-slate-600 text-white rounded-xl px-4 py-3 outline-none" />
                                     </div>
                                     {!showSuccessCard ? (
-                                        <button onClick={handleSuccessGenerate} disabled={!successName || !successAction || isGeneratingSuccess} className="w-full bg-rose-600 text-white font-black py-4 rounded-xl disabled:bg-slate-700 print-hidden">{isGeneratingSuccess ? '✨ Układam dedykację...' : 'Generuj E-Kartkę'}</button>
+                                        <button onClick={handleSuccessGenerateWithLimit} disabled={!successName || !successAction || isGeneratingSuccess} className="w-full bg-rose-600 text-white font-black py-4 rounded-xl disabled:bg-slate-700 print-hidden btn-bounce">
+                                            {isGeneratingSuccess ? '✨ Układam dedykację...' : `Generuj E-Kartkę ${!isPremium ? '(' + Math.max(0, 5 - usageCount) + ')' : ''}`}
+                                        </button>
                                     ) : (
                                         <div className="fade-in flex flex-col items-center">
                                             <div className="success-card w-full max-w-sm rounded-3xl p-8 text-center mt-4">
@@ -604,7 +779,9 @@ IMG4: [prompt 4]`;
                                                 <p className="text-xl font-bold mb-4 relative z-10 text-slate-800">{successName}</p>
                                                 <div className="bg-white/80 p-4 relative z-10 rounded-2xl shadow-inner text-lg font-medium text-slate-700 whitespace-pre-wrap">{successText}</div>
                                             </div>
-                                            <button onClick={handlePrint} className="mt-8 bg-emerald-600 text-white font-bold px-8 py-3 rounded-xl print-hidden shadow-lg flex items-center gap-2"><Icon name="Printer"/> Wydrukuj</button>
+                                            <button onClick={handlePrintWithLimit} className="mt-8 bg-emerald-600 text-white font-bold px-8 py-3 rounded-xl print-hidden shadow-lg flex items-center gap-2 btn-bounce">
+                                                <Icon name="Printer"/> Wydrukuj
+                                            </button>
                                         </div>
                                     )}
                                 </div>
@@ -618,8 +795,8 @@ IMG4: [prompt 4]`;
                                     
                                     {storyError && <div className="mb-4 text-red-400 text-sm font-bold p-3 bg-red-900/30 border border-red-500/50 rounded-xl text-center">{storyError}</div>}
                                     
-                                    <button onClick={generateStoryAndImage} disabled={isGeneratingStory || !storyProblem} className="w-full bg-amber-600 hover:bg-amber-500 text-white font-black py-4 rounded-xl disabled:bg-slate-700 shadow-lg btn-bounce transition-colors">
-                                        {isGeneratingStory ? '✨ Piszę wiersz i ładuję kadry... (to zajmie kilkanaście sekund)' : 'Stwórz Magiczny Komiks (4 Obrazki)'}
+                                    <button onClick={generateStoryAndImageWithLimit} disabled={isGeneratingStory || !storyProblem} className="w-full bg-amber-600 hover:bg-amber-500 text-white font-black py-4 rounded-xl disabled:bg-slate-700 shadow-lg btn-bounce transition-colors flex items-center justify-center gap-2">
+                                        {isGeneratingStory ? '✨ Piszę wiersz i ładuję kadry...' : `Stwórz Magiczny Komiks ${!isPremium ? '(' + Math.max(0, 5 - usageCount) + ')' : ''}`}
                                     </button>
                                     
                                     {generatedPanels.length > 0 && (
@@ -664,7 +841,9 @@ IMG4: [prompt 4]`;
                                 <div className="glass-panel p-6 sm:p-8 rounded-[2rem] fade-in border border-emerald-500/30">
                                     <div className="flex justify-between items-center mb-6 print-hidden">
                                         <h2 className="text-2xl font-black text-emerald-400 flex items-center gap-2"><Icon name="Grid"/> Kreator PECS (5x5 cm)</h2>
-                                        <button onClick={handlePrint} className="bg-emerald-600 text-white px-4 py-2 rounded-xl font-bold flex items-center gap-2"><Icon name="Printer"/> Drukuj Karty</button>
+                                        <button onClick={handlePrintWithLimit} className="bg-emerald-600 text-white px-4 py-2 rounded-xl font-bold flex items-center gap-2 btn-bounce">
+                                            <Icon name="Printer"/> Drukuj Karty {!isPremium && `(${Math.max(0, 5 - usageCount)})`}
+                                        </button>
                                     </div>
                                     
                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6 print-hidden">
@@ -686,7 +865,7 @@ IMG4: [prompt 4]`;
                                                 <button onClick={() => removePecsCard(card.id)} className="text-slate-500 hover:text-red-500 p-2"><Icon name="Trash"/></button>
                                             </div>
                                         ))}
-                                        <button onClick={addPecsCard} className="bg-emerald-900/30 border-2 border-dashed border-emerald-500/50 hover:bg-emerald-900/50 text-emerald-400 p-4 rounded-xl flex flex-col items-center justify-center gap-2 font-bold min-h-[100px] transition-colors">
+                                        <button onClick={addPecsCard} className="bg-emerald-900/30 border-2 border-dashed border-emerald-500/50 hover:bg-emerald-900/50 text-emerald-400 p-4 rounded-xl flex flex-col items-center justify-center gap-2 font-bold min-h-[100px] transition-colors btn-bounce">
                                             <Icon name="Plus"/> Dodaj Kartę
                                         </button>
                                     </div>
@@ -713,12 +892,14 @@ IMG4: [prompt 4]`;
                                 <div className="glass-panel p-6 sm:p-8 rounded-[2rem] fade-in border border-purple-500/30">
                                     <div className="flex justify-between items-center mb-6 print-hidden">
                                         <h2 className="text-2xl font-black text-purple-400 flex items-center gap-2"><Icon name="Puzzle"/> Zadania z Rzepami (Cienie)</h2>
-                                        <button onClick={handlePrint} className="bg-purple-600 text-white px-4 py-2 rounded-xl font-bold flex items-center gap-2"><Icon name="Printer"/> Drukuj Arkusz A4</button>
+                                        <button onClick={handlePrintWithLimit} className="bg-purple-600 text-white px-4 py-2 rounded-xl font-bold flex items-center gap-2 btn-bounce">
+                                            <Icon name="Printer"/> Drukuj Arkusz A4 {!isPremium && `(${Math.max(0, 5 - usageCount)})`}
+                                        </button>
                                     </div>
                                     
                                     <div className="flex gap-2 overflow-x-auto pb-4 mb-4 custom-scrollbar print-hidden">
                                         {RZEPY_SETS.map(set => (
-                                            <button key={set.id} onClick={() => setSelectedRzepySet(set)} className={`px-4 py-2 rounded-xl font-bold whitespace-nowrap border-2 ${selectedRzepySet.id === set.id ? 'bg-purple-600/30 border-purple-500 text-white' : 'border-slate-700 text-slate-400'}`}>
+                                            <button key={set.id} onClick={() => setSelectedRzepySet(set)} className={`px-4 py-2 rounded-xl font-bold whitespace-nowrap border-2 ${selectedRzepySet.id === set.id ? 'bg-purple-600/30 border-purple-500 text-white' : 'border-slate-700 text-slate-400 hover:bg-slate-800'}`}>
                                                 {set.name}
                                             </button>
                                         ))}
@@ -747,6 +928,42 @@ IMG4: [prompt 4]`;
                                                 ))}
                                             </div>
                                         </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* WIDOK: GIEŁDA WZORÓW */}
+                            {activeTab === 'gielda' && (
+                                <div className="glass-panel p-6 sm:p-8 rounded-[2rem] fade-in border border-fuchsia-500/30 print-hidden h-[800px] flex flex-col">
+                                    <div className="flex justify-between items-center mb-6">
+                                        <h2 className="text-3xl font-black text-fuchsia-400 flex items-center gap-3"><Icon name="Cloud" className="w-8 h-8"/> Baza PECS (Giełda)</h2>
+                                    </div>
+                                    
+                                    <button onClick={sharePattern} className="w-full bg-fuchsia-600 hover:bg-fuchsia-500 text-white p-4 rounded-xl font-bold text-sm mb-8 shadow-lg transition-all btn-bounce flex justify-center items-center gap-2">
+                                        <Icon name="CloudArrowUp" className="w-5 h-5"/> Udostępnij swój obecny zestaw PECS
+                                    </button>
+                                    
+                                    <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4">Zestawy udostępnione przez innych</h3>
+                                    
+                                    <div className="overflow-y-auto custom-scrollbar flex-1 space-y-3 pr-2">
+                                        {patterns.map(p => (
+                                            <div key={p.id} className="bg-slate-900/50 border border-slate-700 p-5 rounded-xl hover:border-fuchsia-500 transition-colors cursor-pointer group flex flex-col gap-3" onClick={() => loadPattern(p)}>
+                                                <div className="flex justify-between items-start gap-2">
+                                                    <span className="text-sm font-bold text-white group-hover:text-fuchsia-400 transition-colors line-clamp-2 leading-tight">{p.name}</span>
+                                                    <span className="text-[10px] font-bold px-2 py-1 rounded bg-fuchsia-900/50 text-fuchsia-300 whitespace-nowrap">{p.type}</span>
+                                                </div>
+                                                <div className="flex justify-between items-center">
+                                                    <p className="text-[10px] text-slate-500">Autor: <span className="text-slate-400">{p.userId.substring(0,6)}</span></p>
+                                                    <p className="text-[10px] text-slate-500">{p.createdAt?.toDate().toLocaleDateString()}</p>
+                                                </div>
+                                            </div>
+                                        ))}
+                                        {patterns.length === 0 && (
+                                            <div className="text-center py-10 opacity-50">
+                                                <Icon name="Cloud" className="w-12 h-12 mb-3 text-slate-500 mx-auto" />
+                                                <p className="text-sm text-slate-400 font-bold">Brak wzorów w chmurze...</p>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             )}
@@ -787,15 +1004,3 @@ IMG4: [prompt 4]`;
     </script>
 </body>
 </html>
-
-    <div id="wspolne-menu-kontener"></div>
-    <script>
-        document.addEventListener("DOMContentLoaded", function() {
-            fetch('/menu.html')
-                .then(r => r.text())
-                .then(d => {
-                    document.getElementById('wspolne-menu-kontener').innerHTML = d;
-                    if (typeof window.initMenuLogic === 'function') window.initMenuLogic();
-                });
-        });
-    </script>
