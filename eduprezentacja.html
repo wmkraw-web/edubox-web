@@ -243,6 +243,7 @@
             
             const [slides, setSlides] = useState([]);
             const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
+            const [regeneratingSlideIndex, setRegeneratingSlideIndex] = useState(null);
 
             // --- INICJALIZACJA EDUBOX CORE ---
             useEffect(() => {
@@ -332,7 +333,7 @@
                 }
             };
 
-            // --- GENERATOR AI ---
+            // --- GENERATOR AI (GŁÓWNY) ---
             const handleGenerate = () => {
                 if (!topic.trim()) {
                     showToast('Wpisz temat prezentacji!');
@@ -357,7 +358,12 @@
                 try {
                     const systemPrompt = `Jesteś ekspertem ds. edukacji tworzącym prezentacje multimedialne. 
                     Wygeneruj zawartość prezentacji w formacie JSON.
-                    Język slajdów: POLSKI. Język promptów (imagePrompt): ANGIELSKI.
+                    Język tekstów na slajdach: POLSKI. Język promptów (imagePrompt): ANGIELSKI.
+                    
+                    ZASADY DLA "imagePrompt":
+                    1. Opisuj TYLKO czyste sceny, krajobrazy lub przedmioty.
+                    2. Kategoryczny ZAKAZ używania słów: "poster", "slide", "infographic", "text", "diagram". Modele AI generują na ich podstawie nieczytelny tekst.
+                    3. Przykłady dobrych promptów: "A realistic photo of a shiny apple on a wooden table", "A beautiful cartoon landscape of ancient Rome".
                     
                     STRUKTURA JSON:
                     {
@@ -366,7 +372,7 @@
                             {
                                 "title": "Tytuł slajdu (krótki)",
                                 "bullets": ["Zwięzły punkt 1", "Zwięzły punkt 2", "Zwięzły punkt 3"],
-                                "imagePrompt": "Angielski opis obrazka ilustrującego ten slajd, np. A photo of ancient Rome architecture. MUST BE IN ENGLISH. NO TEXT ON IMAGE."
+                                "imagePrompt": "Angielski opis SCENY (żadnych napisów, tylko obraz), np. A photo of ancient Rome architecture."
                             }
                         ]
                     }`;
@@ -415,7 +421,7 @@
                         console.warn("Fallback JSON parser");
                         presentationObj = {
                             title: topic,
-                            slides: [{ title: "Wprowadzenie", bullets: ["Błąd w strukturze AI", "Wygenerowano domyślny slajd"], imagePrompt: "Abstract background" }]
+                            slides: [{ title: "Wprowadzenie", bullets: ["Błąd w strukturze AI", "Wygenerowano domyślny slajd"], imagePrompt: "A beautiful empty landscape" }]
                         };
                     }
 
@@ -424,21 +430,21 @@
                     setLoadingStatus('Rysuję ilustracje do slajdów w chmurze...');
                     setLoadingProgress(30);
 
-                    // Pobieranie obrazków (sekwencyjnie, żeby nie przeciążyć API)
+                    // Pobieranie obrazków
                     const updatedSlides = [];
                     for (let i = 0; i < initialSlides.length; i++) {
                         let slide = { ...initialSlides[i] };
                         setLoadingProgress(30 + Math.floor((i / initialSlides.length) * 60));
                         
                         try {
-                            const fullPrompt = `${slide.imagePrompt}. High quality educational illustration, vivid colors, clear subject, isolated focus, photorealistic or high end digital art. ABSOLUTELY NO TEXT, NO WORDS, NO LETTERS, NO WATERMARKS.`;
+                            const fullPrompt = `${slide.imagePrompt}. High quality educational illustration, vivid colors, clear subject, isolated focus, highly detailed. ABSOLUTELY NO TEXT, NO WORDS, NO LETTERS, NO WATERMARKS.`;
                             
                             const resImg = await fetch('/api/generate', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({ 
                                     prompt: fullPrompt, 
-                                    negative_prompt: "text, words, letters, watermark, blurry, deformed, ugly",
+                                    negative_prompt: "text, words, letters, watermark, blurry, deformed, ugly, signature",
                                     aspect_ratio: "16:9",
                                     size: "1024x576" 
                                 })
@@ -465,15 +471,68 @@
                     setGeneratingStep(3);
                     setLoadingProgress(100);
                     
+                    // Zostajemy w edytorze, aby zobaczyć podgląd storyboard!
                     setTimeout(() => {
                         setGeneratingStep(0);
-                        setAppMode('presentation');
                     }, 800);
 
                 } catch (error) {
                     console.error(error);
                     showToast(`Wystąpił problem: ${error.message}`);
                     setGeneratingStep(0);
+                }
+            };
+
+            // --- REGENERACJA POJEDYNCZEGO OBRAZKA ---
+            const handleRegenerateImage = (index) => {
+                window.EduBoxCore.executeWithLimitCheck(isPremium,
+                    (newCount) => {
+                        setUsageCount(newCount);
+                        regenerateSingleImage(index);
+                    },
+                    (msg) => showToast(msg),
+                    (msg) => showToast(msg)
+                );
+            };
+
+            const regenerateSingleImage = async (index) => {
+                if (regeneratingSlideIndex !== null) return;
+                setRegeneratingSlideIndex(index);
+                showToast("Losuję nową grafikę dla tego slajdu...");
+                
+                try {
+                    const slide = slides[index];
+                    const fullPrompt = `${slide.imagePrompt}. High quality educational illustration, vivid colors, clear subject, isolated focus, highly detailed. ABSOLUTELY NO TEXT, NO WORDS, NO LETTERS.`;
+                    
+                    const resImg = await fetch('/api/generate', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                            prompt: fullPrompt, 
+                            negative_prompt: "text, words, letters, watermark, blurry, deformed",
+                            aspect_ratio: "16:9",
+                            size: "1024x576" 
+                        })
+                    });
+
+                    if (resImg.ok) {
+                        const dataImg = await resImg.json();
+                        let imgUrl = dataImg.imageUrl || dataImg.image_url || dataImg.url || (dataImg.data && dataImg.data[0]?.url) || dataImg.image;
+                        if (imgUrl) {
+                            if (imgUrl.length > 1000 && !imgUrl.startsWith('http') && !imgUrl.startsWith('data:')) {
+                                imgUrl = `data:image/png;base64,${imgUrl}`;
+                            }
+                            const newSlides = [...slides];
+                            newSlides[index].imageUrl = imgUrl;
+                            setSlides(newSlides);
+                            showToast("Gotowe! Mamy nową grafikę.");
+                        }
+                    }
+                } catch(e) {
+                    console.error(e);
+                    showToast("Błąd pobierania nowej grafiki.");
+                } finally {
+                    setRegeneratingSlideIndex(null);
                 }
             };
 
@@ -607,7 +666,7 @@
                 );
             }
 
-            // RENDER: Odtwarzacz Prezentacji
+            // RENDER: Odtwarzacz Prezentacji (Pełny ekran)
             if (appMode === 'presentation' && slides.length > 0) {
                 const currentSlide = slides[currentSlideIndex];
                 const isEven = currentSlideIndex % 2 === 0;
@@ -624,13 +683,13 @@
                         <div className="bg-slate-900/80 backdrop-blur-md px-6 py-4 flex justify-between items-center border-b border-slate-800">
                             <h2 className="text-xl font-bold text-white flex items-center gap-2"><i className="ph-fill ph-presentation text-blue-500"></i> Odtwarzacz</h2>
                             <div className="flex gap-3">
-                                <button onClick={sharePattern} className="bg-fuchsia-600 hover:bg-fuchsia-500 text-white px-4 py-2 rounded-xl font-bold text-sm flex items-center gap-2 transition-all">
+                                <button onClick={sharePattern} className="bg-fuchsia-600 hover:bg-fuchsia-500 text-white px-4 py-2 rounded-xl font-bold text-sm flex items-center gap-2 transition-all btn-bounce">
                                     <i className="ph-bold ph-cloud-arrow-up"></i> Do Bazy
                                 </button>
-                                <button onClick={downloadPPTX} className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-xl font-bold text-sm flex items-center gap-2 transition-all">
-                                    <i className="ph-bold ph-download-simple"></i> Pobierz PPTX
+                                <button onClick={downloadPPTX} className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-xl font-bold text-sm flex items-center gap-2 transition-all btn-bounce">
+                                    <i className="ph-bold ph-download-simple"></i> PPTX
                                 </button>
-                                <button onClick={() => setAppMode('editor')} className="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-xl font-bold text-sm transition-all">
+                                <button onClick={() => setAppMode('editor')} className="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-xl font-bold text-sm transition-all btn-bounce">
                                     Wyjdź (ESC)
                                 </button>
                             </div>
@@ -814,11 +873,58 @@
                                 </div>
                             </div>
                             
+                            {/* PODGLĄD WYGENEROWANYCH SLAJDÓW (STORYBOARD) */}
                             {slides.length > 0 && appMode === 'editor' && (
-                                <div className="mt-8 text-center fade-in">
-                                    <button onClick={() => setAppMode('presentation')} className="bg-slate-800 hover:bg-slate-700 text-white px-8 py-4 rounded-xl font-bold transition-all shadow-md btn-bounce inline-flex items-center gap-2 border border-slate-700">
-                                        <i className="ph-bold ph-play text-xl"></i> Wróć do odtwarzacza slajdów
-                                    </button>
+                                <div className="mt-16 fade-in print-hidden">
+                                    <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4">
+                                        <h2 className="text-3xl font-black text-white">Podgląd Slajdów</h2>
+                                        <div className="flex gap-3">
+                                            <button onClick={() => setAppMode('presentation')} className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-3 rounded-xl font-bold transition-all shadow-md btn-bounce flex items-center gap-2">
+                                                <i className="ph-fill ph-play text-xl"></i> Odtwórz
+                                            </button>
+                                            <button onClick={downloadPPTX} className="bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-3 rounded-xl font-bold transition-all shadow-md btn-bounce flex items-center gap-2">
+                                                <i className="ph-bold ph-download-simple text-xl"></i> Pobierz PPTX
+                                            </button>
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        {slides.map((slide, idx) => (
+                                            <div key={idx} className="glass-panel p-6 rounded-3xl flex flex-col relative group border border-slate-700/50 hover:border-blue-500/50 transition-colors">
+                                                <div className="absolute top-8 left-8 bg-slate-900 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold z-10 shadow-lg border border-slate-700">{idx+1}</div>
+                                                
+                                                <div className="aspect-video bg-slate-800 rounded-xl overflow-hidden mb-4 relative shadow-inner">
+                                                    {slide.imageUrl ? (
+                                                        <img src={slide.imageUrl} className="w-full h-full object-cover" />
+                                                    ) : (
+                                                        <div className="w-full h-full flex flex-col items-center justify-center text-slate-500">
+                                                            <i className="ph-duotone ph-image text-4xl mb-2"></i>
+                                                            Brak obrazka
+                                                        </div>
+                                                    )}
+                                                    
+                                                    {/* Przycisk Magiczna Różdżka (Zmień Grafike) */}
+                                                    <button 
+                                                        onClick={() => handleRegenerateImage(idx)}
+                                                        disabled={regeneratingSlideIndex !== null}
+                                                        className={`absolute inset-0 bg-slate-900/80 flex flex-col items-center justify-center transition-opacity text-white font-bold backdrop-blur-sm
+                                                            ${regeneratingSlideIndex === idx ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                                                    >
+                                                        {regeneratingSlideIndex === idx ? (
+                                                            <><i className="ph-bold ph-spinner animate-spin text-4xl mb-2 text-blue-400"></i> Odświeżam...</>
+                                                        ) : (
+                                                            <><i className="ph-bold ph-arrows-clockwise text-4xl mb-2 text-blue-400"></i> Zmień Grafikę</>
+                                                        )}
+                                                    </button>
+                                                </div>
+                                                
+                                                <h3 className="text-xl font-bold text-white mb-3 pr-2 leading-tight">{slide.title}</h3>
+                                                <ul className="text-slate-400 text-sm space-y-2 pl-4 list-disc font-medium">
+                                                    {slide.bullets?.map((b, i) => <li key={i}>{b}</li>)}
+                                                </ul>
+                                            </div>
+                                        ))}
+                                    </div>
                                 </div>
                             )}
 
