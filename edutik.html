@@ -197,7 +197,6 @@
             // === STUDIO NAGRANIOWE (AUDIO AI & FALLBACK) ===
             const [audioUrl, setAudioUrl] = useState(null);
             const [isAudioGenerating, setIsAudioGenerating] = useState(false);
-            const [isPlayingTTS, setIsPlayingTTS] = useState(false); // Do natywnego lektora
 
             const [gieldaItems, setGieldaItems] = useState([]);
             const [isSavingToGielda, setIsSavingToGielda] = useState(false);
@@ -248,6 +247,25 @@
             };
 
             // === API FUNCTIONS ===
+            const fetchWithBackoff = async (url, options) => {
+                const delays = [1000, 2000, 4000, 8000, 16000];
+                let lastErr;
+                for (let i = 0; i < 5; i++) {
+                    try {
+                        const res = await fetch(url, options);
+                        if (!res.ok) {
+                            const errText = await res.text();
+                            throw new Error(`HTTP ${res.status}: ${errText.substring(0, 100)}`);
+                        }
+                        return await res.json();
+                    } catch (err) {
+                        lastErr = err;
+                        if (i < 4) await new Promise(r => setTimeout(r, delays[i]));
+                    }
+                }
+                throw lastErr;
+            };
+
             const parseAIResponse = (rawText) => {
                 try {
                     let jsonStr = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
@@ -377,16 +395,16 @@
 
                             // RYGORYSTYCZNY PROMPT WYMUSZAJĄCY RYMY I RYTMIKĘ
                             const sysPrompt = `Jesteś najwybitniejszym polskim autorem wierszy dla dzieci (jak Jan Brzechwa). 
-Twoim ABSOLUTNYM priorytetem jest RYTMIKA i DOKŁADNE RYMY.
-ZASADY KRYTYCZNE:
-1. Każdy wers w strofie MUSI mieć zbliżoną liczbę sylab, aby czytało się to śpiewająco.
-2. Wiersz MUSI posiadać DOKŁADNE POLSKIE RYMY na końcach wersów (np. kotek/płotek, rano/kolano). Układ AABB lub ABAB.
-3. Kategoryczny zakaz pisania wierszy białych (bez rymów)!
-ZWRÓĆ WYŁĄCZNIE POPRAWNY JSON o strukturze:
+Twoim ZADANIEM jest napisanie wiersza/piosenki.
+ZASADY KRYTYCZNE (Musisz się ich trzymać w 100%):
+1. RYTMIKA: Każdy wers w zwrotce MUSI mieć dokładnie taką samą liczbę sylab (np. po 8 sylab), aby czytało się to śpiewająco.
+2. RYMY: Wiersz MUSI posiadać DOKŁADNE POLSKIE RYMY na końcach wersów (układ AABB lub ABAB). Np. słońce/końce, głowa/sowa.
+3. ABSOLUTNY ZAKAZ wierszy białych (bez rymów)!
+4. ZWRÓĆ WYŁĄCZNIE POPRAWNY JSON o strukturze:
 {
   "title": "Kreatywny tytuł",
-  "content": "Treść wiersza. Używaj WYŁĄCZNIE znacznika <br/> do oznaczania nowych linii (żadnych prawdziwych enterów w stringu!). Używaj <strong> do zaznaczania np. [Refren].",
-  "imagePrompt": "A highly concise, purely visual English description (max 15 words) of the main subject of this poem. E.g. 'a cute little red dog playing with a ball'. No text."
+  "content": "Treść wiersza. Używaj WYŁĄCZNIE znacznika <br/> do nowych linii (żadnych prawdziwych enterów w stringu!).",
+  "imagePrompt": "A purely visual English description (max 15 words) of the main subject. No text."
 }`;
                             const usrPrompt = `Napisz utwór na temat: "${topic}".\nFormat: ${formatDesc}.\nOdbiorca: dla ${audienceDesc}.\nNastrój: ${moodDesc}.\nPamiętaj: RÓWNE SYLABY i IDEALNE RYMY!`;
 
@@ -460,8 +478,6 @@ ZWRÓĆ WYŁĄCZNIE POPRAWNY JSON o strukturze:
                 setMood(item.config.mood || 'zabawny');
                 setGeneratedData(item.config.generatedData);
                 setAudioUrl(null); 
-                if ('speechSynthesis' in window) window.speechSynthesis.cancel();
-                setIsPlayingTTS(false);
                 setAppMode('generator');
                 showToast("Wczytano z Giełdy!", "info");
                 setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
@@ -513,9 +529,8 @@ ZWRÓĆ WYŁĄCZNIE POPRAWNY JSON o strukturze:
                 const cleanText = generatedData.content.replace(/<br\s*\/?>/gi, '. ').replace(/<[^>]*>?/gm, '').replace(/\[.*?\]/g, ''); 
                 
                 try {
-                    // Próba użycia potężnego modelu Gemini TTS - środowisko podglądu automatycznie dostarczy tu klucz w tle!
                     const apiKey = ""; 
-                    const moodPrefix = mood === 'zabawny' ? 'Przeczytaj to radośnie, wesoło i bardzo rytmicznie po polsku: ' : (mood === 'spokojny' ? 'Przeczytaj to cichym, spokojnym i kojącym szeptem po polsku: ' : 'Przeczytaj to wyraźnie i dynamicznie po polsku: ');
+                    const moodPrefix = mood === 'zabawny' ? 'Przeczytaj to radośnie i wesoło po polsku: ' : (mood === 'spokojny' ? 'Przeczytaj to kojącym szeptem po polsku: ' : 'Przeczytaj to dynamicznie po polsku: ');
                     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`;
                     
                     const payload = {
@@ -523,13 +538,16 @@ ZWRÓĆ WYŁĄCZNIE POPRAWNY JSON o strukturze:
                         generationConfig: {
                             responseModalities: ["AUDIO"],
                             speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Aoede" } } }
-                        }
+                        },
+                        model: "gemini-2.5-flash-preview-tts"
                     };
 
-                    const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-                    if (!res.ok) throw new Error("API odrzuciło zapytanie.");
+                    const data = await fetchWithBackoff(url, { 
+                        method: 'POST', 
+                        headers: { 'Content-Type': 'application/json' }, 
+                        body: JSON.stringify(payload) 
+                    });
                     
-                    const data = await res.json();
                     const pcmBase64 = data.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
                     const mimeType = data.candidates?.[0]?.content?.parts?.[0]?.inlineData?.mimeType || "audio/pcm;rate=24000";
                     
@@ -541,37 +559,14 @@ ZWRÓĆ WYŁĄCZNIE POPRAWNY JSON o strukturze:
                         const wavUrl = pcmToWav(pcmBase64, sampleRate);
                         setAudioUrl(wavUrl);
                         showToast("🎧 Nagranie gotowe! Możesz odtworzyć.");
-                        setIsAudioGenerating(false);
-                        return;
-                    }
-                    throw new Error("Brak danych audio");
-                } catch (e) {
-                    console.warn("Używam natywnego lektora przeglądarki (Web Speech API):", e.message);
-                    // PANCERNY FALLBACK: Używamy darmowego lektora zbudowanego w każdą przeglądarkę.
-                    if ('speechSynthesis' in window) {
-                        window.speechSynthesis.cancel(); 
-                        const utterance = new SpeechSynthesisUtterance(cleanText);
-                        utterance.lang = 'pl-PL';
-                        utterance.rate = 0.9; // Odrobinę wolniej dla rytmiki dziecięcej
-                        utterance.pitch = mood === 'zabawny' ? 1.2 : (mood === 'spokojny' ? 0.8 : 1.0);
-                        
-                        utterance.onend = () => setIsPlayingTTS(false);
-                        utterance.onerror = () => setIsPlayingTTS(false);
-                        
-                        window.speechSynthesis.speak(utterance);
-                        setIsPlayingTTS(true);
-                        showToast("🎧 Lektor odczytuje utwór.");
                     } else {
-                        showToast("Twoja przeglądarka nie obsługuje czytania głosem.", "error");
+                        throw new Error("Brak danych audio");
                     }
+                } catch (e) {
+                    console.error("Audio error:", e);
+                    showToast(`Błąd Lektora AI: ${e.message}`, "error");
+                } finally {
                     setIsAudioGenerating(false);
-                }
-            };
-
-            const stopBrowserTTS = () => {
-                if ('speechSynthesis' in window) {
-                    window.speechSynthesis.cancel();
-                    setIsPlayingTTS(false);
                 }
             };
 
@@ -830,15 +825,7 @@ ZWRÓĆ WYŁĄCZNIE POPRAWNY JSON o strukturze:
                                                 </div>
                                             )}
                                             
-                                            {isPlayingTTS && (
-                                                <div className="mt-10 flex justify-center print-hidden fade-in">
-                                                    <button onClick={stopBrowserTTS} className="flex items-center justify-center gap-3 bg-red-600 hover:bg-red-500 text-white px-8 py-4 rounded-xl font-black shadow-lg btn-bounce text-sm uppercase tracking-widest transition-all">
-                                                        <i className="ph-bold ph-stop-circle text-2xl"></i> Zatrzymaj Lektora
-                                                    </button>
-                                                </div>
-                                            )}
-
-                                            {!audioUrl && !isAudioGenerating && !isPlayingTTS && (
+                                            {!audioUrl && !isAudioGenerating && (
                                                 <div className="mt-10 flex justify-center print-hidden">
                                                     <button onClick={generateAudio} className="flex items-center justify-center gap-3 bg-gradient-to-r from-purple-600 to-fuchsia-500 hover:from-purple-500 hover:to-fuchsia-400 text-white px-8 py-4 rounded-xl font-black shadow-lg btn-bounce text-sm uppercase tracking-widest transition-all">
                                                         <i className="ph-bold ph-speaker-high text-2xl"></i> Przeczytaj Głosowo
@@ -848,7 +835,7 @@ ZWRÓĆ WYŁĄCZNIE POPRAWNY JSON o strukturze:
                                             
                                             {isAudioGenerating && (
                                                 <div className="mt-10 flex items-center justify-center gap-3 text-fuchsia-500 font-bold print-hidden">
-                                                    <i className="ph-bold ph-spinner animate-spin text-3xl"></i> Uruchamiam lektora...
+                                                    <i className="ph-bold ph-spinner animate-spin text-3xl"></i> Uruchamiam lektora AI...
                                                 </div>
                                             )}
 
