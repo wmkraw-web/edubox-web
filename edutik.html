@@ -194,9 +194,10 @@
             const [generatedData, setGeneratedData] = useState(null);
             const [botMessage, setBotMessage] = useState("Cześć! O czym napiszemy dzisiaj? Podaj mi temat, a ja ułożę rytmiczną rymowankę i narysuję do niej piękną, kolorową ilustrację!");
 
-            // === STUDIO NAGRANIOWE (AUDIO AI & FALLBACK) ===
+            // === STUDIO NAGRANIOWE (AUDIO AI) ===
             const [audioUrl, setAudioUrl] = useState(null);
             const [isAudioGenerating, setIsAudioGenerating] = useState(false);
+            const [isPlayingTTS, setIsPlayingTTS] = useState(false);
 
             const [gieldaItems, setGieldaItems] = useState([]);
             const [isSavingToGielda, setIsSavingToGielda] = useState(false);
@@ -246,129 +247,128 @@
                 }
             };
 
-            // === API FUNCTIONS ===
-            const fetchWithBackoff = async (url, options) => {
+            // === PANCERNE API FUNCTIONS ===
+            const fetchWithExponentialBackoff = async (url, options, timeoutMs = 25000) => {
                 const delays = [1000, 2000, 4000, 8000, 16000];
                 let lastErr;
                 for (let i = 0; i < 5; i++) {
                     try {
-                        const res = await fetch(url, options);
+                        const controller = new AbortController();
+                        const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+                        const fetchOptions = { ...options, signal: controller.signal };
+                        
+                        const res = await fetch(url, fetchOptions);
+                        clearTimeout(timeoutId);
+                        
                         if (!res.ok) {
                             const errText = await res.text();
-                            throw new Error(`HTTP ${res.status}: ${errText.substring(0, 100)}`);
+                            throw new Error(`HTTP ${res.status}: ${errText.substring(0, 80)}`);
                         }
                         return await res.json();
                     } catch (err) {
                         lastErr = err;
+                        if (err.name === 'AbortError') {
+                            lastErr = new Error("Serwer nie odpowiedział na czas (Timeout).");
+                        }
                         if (i < 4) await new Promise(r => setTimeout(r, delays[i]));
                     }
                 }
                 throw lastErr;
             };
 
-            const parseAIResponse = (rawText) => {
-                try {
-                    let jsonStr = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
-                    const startIdx = jsonStr.indexOf('{');
-                    const endIdx = jsonStr.lastIndexOf('}');
-                    if (startIdx !== -1 && endIdx !== -1) {
-                        jsonStr = jsonStr.substring(startIdx, endIdx + 1);
-                    }
-                    // Pancerna ochrona: Usuwamy WSZYSTKIE surowe znaki kontrolne (w tym twarde entery), które psują JSON
-                    jsonStr = jsonStr.replace(/[\u0000-\u001F]+/g, ' ');
-                    return JSON.parse(jsonStr);
-                } catch (err) {
-                    console.error("JSON Parse Error. Surowy tekst:", rawText);
-                    throw new Error("Model AI zwrócił uszkodzony tekst.");
-                }
-            };
-
             const fetchRhymeText = async (userPrompt, systemInstruction) => {
                 try {
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 15000);
                     const res = await fetch('/api/chat', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ 
                             prompt: userPrompt, 
                             system: systemInstruction,
-                            temperature: 0.6, // Mniejsza temperatura gwarantuje lepsze trzymanie rymów i formatu
+                            temperature: 0.6,
                             format: "json",
                             model: "gpt-4o-mini"
-                        })
+                        }),
+                        signal: controller.signal
                     });
+                    clearTimeout(timeoutId);
                     
-                    if (!res.ok) throw new Error(`Serwer główny: ${res.status}`);
+                    if (!res.ok) throw new Error(`Serwer główny: HTTP ${res.status}`);
                     const data = await res.json();
-                    return parseAIResponse(data.text);
-                } catch (e) {
-                    console.warn("Przełączam na model awaryjny:", e.message);
-                    let attempt = 0;
-                    let lastError = e.message;
-                    while (attempt < 3) {
-                        try {
-                            const apiKey = ""; 
-                            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
-                            const res = await fetch(url, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                    contents: [{ parts: [{ text: userPrompt }] }],
-                                    systemInstruction: { parts: [{ text: systemInstruction }] }
-                                })
-                            });
-                            
-                            if (!res.ok) {
-                                const errText = await res.text();
-                                throw new Error(`HTTP ${res.status}: ${errText.substring(0, 60)}...`);
-                            }
-                            
-                            const data = await res.json();
-                            return parseAIResponse(data.candidates[0].content.parts[0].text);
-                        } catch (err) {
-                            lastError = err.message;
-                            attempt++;
-                            if (attempt >= 3) throw new Error(`Błąd AI: ${lastError}`);
-                            await new Promise(r => setTimeout(r, 1000 * attempt));
-                        }
+                    
+                    let jsonStr = data.text.replace(/```json/gi, '').replace(/```/g, '').trim();
+                    const startIdx = jsonStr.indexOf('{');
+                    const endIdx = jsonStr.lastIndexOf('}');
+                    if (startIdx !== -1 && endIdx !== -1) {
+                        jsonStr = jsonStr.substring(startIdx, endIdx + 1);
                     }
+                    jsonStr = jsonStr.replace(/[\u0000-\u001F]+/g, ' '); // Czyści surowe entery
+                    return JSON.parse(jsonStr);
+                    
+                } catch (e) {
+                    console.warn("Przełączam na model awaryjny tekstu:", e.message);
+                    const apiKey = ""; 
+                    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+                    
+                    // Schemat wymusza na sztucznej inteligencji zwrot ZAWSZE idealnego JSONa (chroni przed błędem 400 i padającym parserem)
+                    const payload = {
+                        contents: [{ parts: [{ text: userPrompt }] }],
+                        systemInstruction: { parts: [{ text: systemInstruction }] },
+                        generationConfig: {
+                            responseMimeType: "application/json",
+                            responseSchema: {
+                                type: "OBJECT",
+                                properties: {
+                                    title: { type: "STRING" },
+                                    content: { type: "STRING" },
+                                    imagePrompt: { type: "STRING" }
+                                },
+                                required: ["title", "content", "imagePrompt"]
+                            }
+                        }
+                    };
+
+                    const data = await fetchWithExponentialBackoff(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    }, 20000);
+                    
+                    const responseText = data.candidates[0].content.parts[0].text;
+                    return JSON.parse(responseText);
                 }
             };
 
             const secureApiImageCall = async (payloadData) => {
                 try {
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 20000);
                     const res = await fetch('/api/generate', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payloadData) 
+                        body: JSON.stringify(payloadData),
+                        signal: controller.signal
                     });
+                    clearTimeout(timeoutId);
+                    
                     if (res.ok) return await res.json();
                     throw new Error(`Status API: ${res.status}`);
                 } catch (e) {
-                    console.warn("Przełączam na model awaryjny obrazu (Canvas):", e.message);
-                    let attempt = 0;
-                    let lastError = e.message;
-                    while(attempt < 3) {
-                        try {
-                            const apiKey = ""; 
-                            const url = `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${apiKey}`;
-                            const fallbackRes = await fetch(url, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                    instances: { prompt: payloadData.prompt },
-                                    parameters: { sampleCount: 1 } 
-                                })
-                            });
-                            
-                            if (!fallbackRes.ok) throw new Error(`HTTP ${fallbackRes.status}`);
-                            return await fallbackRes.json();
-                        } catch(err) {
-                            lastError = err.message;
-                            attempt++;
-                            if (attempt >= 3) throw new Error(`Błąd obrazu: ${lastError}`);
-                            await new Promise(r => setTimeout(r, 1000 * attempt));
-                        }
-                    }
+                    console.warn("Przełączam na model awaryjny obrazu:", e.message);
+                    const apiKey = ""; 
+                    const url = `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${apiKey}`;
+                    
+                    const payload = {
+                        instances: { prompt: payloadData.prompt },
+                        parameters: { sampleCount: 1 } 
+                    };
+
+                    return await fetchWithExponentialBackoff(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    }, 25000); // Wydłużony czas, obrazy ładują się dłużej
                 }
             };
 
@@ -400,12 +400,7 @@ ZASADY KRYTYCZNE (Musisz się ich trzymać w 100%):
 1. RYTMIKA: Każdy wers w zwrotce MUSI mieć dokładnie taką samą liczbę sylab (np. po 8 sylab), aby czytało się to śpiewająco.
 2. RYMY: Wiersz MUSI posiadać DOKŁADNE POLSKIE RYMY na końcach wersów (układ AABB lub ABAB). Np. słońce/końce, głowa/sowa.
 3. ABSOLUTNY ZAKAZ wierszy białych (bez rymów)!
-4. ZWRÓĆ WYŁĄCZNIE POPRAWNY JSON o strukturze:
-{
-  "title": "Kreatywny tytuł",
-  "content": "Treść wiersza. Używaj WYŁĄCZNIE znacznika <br/> do nowych linii (żadnych prawdziwych enterów w stringu!).",
-  "imagePrompt": "A purely visual English description (max 15 words) of the main subject. No text."
-}`;
+4. ZWRÓĆ WYŁĄCZNIE POPRAWNY JSON: title (tytuł), content (treść z tagiem <br/>), imagePrompt (krótki angielski opis obrazka, max 15 słów).`;
                             const usrPrompt = `Napisz utwór na temat: "${topic}".\nFormat: ${formatDesc}.\nOdbiorca: dla ${audienceDesc}.\nNastrój: ${moodDesc}.\nPamiętaj: RÓWNE SYLABY i IDEALNE RYMY!`;
 
                             const textData = await fetchRhymeText(usrPrompt, sysPrompt);
@@ -478,6 +473,8 @@ ZASADY KRYTYCZNE (Musisz się ich trzymać w 100%):
                 setMood(item.config.mood || 'zabawny');
                 setGeneratedData(item.config.generatedData);
                 setAudioUrl(null); 
+                if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+                setIsPlayingTTS(false);
                 setAppMode('generator');
                 showToast("Wczytano z Giełdy!", "info");
                 setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
@@ -542,11 +539,11 @@ ZASADY KRYTYCZNE (Musisz się ich trzymać w 100%):
                         model: "gemini-2.5-flash-preview-tts"
                     };
 
-                    const data = await fetchWithBackoff(url, { 
+                    const data = await fetchWithExponentialBackoff(url, { 
                         method: 'POST', 
                         headers: { 'Content-Type': 'application/json' }, 
                         body: JSON.stringify(payload) 
-                    });
+                    }, 25000);
                     
                     const pcmBase64 = data.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
                     const mimeType = data.candidates?.[0]?.content?.parts?.[0]?.inlineData?.mimeType || "audio/pcm;rate=24000";
@@ -563,10 +560,32 @@ ZASADY KRYTYCZNE (Musisz się ich trzymać w 100%):
                         throw new Error("Brak danych audio");
                     }
                 } catch (e) {
-                    console.error("Audio error:", e);
-                    showToast(`Błąd Lektora AI: ${e.message}`, "error");
+                    console.warn("Błąd Lektora AI, używam Web Speech API:", e.message);
+                    if ('speechSynthesis' in window) {
+                        window.speechSynthesis.cancel(); 
+                        const utterance = new SpeechSynthesisUtterance(cleanText);
+                        utterance.lang = 'pl-PL';
+                        utterance.rate = 0.9; 
+                        utterance.pitch = mood === 'zabawny' ? 1.2 : (mood === 'spokojny' ? 0.8 : 1.0);
+                        
+                        utterance.onend = () => setIsPlayingTTS(false);
+                        utterance.onerror = () => setIsPlayingTTS(false);
+                        
+                        window.speechSynthesis.speak(utterance);
+                        setIsPlayingTTS(true);
+                        showToast("🎧 Lektor odczytuje utwór.");
+                    } else {
+                        showToast("Twoja przeglądarka nie obsługuje czytania głosem.", "error");
+                    }
                 } finally {
                     setIsAudioGenerating(false);
+                }
+            };
+
+            const stopBrowserTTS = () => {
+                if ('speechSynthesis' in window) {
+                    window.speechSynthesis.cancel();
+                    setIsPlayingTTS(false);
                 }
             };
 
@@ -825,7 +844,15 @@ ZASADY KRYTYCZNE (Musisz się ich trzymać w 100%):
                                                 </div>
                                             )}
                                             
-                                            {!audioUrl && !isAudioGenerating && (
+                                            {isPlayingTTS && (
+                                                <div className="mt-10 flex justify-center print-hidden fade-in">
+                                                    <button onClick={stopBrowserTTS} className="flex items-center justify-center gap-3 bg-red-600 hover:bg-red-500 text-white px-8 py-4 rounded-xl font-black shadow-lg btn-bounce text-sm uppercase tracking-widest transition-all">
+                                                        <i className="ph-bold ph-stop-circle text-2xl"></i> Zatrzymaj Lektora
+                                                    </button>
+                                                </div>
+                                            )}
+
+                                            {!audioUrl && !isAudioGenerating && !isPlayingTTS && (
                                                 <div className="mt-10 flex justify-center print-hidden">
                                                     <button onClick={generateAudio} className="flex items-center justify-center gap-3 bg-gradient-to-r from-purple-600 to-fuchsia-500 hover:from-purple-500 hover:to-fuchsia-400 text-white px-8 py-4 rounded-xl font-black shadow-lg btn-bounce text-sm uppercase tracking-widest transition-all">
                                                         <i className="ph-bold ph-speaker-high text-2xl"></i> Przeczytaj Głosowo
