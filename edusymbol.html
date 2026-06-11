@@ -202,12 +202,13 @@
             };
 
             // ETAP 2: Wywołanie Grafiki
-            const secureApiCall = async (payload) => {
+            const secureApiCall = async (payloadData) => {
                 try {
+                    // FIX: Twój serwer do obrazów oczekuje "płaskiego" obiektu (od razu "prompt"), a nie zagnieżdżonego "payload"
                     const res = await fetch('/api/generate', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ payload, type: 'image' })
+                        body: JSON.stringify(payloadData) 
                     });
                     
                     if (res.ok) return await res.json();
@@ -221,8 +222,8 @@
                         const apiKey = ""; 
                         const url = `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${apiKey}`;
                         const previewPayload = {
-                            instances: { prompt: payload.instances.prompt },
-                            parameters: { sampleCount: 1, aspectRatio: "1:1" }
+                            instances: { prompt: payloadData.prompt },
+                            parameters: { sampleCount: 1 }
                         };
                         const fallbackRes = await fetch(url, {
                             method: 'POST',
@@ -329,17 +330,17 @@
                         prompt: hiddenInstruction, 
                         negative_prompt: negativePrompt, 
                         style_preset: apiStylePreset,
+                        aspect_ratio: '1:1',
                         width: 1024,
-                        height: 1024,
-                        instances: { prompt: hiddenInstruction }, 
-                        parameters: { sampleCount: 1 }
+                        height: 1024
                     };
 
                     const data = await secureApiCall(payload);
-                    const base64Image = data.predictions?.[0]?.bytesBase64Encoded || data.artifacts?.[0]?.base64 || data.image; 
+                    // Lepsze wyszukiwanie obrazka z różnych silników (Stability, Fal, Imagen)
+                    const base64Image = data.predictions?.[0]?.bytesBase64Encoded || data.artifacts?.[0]?.base64 || data.image || data.imageUrl || data.image_url || data.url || (data.data && data.data[0]?.url); 
                     
                     if (base64Image) {
-                        const finalImage = base64Image.startsWith('data:image') ? base64Image : `data:image/png;base64,${base64Image}`;
+                        const finalImage = base64Image.startsWith('http') || base64Image.startsWith('data:image') ? base64Image : `data:image/png;base64,${base64Image}`;
                         setGeneratedImage(finalImage);
                         setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
                     } else {
