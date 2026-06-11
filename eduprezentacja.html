@@ -299,67 +299,28 @@
                 }
             };
 
-            // === API FUNCTIONS (GEMINI Canvas Integration) ===
-            const apiKey = ""; // Canvas injects this securely
+            // === API FUNCTIONS (Twój własny backend: GPT-4o-mini + SD/Fal) ===
             
-            const fetchGeminiText = async (promptText) => {
-                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+            const fetchEduBoxText = async (userPrompt, systemPrompt) => {
+                const res = await fetch('/api/chat', {
+                    method: 'POST', 
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt: userPrompt, system: systemPrompt, format: "json", temperature: 0.7, model: "gpt-4o-mini" })
+                });
                 
-                const systemPrompt = `Jesteś ekspertem edukacyjnym. Tworzysz konspekty prezentacji szkolnych. 
-                Zwracasz WYŁĄCZNIE poprawny JSON. Schemat:
-                {
-                    "slides": [
-                        {
-                            "title": "Tytuł slajdu (max 5 słów)",
-                            "bullets": ["Treść 1", "Treść 2"],
-                            "imagePrompt": "Bardzo krótki, jednozdaniowy opis głównego obiektu/tematu na obrazku (w języku angielskim). NIE DODAJ instrukcji o braku tekstu, ja to zrobię.",
-                            "notes": "Notatki dla nauczyciela (co powiedzieć)."
-                        }
-                    ]
+                if (!res.ok) throw new Error(`API Error: ${res.status}`);
+                const data = await res.json();
+                
+                let jsonStr = data.text.replace(/```json/gi, '').replace(/```/g, '').trim();
+                const startIdx = jsonStr.indexOf('{');
+                const endIdx = jsonStr.lastIndexOf('}');
+                if (startIdx !== -1 && endIdx !== -1) {
+                    jsonStr = jsonStr.substring(startIdx, endIdx + 1);
                 }
-                Zasady:
-                1. Wygeneruj dokładnie zadaną liczbę slajdów.
-                2. Jeśli contentStyle to 'bullets', pole "bullets" ma zawierać 3-5 równoważników zdań.
-                3. Jeśli contentStyle to 'descriptive', pole "bullets" ma zawierać 2 krótkie, pełne akapity narracji.
-                4. Zawsze pierwszy slajd to tytuł.
-                5. Jeśli zażądano quizu, ostatni slajd to pytanie, a odpowiedzi są w 'bullets' (A, B, C, Poprawna: ...).`;
-
-                const payload = {
-                    contents: [{ parts: [{ text: promptText }] }],
-                    systemInstruction: { parts: [{ text: systemPrompt }] },
-                    generationConfig: {
-                        responseMimeType: "application/json"
-                    }
-                };
-
-                let attempt = 0;
-                while (attempt < 5) {
-                    try {
-                        const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-                        if (!res.ok) throw new Error(`API Error: ${res.status}`);
-                        const data = await res.json();
-                        
-                        let textOutput = data.candidates[0].content.parts[0].text;
-                        
-                        // Fallback: Twarde czyszczenie JSONa ze zbędnych markdownów
-                        textOutput = textOutput.replace(/```json/gi, '').replace(/```/g, '').trim();
-                        const startIdx = textOutput.indexOf('{');
-                        const endIdx = textOutput.lastIndexOf('}');
-                        if (startIdx !== -1 && endIdx !== -1) {
-                            textOutput = textOutput.substring(startIdx, endIdx + 1);
-                        }
-                        
-                        return JSON.parse(textOutput);
-                    } catch (error) {
-                        attempt++;
-                        if (attempt >= 5) throw error;
-                        // Exponential backoff: Czeka 1s, 2s, 4s, 8s przed kolejną próbą
-                        await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt - 1) * 1000));
-                    }
-                }
+                return JSON.parse(jsonStr);
             };
 
-            const fetchGeminiImage = async (basePrompt, selectedTheme) => {
+            const fetchEduBoxImage = async (basePrompt, selectedTheme) => {
                 // Twardy Prompt Wrapper - Poprawia jakość grafiki i wymusza brak tekstu
                 let styleMod = '';
                 if (selectedTheme === 'chalkboard') styleMod = "chalkboard drawing style, chalk art, flat design, educational";
@@ -368,16 +329,25 @@
 
                 const strictPrompt = `A beautiful, premium quality illustration of: ${basePrompt}. STYLE: ${styleMod}. CRITICAL RULES: ABSOLUTELY NO TEXT, NO LETTERS, NO WORDS, NO NUMBERS, NO WATERMARKS. Clean composition, highly detailed, visually appealing.`;
 
-                const url = `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${apiKey}`;
-                const payload = {
-                    instances: { prompt: strictPrompt },
-                    parameters: { sampleCount: 1, aspectRatio: "16:9" }
-                };
-
-                const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-                if (!res.ok) throw new Error("Image API Error");
-                const data = await res.json();
-                return `data:image/png;base64,${data.predictions[0].bytesBase64Encoded}`;
+                const response = await fetch('/api/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        prompt: strictPrompt,
+                        aspect_ratio: '16:9',
+                        width: 1024,
+                        height: 576
+                    })
+                });
+                
+                if (!response.ok) throw new Error(`Image API Error: ${response.status}`);
+                const data = await response.json();
+                
+                let imgUrl = data.imageUrl || data.image_url || data.url || (data.data && data.data[0]?.url) || data.image;
+                if (imgUrl && imgUrl.length > 1000 && !imgUrl.startsWith('http') && !imgUrl.startsWith('data:')) {
+                    imgUrl = `data:image/png;base64,${imgUrl}`;
+                }
+                return imgUrl;
             };
 
             // === CORE LOGIC ===
@@ -390,10 +360,29 @@
                         setUsages(newCount);
                         setStep('generating_text');
                         
+                        const systemPrompt = `Jesteś ekspertem edukacyjnym. Tworzysz konspekty prezentacji szkolnych. 
+                        Zwracasz WYŁĄCZNIE poprawny JSON. Schemat:
+                        {
+                            "slides": [
+                                {
+                                    "title": "Tytuł slajdu (max 5 słów)",
+                                    "bullets": ["Treść 1", "Treść 2"],
+                                    "imagePrompt": "Bardzo krótki, jednozdaniowy opis głównego obiektu/tematu na obrazku (w języku angielskim). NIE DODAJ instrukcji o braku tekstu, ja to zrobię.",
+                                    "notes": "Notatki dla nauczyciela (co powiedzieć)."
+                                }
+                            ]
+                        }
+                        Zasady:
+                        1. Wygeneruj dokładnie zadaną liczbę slajdów.
+                        2. Jeśli contentStyle to 'bullets', pole "bullets" ma zawierać 3-5 równoważników zdań.
+                        3. Jeśli contentStyle to 'descriptive', pole "bullets" ma zawierać 2 krótkie, pełne akapity narracji.
+                        4. Zawsze pierwszy slajd to tytuł.
+                        5. Jeśli zażądano quizu, ostatni slajd to pytanie, a odpowiedzi są w 'bullets' (A, B, C, Poprawna: ...).`;
+
                         const userPrompt = `Temat: ${topic}. Grupa: ${audience}. Liczba slajdów: ${slideCount}. Styl: ${contentStyle}. Quiz: ${includeQuiz ? 'Tak' : 'Nie'}. Język: Polski.`;
                         
                         try {
-                            const result = await fetchGeminiText(userPrompt);
+                            const result = await fetchEduBoxText(userPrompt, systemPrompt);
                             const newSlides = result.slides.map((s, i) => ({ ...s, id: i, imageUrl: null }));
                             setSlides(newSlides);
                             setStep('review');
@@ -417,20 +406,9 @@
                     if (updatedSlides[i].imageUrl) continue; 
 
                     try {
-                        // Exponential backoff mock for image gen (basic retry)
-                        let retries = 3;
-                        while(retries > 0) {
-                            try {
-                                const imgUrl = await fetchGeminiImage(updatedSlides[i].imagePrompt, theme);
-                                updatedSlides[i].imageUrl = imgUrl;
-                                setSlides([...updatedSlides]);
-                                break;
-                            } catch(e) {
-                                retries--;
-                                if(retries === 0) throw e;
-                                await new Promise(r => setTimeout(r, 2000));
-                            }
-                        }
+                        const imgUrl = await fetchEduBoxImage(updatedSlides[i].imagePrompt, theme);
+                        updatedSlides[i].imageUrl = imgUrl;
+                        setSlides([...updatedSlides]);
                     } catch (err) { 
                         console.error(`Błąd przy obrazku ${i}:`, err);
                     }
@@ -443,7 +421,7 @@
             const regenerateSingleImage = async (index) => {
                 setIsRegeneratingImage(index);
                 try {
-                    const imgUrl = await fetchGeminiImage(slides[index].imagePrompt, theme);
+                    const imgUrl = await fetchEduBoxImage(slides[index].imagePrompt, theme);
                     const newSlides = [...slides];
                     newSlides[index].imageUrl = imgUrl;
                     setSlides(newSlides);
