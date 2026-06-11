@@ -33,7 +33,7 @@
                 extend: {
                     fontFamily: {
                         sans: ['"Plus Jakarta Sans"', 'sans-serif'],
-                        serif: ['"Comic Neue"', 'cursive'], // Używane do wierszyków na wydruku
+                        serif: ['"Comic Neue"', 'cursive'], 
                     },
                     colors: { slate: { 950: '#020617' } }
                 }
@@ -51,7 +51,6 @@
             margin: 0; padding: 0;
         }
         
-        /* Magiczne Aury w tle - Motyw Cyan/Rose (Vibe muzyczny) */
         .aura-blob {
             position: fixed;
             border-radius: 50%;
@@ -86,7 +85,6 @@
 
         .poem-font { font-family: 'Comic Neue', cursive; font-size: 1.3rem; line-height: 1.6; color: #1e293b; text-align: center; }
 
-        /* Print Rules - V3 Standard */
         @media print {
             body { background: white !important; color: black !important; background-image: none !important; }
             .aura-blob { display: none !important; }
@@ -101,12 +99,9 @@
 </head>
 <body class="custom-scrollbar">
     
-    <!-- Kontener na globalne menu -->
     <div id="wspolne-menu-kontener" class="print-hidden"></div>
-    
     <div id="root"></div>
 
-    <!-- MOCK EduBoxCore -->
     <script type="module">
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
@@ -182,7 +177,7 @@
         function App() {
             // === SYSTEM & LIMITS STATE ===
             const [user, setUser] = useState(null);
-            const [appMode, setAppMode] = useState('generator'); // 'generator' | 'gielda'
+            const [appMode, setAppMode] = useState('generator'); 
             const [isPremium, setIsPremium] = useState(false);
             const [usages, setUsages] = useState(0);
             const [accessCode, setAccessCode] = useState('');
@@ -190,26 +185,25 @@
 
             // === APP STATE ===
             const [topic, setTopic] = useState('');
-            const [audience, setAudience] = useState('przedszkole'); // maluchy, przedszkole, szkolne
-            const [contentType, setContentType] = useState('wierszyk'); // wierszyk, piosenka, wyliczanka
-            const [mood, setMood] = useState('zabawny'); // zabawny, spokojny, edukacyjny
+            const [audience, setAudience] = useState('przedszkole'); 
+            const [contentType, setContentType] = useState('wierszyk'); 
+            const [mood, setMood] = useState('zabawny'); 
             
             const [isGenerating, setIsGenerating] = useState(false);
-            const [generationStep, setGenerationStep] = useState(null); // null, 'text', 'image'
+            const [generationStep, setGenerationStep] = useState(null); 
             const [generatedData, setGeneratedData] = useState(null);
             const [botMessage, setBotMessage] = useState("Cześć! O czym napiszemy dzisiaj? Podaj mi temat, a ja ułożę rytmiczną rymowankę i narysuję do niej piękną, kolorową ilustrację!");
 
-            // NOWE: Obsługa Studio Nagraniowego (Audio AI)
+            // === STUDIO NAGRANIOWE (AUDIO AI & FALLBACK) ===
             const [audioUrl, setAudioUrl] = useState(null);
             const [isAudioGenerating, setIsAudioGenerating] = useState(false);
+            const [isPlayingTTS, setIsPlayingTTS] = useState(false); // Do natywnego lektora
 
-            // === GIEŁDA (MARKETPLACE) ===
             const [gieldaItems, setGieldaItems] = useState([]);
             const [isSavingToGielda, setIsSavingToGielda] = useState(false);
             
             const resultRef = useRef(null);
 
-            // === INITIALIZATION ===
             useEffect(() => {
                 let unsubscribeSnapshot = null;
 
@@ -233,6 +227,7 @@
                 return () => {
                     clearInterval(checkInterval);
                     if (unsubscribeSnapshot) unsubscribeSnapshot();
+                    if ('speechSynthesis' in window) window.speechSynthesis.cancel();
                 };
             }, []);
 
@@ -261,11 +256,11 @@
                     if (startIdx !== -1 && endIdx !== -1) {
                         jsonStr = jsonStr.substring(startIdx, endIdx + 1);
                     }
-                    // Pancerna ochrona: Usuwamy WSZYSTKIE surowe znaki kontrolne (w tym twarde entery), które psują JSON
+                    // Ochrona: Usuwamy entery z surowego stringa przed parsowaniem
                     jsonStr = jsonStr.replace(/[\u0000-\u001F]+/g, ' ');
                     return JSON.parse(jsonStr);
                 } catch (err) {
-                    console.error("JSON Parse Error. Surowy tekst:", rawText);
+                    console.error("JSON Parse Error:", rawText);
                     throw new Error("Model AI zwrócił uszkodzony tekst.");
                 }
             };
@@ -290,7 +285,6 @@
                 } catch (e) {
                     console.warn("Przełączam na model awaryjny:", e.message);
                     let attempt = 0;
-                    let lastError = e.message;
                     while (attempt < 3) {
                         try {
                             const apiKey = ""; 
@@ -301,21 +295,19 @@
                                 body: JSON.stringify({
                                     contents: [{ parts: [{ text: userPrompt }] }],
                                     systemInstruction: { parts: [{ text: systemInstruction }] }
-                                    // Usunięto generationConfig by uniknąć błędu 400 Bad Request
                                 })
                             });
                             
                             if (!res.ok) {
                                 const errText = await res.text();
-                                throw new Error(`HTTP ${res.status}: ${errText.substring(0, 60)}...`);
+                                throw new Error(`HTTP ${res.status}`);
                             }
                             
                             const data = await res.json();
                             return parseAIResponse(data.candidates[0].content.parts[0].text);
                         } catch (err) {
-                            lastError = err.message;
                             attempt++;
-                            if (attempt >= 3) throw new Error(`Błąd Gemini: ${lastError}`);
+                            if (attempt >= 3) throw new Error(`Błąd AI: ${err.message}`);
                             await new Promise(r => setTimeout(r, 1000 * attempt));
                         }
                     }
@@ -330,41 +322,33 @@
                         body: JSON.stringify(payloadData) 
                     });
                     if (res.ok) return await res.json();
-                    if (res.status === 404 || res.status === 405) throw new Error("USE_FALLBACK");
-                    const errData = await res.json();
-                    throw new Error(errData.error || `Status API: ${res.status}`);
+                    throw new Error(`Status API: ${res.status}`);
                 } catch (e) {
-                    if (e.message === "USE_FALLBACK" || e.message.includes("Failed to fetch") || e.message.includes("Unexpected token")) {
-                        let attempt = 0;
-                        let lastError = e.message;
-                        while(attempt < 3) {
-                            try {
-                                const apiKey = ""; 
-                                const url = `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${apiKey}`;
-                                const fallbackRes = await fetch(url, {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({
-                                        instances: { prompt: payloadData.prompt },
-                                        parameters: { sampleCount: 1 } 
-                                    })
-                                });
-                                
-                                if (!fallbackRes.ok) {
-                                    const errText = await fallbackRes.text();
-                                    throw new Error(`HTTP ${fallbackRes.status}: ${errText.substring(0, 60)}...`);
-                                }
-                                
-                                return await fallbackRes.json();
-                            } catch(err) {
-                                lastError = err.message;
-                                attempt++;
-                                if (attempt >= 3) throw new Error(`Błąd Imagen: ${lastError}`);
-                                await new Promise(r => setTimeout(r, 1000 * attempt));
-                            }
+                    console.warn("Przełączam na model awaryjny obrazu (Canvas):", e.message);
+                    let attempt = 0;
+                    let lastError = e.message;
+                    while(attempt < 3) {
+                        try {
+                            const apiKey = ""; 
+                            const url = `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${apiKey}`;
+                            const fallbackRes = await fetch(url, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    instances: { prompt: payloadData.prompt },
+                                    parameters: { sampleCount: 1 } 
+                                })
+                            });
+                            
+                            if (!fallbackRes.ok) throw new Error(`HTTP ${fallbackRes.status}`);
+                            return await fallbackRes.json();
+                        } catch(err) {
+                            lastError = err.message;
+                            attempt++;
+                            if (attempt >= 3) throw new Error(`Błąd obrazu: ${lastError}`);
+                            await new Promise(r => setTimeout(r, 1000 * attempt));
                         }
                     }
-                    throw e;
                 }
             };
 
@@ -378,26 +362,28 @@
                         setIsGenerating(true);
                         setGeneratedData(null);
                         setAudioUrl(null); 
+                        if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+                        setIsPlayingTTS(false);
                         
                         try {
                             setGenerationStep('text');
-                            setBotMessage("Piszę rymowankę w idealnym rytmie...");
+                            setBotMessage("Piszę rymowankę. Składam rymy...");
                             
                             const formatDesc = contentType === 'wierszyk' ? 'Wierszyk' : (contentType === 'piosenka' ? 'Tekst piosenki z podziałem na Zwrotki i Refren' : 'Krótka, rytmiczna wyliczanka (jak do zabawy w chowanego)');
                             const moodDesc = mood === 'zabawny' ? 'śmieszny, wesoły, wywołujący uśmiech' : (mood === 'spokojny' ? 'wyciszający, kojący, idealny do zasypiania' : 'edukacyjny, uczący ważnych wartości lub wiedzy');
-                            
-                            // POPRAWA BŁĘDU: Zmieniono 'ageGroup' na prawidłową zmienną 'audience'
-                            const audienceDesc = audience === 'maluchy' ? 'najmłodszych dzieci (2-3 lata), bardzo proste słowa, onomatopeje' : (audience === 'przedszkole' ? 'przedszkolaków (4-6 lat), klasyczny rytm' : 'dzieci wczesnoszkolnych (7-9 lat), bogatsze słownictwo');
+                            const audienceDesc = audience === 'maluchy' ? 'najmłodszych dzieci (2-3 lata), proste słowa, onomatopeje' : (audience === 'przedszkole' ? 'przedszkolaków (4-6 lat), klasyczny rytm' : 'dzieci szkolnych (7-9 lat), bogatsze słownictwo');
 
-                            const sysPrompt = `Jesteś wybitnym polskim autorem literatury dziecięcej (jak Brzechwa czy Tuwim). 
-Twoim zadaniem jest napisanie rymowanki.
+                            // RYGORYSTYCZNY PROMPT WYMUSZAJĄCY RYMY
+                            const sysPrompt = `Jesteś wybitnym polskim autorem literatury dziecięcej. 
+Twoim zadaniem jest napisanie pięknej RYMOWANKI.
+ZASADA KRYTYCZNA: Wiersz MUSI posiadać wyraźne rymy na końcach wersów (układ AABB lub ABAB). Używaj tylko prawdziwych, dokładnych polskich rymów!
 ZWRÓĆ WYŁĄCZNIE POPRAWNY JSON o strukturze:
 {
   "title": "Kreatywny tytuł",
   "content": "Treść wiersza. Używaj WYŁĄCZNIE znacznika <br/> do oznaczania nowych linii i enterów. Używaj <strong> do zaznaczania np. [Refren]. BARDZO WAŻNE: Nie stawiaj znaków nowej linii (enterów) w samym kodzie JSON!",
   "imagePrompt": "A highly concise, purely visual English description (max 15 words) of the main subject of this poem. E.g. 'a cute little red dog playing with a ball'. No text."
 }`;
-                            const usrPrompt = `Napisz utwór na temat: "${topic}".\nFormat: ${formatDesc}.\nOdbiorca: dla ${audienceDesc}.\nNastrój: ${moodDesc}.\nZadbaj o idealny rytm i rymy (AABB lub ABAB).`;
+                            const usrPrompt = `Napisz utwór na temat: "${topic}".\nFormat: ${formatDesc}.\nOdbiorca: dla ${audienceDesc}.\nNastrój: ${moodDesc}.\nZadbaj o idealny rytm i RYMY.`;
 
                             const textData = await fetchRhymeText(usrPrompt, sysPrompt);
 
@@ -423,13 +409,12 @@ ZWRÓĆ WYŁĄCZNIE POPRAWNY JSON o strukturze:
                             if (base64Image) finalImage = base64Image.startsWith('http') || base64Image.startsWith('data:image') ? base64Image : `data:image/png;base64,${base64Image}`;
 
                             setGeneratedData({ title: textData.title, content: textData.content, image: finalImage });
-                            setBotMessage("Tadaam! Masz przed sobą gotowy utwór z piękną grafiką. Możesz go zapisać na giełdzie lub od razu wydrukować!");
+                            setBotMessage("Tadaam! Masz przed sobą rymowankę z piękną grafiką. Możesz ją wydrukować lub kazać mi przeczytać na głos!");
 
                             setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
 
                         } catch (error) {
                             console.error("Szczegóły błędu:", error); 
-                            // Zamiast ogólnika "Serwer przeciążony", teraz wypluje czarno na białym co poszło nie tak
                             showToast(`Błąd: ${error.message.substring(0, 80)}`, 'error');
                             setBotMessage(`Napotkałem problem. Szczegóły: ${error.message}`);
                         } finally { 
@@ -448,7 +433,7 @@ ZWRÓĆ WYŁĄCZNIE POPRAWNY JSON o strukturze:
                 try {
                     let safeData = { ...generatedData };
                     if (safeData.image && safeData.image.length > 800000) {
-                        safeData.image = null; // Usuwamy bardzo duże obrazki, żeby Firebase nie rzucił błędem.
+                        safeData.image = null; 
                     }
 
                     const configToSave = { topic, audience, contentType, mood, generatedData: safeData };
@@ -469,13 +454,15 @@ ZWRÓĆ WYŁĄCZNIE POPRAWNY JSON o strukturze:
                 setContentType(item.config.contentType || 'wierszyk');
                 setMood(item.config.mood || 'zabawny');
                 setGeneratedData(item.config.generatedData);
-                setAudioUrl(null); // Reset audio
+                setAudioUrl(null); 
+                if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+                setIsPlayingTTS(false);
                 setAppMode('generator');
                 showToast("Wczytano z Giełdy!", "info");
                 setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
             };
 
-            // === TEXT TO SPEECH (AUDIO AI) ===
+            // === TEXT TO SPEECH (AUDIO AI + ROBUST FALLBACK) ===
             const pcmToWav = (base64Pcm, sampleRate) => {
                 const binaryString = atob(base64Pcm);
                 const bytes = new Uint8Array(binaryString.length);
@@ -501,12 +488,12 @@ ZWRÓĆ WYŁĄCZNIE POPRAWNY JSON o strukturze:
                 writeString(view, 8, 'WAVE');
                 writeString(view, 12, 'fmt ');
                 view.setUint32(16, 16, true);
-                view.setUint16(20, 1, true); // PCM
+                view.setUint16(20, 1, true); 
                 view.setUint16(22, numChannels, true);
                 view.setUint32(24, sampleRate, true);
                 view.setUint32(28, byteRate, true);
                 view.setUint16(32, blockAlign, true);
-                view.setUint16(34, 16, true); // 16-bit
+                view.setUint16(34, 16, true); 
                 writeString(view, 36, 'data');
                 view.setUint32(40, pcmData.length * 2, true);
                 
@@ -517,18 +504,19 @@ ZWRÓĆ WYŁĄCZNIE POPRAWNY JSON o strukturze:
             const generateAudio = async () => {
                 if (!generatedData || !generatedData.content) return;
                 setIsAudioGenerating(true);
+                
+                const cleanText = generatedData.content.replace(/<br\s*\/?>/gi, '. ').replace(/<[^>]*>?/gm, '').replace(/\[.*?\]/g, ''); 
+                
                 try {
-                    // Czyścimy utwór z tagów HTML na potrzeby lektora
-                    const cleanText = generatedData.content.replace(/<br\s*\/?>/gi, '. ').replace(/<[^>]*>?/gm, '').replace(/\[.*?\]/g, ''); 
-                    
-                    // Modulator emocji dla Głosowego AI
-                    const moodPrefix = mood === 'zabawny' ? 'Say playfully and rhythmically in polish: ' : (mood === 'spokojny' ? 'Say in a calm, soothing whisper in polish: ' : 'Say clearly and dynamically in polish: ');
-                    
+                    // Próba Gemini TTS (Zadziała w Canvas)
                     const apiKey = ""; 
+                    if (!apiKey) throw new Error("Brak autoryzacji do zaawansowanego TTS. Przechodzę do Web Speech.");
+                    
+                    const moodPrefix = mood === 'zabawny' ? 'Say playfully and rhythmically in polish: ' : (mood === 'spokojny' ? 'Say in a calm, soothing whisper in polish: ' : 'Say clearly and dynamically in polish: ');
                     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`;
                     
                     const payload = {
-                        contents: [{ parts: [{ text: moodPrefix + cleanText }] }],
+                        contents: [{ parts: [{ text: moodPrefix + cleanText.substring(0, 1500) }] }],
                         generationConfig: {
                             responseModalities: ["AUDIO"],
                             speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Aoede" } } }
@@ -536,9 +524,9 @@ ZWRÓĆ WYŁĄCZNIE POPRAWNY JSON o strukturze:
                     };
 
                     const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-                    if (!res.ok) throw new Error("Audio API failed");
-                    const data = await res.json();
+                    if (!res.ok) throw new Error("Gemini TTS API error");
                     
+                    const data = await res.json();
                     const pcmBase64 = data.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
                     const mimeType = data.candidates?.[0]?.content?.parts?.[0]?.inlineData?.mimeType || "audio/pcm;rate=24000";
                     
@@ -550,14 +538,38 @@ ZWRÓĆ WYŁĄCZNIE POPRAWNY JSON o strukturze:
                         const wavUrl = pcmToWav(pcmBase64, sampleRate);
                         setAudioUrl(wavUrl);
                         showToast("🎧 Nagranie gotowe! Możesz odtworzyć.");
-                    } else {
-                        throw new Error("Brak danych audio");
+                        setIsAudioGenerating(false);
+                        return;
                     }
+                    throw new Error("Brak danych audio");
                 } catch (e) {
-                    console.error("Audio generation error:", e);
-                    showToast("Błąd serwera podczas generowania głosu.", "error");
-                } finally {
+                    console.warn("Używam natywnego lektora przeglądarki (Web Speech API):", e.message);
+                    // PANCERNY FALLBACK: Używamy darmowego lektora zbudowanego w każdą przeglądarkę,
+                    // który zadziała zawsze i wszędzie, nawet na Twoim serwerze Vercel bez klucza Google!
+                    if ('speechSynthesis' in window) {
+                        window.speechSynthesis.cancel(); 
+                        const utterance = new SpeechSynthesisUtterance(cleanText);
+                        utterance.lang = 'pl-PL';
+                        utterance.rate = 0.9; // Odrobinę wolniej dla dzieci
+                        utterance.pitch = mood === 'zabawny' ? 1.2 : (mood === 'spokojny' ? 0.8 : 1.0);
+                        
+                        utterance.onend = () => setIsPlayingTTS(false);
+                        utterance.onerror = () => setIsPlayingTTS(false);
+                        
+                        window.speechSynthesis.speak(utterance);
+                        setIsPlayingTTS(true);
+                        showToast("🎧 Lektor odczytuje utwór.");
+                    } else {
+                        showToast("Twoja przeglądarka nie obsługuje czytania głosem.", "error");
+                    }
                     setIsAudioGenerating(false);
+                }
+            };
+
+            const stopBrowserTTS = () => {
+                if ('speechSynthesis' in window) {
+                    window.speechSynthesis.cancel();
+                    setIsPlayingTTS(false);
                 }
             };
 
@@ -700,7 +712,7 @@ ZWRÓĆ WYŁĄCZNIE POPRAWNY JSON o strukturze:
                                         Wierszyki i <br/><span className="text-gradient">Piosenki AI.</span>
                                     </h1>
                                     <p className="text-slate-400 text-sm">
-                                        Wpisz temat (np. witaminki, numery alarmowe, sprzątanie zabawek), a sztuczna inteligencja stworzy rytmiczny wierszyk i uroczą ilustrację.
+                                        Wpisz temat, a sztuczna inteligencja stworzy piękny, w pełni rymujący się wierszyk oraz wygeneruje do niego ilustrację.
                                     </p>
                                 </div>
 
@@ -809,22 +821,32 @@ ZWRÓĆ WYŁĄCZNIE POPRAWNY JSON o strukturze:
                                                 />
                                             </div>
                                             
-                                            {/* Zintegrowany odtwarzacz Audio */}
+                                            {/* Zintegrowany odtwarzacz Audio (Natywny + API) */}
                                             {audioUrl && (
                                                 <div className="mt-10 flex justify-center print-hidden fade-in">
                                                     <audio controls src={audioUrl} className="w-full max-w-sm rounded-full shadow-[0_10px_20px_rgba(0,0,0,0.15)] border-2 border-cyan-200" />
                                                 </div>
                                             )}
-                                            {!audioUrl && !isAudioGenerating && (
-                                                <div className="mt-10 flex justify-center print-hidden">
-                                                    <button onClick={generateAudio} className="flex items-center justify-center gap-3 bg-gradient-to-r from-purple-600 to-fuchsia-500 hover:from-purple-500 hover:to-fuchsia-400 text-white px-8 py-4 rounded-xl font-black shadow-lg btn-bounce text-sm uppercase tracking-widest transition-all">
-                                                        <i className="ph-bold ph-speaker-high text-2xl"></i> Przeczytaj Głosowo (Lektor AI)
+                                            
+                                            {isPlayingTTS && (
+                                                <div className="mt-10 flex justify-center print-hidden fade-in">
+                                                    <button onClick={stopBrowserTTS} className="flex items-center justify-center gap-3 bg-red-600 hover:bg-red-500 text-white px-8 py-4 rounded-xl font-black shadow-lg btn-bounce text-sm uppercase tracking-widest transition-all">
+                                                        <i className="ph-bold ph-stop-circle text-2xl"></i> Zatrzymaj Lektora
                                                     </button>
                                                 </div>
                                             )}
+
+                                            {!audioUrl && !isAudioGenerating && !isPlayingTTS && (
+                                                <div className="mt-10 flex justify-center print-hidden">
+                                                    <button onClick={generateAudio} className="flex items-center justify-center gap-3 bg-gradient-to-r from-purple-600 to-fuchsia-500 hover:from-purple-500 hover:to-fuchsia-400 text-white px-8 py-4 rounded-xl font-black shadow-lg btn-bounce text-sm uppercase tracking-widest transition-all">
+                                                        <i className="ph-bold ph-speaker-high text-2xl"></i> Przeczytaj Głosowo
+                                                    </button>
+                                                </div>
+                                            )}
+                                            
                                             {isAudioGenerating && (
                                                 <div className="mt-10 flex items-center justify-center gap-3 text-fuchsia-500 font-bold print-hidden">
-                                                    <i className="ph-bold ph-spinner animate-spin text-3xl"></i> Trwa nagrywanie w studiu głosowym...
+                                                    <i className="ph-bold ph-spinner animate-spin text-3xl"></i> Uruchamiam lektora...
                                                 </div>
                                             )}
 
