@@ -254,15 +254,20 @@
 
             // === API FUNCTIONS ===
             const parseAIResponse = (rawText) => {
-                let jsonStr = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
-                const startIdx = jsonStr.indexOf('{');
-                const endIdx = jsonStr.lastIndexOf('}');
-                if (startIdx !== -1 && endIdx !== -1) {
-                    jsonStr = jsonStr.substring(startIdx, endIdx + 1);
+                try {
+                    let jsonStr = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
+                    const startIdx = jsonStr.indexOf('{');
+                    const endIdx = jsonStr.lastIndexOf('}');
+                    if (startIdx !== -1 && endIdx !== -1) {
+                        jsonStr = jsonStr.substring(startIdx, endIdx + 1);
+                    }
+                    // Pancerna ochrona: Usuwamy WSZYSTKIE surowe znaki kontrolne (w tym twarde entery), które psują JSON
+                    jsonStr = jsonStr.replace(/[\u0000-\u001F]+/g, ' ');
+                    return JSON.parse(jsonStr);
+                } catch (err) {
+                    console.error("JSON Parse Error. Surowy tekst:", rawText);
+                    throw new Error("Model AI zwrócił uszkodzony tekst.");
                 }
-                // NIEZAWODNY TRIK: Eliminujemy wszystkie "twarde" entery, które model zostawia wewnątrz JSONa, łamiąc kompilator.
-                jsonStr = jsonStr.replace(/\n/g, ' ').replace(/\r/g, '');
-                return JSON.parse(jsonStr);
             };
 
             const fetchRhymeText = async (userPrompt, systemInstruction) => {
@@ -279,12 +284,13 @@
                         })
                     });
                     
-                    if (!res.ok) throw new Error(`API Error: ${res.status}`);
+                    if (!res.ok) throw new Error(`Serwer główny: ${res.status}`);
                     const data = await res.json();
                     return parseAIResponse(data.text);
                 } catch (e) {
-                    console.warn("Przełączam na model awaryjny (Canvas Fallback):", e);
+                    console.warn("Przełączam na model awaryjny:", e.message);
                     let attempt = 0;
+                    let lastError = e.message;
                     while (attempt < 3) {
                         try {
                             const apiKey = ""; 
@@ -294,18 +300,22 @@
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({
                                     contents: [{ parts: [{ text: userPrompt }] }],
-                                    systemInstruction: { parts: [{ text: systemInstruction }] },
-                                    generationConfig: { temperature: 0.7, responseMimeType: "application/json" }
+                                    systemInstruction: { parts: [{ text: systemInstruction }] }
+                                    // Usunięto generationConfig by uniknąć błędu 400 Bad Request
                                 })
                             });
-                            if (!res.ok) throw new Error("Awaria modelu zapasowego");
+                            
+                            if (!res.ok) {
+                                const errText = await res.text();
+                                throw new Error(`HTTP ${res.status}: ${errText.substring(0, 60)}...`);
+                            }
+                            
                             const data = await res.json();
-                            // Bezpieczne parsowanie odpowiedzi, która może zawierać formatowanie markdown
                             return parseAIResponse(data.candidates[0].content.parts[0].text);
                         } catch (err) {
+                            lastError = err.message;
                             attempt++;
-                            if (attempt >= 3) throw new Error("Oba modele AI niedostępne");
-                            // Exponential backoff
+                            if (attempt >= 3) throw new Error(`Błąd Gemini: ${lastError}`);
                             await new Promise(r => setTimeout(r, 1000 * attempt));
                         }
                     }
@@ -326,6 +336,7 @@
                 } catch (e) {
                     if (e.message === "USE_FALLBACK" || e.message.includes("Failed to fetch") || e.message.includes("Unexpected token")) {
                         let attempt = 0;
+                        let lastError = e.message;
                         while(attempt < 3) {
                             try {
                                 const apiKey = ""; 
@@ -335,14 +346,20 @@
                                     headers: { 'Content-Type': 'application/json' },
                                     body: JSON.stringify({
                                         instances: { prompt: payloadData.prompt },
-                                        parameters: { sampleCount: 1 } // Usunięto aspectRatio dla modelu awaryjnego
+                                        parameters: { sampleCount: 1 } 
                                     })
                                 });
-                                if (!fallbackRes.ok) throw new Error("Błąd silnika graficznego Google.");
+                                
+                                if (!fallbackRes.ok) {
+                                    const errText = await fallbackRes.text();
+                                    throw new Error(`HTTP ${fallbackRes.status}: ${errText.substring(0, 60)}...`);
+                                }
+                                
                                 return await fallbackRes.json();
                             } catch(err) {
+                                lastError = err.message;
                                 attempt++;
-                                if (attempt >= 3) throw err;
+                                if (attempt >= 3) throw new Error(`Błąd Imagen: ${lastError}`);
                                 await new Promise(r => setTimeout(r, 1000 * attempt));
                             }
                         }
@@ -360,7 +377,7 @@
                         setUsages(newCount);
                         setIsGenerating(true);
                         setGeneratedData(null);
-                        setAudioUrl(null); // Reset audio
+                        setAudioUrl(null); 
                         
                         try {
                             setGenerationStep('text');
@@ -370,7 +387,6 @@
                             const moodDesc = mood === 'zabawny' ? 'śmieszny, wesoły, wywołujący uśmiech' : (mood === 'spokojny' ? 'wyciszający, kojący, idealny do zasypiania' : 'edukacyjny, uczący ważnych wartości lub wiedzy');
                             const audienceDesc = ageGroup === 'maluchy' ? 'najmłodszych dzieci (2-3 lata), bardzo proste słowa, onomatopeje' : (ageGroup === 'przedszkole' ? 'przedszkolaków (4-6 lat), klasyczny rytm' : 'dzieci wczesnoszkolnych (7-9 lat), bogatsze słownictwo');
 
-                            // Wzmocniono zakaz stosowania enterów (\n) aby nigdy więcej nie wykoleić JSONa
                             const sysPrompt = `Jesteś wybitnym polskim autorem literatury dziecięcej (jak Brzechwa czy Tuwim). 
 Twoim zadaniem jest napisanie rymowanki.
 ZWRÓĆ WYŁĄCZNIE POPRAWNY JSON o strukturze:
@@ -386,7 +402,6 @@ ZWRÓĆ WYŁĄCZNIE POPRAWNY JSON o strukturze:
                             setGenerationStep('image');
                             setBotMessage("Rymowanka gotowa! Teraz maluję do niej przepiękną, kolorową ilustrację...");
                             
-                            // Generowanie obrazka z twardą blokadą tekstu i ZABEZPIECZENIEM przed błędami \n (Enter)
                             const safeImagePrompt = (textData.imagePrompt || '').replace(/['"\n]/g, ' ').trim();
                             const hiddenInstruction = `A beautiful, highly detailed 3D Pixar style children's book illustration. MAIN SUBJECT: ${safeImagePrompt}. Cozy, warm, cheerful environment. Single unified scene. CRITICAL RULE: ABSOLUTELY NO TEXT, NO LETTERS, NO WORDS anywhere on the image. Perfect masterpiece.`;
                             
@@ -411,9 +426,10 @@ ZWRÓĆ WYŁĄCZNIE POPRAWNY JSON o strukturze:
                             setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
 
                         } catch (error) {
-                            console.error(error); 
-                            showToast('Błąd generowania. Serwer jest przeciążony.', 'error');
-                            setBotMessage("Ojej, coś przerwało połączenie. Spróbujmy wygenerować jeszcze raz!");
+                            console.error("Szczegóły błędu:", error); 
+                            // Zamiast ogólnika "Serwer przeciążony", teraz wypluje czarno na białym co poszło nie tak
+                            showToast(`Błąd: ${error.message.substring(0, 80)}`, 'error');
+                            setBotMessage(`Napotkałem problem. Szczegóły: ${error.message}`);
                         } finally { 
                             setIsGenerating(false); 
                             setGenerationStep(null);
