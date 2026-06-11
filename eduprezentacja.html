@@ -332,10 +332,31 @@
                     }
                 };
 
-                const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-                if (!res.ok) throw new Error("API Error");
-                const data = await res.json();
-                return JSON.parse(data.candidates[0].content.parts[0].text);
+                let attempt = 0;
+                while (attempt < 5) {
+                    try {
+                        const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+                        if (!res.ok) throw new Error(`API Error: ${res.status}`);
+                        const data = await res.json();
+                        
+                        let textOutput = data.candidates[0].content.parts[0].text;
+                        
+                        // Fallback: Twarde czyszczenie JSONa ze zbędnych markdownów
+                        textOutput = textOutput.replace(/```json/gi, '').replace(/```/g, '').trim();
+                        const startIdx = textOutput.indexOf('{');
+                        const endIdx = textOutput.lastIndexOf('}');
+                        if (startIdx !== -1 && endIdx !== -1) {
+                            textOutput = textOutput.substring(startIdx, endIdx + 1);
+                        }
+                        
+                        return JSON.parse(textOutput);
+                    } catch (error) {
+                        attempt++;
+                        if (attempt >= 5) throw error;
+                        // Exponential backoff: Czeka 1s, 2s, 4s, 8s przed kolejną próbą
+                        await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt - 1) * 1000));
+                    }
+                }
             };
 
             const fetchGeminiImage = async (basePrompt, selectedTheme) => {
