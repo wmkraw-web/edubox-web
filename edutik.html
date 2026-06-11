@@ -473,14 +473,12 @@ ZASADY KRYTYCZNE (Musisz się ich trzymać w 100%):
                 setMood(item.config.mood || 'zabawny');
                 setGeneratedData(item.config.generatedData);
                 setAudioUrl(null); 
-                if ('speechSynthesis' in window) window.speechSynthesis.cancel();
-                setIsPlayingTTS(false);
                 setAppMode('generator');
                 showToast("Wczytano z Giełdy!", "info");
                 setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
             };
 
-            // === TEXT TO SPEECH (AUDIO AI + ROBUST FALLBACK) ===
+            // === TEXT TO SPEECH (WYŁĄCZNIE CZYSTE AI) ===
             const pcmToWav = (base64Pcm, sampleRate) => {
                 const binaryString = atob(base64Pcm);
                 const bytes = new Uint8Array(binaryString.length);
@@ -527,14 +525,14 @@ ZASADY KRYTYCZNE (Musisz się ich trzymać w 100%):
                 
                 try {
                     const apiKey = ""; 
-                    const moodPrefix = mood === 'zabawny' ? 'Przeczytaj to radośnie i wesoło po polsku: ' : (mood === 'spokojny' ? 'Przeczytaj to kojącym szeptem po polsku: ' : 'Przeczytaj to dynamicznie po polsku: ');
+                    const moodPrefix = mood === 'zabawny' ? 'Przeczytaj to wesoło: ' : (mood === 'spokojny' ? 'Przeczytaj to powoli: ' : 'Przeczytaj to wyraźnie: ');
                     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`;
                     
                     const payload = {
-                        contents: [{ parts: [{ text: moodPrefix + cleanText.substring(0, 1500) }] }],
+                        contents: [{ parts: [{ text: moodPrefix + cleanText.substring(0, 1000) }] }],
                         generationConfig: {
                             responseModalities: ["AUDIO"],
-                            speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Aoede" } } }
+                            speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Kore" } } }
                         },
                         model: "gemini-2.5-flash-preview-tts"
                     };
@@ -557,35 +555,13 @@ ZASADY KRYTYCZNE (Musisz się ich trzymać w 100%):
                         setAudioUrl(wavUrl);
                         showToast("🎧 Nagranie gotowe! Możesz odtworzyć.");
                     } else {
-                        throw new Error("Brak danych audio");
+                        throw new Error("Pusta odpowiedź API. Brak głosu.");
                     }
                 } catch (e) {
-                    console.warn("Błąd Lektora AI, używam Web Speech API:", e.message);
-                    if ('speechSynthesis' in window) {
-                        window.speechSynthesis.cancel(); 
-                        const utterance = new SpeechSynthesisUtterance(cleanText);
-                        utterance.lang = 'pl-PL';
-                        utterance.rate = 0.9; 
-                        utterance.pitch = mood === 'zabawny' ? 1.2 : (mood === 'spokojny' ? 0.8 : 1.0);
-                        
-                        utterance.onend = () => setIsPlayingTTS(false);
-                        utterance.onerror = () => setIsPlayingTTS(false);
-                        
-                        window.speechSynthesis.speak(utterance);
-                        setIsPlayingTTS(true);
-                        showToast("🎧 Lektor odczytuje utwór.");
-                    } else {
-                        showToast("Twoja przeglądarka nie obsługuje czytania głosem.", "error");
-                    }
+                    console.error("Błąd Audio AI:", e);
+                    showToast(`Błąd Lektora AI: ${e.message}`, "error");
                 } finally {
                     setIsAudioGenerating(false);
-                }
-            };
-
-            const stopBrowserTTS = () => {
-                if ('speechSynthesis' in window) {
-                    window.speechSynthesis.cancel();
-                    setIsPlayingTTS(false);
                 }
             };
 
@@ -837,32 +813,24 @@ ZASADY KRYTYCZNE (Musisz się ich trzymać w 100%):
                                                 />
                                             </div>
                                             
-                                            {/* Zintegrowany odtwarzacz Audio (Natywny + API) */}
+                                            {/* Zintegrowany odtwarzacz Audio (Czyste API) */}
                                             {audioUrl && (
                                                 <div className="mt-10 flex justify-center print-hidden fade-in">
                                                     <audio controls src={audioUrl} className="w-full max-w-sm rounded-full shadow-[0_10px_20px_rgba(0,0,0,0.15)] border-2 border-cyan-200" />
                                                 </div>
                                             )}
-                                            
-                                            {isPlayingTTS && (
-                                                <div className="mt-10 flex justify-center print-hidden fade-in">
-                                                    <button onClick={stopBrowserTTS} className="flex items-center justify-center gap-3 bg-red-600 hover:bg-red-500 text-white px-8 py-4 rounded-xl font-black shadow-lg btn-bounce text-sm uppercase tracking-widest transition-all">
-                                                        <i className="ph-bold ph-stop-circle text-2xl"></i> Zatrzymaj Lektora
-                                                    </button>
-                                                </div>
-                                            )}
 
-                                            {!audioUrl && !isAudioGenerating && !isPlayingTTS && (
+                                            {!audioUrl && !isAudioGenerating && (
                                                 <div className="mt-10 flex justify-center print-hidden">
                                                     <button onClick={generateAudio} className="flex items-center justify-center gap-3 bg-gradient-to-r from-purple-600 to-fuchsia-500 hover:from-purple-500 hover:to-fuchsia-400 text-white px-8 py-4 rounded-xl font-black shadow-lg btn-bounce text-sm uppercase tracking-widest transition-all">
-                                                        <i className="ph-bold ph-speaker-high text-2xl"></i> Przeczytaj Głosowo
+                                                        <i className="ph-bold ph-speaker-high text-2xl"></i> Przeczytaj Głosowo (AI)
                                                     </button>
                                                 </div>
                                             )}
                                             
                                             {isAudioGenerating && (
                                                 <div className="mt-10 flex items-center justify-center gap-3 text-fuchsia-500 font-bold print-hidden">
-                                                    <i className="ph-bold ph-spinner animate-spin text-3xl"></i> Uruchamiam lektora AI...
+                                                    <i className="ph-bold ph-spinner animate-spin text-3xl"></i> Uruchamiam studio nagraniowe...
                                                 </div>
                                             )}
 
