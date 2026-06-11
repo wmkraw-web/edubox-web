@@ -2,7 +2,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebas
 import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
 import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
 
-// 1. WSPÓLNA KONFIGURACJA
+// 1. WSPÓLNA KONFIGURACJA FIREBASE
 const FIREBASE_CONFIG = {
     apiKey: "AIzaSyDL_mvepNJjMmZYQzifN2cXzoKwCE8jNd0",
     authDomain: "edubox-pro.firebaseapp.com",
@@ -21,7 +21,7 @@ let isInitialized = false;
 // 2. GŁÓWNY OBIEKT EDUBOX CORE
 export const EduBoxCore = {
     
-    // Inicjalizacja (logowanie w tle)
+    // Inicjalizacja (logowanie + pobranie menu)
     init: (onUserLoad) => {
         if (!isInitialized) {
             app = initializeApp(FIREBASE_CONFIG);
@@ -29,12 +29,26 @@ export const EduBoxCore = {
             db = getFirestore(app);
             signInAnonymously(auth).catch(e => console.error("Firebase Auth Error:", e));
             isInitialized = true;
+            
+            // Auto-pobieranie menu do wskazanego kontenera!
+            EduBoxCore.loadMenu();
         }
         
         onAuthStateChanged(auth, (user) => {
             currentUser = user;
             if(onUserLoad) onUserLoad(user);
         });
+    },
+
+    // Pobieranie menu
+    loadMenu: () => {
+        const container = document.getElementById('wspolne-menu-kontener');
+        if (container) {
+            fetch('/menu.html')
+                .then(r => r.text())
+                .then(html => { container.innerHTML = html; })
+                .catch(err => console.log('Brak pliku menu lokalnie.', err));
+        }
     },
 
     // Sprawdzanie i aktualizacja liczników
@@ -50,11 +64,12 @@ export const EduBoxCore = {
         return 0;
     },
 
-    // Mechanizm blokady limitów (do użycia pod przyciskiem 'Drukuj')
+    // Mechanizm blokady limitów (do użycia pod przyciskiem 'Drukuj' itp.)
     executeWithLimitCheck: (isPremium, onSuccess, onLimitReached, onToastUpdate) => {
         const status = localStorage.getItem('eduboxProStatus');
         if (status === 'PRO' || isPremium) {
-            onSuccess();
+            // Konto PRO - akcja bez zwiększania licznika, ale podajemy dotychczasowy stan
+            onSuccess(EduBoxCore.getUsageCount());
             return;
         }
         
@@ -79,7 +94,7 @@ export const EduBoxCore = {
 
     // Giełda Wzorów - ZAPIS
     saveToGielda: async (collectionName, appType, itemName, config) => {
-        if (!currentUser) throw new Error("Brak połączenia z chmurą.");
+        if (!currentUser) throw new Error("Brak połączenia z chmurą. Odśwież stronę.");
         
         const publicRef = collection(db, 'artifacts', APP_ID, 'public', 'data', collectionName);
         const payload = {
@@ -90,7 +105,7 @@ export const EduBoxCore = {
             config: config
         };
 
-        // Zabezpieczenie przed za dużymi plikami z obrazkami
+        // Zabezpieczenie przed za dużymi plikami (b64 obrazki)
         if (JSON.stringify(payload).length > 950000) {
             throw new Error("🚨 Użyta grafika jest za duża by zapisać ją w chmurze (Max ~1MB)!");
         }
