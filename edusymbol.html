@@ -172,24 +172,32 @@
                     });
                     if(res.ok) {
                         const data = await res.json();
-                        return data.text.trim();
+                        // Usuwamy znaki nowej linii i cudzysłowy, aby nie "zepsuć" zapytania API
+                        return data.text.trim().replace(/['"\n]/g, '');
                     }
                     throw new Error("Chat API failed");
                 } catch(e) {
                     console.warn("Używam awaryjnego tłumacza (Canvas Mode)");
-                    const apiKey = ""; 
-                    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
-                    const res = await fetch(url, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            contents: [{ parts: [{ text: polishText }] }],
-                            systemInstruction: { parts: [{ text: "Translate the following Polish AAC symbol request into a highly concise, purely visual English description (max 8 words). Just the object or action. Return ONLY the English phrase, no quotes." }] },
-                            generationConfig: { temperature: 0.1 }
-                        })
-                    });
-                    const data = await res.json();
-                    return data.candidates[0].content.parts[0].text.trim().replace(/['"]/g, '');
+                    try {
+                        const apiKey = ""; 
+                        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+                        const res = await fetch(url, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                contents: [{ parts: [{ text: polishText }] }],
+                                systemInstruction: { parts: [{ text: "Translate the following Polish AAC symbol request into a highly concise, purely visual English description (max 8 words). Just the object or action. Return ONLY the English phrase, no quotes." }] },
+                                generationConfig: { temperature: 0.1 }
+                            })
+                        });
+                        if (res.ok) {
+                            const data = await res.json();
+                            return data.candidates[0].content.parts[0].text.trim().replace(/['"\n]/g, '');
+                        }
+                        return polishText; // Fallback: jeśli wszystko zawiedzie, zwracamy tekst bazowy
+                    } catch (err) {
+                        return polishText;
+                    }
                 }
             };
 
@@ -311,14 +319,8 @@
                         styleModifier = "Professional educational textbook illustration, flat vector style, highly clear and descriptive, pure white background.";
                     }
 
-                    // Totalna izolacja słów. Model obrazowy ma myśleć TYLKO o obrazie.
-                    const hiddenInstruction = `A single, isolated educational illustration on a pure white background. 
-EXACT SUBJECT TO DRAW: "${englishSubject}". 
-CRITICAL RULES:
-1. ABSOLUTELY NO TEXT, NO WORDS, NO LETTERS, NO NUMBERS anywhere on the image. Pure visual art only.
-2. Focus ONLY on the main subject. No random floating objects, no extra background clutter, no scenery.
-3. If drawing a person, they must be caucasian/fair-skinned.
-Style: ${styleModifier}.`;
+                    // Totalna izolacja słów. Zapisane w jednej linii, bez ENTERÓW (\n), które powodowały BŁĄD 400!
+                    const hiddenInstruction = `A single, isolated educational illustration on a pure white background. EXACT SUBJECT TO DRAW: "${englishSubject}". CRITICAL RULES: 1. ABSOLUTELY NO TEXT, NO WORDS, NO LETTERS, NO NUMBERS anywhere on the image. Pure visual art only. 2. Focus ONLY on the main subject. No random floating objects, no extra background clutter, no scenery. 3. If drawing a person, they must be caucasian/fair-skinned. Style: ${styleModifier}`;
                     
                     // Najsilniejszy negatywny prompt - zero litości dla bazgrołów
                     const negativePrompt = "text, letters, words, spelling, writing, typography, signature, watermark, messy, multiple subjects, clutter, floating objects, background scenery, 3d render, realistic, ugly, deformed";
