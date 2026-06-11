@@ -30,6 +30,7 @@
     <!-- Biblioteki -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <!-- UWAGA: Usunięty data-type="module" w Babelu rozwiązuje problem z importami! -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     
@@ -42,7 +43,6 @@
         body { background-color: #020617; font-family: 'Plus Jakarta Sans', sans-serif; color: #f8fafc; overflow-x: hidden; min-height: 100vh; }
         
         .glass-panel { background: rgba(30, 41, 59, 0.4); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.05); }
-        .glass-nav { background: rgba(2, 6, 23, 0.8); backdrop-filter: blur(20px); border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
         .btn-bounce:active { transform: scale(0.95); transition: transform 0.1s; }
 
         .font-sans { font-family: 'Montserrat', sans-serif; }
@@ -74,27 +74,135 @@
     </style>
 </head>
 <body>
-    <!-- WSPÓLNE MENU V3 PRO MAX -->
+    <!-- Kontener na Wspólne Menu -->
     <div id="wspolne-menu-kontener" class="print-hidden"></div>
-    <script>
-        document.addEventListener("DOMContentLoaded", () => {
-            fetch('/menu.html')
-                .then(r => r.text())
-                .then(html => {
-                    const c = document.getElementById('wspolne-menu-kontener');
-                    if(c) c.innerHTML = html;
-                })
-                .catch(err => console.log('Brak pliku menu lokalnie.'));
-        });
-    </script>
 
-    <div id="root"></div>
-
-    <script type="text/babel" data-type="module">
+    <!-- ========================================================= -->
+    <!-- MODUŁ EDUBOX CORE (Wspólny silnik dla wszystkich 35 apek) -->
+    <!-- W docelowym środowisku na Twoim serwerze ten cały tag   -->
+    <!-- script zastąpisz krótkim: <script type="module" src="/global-core.js"></script> -->
+    <!-- ========================================================= -->
+    <script type="module">
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
         import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
         import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
 
+        const FIREBASE_CONFIG = typeof window.__firebase_config !== 'undefined' ? JSON.parse(window.__firebase_config) : {};
+        const APP_ID = window.__app_id || "eduboxpro";
+
+        let app, auth, db, currentUser = null;
+        let isInitialized = false;
+
+        window.EduBoxCore = {
+            init: (onUserLoad) => {
+                if (!isInitialized && FIREBASE_CONFIG.apiKey) {
+                    app = initializeApp(FIREBASE_CONFIG);
+                    auth = getAuth(app);
+                    db = getFirestore(app);
+                    signInAnonymously(auth).catch(e => console.error("Firebase Auth Error:", e));
+                    isInitialized = true;
+                    
+                    window.EduBoxCore.loadMenu();
+                }
+                
+                if (auth) {
+                    onAuthStateChanged(auth, (user) => {
+                        currentUser = user;
+                        if(onUserLoad) onUserLoad(user);
+                    });
+                }
+            },
+
+            loadMenu: () => {
+                const container = document.getElementById('wspolne-menu-kontener');
+                if (container) {
+                    fetch('/menu.html')
+                        .then(r => r.text())
+                        .then(html => { container.innerHTML = html; })
+                        .catch(err => console.log('Brak pliku menu lokalnie.', err));
+                }
+            },
+
+            getUsageCount: () => {
+                const today = new Date().toISOString().split('T')[0];
+                let usageStr = localStorage.getItem('eduboxUsage');
+                if (usageStr) {
+                    try {
+                        const parsed = JSON.parse(usageStr);
+                        if (parsed.date === today) return parsed.count;
+                    } catch(e) {}
+                }
+                return 0;
+            },
+
+            executeWithLimitCheck: (isPremium, onSuccess, onLimitReached, onToastUpdate) => {
+                const status = localStorage.getItem('eduboxProStatus');
+                if (status === 'PRO' || isPremium) {
+                    onSuccess(window.EduBoxCore.getUsageCount());
+                    return;
+                }
+                
+                let currentCount = window.EduBoxCore.getUsageCount();
+                if (currentCount >= 5) {
+                    onLimitReached("⚠️ Dzienny limit użyć (5/5) wyczerpany. Wpisz kod odblokowujący na górze!");
+                    return;
+                }
+                
+                const newCount = currentCount + 1;
+                const today = new Date().toISOString().split('T')[0];
+                localStorage.setItem('eduboxUsage', JSON.stringify({ date: today, count: newCount }));
+                
+                onToastUpdate(`Wykorzystano ${newCount}/5 darmowych działań`);
+                onSuccess(newCount);
+            },
+
+            verifyPremiumCode: (code) => {
+                return code.toUpperCase() === 'KAWA2024';
+            },
+
+            saveToGielda: async (collectionName, appType, itemName, config) => {
+                if (!currentUser) throw new Error("Brak połączenia z chmurą. Odśwież stronę.");
+                
+                const publicRef = collection(db, 'artifacts', APP_ID, 'public', 'data', collectionName);
+                const payload = {
+                    userId: currentUser.uid,
+                    createdAt: serverTimestamp(),
+                    type: appType,
+                    name: itemName,
+                    config: config
+                };
+
+                if (JSON.stringify(payload).length > 950000) {
+                    throw new Error("🚨 Użyta grafika jest za duża by zapisać ją w chmurze (Max ~1MB)!");
+                }
+
+                await addDoc(publicRef, payload);
+            },
+
+            subscribeToGielda: (collectionName, onDataLoaded, onError) => {
+                if (!db) return () => {};
+                
+                const publicRef = collection(db, 'artifacts', APP_ID, 'public', 'data', collectionName);
+                return onSnapshot(publicRef, (snapshot) => {
+                    const loaded = [];
+                    snapshot.forEach(doc => loaded.push({ id: doc.id, ...doc.data() }));
+                    loaded.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
+                    onDataLoaded(loaded);
+                }, onError);
+            }
+        };
+
+        // Powiadom Reacta, że moduł został bezpiecznie załadowany
+        window.dispatchEvent(new Event('EduBoxCoreReady'));
+    </script>
+    <!-- ========================================================= -->
+
+
+    <!-- Zasadnicza aplikacja (React App) -->
+    <div id="root"></div>
+
+    <script type="text/babel">
+        // Wykorzystujemy wyciągnięty Core poprzez obiekt globalny (window)
         const { useState, useEffect, useRef } = window.React;
 
         const THEMES = [
@@ -154,6 +262,9 @@
         };
 
         function App() {
+            // STATE - Oczekiwanie na inicjalizację modułu Core
+            const [coreReady, setCoreReady] = useState(!!window.EduBoxCore);
+            
             // MAIN MODES: 'editor' | 'gielda'
             const [appMode, setAppMode] = useState('editor');
             const [activeTab, setActiveTab] = useState('diploma');
@@ -163,15 +274,15 @@
             const [toastMessage, setToastMessage] = useState('');
             const fileInputRef = useRef(null);
 
-            // FIREBASE, GIEŁDA WZORÓW & LIMITY
+            // ZMIENNE DOT. BAZY I LIMITÓW
             const [user, setUser] = useState(null);
             const [patterns, setPatterns] = useState([]);
-            const [usageCount, setUsageCount] = useState(0);
+            const [usageCount, setUsageCount] = useState(0); 
 
             const [diplomaTitle, setDiplomaTitle] = useState('DYPLOM');
             const [diplomaSubtitle, setDiplomaSubtitle] = useState('ZA WYBITNE OSIĄGNIĘCIA');
             const [studentName, setStudentName] = useState('Jan Kowalski');
-            const [diplomaReason, setDiplomaReason] = useState('za udział w konkursie plastycznym "Wiosna w przedszkolu"\ni przygotowanie najpiękniejszej pracy.');
+            const [diplomaReason, setDiplomaReason] = useState('za udział w konkursie plastycznym "Wiosna w przedszkolu"\\ni przygotowanie najpiękniejszej pracy.');
             const [diplomaDate, setDiplomaDate] = useState('Leżajsk, 31 Marca 2026');
             const [diplomaSignature, setDiplomaSignature] = useState('Wychowawca');
             
@@ -220,121 +331,89 @@
                 setTimeout(() => setToastMessage(''), 4000);
             };
 
-            // INICJALIZACJA FIREBASE
+            // Nasłuchiwanie na załadowanie modułu EDUBOX CORE (asynchroniczne)
             useEffect(() => {
-                const firebaseConfig = JSON.parse(window.__firebase_config);
-                const app = initializeApp(firebaseConfig);
-                const auth = getAuth(app);
+                if (!coreReady) {
+                    const handleReady = () => setCoreReady(true);
+                    window.addEventListener('EduBoxCoreReady', handleReady);
+                    return () => window.removeEventListener('EduBoxCoreReady', handleReady);
+                }
+            }, [coreReady]);
 
-                const initAuth = async () => {
-                    try {
-                        await signInAnonymously(auth);
-                    } catch (e) {
-                        console.error("Błąd autoryzacji Firebase:", e);
-                    }
-                };
-                initAuth();
-
-                const unsubscribeAuth = onAuthStateChanged(auth, (u) => {
-                    setUser(u);
-                });
-                return () => unsubscribeAuth();
-            }, []);
-
-            // ODCZYT GIEŁDY
+            // Inicjalizacja EduBoxCore kiedy jest już gotowy
             useEffect(() => {
-                if (!user) return;
-                const db = getFirestore();
-                const appId = window.__app_id || 'eduboxpro';
-                const publicRef = collection(db, 'artifacts', appId, 'public', 'data', 'gielda_wzorow_edugenerator');
-                
-                const unsubscribe = onSnapshot(publicRef, (snapshot) => {
-                    const loaded = [];
-                    snapshot.forEach(doc => loaded.push({ id: doc.id, ...doc.data() }));
-                    loaded.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
-                    setPatterns(loaded);
-                }, (error) => {
-                    console.error("Błąd odczytu Giełdy:", error);
-                });
+                if (coreReady && window.EduBoxCore) {
+                    window.EduBoxCore.init((loadedUser) => setUser(loadedUser));
+                    setUsageCount(window.EduBoxCore.getUsageCount());
+                    
+                    const status = localStorage.getItem('eduboxProStatus');
+                    if(status === 'PRO') setIsPremium(true);
+                }
+            }, [coreReady]);
 
+            // Nasłuchiwanie Giełdy
+            useEffect(() => {
+                if (!user || !coreReady || !window.EduBoxCore) return;
+                const unsubscribe = window.EduBoxCore.subscribeToGielda('gielda_wzorow_edugenerator', 
+                    (loadedData) => setPatterns(loadedData),
+                    (error) => console.error("Błąd odczytu Giełdy:", error)
+                );
                 return () => unsubscribe();
-            }, [user]);
+            }, [user, coreReady]);
 
-            // ŁADOWANIE STANU LICZNIKA
             useEffect(() => {
-                const today = new Date().toISOString().split('T')[0];
-                let usageStr = localStorage.getItem('eduboxUsage');
-                if (usageStr) {
-                    try {
-                        const parsed = JSON.parse(usageStr);
-                        if (parsed.date === today) {
-                            setUsageCount(parsed.count);
-                        }
-                    } catch(e) {}
-                }
-            }, []);
+                setDiplomaBgColor(activeTheme.bgHex);
+                setDiplomaBorderColor(activeTheme.borderHex);
+            }, [selectedThemeId]);
 
-            // OBSŁUGA LIMITÓW
-            const checkLimitAndExecute = (actionFn) => {
-                const status = localStorage.getItem('eduboxProStatus');
-                if (status === 'PRO' || isPremium) {
-                    actionFn();
-                    return;
+            const handleVerifyCode = () => {
+                if (window.EduBoxCore.verifyPremiumCode(accessCode)) {
+                    setIsPremium(true); 
+                    setAccessCode(''); 
+                    localStorage.setItem('eduboxProStatus', 'PRO');
+                    showToast("🎉 Moduł Premium odblokowany!"); 
+                } else { 
+                    showToast("❌ Nieprawidłowy kod!"); 
                 }
-                
-                if (usageCount >= 5) {
-                    showToast("⚠️ Dzienny limit użyć (5/5) wyczerpany. Wpisz kod odblokowujący na górze!");
-                    return;
-                }
-                
-                const newCount = usageCount + 1;
-                setUsageCount(newCount);
-                const today = new Date().toISOString().split('T')[0];
-                localStorage.setItem('eduboxUsage', JSON.stringify({ date: today, count: newCount }));
-                
-                showToast(`Wykorzystano ${newCount}/5 darmowych działań`);
-                actionFn();
+            };
+
+            const executePrint = () => {
+                window.EduBoxCore.executeWithLimitCheck(isPremium, 
+                    (newCount) => {
+                        setUsageCount(newCount);
+                        window.print();
+                    },
+                    (msg) => showToast(msg),
+                    (msg) => showToast(msg)
+                );
             };
 
             const sharePattern = async () => {
-                if (!user) {
-                    showToast("🚨 Brak połączenia z chmurą.");
-                    return;
-                }
-                
-                const currentConfig = {
-                    activeTab, diplomaTitle, diplomaSubtitle, studentName, diplomaReason, diplomaDate, diplomaSignature,
-                    textFormats, titleBoxWidth, titleBoxOpacity, titleBoxOffset, boxWidth, boxOpacity, boxOffset,
-                    bgImageOpacity, diplomaTextColor, diplomaBgColor, diplomaBorderColor, borderStyle, borderWidth,
-                    selectedThemeId, selectedFont, artStyle, graphicLayout, diplomaOrientation,
-                    garlandText, garlandTextColor, garlandLetterSize, garlandLetterOffset, garlandShape,
-                    customImage
-                };
-                
-                try {
-                    const db = getFirestore();
-                    const appId = window.__app_id || 'eduboxpro';
-                    const publicRef = collection(db, 'artifacts', appId, 'public', 'data', 'gielda_wzorow_edugenerator');
-                    
-                    const payload = {
-                        userId: user.uid,
-                        createdAt: serverTimestamp(),
-                        type: activeTab === 'garland' ? 'Girlanda' : 'Dyplom',
-                        name: `${activeTab === 'garland' ? 'Girlanda' : 'Dyplom'} - ${THEMES.find(t=>t.id===selectedThemeId)?.name || 'Własny'}`,
-                        config: currentConfig
-                    };
-
-                    if (JSON.stringify(payload).length > 950000) {
-                        showToast("🚨 Użyta grafika jest za duża by zapisać ją w chmurze (Max ~1MB)!");
-                        return;
-                    }
-
-                    await addDoc(publicRef, payload);
-                    showToast("✨ Zapisano w Giełdzie Wzorów!");
-                } catch (e) {
-                    console.error(e);
-                    showToast("🚨 Błąd podczas zapisu w chmurze.");
-                }
+                window.EduBoxCore.executeWithLimitCheck(isPremium, 
+                    async (newCount) => {
+                        setUsageCount(newCount);
+                        const currentConfig = {
+                            activeTab, diplomaTitle, diplomaSubtitle, studentName, diplomaReason, diplomaDate, diplomaSignature,
+                            textFormats, titleBoxWidth, titleBoxOpacity, titleBoxOffset, boxWidth, boxOpacity, boxOffset,
+                            bgImageOpacity, diplomaTextColor, diplomaBgColor, diplomaBorderColor, borderStyle, borderWidth,
+                            selectedThemeId, selectedFont, artStyle, graphicLayout, diplomaOrientation,
+                            garlandText, garlandTextColor, garlandLetterSize, garlandLetterOffset, garlandShape,
+                            customImage
+                        };
+                        
+                        try {
+                            const name = `${activeTab === 'garland' ? 'Girlanda' : 'Dyplom'} - ${activeTheme.name || 'Własny'}`;
+                            const type = activeTab === 'garland' ? 'Girlanda' : 'Dyplom';
+                            
+                            await window.EduBoxCore.saveToGielda('gielda_wzorow_edugenerator', type, name, currentConfig);
+                            showToast("✨ Zapisano w Giełdzie Wzorów!");
+                        } catch (e) {
+                            showToast(e.message || "🚨 Błąd podczas zapisu w chmurze.");
+                        }
+                    },
+                    (msg) => showToast(msg),
+                    (msg) => showToast(msg)
+                );
             };
 
             const loadPattern = (pattern) => {
@@ -376,20 +455,6 @@
                 else setCustomImage(null);
                 
                 showToast("✨ Wzór z Giełdy wczytany!");
-            };
-
-            useEffect(() => {
-                setDiplomaBgColor(activeTheme.bgHex);
-                setDiplomaBorderColor(activeTheme.borderHex);
-            }, [selectedThemeId]);
-
-            const handleVerifyCode = () => {
-                if (accessCode.toUpperCase() === 'KAWA2024') { 
-                    setIsPremium(true); setAccessCode(''); 
-                    showToast("🎉 Moduł Premium odblokowany!"); 
-                } else { 
-                    showToast("❌ Nieprawidłowy kod!"); 
-                }
             };
 
             const handleFileUpload = (e) => {
@@ -530,6 +595,10 @@
                 );
             };
 
+            if (!coreReady) {
+                return <div className="min-h-screen flex items-center justify-center text-white">Trwa ładowanie silnika EduBoxCore...</div>;
+            }
+
             return (
                 <div className={`min-h-screen flex flex-col ${selectedFont}`}>
                     
@@ -570,10 +639,10 @@
 
                             ${activeTab === 'diploma' ? `
                             #print-area { 
-                                width: ${isLandscape ? '297mm' : '210mm'} !important; 
-                                height: ${isLandscape ? '210mm' : '297mm'} !important; 
+                                width: ${isLandscape ? '1122px' : '794px'} !important; 
+                                height: ${isLandscape ? '794px' : '1122px'} !important; 
                                 margin: 0 auto !important; 
-                                padding: 15mm !important; 
+                                padding: 60px !important; 
                                 box-shadow: none !important; 
                                 border-radius: 0 !important; 
                                 box-sizing: border-box !important;
@@ -593,8 +662,8 @@
                             .page-break { 
                                 page-break-after: always;
                                 break-after: page;
-                                width: 210mm !important; 
-                                height: 297mm !important; 
+                                width: 794px !important; 
+                                height: 1122px !important; 
                                 display: flex !important; 
                                 align-items: center !important; 
                                 justify-content: center !important; 
@@ -935,7 +1004,7 @@
                                         <button onClick={() => setAppMode('editor')} className="text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-lg text-xs font-bold uppercase transition-colors btn-bounce"><i className="ph-bold ph-arrow-left"></i> Wróć</button>
                                     </div>
                                     
-                                    <button onClick={() => checkLimitAndExecute(sharePattern)} className="w-full bg-fuchsia-600 hover:bg-fuchsia-500 text-white p-3 rounded-xl font-bold text-sm mb-6 shadow-lg transition-all btn-bounce flex justify-center items-center gap-2">
+                                    <button onClick={sharePattern} className="w-full bg-fuchsia-600 hover:bg-fuchsia-500 text-white p-3 rounded-xl font-bold text-sm mb-6 shadow-lg transition-all btn-bounce flex justify-center items-center gap-2">
                                         <i className="ph-bold ph-cloud-arrow-up text-lg"></i> Zapisz i udostępnij mój wzór
                                     </button>
                                     
@@ -1062,10 +1131,10 @@
                             </div>
 
                             <div className="absolute -bottom-6 md:-bottom-12 left-1/2 -translate-x-1/2 flex items-center justify-center gap-2 sm:gap-4 print-hidden z-50 w-[95%] sm:w-auto">
-                                <button onClick={() => checkLimitAndExecute(sharePattern)} className="bg-fuchsia-600 hover:bg-fuchsia-500 text-white px-4 sm:px-8 py-4 sm:py-5 rounded-2xl font-black text-[10px] sm:text-sm md:text-base tracking-widest flex items-center justify-center gap-2 shadow-[0_10px_40px_rgba(192,38,211,0.4)] transition-all btn-bounce uppercase whitespace-nowrap flex-1 sm:flex-none">
+                                <button onClick={sharePattern} className="bg-fuchsia-600 hover:bg-fuchsia-500 text-white px-4 sm:px-8 py-4 sm:py-5 rounded-2xl font-black text-[10px] sm:text-sm md:text-base tracking-widest flex items-center justify-center gap-2 shadow-[0_10px_40px_rgba(192,38,211,0.4)] transition-all btn-bounce uppercase whitespace-nowrap flex-1 sm:flex-none">
                                     <i className="ph-bold ph-cloud-arrow-up text-xl md:text-2xl"></i><span>Do Biblioteki</span>
                                 </button>
-                                <button onClick={() => checkLimitAndExecute(() => window.print())} className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 sm:px-10 py-4 sm:py-5 rounded-2xl font-black text-[10px] sm:text-sm md:text-base tracking-widest flex items-center justify-center gap-2 md:gap-3 shadow-[0_10px_40px_rgba(99,102,241,0.5)] transition-all btn-bounce uppercase whitespace-nowrap flex-1 sm:flex-none">
+                                <button onClick={executePrint} className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 sm:px-10 py-4 sm:py-5 rounded-2xl font-black text-[10px] sm:text-sm md:text-base tracking-widest flex items-center justify-center gap-2 md:gap-3 shadow-[0_10px_40px_rgba(99,102,241,0.5)] transition-all btn-bounce uppercase whitespace-nowrap flex-1 sm:flex-none">
                                     <i className="ph-bold ph-printer text-xl md:text-2xl"></i><span>Drukuj {!isPremium && `(${Math.max(0, 5 - usageCount)})`}</span>
                                 </button>
                             </div>
