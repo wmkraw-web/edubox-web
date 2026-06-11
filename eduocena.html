@@ -370,9 +370,25 @@ Na podstawie tych parametrów wygeneruj pełną ocenę opisową, łącząc te el
                     }
                     cleanText = cleanText.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
                     let jsonStr = cleanText.replace(/```json/gi, '').replace(/```/g, '').trim();
-                    if(jsonStr.indexOf('{') !== -1) jsonStr = jsonStr.substring(jsonStr.indexOf('{'), jsonStr.lastIndexOf('}') + 1);
+                    
+                    let parsedData;
+                    try {
+                        if (jsonStr.indexOf('{') !== -1) {
+                            let extractedJson = jsonStr.substring(jsonStr.indexOf('{'), jsonStr.lastIndexOf('}') + 1);
+                            parsedData = JSON.parse(extractedJson);
+                            if (!parsedData.title) parsedData.title = "Ocena Opisowa";
+                            if (!parsedData.content) parsedData.content = cleanText;
+                        } else {
+                            throw new Error("Brak struktury JSON");
+                        }
+                    } catch (e) {
+                        console.warn("AI zwróciło czysty tekst. Uruchamiam tryb awaryjny.", e);
+                        parsedData = {
+                            title: "Ocena Opisowa",
+                            content: cleanText.replace(/```json/gi, '').replace(/```/g, '').trim()
+                        };
+                    }
 
-                    const parsedData = JSON.parse(jsonStr);
                     setGeneratedData(parsedData);
                     setBotMessage("Gotowe! Ocena jest sformułowana profesjonalnie. Możesz skopiować ją wprost do dziennika lub wydrukować!");
                 } catch (error) {
