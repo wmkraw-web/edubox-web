@@ -3,24 +3,40 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EduMotywator AI - Karty Wyjścia i Tajne Misje</title>
+    <title>EduMotywator AI PRO - Karty Wyjścia i Tajne Misje (V3 PRO MAX)</title>
     <!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-3RQ9R0N0K8"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-
-  gtag('config', 'G-3RQ9R0N0K8');
-</script>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-3RQ9R0N0K8"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-3RQ9R0N0K8');
+    </script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Ikony Phosphor (Standard V3 PRO MAX) -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+    <!-- FIREBASE CONFIG V3 PRO MAX -->
+    <script>
+        window.__firebase_config = JSON.stringify({
+            apiKey: "AIzaSyDL_mvepNJjMmZYQzifN2cXzoKwCE8jNd0",
+            authDomain: "edubox-pro.firebaseapp.com",
+            projectId: "edubox-pro",
+            storageBucket: "edubox-pro.firebasestorage.app",
+            messagingSenderId: "570263845714",
+            appId: "1:570263845714:web:0b029211f7af071b66988b"
+        });
+        window.__app_id = "eduboxpro";
+    </script>
+
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;600;700&display=swap');
         
-        body { background-color: #020617; font-family: 'Plus Jakarta Sans', sans-serif; color: #f8fafc; overflow-x: hidden; }
+        body { background-color: #020617; font-family: 'Plus Jakarta Sans', sans-serif; color: #f8fafc; overflow-x: hidden; min-height: 100vh;}
         
         .glass-panel { background: rgba(30, 41, 59, 0.4); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.05); }
         .glass-nav { background: rgba(2, 6, 23, 0.8); backdrop-filter: blur(20px); border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
@@ -34,11 +50,16 @@
 
         input:focus, select:focus, textarea:focus { box-shadow: 0 0 15px rgba(139, 92, 246, 0.3); border-color: #8b5cf6 !important; }
 
+        .btn-bounce:active { transform: scale(0.95); transition: transform 0.1s; }
+
+        /* --- STYLE WYDRUKU V3 PRO MAX --- */
         @media print {
-            body { background: white; color: black; }
-            .print-hidden { display: none !important; }
+            @page { margin: 15mm; size: portrait; }
+            body, html { background: white !important; color: black !important; min-height: auto !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+            .print-hidden, #wspolne-menu-kontener, nav { display: none !important; }
+            main { padding: 0 !important; margin: 0 !important; }
+            .glass-panel { background: transparent !important; border: none !important; box-shadow: none !important; }
             #print-container { border: none !important; box-shadow: none !important; padding: 0 !important; margin: 0 !important; width: 100% !important; max-width: 100% !important; background: white !important; }
-            body, html { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
             .page-break { page-break-before: always; }
             .page-break-inside-avoid { break-inside: avoid; page-break-inside: avoid; }
             .ticket-card { border: 2px dashed #94a3b8 !important; }
@@ -55,6 +76,126 @@
     </style>
 </head>
 <body>
+    <!-- KONTENER NA WSPÓLNE MENU V3 PRO MAX -->
+    <div id="wspolne-menu-kontener" class="print-hidden"></div>
+
+    <!-- ========================================================= -->
+    <!-- MODUŁ EDUBOX CORE (Wspólny silnik dla wszystkich apek)    -->
+    <!-- ========================================================= -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
+        import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
+        import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+
+        const FIREBASE_CONFIG = typeof window.__firebase_config !== 'undefined' ? JSON.parse(window.__firebase_config) : {};
+        const APP_ID = window.__app_id || "eduboxpro";
+
+        let app, auth, db, currentUser = null;
+        let isInitialized = false;
+
+        window.EduBoxCore = {
+            init: (onUserLoad) => {
+                if (!isInitialized && FIREBASE_CONFIG.apiKey) {
+                    app = initializeApp(FIREBASE_CONFIG);
+                    auth = getAuth(app);
+                    db = getFirestore(app);
+                    signInAnonymously(auth).catch(e => console.error("Firebase Auth Error:", e));
+                    isInitialized = true;
+                    
+                    window.EduBoxCore.loadMenu();
+                }
+                
+                if (auth) {
+                    onAuthStateChanged(auth, (user) => {
+                        currentUser = user;
+                        if(onUserLoad) onUserLoad(user);
+                    });
+                }
+            },
+
+            loadMenu: () => {
+                const container = document.getElementById('wspolne-menu-kontener');
+                if (container) {
+                    fetch('/menu.html')
+                        .then(r => r.text())
+                        .then(html => { container.innerHTML = html; })
+                        .catch(err => console.log('Brak pliku menu lokalnie.', err));
+                }
+            },
+
+            getUsageCount: () => {
+                const today = new Date().toISOString().split('T')[0];
+                let usageStr = localStorage.getItem('eduboxUsage');
+                if (usageStr) {
+                    try {
+                        const parsed = JSON.parse(usageStr);
+                        if (parsed.date === today) return parsed.count;
+                    } catch(e) {}
+                }
+                return 0;
+            },
+
+            executeWithLimitCheck: (isPremium, onSuccess, onLimitReached, onToastUpdate) => {
+                const status = localStorage.getItem('eduboxProStatus');
+                if (status === 'PRO' || isPremium) {
+                    onSuccess(window.EduBoxCore.getUsageCount());
+                    return;
+                }
+                
+                let currentCount = window.EduBoxCore.getUsageCount();
+                if (currentCount >= 5) {
+                    onLimitReached("⚠️ Dzienny limit użyć (5/5) wyczerpany. Wpisz kod odblokowujący na górze!");
+                    return;
+                }
+                
+                const newCount = currentCount + 1;
+                const today = new Date().toISOString().split('T')[0];
+                localStorage.setItem('eduboxUsage', JSON.stringify({ date: today, count: newCount }));
+                
+                onToastUpdate(`Wykorzystano ${newCount}/5 darmowych działań`);
+                onSuccess(newCount);
+            },
+
+            verifyPremiumCode: (code) => {
+                return code.toUpperCase() === 'KAWA2024';
+            },
+
+            saveToGielda: async (collectionName, appType, itemName, config) => {
+                if (!currentUser) throw new Error("Brak połączenia z chmurą. Odśwież stronę.");
+                
+                const publicRef = collection(db, 'artifacts', APP_ID, 'public', 'data', collectionName);
+                const payload = {
+                    userId: currentUser.uid,
+                    createdAt: serverTimestamp(),
+                    type: appType,
+                    name: itemName,
+                    config: config
+                };
+
+                if (JSON.stringify(payload).length > 950000) {
+                    throw new Error("🚨 Zapisane dane są zbyt duże (max 1MB)!");
+                }
+
+                await addDoc(publicRef, payload);
+            },
+
+            subscribeToGielda: (collectionName, onDataLoaded, onError) => {
+                if (!db) return () => {};
+                
+                const publicRef = collection(db, 'artifacts', APP_ID, 'public', 'data', collectionName);
+                return onSnapshot(publicRef, (snapshot) => {
+                    const loaded = [];
+                    snapshot.forEach(doc => loaded.push({ id: doc.id, ...doc.data() }));
+                    loaded.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
+                    onDataLoaded(loaded);
+                }, onError);
+            }
+        };
+
+        window.dispatchEvent(new Event('EduBoxCoreReady'));
+    </script>
+    <!-- ========================================================= -->
+
     <div id="root"></div>
 
     <script type="text/babel">
@@ -88,11 +229,18 @@
         );
 
         function App() {
+            // --- V3 PRO MAX STATES (CORE) ---
+            const [coreReady, setCoreReady] = useState(!!window.EduBoxCore);
+            const [appMode, setAppMode] = useState('editor'); // 'editor' | 'gielda'
             const [isPremium, setIsPremium] = useState(false);
             const [accessCode, setAccessCode] = useState('');
+            const [user, setUser] = useState(null);
+            const [patterns, setPatterns] = useState([]);
+            const [usageCount, setUsageCount] = useState(0); 
+            
+            // --- LOCAL STATES ---
             const [isGenerating, setIsGenerating] = useState(false);
             const [toastMessage, setToastMessage] = useState('');
-            
             const [botMessage, setBotMessage] = useState("Cześć! Zamiast prac domowych, wygeneruję dla Ciebie 4 'Karty Wyjścia' na koniec lekcji oraz 1 grywalną 'Misję Tajną' do domu. Uczniowie to pokochają!");
             
             const [params, setParams] = useState({
@@ -103,15 +251,44 @@
 
             const [generatedData, setGeneratedData] = useState(null);
 
+            // --- INICJALIZACJA EDUBOX CORE ---
+            useEffect(() => {
+                if (!coreReady) {
+                    const handleReady = () => setCoreReady(true);
+                    window.addEventListener('EduBoxCoreReady', handleReady);
+                    return () => window.removeEventListener('EduBoxCoreReady', handleReady);
+                }
+            }, [coreReady]);
+
+            useEffect(() => {
+                if (coreReady && window.EduBoxCore) {
+                    window.EduBoxCore.init((loadedUser) => setUser(loadedUser));
+                    setUsageCount(window.EduBoxCore.getUsageCount());
+                    const status = localStorage.getItem('eduboxProStatus');
+                    if(status === 'PRO') setIsPremium(true);
+                }
+            }, [coreReady]);
+
+            // Nasłuchiwanie Giełdy
+            useEffect(() => {
+                if (!user || !coreReady || !window.EduBoxCore) return;
+                const unsubscribe = window.EduBoxCore.subscribeToGielda('gielda_wzorow_edumotywator', 
+                    (loadedData) => setPatterns(loadedData),
+                    (error) => console.error("Błąd odczytu Giełdy:", error)
+                );
+                return () => unsubscribe();
+            }, [user, coreReady]);
+
             const showToast = (msg) => {
                 setToastMessage(msg);
                 setTimeout(() => setToastMessage(''), 4000);
             };
 
             const handleVerifyCode = () => {
-                if (accessCode.toUpperCase() === 'KAWA2024') { 
+                if (window.EduBoxCore.verifyPremiumCode(accessCode)) {
                     setIsPremium(true); 
                     setAccessCode(''); 
+                    localStorage.setItem('eduboxProStatus', 'PRO');
                     showToast('Kod aktywny! Witamy w Premium 🌟');
                     setBotMessage("Odblokowano funkcje PRO! Teraz misje i bilety wyjścia będą spersonalizowane i oparte na psychologii grywalizacji.");
                 } else {
@@ -119,12 +296,58 @@
                 }
             };
 
-            const generateContent = async () => {
+            // --- GIEŁDA WZORÓW ACTIONS ---
+            const sharePattern = async () => {
+                if (!generatedData) {
+                    showToast("Musisz najpierw wygenerować misję, aby ją udostępnić!");
+                    return;
+                }
+                window.EduBoxCore.executeWithLimitCheck(isPremium, 
+                    async (newCount) => {
+                        setUsageCount(newCount);
+                        try {
+                            const name = `Misja: ${params.topic.substring(0, 25)}...`;
+                            const config = { params, generatedData };
+                            
+                            await window.EduBoxCore.saveToGielda('gielda_wzorow_edumotywator', 'Grywalizacja', name, config);
+                            showToast("✨ Udostępniono w Giełdzie Wzorów!");
+                        } catch (e) {
+                            showToast(e.message || "🚨 Błąd podczas zapisu w chmurze.");
+                        }
+                    },
+                    (msg) => showToast(msg),
+                    (msg) => showToast(msg)
+                );
+            };
+
+            const loadPattern = (pattern) => {
+                const c = pattern.config;
+                if(c) {
+                    if(c.params) setParams(c.params);
+                    if(c.generatedData) setGeneratedData(c.generatedData);
+                    
+                    setAppMode('editor');
+                    showToast("✨ Załadowano Misję z Giełdy!");
+                    setBotMessage("Załadowałem gotowe wyzwanie z Giełdy. Wydrukuj je lub wygeneruj własne!");
+                }
+            };
+
+            const handleGenerateContent = () => {
                 if (!params.topic.trim()) {
                     showToast('Wpisz temat zrealizowanej lekcji!');
                     return;
                 }
-                
+                window.EduBoxCore.executeWithLimitCheck(isPremium,
+                    (newCount) => {
+                        setUsageCount(newCount);
+                        generateContent();
+                    },
+                    (msg) => showToast(msg),
+                    (msg) => showToast(msg)
+                );
+            };
+
+            const generateContent = async () => {
                 setIsGenerating(true);
                 setGeneratedData(null);
                 setBotMessage("Opracowuję karty wyjścia i wymyślam wciągającą fabułę dla Tajnej Misji... Chwileczkę!");
@@ -195,7 +418,7 @@
                 } catch (error) {
                     console.error("Błąd AI:", error); 
                     showToast(`Błąd: ${error.message}`);
-                    setBotMessage("Serwer jest obciążony. Odczekaj 5 sekund i kliknij Generuj jeszcze raz!");
+                    setBotMessage("Serwer jest obciążony. Odczekaj chwilę i kliknij Generuj jeszcze raz!");
                 } finally { 
                     setIsGenerating(false); 
                 }
@@ -222,6 +445,54 @@
                 link.click();
             };
 
+            if (!coreReady) {
+                return <div className="min-h-screen flex items-center justify-center text-white">Trwa ładowanie silnika EduBoxCore...</div>;
+            }
+
+            // RENDER: Giełda Wzorów
+            if (appMode === 'gielda') {
+                return (
+                    <div className="min-h-screen relative flex flex-col font-sans">
+                        {toastMessage && (
+                            <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[300] bg-violet-600 text-white px-6 py-3 rounded-xl font-bold shadow-2xl transition-all duration-300 border border-violet-400">
+                                {toastMessage}
+                            </div>
+                        )}
+                        
+                        <div className="max-w-4xl mx-auto px-4 pt-32 pb-24 w-full relative z-10 print-hidden">
+                            <div className="glass-panel p-8 rounded-3xl shadow-2xl flex flex-col h-[800px] border-t-4 border-fuchsia-500">
+                                <div className="flex justify-between items-center mb-8 border-b border-slate-700/50 pb-4">
+                                    <h2 className="text-3xl font-black text-fuchsia-400 flex items-center gap-3"><i className="ph-bold ph-books text-4xl"></i> Baza Grywalizacji</h2>
+                                    <button onClick={() => setAppMode('editor')} className="text-white bg-slate-800 border border-slate-600 hover:bg-slate-700 px-5 py-2.5 rounded-xl text-sm font-bold uppercase transition-all active:scale-95 shadow-md flex items-center gap-2"><i className="ph-bold ph-arrow-left"></i> Wróć</button>
+                                </div>
+                                
+                                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Misje i Bilety od Nauczycieli</h3>
+                                <div className="overflow-y-auto custom-scrollbar flex-1 space-y-4 pr-2">
+                                    {patterns.map(p => (
+                                        <div key={p.id} className="bg-slate-900/50 border border-slate-700 p-5 rounded-2xl hover:border-fuchsia-500 transition-colors cursor-pointer group flex flex-col gap-3 shadow-lg" onClick={() => loadPattern(p)}>
+                                            <div className="flex justify-between items-start gap-3">
+                                                <span className="text-base font-bold text-slate-200 group-hover:text-fuchsia-400 transition-colors line-clamp-2 leading-relaxed">{p.name}</span>
+                                                <span className="text-[10px] font-bold px-2 py-1 rounded bg-violet-900/50 border border-violet-500/30 text-violet-300 whitespace-nowrap uppercase tracking-widest">{p.type}</span>
+                                            </div>
+                                            <div className="flex justify-between items-center font-bold">
+                                                <p className="text-xs text-slate-500">Autor: <span className="text-slate-300">{p.userId.substring(0,6)}</span></p>
+                                                <p className="text-xs text-slate-500">{p.createdAt?.toDate().toLocaleDateString()}</p>
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {patterns.length === 0 && (
+                                        <div className="text-center py-10 opacity-50">
+                                            <i className="ph-bold ph-cloud-arrow-down text-5xl mb-2 text-slate-500 mx-auto block"></i>
+                                            <p className="text-base text-slate-400 font-bold">Brak misji w chmurze...</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
             return (
                 <div className="min-h-screen flex flex-col relative overflow-x-hidden">
                     
@@ -232,7 +503,7 @@
                     )}
 
                     {isGenerating && (
-                        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-[100] flex flex-col items-center justify-center text-white">
+                        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-[100] flex flex-col items-center justify-center text-white print-hidden">
                             <div className="glass-panel p-10 rounded-3xl flex flex-col items-center space-y-6 max-w-sm border border-violet-500/20 shadow-[0_0_50px_rgba(139,92,246,0.2)]">
                                 <div className="w-16 h-16 border-4 border-slate-700 border-t-violet-500 rounded-full animate-spin"></div>
                                 <div className="text-center">
@@ -249,16 +520,10 @@
                                 <div className="bg-gradient-to-br from-violet-500 to-fuchsia-600 p-2 rounded-xl text-white shadow-lg">
                                     <Icon name="Ticket" size={22}/>
                                 </div>
-                                <span>Edu<span className="text-violet-400">Motywator</span> AI</span>
+                                <span className="hidden sm:block">Edu<span className="text-violet-400">Motywator</span> AI</span>
                             </div>
                             
                             <div className="flex items-center space-x-4">
-                                {!isPremium && (
-                                    <div className="hidden md:flex items-center space-x-2 bg-slate-900 p-1.5 rounded-xl border border-slate-700">
-                                        <input value={accessCode} onChange={e => setAccessCode(e.target.value)} placeholder="Kod Premium..." className="p-2 bg-transparent text-sm w-32 outline-none font-medium text-white placeholder-slate-500"/>
-                                        <button onClick={handleVerifyCode} className="p-2 text-white rounded-lg bg-slate-800 hover:bg-slate-700 transition-colors border border-slate-600"><Icon name="Lock" size={16}/></button>
-                                    </div>
-                                )}
                                 <button onClick={() => window.open('https://buycoffee.to/magiccolor')} className="flex items-center space-x-2 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white px-5 py-2.5 rounded-xl font-bold transition-all active:scale-95 text-sm shadow-md">
                                     <Icon name="Coffee" size={18} className="text-amber-400"/><span>Postaw Kawę</span>
                                 </button>
@@ -270,6 +535,31 @@
                         
                         <div className="lg:col-span-4 space-y-6 print-hidden">
                             
+                            {/* ODBLOKOWANIE PREMIUM / BAZA WZORÓW */}
+                            <div className="flex flex-col gap-4">
+                                {!isPremium ? (
+                                    <div className="glass-panel p-3 rounded-2xl flex flex-col sm:flex-row justify-between items-center gap-4 border border-violet-500/30 bg-violet-950/20">
+                                        <div className="flex flex-col px-2">
+                                            <span className="text-[10px] font-bold text-violet-300 uppercase tracking-widest">Darmowe użycia: {Math.max(0, 5 - usageCount)}/5</span>
+                                            <span className="text-[9px] text-slate-400 font-bold">Wersja Free</span>
+                                        </div>
+                                        <div className="flex items-center gap-2 w-full sm:w-auto">
+                                            <input value={accessCode} onChange={e => setAccessCode(e.target.value)} placeholder="Kod dostępu..." className="flex-1 sm:w-32 px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs outline-none text-white focus:border-violet-500 transition-colors uppercase"/>
+                                            <button onClick={handleVerifyCode} className="px-3 py-2 bg-violet-600 hover:bg-violet-500 text-white rounded-lg text-xs font-bold transition-all shadow-md btn-bounce">OK</button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="glass-panel px-5 py-3 rounded-2xl border border-emerald-500/30 bg-emerald-950/20 flex items-center gap-3">
+                                        <i className="ph-fill ph-check-circle text-emerald-400 text-xl"></i>
+                                        <span className="text-xs font-bold text-emerald-300 uppercase tracking-widest">EduMotywator PRO Aktywny</span>
+                                    </div>
+                                )}
+
+                                <button onClick={() => setAppMode('gielda')} className="w-full bg-slate-800 border border-slate-700 text-white p-3 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-fuchsia-900/30 hover:border-fuchsia-500/50 transition-all shadow-md btn-bounce flex items-center justify-center gap-2">
+                                    <i className="ph-bold ph-files text-lg text-fuchsia-400"></i> Baza Motywatorów (Giełda)
+                                </button>
+                            </div>
+
                             <div className="glass-panel p-6 md:p-8 rounded-[2rem] space-y-6 relative overflow-hidden">
                                 <div className="absolute top-0 right-0 p-4 opacity-[0.03] text-violet-400"><Icon name="Target" size={80}/></div>
                                 <h2 className="font-bold text-sm uppercase tracking-widest border-b border-slate-700/50 pb-4 text-violet-400 flex items-center gap-2 relative z-10">
@@ -306,19 +596,9 @@
                                     </div>
                                 </div>
 
-                                {!isPremium ? (
-                                    <div className="p-6 rounded-xl border-2 border-dashed border-slate-700 flex flex-col items-center justify-center text-center gap-3 bg-slate-900/50 relative z-10">
-                                        <div className="p-3 bg-slate-800 rounded-full"><Icon name="Lock" size={24} className="text-slate-400"/></div>
-                                        <div>
-                                            <span className="text-sm font-bold text-slate-300 block mb-1">Funkcja zablokowana</span>
-                                            <span className="text-xs text-slate-500">Wpisz kod Premium na górnym pasku.</span>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <button onClick={generateContent} disabled={isGenerating} className="w-full bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white py-4 rounded-xl font-black text-sm tracking-widest shadow-lg shadow-violet-500/20 flex justify-center items-center gap-2 transition-all active:scale-95 uppercase disabled:opacity-50 relative z-10">
-                                        <Icon name="Sparkles" size={20}/> Generuj z AI
-                                    </button>
-                                )}
+                                <button onClick={handleGenerateContent} disabled={isGenerating} className="w-full bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white py-4 rounded-xl font-black text-sm tracking-widest shadow-lg shadow-violet-500/20 flex justify-center items-center gap-2 transition-all active:scale-95 uppercase disabled:opacity-50 relative z-10 btn-bounce">
+                                    <Icon name="Sparkles" size={20}/> Generuj z AI {!isPremium && `(${Math.max(0, 5 - usageCount)})`}
+                                </button>
                             </div>
 
                             <div className="p-5 rounded-3xl shadow-lg border flex items-start gap-4 animate-[reveal_0.3s_ease-out] transition-colors bg-violet-900/20 border-violet-500/30">
@@ -345,11 +625,14 @@
                             ) : (
                                 <div className="w-full max-w-[210mm] animate-[reveal_0.5s_ease-out] print:max-w-full">
                                     
-                                    <div className="flex justify-end gap-3 mb-6 print-hidden bg-slate-900/50 p-2 rounded-2xl border border-slate-800 backdrop-blur-md">
-                                        <button onClick={exportToWord} className="flex-1 sm:flex-none bg-violet-600 hover:bg-violet-500 text-white px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all text-sm shadow-[0_0_15px_rgba(139,92,246,0.3)] active:scale-95">
+                                    <div className="flex flex-wrap justify-end gap-3 mb-6 print-hidden bg-slate-900/50 p-2 rounded-2xl border border-slate-800 backdrop-blur-md">
+                                        <button onClick={sharePattern} className="flex-1 sm:flex-none bg-fuchsia-600 hover:bg-fuchsia-500 text-white px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all text-sm shadow-lg active:scale-95 btn-bounce">
+                                            <i className="ph-bold ph-cloud-arrow-up text-lg"></i> Do Bazy
+                                        </button>
+                                        <button onClick={exportToWord} className="flex-1 sm:flex-none bg-violet-600 hover:bg-violet-500 text-white px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all text-sm shadow-[0_0_15px_rgba(139,92,246,0.3)] active:scale-95 btn-bounce">
                                             <Icon name="Download" size={18}/> Word (.docx)
                                         </button>
-                                        <button onClick={() => window.print()} className="flex-1 sm:flex-none bg-slate-700 hover:bg-slate-600 text-white px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all text-sm active:scale-95">
+                                        <button onClick={() => window.print()} className="flex-1 sm:flex-none bg-slate-700 hover:bg-slate-600 text-white px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all text-sm active:scale-95 btn-bounce">
                                             <Icon name="Printer" size={18}/> Drukuj PDF
                                         </button>
                                     </div>
@@ -380,7 +663,7 @@
                                         </div>
 
                                         {/* KARTA TAJNEJ MISJI */}
-                                        <div className="page-break-inside-avoid mission-card relative overflow-hidden rounded-2xl border-4 border-slate-800 bg-slate-50 p-8 shadow-sm">
+                                        <div className="page-break-inside-avoid mission-card relative overflow-hidden rounded-2xl border-4 border-slate-800 bg-slate-50 p-8 shadow-sm mt-10">
                                             <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-violet-500 via-fuchsia-500 to-amber-500"></div>
                                             <div className="absolute top-6 right-6 opacity-10 text-slate-900"><Icon name="Trophy" size={80}/></div>
                                             
