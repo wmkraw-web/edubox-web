@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EduGrupy - Koło Fortuny i Menedżer Klasy</title>
+    <title>EduGrupy - Koło Fortuny i Menedżer Klasy (V3 PRO MAX)</title>
     
     <!-- Biblioteki -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
@@ -15,6 +15,19 @@
     <!-- Ikony Phosphor i Confetti -->
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <!-- FIREBASE CONFIG V3 PRO MAX -->
+    <script>
+        window.__firebase_config = JSON.stringify({
+            apiKey: "AIzaSyDL_mvepNJjMmZYQzifN2cXzoKwCE8jNd0",
+            authDomain: "edubox-pro.firebaseapp.com",
+            projectId: "edubox-pro",
+            storageBucket: "edubox-pro.firebasestorage.app",
+            messagingSenderId: "570263845714",
+            appId: "1:570263845714:web:0b029211f7af071b66988b"
+        });
+        window.__app_id = "eduboxpro";
+    </script>
 
     <style>
         body { 
@@ -30,12 +43,6 @@
             backdrop-filter: blur(16px); 
             -webkit-backdrop-filter: blur(16px); 
             border: 1px solid rgba(255, 255, 255, 0.05); 
-        }
-
-        .glass-nav { 
-            background: rgba(2, 6, 23, 0.8); 
-            backdrop-filter: blur(20px); 
-            border-bottom: 1px solid rgba(255, 255, 255, 0.05); 
         }
 
         .btn-bounce:active { transform: scale(0.95); transition: transform 0.1s; }
@@ -70,17 +77,146 @@
     </style>
 </head>
 <body>
+    <!-- Kontener na Wspólne Menu -->
+    <div id="wspolne-menu-kontener" class="print-hidden"></div>
+
+    <!-- ========================================================= -->
+    <!-- MODUŁ EDUBOX CORE (Wspólny silnik dla wszystkich 35 apek) -->
+    <!-- Docelowo wystarczy tu zostawić: <script type="module" src="/global-core.js"></script> -->
+    <!-- ========================================================= -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
+        import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
+        import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+
+        const FIREBASE_CONFIG = typeof window.__firebase_config !== 'undefined' ? JSON.parse(window.__firebase_config) : {};
+        const APP_ID = window.__app_id || "eduboxpro";
+
+        let app, auth, db, currentUser = null;
+        let isInitialized = false;
+
+        window.EduBoxCore = {
+            init: (onUserLoad) => {
+                if (!isInitialized && FIREBASE_CONFIG.apiKey) {
+                    app = initializeApp(FIREBASE_CONFIG);
+                    auth = getAuth(app);
+                    db = getFirestore(app);
+                    signInAnonymously(auth).catch(e => console.error("Firebase Auth Error:", e));
+                    isInitialized = true;
+                    
+                    window.EduBoxCore.loadMenu();
+                }
+                
+                if (auth) {
+                    onAuthStateChanged(auth, (user) => {
+                        currentUser = user;
+                        if(onUserLoad) onUserLoad(user);
+                    });
+                }
+            },
+
+            loadMenu: () => {
+                const container = document.getElementById('wspolne-menu-kontener');
+                if (container) {
+                    fetch('/menu.html')
+                        .then(r => r.text())
+                        .then(html => { container.innerHTML = html; })
+                        .catch(err => console.log('Brak pliku menu lokalnie.', err));
+                }
+            },
+
+            getUsageCount: () => {
+                const today = new Date().toISOString().split('T')[0];
+                let usageStr = localStorage.getItem('eduboxUsage');
+                if (usageStr) {
+                    try {
+                        const parsed = JSON.parse(usageStr);
+                        if (parsed.date === today) return parsed.count;
+                    } catch(e) {}
+                }
+                return 0;
+            },
+
+            executeWithLimitCheck: (isPremium, onSuccess, onLimitReached, onToastUpdate) => {
+                const status = localStorage.getItem('eduboxProStatus');
+                if (status === 'PRO' || isPremium) {
+                    onSuccess(window.EduBoxCore.getUsageCount());
+                    return;
+                }
+                
+                let currentCount = window.EduBoxCore.getUsageCount();
+                if (currentCount >= 5) {
+                    onLimitReached("⚠️ Dzienny limit użyć (5/5) wyczerpany. Wpisz kod odblokowujący na górze!");
+                    return;
+                }
+                
+                const newCount = currentCount + 1;
+                const today = new Date().toISOString().split('T')[0];
+                localStorage.setItem('eduboxUsage', JSON.stringify({ date: today, count: newCount }));
+                
+                onToastUpdate(`Wykorzystano ${newCount}/5 darmowych działań`);
+                onSuccess(newCount);
+            },
+
+            verifyPremiumCode: (code) => {
+                return code.toUpperCase() === 'KAWA2024';
+            },
+
+            saveToGielda: async (collectionName, appType, itemName, config) => {
+                if (!currentUser) throw new Error("Brak połączenia z chmurą. Odśwież stronę.");
+                
+                const publicRef = collection(db, 'artifacts', APP_ID, 'public', 'data', collectionName);
+                const payload = {
+                    userId: currentUser.uid,
+                    createdAt: serverTimestamp(),
+                    type: appType,
+                    name: itemName,
+                    config: config
+                };
+
+                if (JSON.stringify(payload).length > 950000) {
+                    throw new Error("🚨 Zapisane dane są zbyt duże!");
+                }
+
+                await addDoc(publicRef, payload);
+            },
+
+            subscribeToGielda: (collectionName, onDataLoaded, onError) => {
+                if (!db) return () => {};
+                
+                const publicRef = collection(db, 'artifacts', APP_ID, 'public', 'data', collectionName);
+                return onSnapshot(publicRef, (snapshot) => {
+                    const loaded = [];
+                    snapshot.forEach(doc => loaded.push({ id: doc.id, ...doc.data() }));
+                    loaded.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
+                    onDataLoaded(loaded);
+                }, onError);
+            }
+        };
+
+        window.dispatchEvent(new Event('EduBoxCoreReady'));
+    </script>
+    <!-- ========================================================= -->
+
     <div id="root"></div>
 
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
-
-        const BUY_COFFEE_LINK = "https://buycoffee.to/magiccolor";
         
         // Paleta żywych kolorów dla koła fortuny
         const WHEEL_COLORS = ['#ef4444', '#f97316', '#f59e0b', '#84cc16', '#10b981', '#06b6d4', '#3b82f6', '#8b5cf6', '#d946ef', '#f43f5e'];
 
         function EduGrupyApp() {
+            // --- V3 PRO MAX STATES (CORE) ---
+            const [coreReady, setCoreReady] = useState(!!window.EduBoxCore);
+            const [appMode, setAppMode] = useState('editor'); // 'editor' | 'gielda'
+            const [isPremium, setIsPremium] = useState(false);
+            const [accessCode, setAccessCode] = useState('');
+            const [user, setUser] = useState(null);
+            const [patterns, setPatterns] = useState([]);
+            const [usageCount, setUsageCount] = useState(0); 
+            const [toastMessage, setToastMessage] = useState('');
+
             // --- STATE (PAMIĘĆ) KLASY ---
             const [students, setStudents] = useState([]);
             const [bulkText, setBulkText] = useState("");
@@ -103,9 +239,37 @@
                 }
             }, [students]);
 
+            // --- INICJALIZACJA EDUBOX CORE ---
+            useEffect(() => {
+                if (!coreReady) {
+                    const handleReady = () => setCoreReady(true);
+                    window.addEventListener('EduBoxCoreReady', handleReady);
+                    return () => window.removeEventListener('EduBoxCoreReady', handleReady);
+                }
+            }, [coreReady]);
+
+            useEffect(() => {
+                if (coreReady && window.EduBoxCore) {
+                    window.EduBoxCore.init((loadedUser) => setUser(loadedUser));
+                    setUsageCount(window.EduBoxCore.getUsageCount());
+                    
+                    const status = localStorage.getItem('eduboxProStatus');
+                    if(status === 'PRO') setIsPremium(true);
+                }
+            }, [coreReady]);
+
+            // Nasłuchiwanie Giełdy
+            useEffect(() => {
+                if (!user || !coreReady || !window.EduBoxCore) return;
+                const unsubscribe = window.EduBoxCore.subscribeToGielda('gielda_wzorow_edugrupy', 
+                    (loadedData) => setPatterns(loadedData),
+                    (error) => console.error("Błąd odczytu Giełdy:", error)
+                );
+                return () => unsubscribe();
+            }, [user, coreReady]);
+
             // --- STATE APLIKACJI ---
             const [activeTab, setActiveTab] = useState('wheel'); // wheel | groups
-            const [toastMessage, setToastMessage] = useState('');
 
             // --- STATE KOŁA FORTUNY ---
             const [isSpinning, setIsSpinning] = useState(false);
@@ -119,6 +283,17 @@
             const showToast = (msg) => {
                 setToastMessage(msg);
                 setTimeout(() => setToastMessage(''), 3000);
+            };
+
+            const handleVerifyCode = () => {
+                if (window.EduBoxCore.verifyPremiumCode(accessCode)) {
+                    setIsPremium(true); 
+                    setAccessCode(''); 
+                    localStorage.setItem('eduboxProStatus', 'PRO');
+                    showToast("🎉 Moduł Premium odblokowany!"); 
+                } else { 
+                    showToast("❌ Nieprawidłowy kod!"); 
+                }
             };
 
             const playTadaSound = () => {
@@ -136,6 +311,34 @@
                     gain.gain.exponentialRampToValueAtTime(0.00001, ctx.currentTime + 0.8);
                     osc.stop(ctx.currentTime + 0.8);
                 } catch(e) {}
+            };
+
+            // --- GIEŁDA WZORÓW ACTIONS ---
+            const executeSharePattern = async () => {
+                window.EduBoxCore.executeWithLimitCheck(isPremium, 
+                    async (newCount) => {
+                        setUsageCount(newCount);
+                        try {
+                            const name = `Lista Klasy (${students.length} os.)`;
+                            await window.EduBoxCore.saveToGielda('gielda_wzorow_edugrupy', 'Lista Uczniów', name, { students });
+                            showToast("✨ Zapisano w Giełdzie Wzorów!");
+                        } catch (e) {
+                            showToast(e.message || "🚨 Błąd podczas zapisu w chmurze.");
+                        }
+                    },
+                    (msg) => showToast(msg),
+                    (msg) => showToast(msg)
+                );
+            };
+
+            const loadPattern = (pattern) => {
+                if(pattern.config && pattern.config.students) {
+                    setStudents(pattern.config.students);
+                    setWinner(null);
+                    setGroups([]);
+                    setAppMode('editor');
+                    showToast("✨ Lista załadowana pomyślnie!");
+                }
             };
 
             // --- ZARZĄDZANIE LISTĄ ---
@@ -178,6 +381,17 @@
             };
 
             // --- LOGIKA KOŁA FORTUNY ---
+            const executeSpinWheel = () => {
+                window.EduBoxCore.executeWithLimitCheck(isPremium, 
+                    (newCount) => {
+                        setUsageCount(newCount);
+                        spinWheel();
+                    },
+                    (msg) => showToast(msg),
+                    (msg) => showToast(msg)
+                );
+            };
+
             const spinWheel = () => {
                 if (students.length === 0 || isSpinning) return;
                 
@@ -198,24 +412,18 @@
                     const actualRotation = totalRotation % 360;
                     const sliceAngle = 360 / students.length;
                     
-                    // NAPRAWA: Wskaźnik (strzałka) znajduje się na godzinie 3:00 (90 stopni od góry).
-                    // SVG startuje od godziny 12:00 (0 stopni z racji -rotate-90).
-                    // Obliczamy "wirtualny" kąt wskaźnika względem obróconego koła.
                     const pointerAngle = (90 - actualRotation + 360) % 360;
-                    
                     const winningIndex = Math.floor(pointerAngle / sliceAngle);
                     
                     setWinner(students[winningIndex]);
                     playTadaSound();
                     
-                    // Odpalenie konfetti!
                     if (window.confetti) {
                         window.confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 }, zIndex: 300 });
                     }
-                }, 4000); // 4 sekundy animacji
+                }, 4000); 
             };
 
-            // Rysowanie wycinków (Slice'ów) dla SVG
             const getCoordinatesForPercent = (percent) => {
                 const x = Math.cos(2 * Math.PI * percent) * 100;
                 const y = Math.sin(2 * Math.PI * percent) * 100;
@@ -223,20 +431,29 @@
             };
 
             // --- LOGIKA PODZIAŁU NA GRUPY ---
+            const executeDivideClass = () => {
+                window.EduBoxCore.executeWithLimitCheck(isPremium, 
+                    (newCount) => {
+                        setUsageCount(newCount);
+                        divideClass();
+                    },
+                    (msg) => showToast(msg),
+                    (msg) => showToast(msg)
+                );
+            };
+
             const divideClass = () => {
                 if (students.length === 0) return;
                 
-                setGroups([]); // Reset by odpalić animację
+                setGroups([]); 
                 
                 setTimeout(() => {
-                    // Algorytm Fisher-Yates do tasowania
                     const shuffled = [...students];
                     for (let i = shuffled.length - 1; i > 0; i--) {
                         const j = Math.floor(Math.random() * (i + 1));
                         [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
                     }
 
-                    // Rozdział do grup
                     const newGroups = Array.from({ length: numGroups }, () => []);
                     shuffled.forEach((student, index) => {
                         newGroups[index % numGroups].push(student);
@@ -245,6 +462,10 @@
                     setGroups(newGroups);
                 }, 100);
             };
+
+            if (!coreReady) {
+                return <div className="min-h-screen flex items-center justify-center text-white">Trwa ładowanie silnika EduBoxCore...</div>;
+            }
 
             return (
                 <div className="min-h-screen relative flex flex-col pb-10">
@@ -255,95 +476,129 @@
                         {toastMessage}
                     </div>
 
-                    {/* Nawigacja */}
-                    <nav className="w-full z-[100] glass-nav sticky top-0">
-                        <div className="max-w-[90rem] mx-auto px-6 h-20 flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 bg-gradient-to-br from-pink-500 to-rose-600 rounded-xl flex items-center justify-center shadow-[0_0_15px_rgba(236,72,153,0.5)]">
-                                    <i className="ph-bold ph-users-three text-white text-xl"></i>
-                                </div>
-                                <span className="text-xl font-extrabold tracking-tight text-white hidden sm:block">EduGrupy</span>
-                            </div>
-                            <div className="flex items-center gap-4">
-                                <div className="hidden md:flex items-center gap-2 bg-slate-900 border border-slate-700 px-4 py-2 rounded-full">
-                                    <i className="ph-bold ph-hard-drives text-slate-400"></i>
-                                    <span className="text-[10px] text-slate-300 font-bold tracking-widest uppercase">Zapis lokalny (Offline)</span>
-                                </div>
-                                <a href={BUY_COFFEE_LINK} target="_blank" className="flex items-center gap-2 bg-slate-800 border border-slate-700 text-amber-400 px-5 py-2.5 rounded-full hover:bg-slate-700 transition-all shadow-lg btn-bounce text-xs font-bold uppercase tracking-wider">
-                                    <i className="ph-fill ph-coffee text-base"></i> Postaw Kawę
-                                </a>
-                            </div>
-                        </div>
-                    </nav>
-
-                    <main className="flex-grow max-w-[90rem] w-full mx-auto px-4 sm:px-6 py-8 relative z-10 flex flex-col xl:flex-row gap-8 items-start">
+                    <main className="flex-grow max-w-[90rem] w-full mx-auto px-4 sm:px-6 py-8 relative z-10 flex flex-col xl:flex-row gap-8 items-start mt-10">
                         
                         {/* ================================== */}
-                        {/* LEWA KOLUMNA: Menedżer Listy Klasy */}
+                        {/* LEWA KOLUMNA: Menedżer Listy / Giełda */}
                         {/* ================================== */}
-                        <div className="w-full xl:w-3/12 flex flex-col gap-6 shrink-0">
+                        <div className="w-full xl:w-3/12 flex flex-col gap-6 shrink-0 print-hidden">
                             
-                            <div className="glass-panel rounded-[2rem] p-6 border-t-4 border-pink-500 flex flex-col h-[800px]">
-                                <div className="flex justify-between items-center mb-6">
-                                    <h2 className="text-xl font-black text-white flex items-center gap-2">
-                                        <i className="ph-bold ph-list-numbers text-pink-400"></i> Lista Klasy
-                                    </h2>
-                                    <div className="bg-slate-800 text-slate-300 text-xs px-3 py-1 rounded-full font-bold border border-slate-700">
-                                        {students.length}
-                                    </div>
-                                </div>
-
-                                {/* Formularz dodawania pjedynczego */}
-                                <form onSubmit={addStudent} className="flex gap-2 mb-4">
-                                    <input 
-                                        name="studentName"
-                                        type="text" 
-                                        placeholder="Imię ucznia..." 
-                                        autoComplete="off"
-                                        className="flex-grow bg-slate-900 border border-slate-700 text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-pink-500 transition-colors"
-                                    />
-                                    <button type="submit" className="bg-pink-600 hover:bg-pink-500 text-white w-10 h-10 rounded-xl font-bold flex items-center justify-center transition-colors btn-bounce shrink-0 shadow-md">
-                                        <i className="ph-bold ph-plus"></i>
-                                    </button>
-                                </form>
-
-                                {/* Lista uczniów */}
-                                <div className="flex-grow overflow-y-auto custom-scrollbar pr-2 space-y-2 mb-4 bg-slate-900/30 p-2 rounded-xl border border-slate-800/50">
-                                    {students.length === 0 ? (
-                                        <div className="text-center text-slate-500 text-xs py-8">
-                                            Brak uczniów. Dodaj ich powyżej lub wklej listę poniżej.
+                            {appMode === 'editor' ? (
+                                <>
+                                    {/* Panel darmowych użyć i weryfikacji */}
+                                    {!isPremium && (
+                                        <div className="glass-panel p-4 rounded-2xl flex flex-col gap-2 border border-indigo-500/30 bg-indigo-950/20">
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-[10px] font-bold text-indigo-300 uppercase tracking-widest">Darmowe użycia: {Math.max(0, 5 - usageCount)}/5</span>
+                                                <span className="text-[10px] text-slate-400">Wersja Free</span>
+                                            </div>
+                                            <div className="flex items-center gap-2 mt-1">
+                                                <input value={accessCode} onChange={e => setAccessCode(e.target.value)} placeholder="Kod odblokowujący..." className="flex-1 px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs outline-none text-white focus:border-indigo-500 transition-colors"/>
+                                                <button onClick={handleVerifyCode} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold transition-all shadow-md">OK</button>
+                                            </div>
                                         </div>
-                                    ) : (
-                                        students.map((student, idx) => (
-                                            <div key={idx} className="flex justify-between items-center bg-slate-800 border border-slate-700 px-3 py-2 rounded-lg group hover:border-slate-500 transition-colors">
-                                                <span className="text-slate-200 text-sm font-medium truncate">{student}</span>
-                                                <button onClick={() => removeStudent(student)} className="text-slate-500 hover:text-red-400 p-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    <i className="ph-bold ph-trash"></i>
+                                    )}
+
+                                    {/* Przycisk przejścia do Giełdy */}
+                                    <button onClick={() => setAppMode('gielda')} className="w-full bg-slate-800 border border-slate-700 text-white p-3 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-fuchsia-900/30 hover:border-fuchsia-500/50 transition-all shadow-md btn-bounce flex items-center justify-center gap-2">
+                                        <i className="ph-bold ph-cloud text-lg text-fuchsia-400"></i> Giełda Wzorów (Współdzielone)
+                                    </button>
+
+                                    {/* Właściwy Menedżer Listy Klasy */}
+                                    <div className="glass-panel rounded-[2rem] p-6 border-t-4 border-pink-500 flex flex-col h-[700px]">
+                                        <div className="flex justify-between items-center mb-6">
+                                            <h2 className="text-xl font-black text-white flex items-center gap-2">
+                                                <i className="ph-bold ph-list-numbers text-pink-400"></i> Lista Klasy
+                                            </h2>
+                                            <div className="bg-slate-800 text-slate-300 text-xs px-3 py-1 rounded-full font-bold border border-slate-700">
+                                                {students.length}
+                                            </div>
+                                        </div>
+
+                                        <form onSubmit={addStudent} className="flex gap-2 mb-4">
+                                            <input 
+                                                name="studentName"
+                                                type="text" 
+                                                placeholder="Imię ucznia..." 
+                                                autoComplete="off"
+                                                className="flex-grow bg-slate-900 border border-slate-700 text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-pink-500 transition-colors"
+                                            />
+                                            <button type="submit" className="bg-pink-600 hover:bg-pink-500 text-white w-10 h-10 rounded-xl font-bold flex items-center justify-center transition-colors btn-bounce shrink-0 shadow-md">
+                                                <i className="ph-bold ph-plus"></i>
+                                            </button>
+                                        </form>
+
+                                        <div className="flex-grow overflow-y-auto custom-scrollbar pr-2 space-y-2 mb-4 bg-slate-900/30 p-2 rounded-xl border border-slate-800/50">
+                                            {students.length === 0 ? (
+                                                <div className="text-center text-slate-500 text-xs py-8">
+                                                    Brak uczniów. Dodaj ich powyżej lub wklej listę poniżej.
+                                                </div>
+                                            ) : (
+                                                students.map((student, idx) => (
+                                                    <div key={idx} className="flex justify-between items-center bg-slate-800 border border-slate-700 px-3 py-2 rounded-lg group hover:border-slate-500 transition-colors">
+                                                        <span className="text-slate-200 text-sm font-medium truncate">{student}</span>
+                                                        <button onClick={() => removeStudent(student)} className="text-slate-500 hover:text-red-400 p-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                            <i className="ph-bold ph-trash"></i>
+                                                        </button>
+                                                    </div>
+                                                ))
+                                            )}
+                                        </div>
+
+                                        <div className="pt-4 border-t border-slate-700/50">
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2">Szybkie wklejanie (z Excela/Worda)</label>
+                                            <textarea 
+                                                value={bulkText}
+                                                onChange={e => setBulkText(e.target.value)}
+                                                placeholder="Wklej listę imion (każde w nowej linii)..."
+                                                className="w-full h-20 bg-slate-900 border border-slate-700 text-slate-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-pink-500 transition-colors resize-none custom-scrollbar mb-2"
+                                            ></textarea>
+                                            <div className="flex gap-2">
+                                                <button onClick={handleBulkAdd} className="flex-1 bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold py-2 rounded-lg border border-slate-600 transition-colors btn-bounce">
+                                                    Dodaj Masowo
+                                                </button>
+                                                <button onClick={clearList} className="bg-red-900/30 hover:bg-red-900/50 text-red-400 text-xs font-bold py-2 px-3 rounded-lg border border-red-500/30 transition-colors btn-bounce" title="Wyczyść listę">
+                                                    <i className="ph-bold ph-trash text-base"></i>
                                                 </button>
                                             </div>
-                                        ))
-                                    )}
-                                </div>
-
-                                {/* Dodawanie masowe */}
-                                <div className="pt-4 border-t border-slate-700/50">
-                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2">Szybkie wklejanie (z Excela/Worda)</label>
-                                    <textarea 
-                                        value={bulkText}
-                                        onChange={e => setBulkText(e.target.value)}
-                                        placeholder="Wklej listę imion (każde w nowej linii)..."
-                                        className="w-full h-20 bg-slate-900 border border-slate-700 text-slate-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-pink-500 transition-colors resize-none custom-scrollbar mb-2"
-                                    ></textarea>
-                                    <div className="flex gap-2">
-                                        <button onClick={handleBulkAdd} className="flex-1 bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold py-2 rounded-lg border border-slate-600 transition-colors btn-bounce">
-                                            Dodaj Masowo
-                                        </button>
-                                        <button onClick={clearList} className="bg-red-900/30 hover:bg-red-900/50 text-red-400 text-xs font-bold py-2 px-3 rounded-lg border border-red-500/30 transition-colors btn-bounce" title="Wyczyść listę">
-                                            <i className="ph-bold ph-trash text-base"></i>
-                                        </button>
+                                        </div>
+                                    </div>
+                                </>
+                            ) : (
+                                /* Widok Giełdy Wzorów */
+                                <div className="glass-panel p-6 rounded-[2rem] border-t-4 border-fuchsia-500 shadow-lg h-[800px] flex flex-col">
+                                    <div className="flex justify-between items-center mb-6">
+                                        <h2 className="font-black text-white uppercase tracking-widest text-sm flex items-center gap-2"><i className="ph-bold ph-users text-fuchsia-400"></i> Giełda Wzorów</h2>
+                                        <button onClick={() => setAppMode('editor')} className="text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-lg text-xs font-bold uppercase transition-colors btn-bounce"><i className="ph-bold ph-arrow-left"></i> Wróć</button>
+                                    </div>
+                                    
+                                    <button onClick={executeSharePattern} className="w-full bg-fuchsia-600 hover:bg-fuchsia-500 text-white p-3 rounded-xl font-bold text-sm mb-6 shadow-lg transition-all btn-bounce flex justify-center items-center gap-2">
+                                        <i className="ph-bold ph-cloud-arrow-up text-lg"></i> Udostępnij swoją Listę
+                                    </button>
+                                    
+                                    <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Ostatnio dodane listy</h3>
+                                    <div className="overflow-y-auto custom-scrollbar flex-1 space-y-3 pr-2">
+                                        {patterns.map(p => (
+                                            <div key={p.id} className="bg-slate-900 border border-slate-700 p-4 rounded-xl hover:border-fuchsia-500 transition-colors cursor-pointer group flex flex-col gap-2" onClick={() => loadPattern(p)}>
+                                                <div className="flex justify-between items-start gap-2">
+                                                    <span className="text-xs font-bold text-white group-hover:text-fuchsia-400 transition-colors line-clamp-2 leading-tight">{p.name}</span>
+                                                    <span className="text-[9px] font-bold px-2 py-1 rounded shrink-0 bg-fuchsia-900/50 text-fuchsia-300"><i className="ph-bold ph-list-numbers"></i> {p.config.students?.length}</span>
+                                                </div>
+                                                <div className="flex justify-between items-center">
+                                                    <p className="text-[9px] text-slate-500">Autor: <span className="text-slate-400">{p.userId.substring(0,6)}</span></p>
+                                                    <p className="text-[9px] text-slate-500">{p.createdAt?.toDate().toLocaleDateString()}</p>
+                                                </div>
+                                            </div>
+                                        ))}
+                                        {patterns.length === 0 && (
+                                            <div className="text-center py-10 opacity-50">
+                                                <i className="ph-bold ph-cloud-arrow-down text-4xl mb-2 text-slate-500"></i>
+                                                <p className="text-xs text-slate-400">Pobieranie list z chmury...</p>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
-                            </div>
+                            )}
                         </div>
 
                         {/* ================================== */}
@@ -352,7 +607,7 @@
                         <div className="w-full xl:w-9/12 flex flex-col h-full">
                             
                             {/* Zakładki */}
-                            <div className="glass-panel p-2 rounded-2xl flex gap-1 bg-slate-900/60 mb-6 max-w-md mx-auto w-full">
+                            <div className="glass-panel p-2 rounded-2xl flex gap-1 bg-slate-900/60 mb-6 max-w-md mx-auto w-full print-hidden">
                                 <button onClick={() => setActiveTab('wheel')} className={`flex-1 py-3 px-4 rounded-xl flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-widest transition-all ${activeTab === 'wheel' ? 'bg-pink-600 text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}>
                                     <i className="ph-bold ph-aperture text-lg"></i> Koło Fortuny
                                 </button>
@@ -363,9 +618,7 @@
 
                             <div className="glass-panel rounded-[2rem] p-6 md:p-10 flex-grow relative overflow-hidden min-h-[600px] flex flex-col items-center justify-center">
                                 
-                                {/* ----------------------------- */}
-                                {/* WIDOK 1: KOŁO FORTUNY         */}
-                                {/* ----------------------------- */}
+                                {/* WIDOK 1: KOŁO FORTUNY */}
                                 {activeTab === 'wheel' && (
                                     <div className="w-full flex flex-col items-center animate-[reveal_0.3s_ease-out]">
                                         
@@ -384,20 +637,17 @@
                                         ) : (
                                             <div className="relative w-[320px] h-[320px] md:w-[450px] md:h-[450px] flex items-center justify-center mb-8">
                                                 
-                                                {/* Strzałka (Indykator) - Prawa strona */}
                                                 <div className="absolute -right-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-white wheel-indicator z-20 drop-shadow-xl filter"></div>
 
-                                                {/* Środek Koła i Przycisk SPIN */}
                                                 <button 
-                                                    onClick={spinWheel}
+                                                    onClick={executeSpinWheel}
                                                     disabled={isSpinning}
-                                                    className="absolute z-20 w-24 h-24 md:w-32 md:h-32 bg-slate-900 rounded-full border-4 border-white/10 shadow-[0_0_30px_rgba(0,0,0,0.8)] flex flex-col items-center justify-center text-white font-black hover:bg-slate-800 transition-colors disabled:opacity-80 group active:scale-95"
+                                                    className="absolute z-20 w-24 h-24 md:w-32 md:h-32 bg-slate-900 rounded-full border-4 border-white/10 shadow-[0_0_30px_rgba(0,0,0,0.8)] flex flex-col items-center justify-center text-white font-black hover:bg-slate-800 transition-colors disabled:opacity-80 group active:scale-95 print-hidden"
                                                 >
                                                     <span className="text-lg md:text-2xl tracking-widest text-pink-400 group-hover:text-pink-300">SPIN</span>
-                                                    <i className="ph-bold ph-hand-tap text-slate-500 mt-1"></i>
+                                                    <span className="text-[9px] text-slate-400 mt-1 uppercase tracking-widest block font-normal">{!isPremium && `(${Math.max(0, 5 - usageCount)})`}</span>
                                                 </button>
 
-                                                {/* Kółko SVG */}
                                                 <div className="w-full h-full rounded-full overflow-hidden shadow-[0_0_50px_rgba(236,72,153,0.3)] border-8 border-slate-800"
                                                      style={{ transform: `rotate(${rotation}deg)`, transition: isSpinning ? 'transform 4s cubic-bezier(0.1, 0.9, 0.2, 1)' : 'none' }}>
                                                     <svg viewBox="-100 -100 200 200" className="w-full h-full transform -rotate-90">
@@ -417,18 +667,14 @@
                                                                 `Z`
                                                             ].join(' ');
 
-                                                            // Kąt tekstu: środek kawałka
                                                             const textPercent = startPercent + (percent / 2);
-                                                            // Przesunięcie tekstu bliżej krawędzi (promień 70)
                                                             const textX = Math.cos(2 * Math.PI * textPercent) * 65;
                                                             const textY = Math.sin(2 * Math.PI * textPercent) * 65;
-                                                            // Obrót tekstu tak, by był czytelny wzdłuż promienia
                                                             const textRotation = (textPercent * 360);
 
                                                             return (
                                                                 <g key={index}>
                                                                     <path d={pathData} fill={WHEEL_COLORS[index % WHEEL_COLORS.length]} stroke="rgba(0,0,0,0.1)" strokeWidth="0.5" />
-                                                                    {/* Trik dla SVG: Tekst musi być obrócony po umiejscowieniu */}
                                                                     <text 
                                                                         x={textX} y={textY} 
                                                                         fill="white" 
@@ -449,18 +695,16 @@
                                             </div>
                                         )}
                                         {students.length >= 2 && !isSpinning && !winner && (
-                                            <p className="text-slate-400 text-sm font-medium">Zakręć kołem, aby wylosować szczęśliwca!</p>
+                                            <p className="text-slate-400 text-sm font-medium print-hidden">Zakręć kołem, aby wylosować szczęśliwca!</p>
                                         )}
                                     </div>
                                 )}
 
-                                {/* ----------------------------- */}
-                                {/* WIDOK 2: PODZIAŁ NA GRUPY     */}
-                                {/* ----------------------------- */}
+                                {/* WIDOK 2: PODZIAŁ NA GRUPY */}
                                 {activeTab === 'groups' && (
                                     <div className="w-full flex flex-col h-full animate-[reveal_0.3s_ease-out]">
                                         
-                                        <div className="bg-slate-900/80 border border-slate-700 rounded-2xl p-6 mb-8 w-full max-w-2xl mx-auto text-center shadow-lg">
+                                        <div className="bg-slate-900/80 border border-slate-700 rounded-2xl p-6 mb-8 w-full max-w-2xl mx-auto text-center shadow-lg print-hidden">
                                             <label className="text-xs font-bold text-amber-400 uppercase tracking-widest block mb-4">Na ile grup dzielimy klasę?</label>
                                             <div className="flex items-center justify-center gap-6 mb-6">
                                                 <button onClick={() => setNumGroups(Math.max(2, numGroups - 1))} className="w-12 h-12 rounded-full bg-slate-800 text-white font-bold text-xl hover:bg-slate-700 transition-colors">-</button>
@@ -468,11 +712,11 @@
                                                 <button onClick={() => setNumGroups(Math.min(10, numGroups + 1))} className="w-12 h-12 rounded-full bg-slate-800 text-white font-bold text-xl hover:bg-slate-700 transition-colors">+</button>
                                             </div>
                                             <button 
-                                                onClick={divideClass}
+                                                onClick={executeDivideClass}
                                                 disabled={students.length < numGroups}
                                                 className="bg-amber-600 hover:bg-amber-500 text-white disabled:opacity-50 px-10 py-4 rounded-xl font-bold shadow-[0_10px_30px_-10px_rgba(245,158,11,0.5)] transition-all btn-bounce uppercase tracking-widest text-sm w-full sm:w-auto"
                                             >
-                                                <i className="ph-bold ph-shuffle mr-2 text-lg"></i> Przydziel Magicznie
+                                                <i className="ph-bold ph-shuffle mr-2 text-lg"></i> Przydziel Magicznie {!isPremium && `(${Math.max(0, 5 - usageCount)})`}
                                             </button>
                                             {students.length < numGroups && (
                                                 <p className="text-red-400 text-xs mt-3">Masz mniej uczniów na liście niż żądanych grup!</p>
@@ -488,13 +732,22 @@
                                                         </div>
                                                         <div className="p-4 space-y-2">
                                                             {grp.map((student, j) => (
-                                                                <div key={j} className="bg-slate-700/50 px-3 py-2 rounded-lg text-slate-200 text-sm font-medium border border-slate-600/50">
+                                                                <div key={j} className="bg-slate-700/50 px-3 py-2 rounded-lg text-slate-200 text-sm font-medium border border-slate-600/50 break-words">
                                                                     {student}
                                                                 </div>
                                                             ))}
                                                         </div>
                                                     </div>
                                                 ))}
+                                            </div>
+                                        )}
+                                        
+                                        {/* Przycisk Druku w zakładce z Grupami */}
+                                        {groups.length > 0 && (
+                                            <div className="mt-8 flex justify-center print-hidden">
+                                                <button onClick={() => window.print()} className="bg-slate-700 hover:bg-slate-600 text-white px-6 py-3 rounded-xl font-bold transition-all shadow-md flex items-center gap-2">
+                                                    <i className="ph-bold ph-printer text-xl"></i> Wydrukuj podział
+                                                </button>
                                             </div>
                                         )}
 
