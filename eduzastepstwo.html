@@ -291,7 +291,8 @@ STYL: Pisz bezpośrednio do nauczyciela. Zadbaj, żeby treści były w 100% dost
                     if (startIdx !== -1 && endIdx !== -1) {
                         jsonStr = jsonStr.substring(startIdx, endIdx + 1);
                     }
-                    jsonStr = jsonStr.replace(/[\u0000-\u001F]+/g, ' '); // Czyści surowe entery
+                    // Czyści surowe entery z odpowiedzi, by nie psuć JSON.parse
+                    jsonStr = jsonStr.replace(/[\u0000-\u001F]+/g, ' '); 
                     return JSON.parse(jsonStr);
                 } catch (err) {
                     console.error("JSON Parse Error. Surowy tekst:", rawText);
@@ -355,6 +356,13 @@ STYL: Pisz bezpośrednio do nauczyciela. Zadbaj, żeby treści były w 100% dost
                 }
             };
 
+            // === TEXT FORMATTER ===
+            // Pancerna funkcja upewniająca się, że nigdy nie zrobimy replace na undefined
+            const formatText = (text) => {
+                if (!text) return "";
+                return String(text).replace(/\\n/g, '<br/>').replace(/\n/g, '<br/>');
+            };
+
             // === LOGIC ===
             const generateLesson = () => {
                 window.EduBoxCore.executeWithLimitCheck(isPremium, 
@@ -367,10 +375,19 @@ STYL: Pisz bezpośrednio do nauczyciela. Zadbaj, żeby treści były w 100% dost
                             const usrPrompt = `Zastępstwo ratunkowe!\nGrupa wiekowa: ${ageGroup}\nTyp aktywności: ${activityType}\nPotrzebuję szybkiego scenariusza JSON.`;
                             const data = await fetchLessonData(usrPrompt);
 
+                            // PANCERNA OSŁONA NA KLUCZE: Jeśli AI zmieni nazwę klucza (np. na "rozgrzewka" zamiast "warmup"), my i tak to złapiemy.
+                            const safeTitle = data?.title || data?.Title || data?.temat || "Plan Ratunkowy";
+                            const safeWarmup = data?.warmup || data?.Warmup || data?.rozgrzewka || data?.rozgrzewka_min || "Brak danych dla rozgrzewki.";
+                            const safeMain = data?.main || data?.Main || data?.glowne || data?.zadanie_glowne || "Brak danych głównego zadania.";
+                            const safeSummary = data?.summary || data?.Summary || data?.podsumowanie || data?.zakonczenie || "Brak danych podsumowania.";
+
                             setGeneratedData({
-                                ...data,
-                                ageGroup,
-                                activityType
+                                title: String(safeTitle),
+                                warmup: String(safeWarmup),
+                                main: String(safeMain),
+                                summary: String(safeSummary),
+                                ageGroup: ageGroup,
+                                activityType: activityType
                             });
 
                             setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
@@ -386,7 +403,8 @@ STYL: Pisz bezpośrednio do nauczyciela. Zadbaj, żeby treści były w 100% dost
                                     warmup: "Czółko bez kartek: Prosisz jednego ucznia, aby stanął tyłem do tablicy. Zapisujesz na tablicy jedno hasło (np. 'Harry Potter'). Reszta klasy musi naprowadzić ucznia na to hasło, ale nie mogą używać słów pokrewnych.",
                                     main: "Czarne Historie Szkolne: Opowiadasz klasie dziwną, krótką historię, a oni zadają Ci pytania, na które możesz odpowiadać tylko TAK lub NIE.<br/><br/>ZAGADKA: Mężczyzna wszedł do restauracji, zamówił zupę z mewy. Zjadł jedną łyżkę, wyszedł i skoczył z klifu. Dlaczego?<br/>ROZWIĄZANIE: Kiedyś rozbił się na wyspie. Przyjaciel przynosił mu mięso, mówiąc, że to mewy (naprawdę był to inny rozbitek). Kiedy zjadł prawdziwą mewę, poznał inny smak i uświadomił sobie prawdę.",
                                     summary: "Mafia w pigułce: Uczniowie zamykają oczy. Kto z nich idealnie oszacuje, kiedy minęło równe 60 sekund, podnosi rękę. Idealne wyciszenie przed dzwonkiem!",
-                                    ageGroup, activityType
+                                    ageGroup: ageGroup, 
+                                    activityType: activityType
                                 });
                             }, 1000);
 
@@ -404,7 +422,8 @@ STYL: Pisz bezpośrednio do nauczyciela. Zadbaj, żeby treści były w 100% dost
                 setIsSavingToGielda(true);
                 try {
                     const configToSave = { generatedData };
-                    const shortName = generatedData.title.substring(0, 40) + (generatedData.title.length > 40 ? '...' : '');
+                    const safeTitle = String(generatedData.title || 'Zastępstwo');
+                    const shortName = safeTitle.substring(0, 40) + (safeTitle.length > 40 ? '...' : '');
                     
                     await window.EduBoxCore.saveToGielda('zastepstwa_market', 'EduZastępstwo', shortName, configToSave);
                     showToast("Opublikowano na Giełdzie! 🎉", "success");
@@ -621,31 +640,31 @@ STYL: Pisz bezpośrednio do nauczyciela. Zadbaj, żeby treści były w 100% dost
                                         <h1 className="text-2xl md:text-3xl font-black text-white print:text-slate-900 mb-4 uppercase leading-tight">{generatedData.title}</h1>
                                         <div className="flex justify-center gap-6 pt-2">
                                             <span className="bg-slate-800 print:bg-slate-100 text-slate-300 print:text-slate-600 px-3 py-1 rounded text-xs font-bold border border-slate-700 print:border-slate-200">Dla: {generatedData.ageGroup}</span>
-                                            <span className="bg-slate-800 print:bg-slate-100 text-slate-300 print:text-slate-600 px-3 py-1 rounded text-xs font-bold border border-slate-700 print:border-slate-200 capitalize">Metoda: {generatedData.activityType?.split(' ')[1] || 'Zabawa'}</span>
+                                            <span className="bg-slate-800 print:bg-slate-100 text-slate-300 print:text-slate-600 px-3 py-1 rounded text-xs font-bold border border-slate-700 print:border-slate-200 capitalize">Metoda: {String(generatedData.activityType || '').split(' ')[1] || 'Zabawa'}</span>
                                         </div>
                                     </div>
                                     
                                     <div className="space-y-8 text-[15px] leading-relaxed text-slate-200 print:text-slate-800">
                                         <section className="bg-slate-800/40 print:bg-transparent p-5 rounded-2xl border border-slate-700/50 print:border-none print:p-0">
                                             <h2 className="text-lg font-bold text-orange-400 print:text-slate-800 uppercase mb-3 flex items-center gap-2"><i className="ph-fill ph-stopwatch text-xl"></i> Rozgrzewka (5 min)</h2>
-                                            <div dangerouslySetInnerHTML={{ __html: String(generatedData.warmup || '').replace(/\n/g, '<br/>') }} />
+                                            <div dangerouslySetInnerHTML={{ __html: formatText(generatedData.warmup) }} />
                                         </section>
                                         
                                         <section className="bg-rose-900/10 print:bg-transparent p-5 rounded-2xl border border-rose-500/20 print:border-none print:p-0">
                                             <h2 className="text-lg font-bold text-rose-400 print:text-slate-800 uppercase mb-3 flex items-center gap-2"><i className="ph-fill ph-brain text-xl"></i> Główne Zadanie (30 min)</h2>
-                                            <div dangerouslySetInnerHTML={{ __html: String(generatedData.main || '').replace(/\n/g, '<br/>') }} />
+                                            <div dangerouslySetInnerHTML={{ __html: formatText(generatedData.main) }} />
                                         </section>
                                         
                                         <section className="bg-slate-800/40 print:bg-transparent p-5 rounded-2xl border border-slate-700/50 print:border-none print:p-0">
                                             <h2 className="text-lg font-bold text-emerald-400 print:text-slate-800 uppercase mb-3 flex items-center gap-2"><i className="ph-fill ph-flag-checkered text-xl"></i> Podsumowanie (10 min)</h2>
-                                            <div dangerouslySetInnerHTML={{ __html: String(generatedData.summary || '').replace(/\n/g, '<br/>') }} />
+                                            <div dangerouslySetInnerHTML={{ __html: formatText(generatedData.summary) }} />
                                         </section>
                                     </div>
                                 </div>
                                 
                                 <div className="mt-6 text-center bg-slate-900/50 p-6 rounded-2xl border border-slate-800 print-hidden fade-in">
                                     <p className="text-slate-400 mb-3 font-medium">Udało się uratować lekcję bez stresu?</p>
-                                    <a href={BUY_COFFEE_LINK} target="_blank" className="inline-flex items-center gap-2 text-amber-500 hover:text-amber-400 font-bold hover:underline">
+                                    <a href="https://buycoffee.to/magiccolor" target="_blank" className="inline-flex items-center gap-2 text-amber-500 hover:text-amber-400 font-bold hover:underline">
                                         Postaw twórcy wirtualną kawę ☕ w ramach podziękowania!
                                     </a>
                                 </div>
