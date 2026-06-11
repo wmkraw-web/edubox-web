@@ -89,6 +89,11 @@
         .fade-in { animation: fadeIn 0.4s ease-out forwards; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
+        /* Fullscreen styles override */
+        :fullscreen { background-color: #020617; }
+        :-webkit-full-screen { background-color: #020617; }
+        :-moz-full-screen { background-color: #020617; }
+
         @media print {
             .print-hidden, #wspolne-menu-kontener, nav { display: none !important; }
             body, html { background: white !important; color: black !important; }
@@ -100,7 +105,7 @@
     <div id="wspolne-menu-kontener" class="print-hidden"></div>
 
     <!-- ========================================================= -->
-    <!-- MODUŁ EDUBOX CORE (Wspólny silnik dla wszystkich apek)    -->
+    <!-- MODUŁ EDUBOX CORE (LIMIT ZMNIEJSZONY DO 1 DLA TEJ APKI)   -->
     <!-- ========================================================= -->
     <script type="module">
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
@@ -163,8 +168,9 @@
                 }
                 
                 let currentCount = window.EduBoxCore.getUsageCount();
-                if (currentCount >= 5) {
-                    onLimitReached("⚠️ Dzienny limit użyć (5/5) wyczerpany. Wpisz kod odblokowujący na górze!");
+                // ZMIANA V3 PRO MAX: Limit w tej aplikacji wynosi tylko 1 z uwagi na koszty API!
+                if (currentCount >= 1) {
+                    onLimitReached("⚠️ Darmowy limit (1/1) wyczerpany. Wpisz kod odblokowujący na górze!");
                     return;
                 }
                 
@@ -172,7 +178,7 @@
                 const today = new Date().toISOString().split('T')[0];
                 localStorage.setItem('eduboxUsage', JSON.stringify({ date: today, count: newCount }));
                 
-                if(onToastUpdate) onToastUpdate(`Wykorzystano ${newCount}/5 darmowych działań`);
+                if(onToastUpdate) onToastUpdate(`Wykorzystano ${newCount}/1 darmowych działań`);
                 onSuccess(newCount);
             },
 
@@ -244,6 +250,9 @@
             const [slides, setSlides] = useState([]);
             const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
             const [regeneratingSlideIndex, setRegeneratingSlideIndex] = useState(null);
+            
+            // Ref do Fullscreenu
+            const playerRef = useRef(null);
 
             // --- INICJALIZACJA EDUBOX CORE ---
             useEffect(() => {
@@ -360,10 +369,10 @@
                     Wygeneruj zawartość prezentacji w formacie JSON.
                     Język tekstów na slajdach: POLSKI. Język promptów (imagePrompt): ANGIELSKI.
                     
-                    ZASADY DLA "imagePrompt":
-                    1. Opisuj TYLKO czyste sceny, krajobrazy lub przedmioty.
-                    2. Kategoryczny ZAKAZ używania słów: "poster", "slide", "infographic", "text", "diagram". Modele AI generują na ich podstawie nieczytelny tekst.
-                    3. Przykłady dobrych promptów: "A realistic photo of a shiny apple on a wooden table", "A beautiful cartoon landscape of ancient Rome".
+                    ZASADY DLA "imagePrompt" (KRYTYCZNE):
+                    1. Opisuj TYLKO obiekty, architekturę, przedmioty lub krajobrazy (ZAKAZ OPISYWANIA LUDZI, DZIECI I TWARZY - modele AI często je deformują).
+                    2. Kategoryczny ZAKAZ używania słów: "poster", "slide", "text", "book cover", "letters", "sign", "diagram". Modele AI generują na ich podstawie losowy, angielski tekst.
+                    3. Przykłady dobrych promptów: "A shiny red apple on a wooden desk", "A beautiful cartoon landscape of ancient Rome ruins without any people".
                     
                     STRUKTURA JSON:
                     {
@@ -372,7 +381,7 @@
                             {
                                 "title": "Tytuł slajdu (krótki)",
                                 "bullets": ["Zwięzły punkt 1", "Zwięzły punkt 2", "Zwięzły punkt 3"],
-                                "imagePrompt": "Angielski opis SCENY (żadnych napisów, tylko obraz), np. A photo of ancient Rome architecture."
+                                "imagePrompt": "Angielski opis SCENY (żadnych napisów, tylko obraz, zero ludzi), np. A realistic photo of ancient Rome architecture."
                             }
                         ]
                     }`;
@@ -437,14 +446,14 @@
                         setLoadingProgress(30 + Math.floor((i / initialSlides.length) * 60));
                         
                         try {
-                            const fullPrompt = `${slide.imagePrompt}. High quality educational illustration, vivid colors, clear subject, isolated focus, highly detailed. ABSOLUTELY NO TEXT, NO WORDS, NO LETTERS, NO WATERMARKS.`;
+                            const fullPrompt = `${slide.imagePrompt}. Beautiful educational illustration, clear subject, highly detailed, visually appealing. ABSOLUTELY NO TEXT, NO WORDS, NO LETTERS, NO HUMANS, NO FACES.`;
                             
                             const resImg = await fetch('/api/generate', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({ 
                                     prompt: fullPrompt, 
-                                    negative_prompt: "text, words, letters, watermark, blurry, deformed, ugly, signature",
+                                    negative_prompt: "text, words, letters, watermark, blurry, deformed, ugly, signature, humans, people, faces",
                                     aspect_ratio: "16:9",
                                     size: "1024x576" 
                                 })
@@ -502,14 +511,14 @@
                 
                 try {
                     const slide = slides[index];
-                    const fullPrompt = `${slide.imagePrompt}. High quality educational illustration, vivid colors, clear subject, isolated focus, highly detailed. ABSOLUTELY NO TEXT, NO WORDS, NO LETTERS.`;
+                    const fullPrompt = `${slide.imagePrompt}. Beautiful educational illustration, clear subject, highly detailed, visually appealing. ABSOLUTELY NO TEXT, NO WORDS, NO LETTERS, NO HUMANS, NO FACES.`;
                     
                     const resImg = await fetch('/api/generate', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ 
                             prompt: fullPrompt, 
-                            negative_prompt: "text, words, letters, watermark, blurry, deformed",
+                            negative_prompt: "text, words, letters, watermark, blurry, deformed, humans, people, faces",
                             aspect_ratio: "16:9",
                             size: "1024x576" 
                         })
@@ -589,6 +598,24 @@
                 }
             };
 
+            // --- FULLSCREEN LOGIC ---
+            const toggleFullScreen = () => {
+                if (!document.fullscreenElement) {
+                    playerRef.current?.requestFullscreen().catch(err => {
+                        console.log(`Błąd pełnego ekranu: ${err.message}`);
+                    });
+                } else {
+                    document.exitFullscreen();
+                }
+            };
+
+            const exitPresentation = () => {
+                if (document.fullscreenElement) {
+                    document.exitFullscreen();
+                }
+                setAppMode('editor');
+            };
+
             // Sterowanie Klawiaturą
             useEffect(() => {
                 const handleKeyDown = (e) => {
@@ -598,7 +625,7 @@
                     } else if (e.key === 'ArrowLeft') {
                         setCurrentSlideIndex(prev => Math.max(0, prev - 1));
                     } else if (e.key === 'Escape') {
-                        setAppMode('editor');
+                        exitPresentation();
                     }
                 };
                 window.addEventListener('keydown', handleKeyDown);
@@ -670,9 +697,10 @@
             if (appMode === 'presentation' && slides.length > 0) {
                 const currentSlide = slides[currentSlideIndex];
                 const isEven = currentSlideIndex % 2 === 0;
+                const isLastSlide = currentSlideIndex === slides.length - 1;
 
                 return (
-                    <div className="fixed inset-0 bg-slate-950 z-[999] flex flex-col font-sans">
+                    <div ref={playerRef} className="fixed inset-0 bg-slate-950 z-[999] flex flex-col font-sans">
                         {toastMessage && (
                             <div className="absolute top-6 left-1/2 -translate-x-1/2 z-[1000] bg-blue-600 text-white px-6 py-3 rounded-full font-bold shadow-2xl transition-all duration-300">
                                 {toastMessage}
@@ -680,17 +708,17 @@
                         )}
                         
                         {/* Górny Pasek Narzędzi */}
-                        <div className="bg-slate-900/80 backdrop-blur-md px-6 py-4 flex justify-between items-center border-b border-slate-800">
+                        <div className="bg-slate-900/80 backdrop-blur-md px-6 py-4 flex flex-col sm:flex-row justify-between items-center border-b border-slate-800 gap-4">
                             <h2 className="text-xl font-bold text-white flex items-center gap-2"><i className="ph-fill ph-presentation text-blue-500"></i> Odtwarzacz</h2>
-                            <div className="flex gap-3">
-                                <button onClick={sharePattern} className="bg-fuchsia-600 hover:bg-fuchsia-500 text-white px-4 py-2 rounded-xl font-bold text-sm flex items-center gap-2 transition-all btn-bounce">
-                                    <i className="ph-bold ph-cloud-arrow-up"></i> Do Bazy
+                            <div className="flex flex-wrap justify-center gap-3">
+                                <button onClick={toggleFullScreen} className="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-xl font-bold text-sm flex items-center gap-2 transition-all btn-bounce border border-slate-600">
+                                    <i className="ph-bold ph-corners-out"></i> Pełny Ekran
                                 </button>
                                 <button onClick={downloadPPTX} className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-xl font-bold text-sm flex items-center gap-2 transition-all btn-bounce">
-                                    <i className="ph-bold ph-download-simple"></i> PPTX
+                                    <i className="ph-bold ph-download-simple"></i> Pobierz PPTX
                                 </button>
-                                <button onClick={() => setAppMode('editor')} className="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-xl font-bold text-sm transition-all btn-bounce">
-                                    Wyjdź (ESC)
+                                <button onClick={exitPresentation} className="bg-rose-600 hover:bg-rose-500 text-white px-4 py-2 rounded-xl font-bold text-sm flex items-center gap-2 transition-all btn-bounce shadow-lg shadow-rose-500/20">
+                                    <i className="ph-bold ph-x"></i> Zakończ Pokaz
                                 </button>
                             </div>
                         </div>
@@ -701,7 +729,7 @@
                             <button 
                                 onClick={() => setCurrentSlideIndex(prev => Math.max(0, prev - 1))}
                                 disabled={currentSlideIndex === 0}
-                                className="absolute left-6 z-50 bg-white/10 hover:bg-white/20 text-white p-4 rounded-full disabled:opacity-30 transition-all backdrop-blur-sm"
+                                className="absolute left-2 sm:left-6 z-50 bg-white/10 hover:bg-white/20 text-white p-3 sm:p-4 rounded-full disabled:opacity-30 transition-all backdrop-blur-sm"
                             >
                                 <i className="ph-bold ph-caret-left text-2xl"></i>
                             </button>
@@ -709,18 +737,18 @@
                             <button 
                                 onClick={() => setCurrentSlideIndex(prev => Math.min(slides.length - 1, prev + 1))}
                                 disabled={currentSlideIndex === slides.length - 1}
-                                className="absolute right-6 z-50 bg-white/10 hover:bg-white/20 text-white p-4 rounded-full disabled:opacity-30 transition-all backdrop-blur-sm"
+                                className="absolute right-2 sm:right-6 z-50 bg-white/10 hover:bg-white/20 text-white p-3 sm:p-4 rounded-full disabled:opacity-30 transition-all backdrop-blur-sm"
                             >
                                 <i className="ph-bold ph-caret-right text-2xl"></i>
                             </button>
 
                             <div className="w-full max-w-[1600px] aspect-video bg-white flex shadow-2xl relative">
-                                <div className={`flex-1 p-10 lg:p-20 flex flex-col justify-center ${isEven ? 'order-1' : 'order-2'}`}>
-                                    <h1 className="text-4xl lg:text-6xl font-black text-slate-800 mb-8 leading-tight">{currentSlide.title}</h1>
+                                <div className={`flex-1 p-8 sm:p-10 lg:p-20 flex flex-col justify-center ${isEven ? 'order-1' : 'order-2'}`}>
+                                    <h1 className="text-2xl sm:text-4xl lg:text-6xl font-black text-slate-800 mb-8 leading-tight">{currentSlide.title}</h1>
                                     {currentSlide.bullets && (
-                                        <ul className="space-y-6">
+                                        <ul className="space-y-4 sm:space-y-6">
                                             {currentSlide.bullets.map((b, i) => (
-                                                <li key={i} className="text-xl lg:text-2xl text-slate-600 font-medium flex items-start gap-4 leading-relaxed">
+                                                <li key={i} className="text-lg sm:text-xl lg:text-2xl text-slate-600 font-medium flex items-start gap-4 leading-relaxed">
                                                     <span className="text-blue-500 mt-2">●</span>
                                                     <span>{b}</span>
                                                 </li>
@@ -732,13 +760,26 @@
                                     {currentSlide.imageUrl ? (
                                         <img src={currentSlide.imageUrl} className="absolute inset-0 w-full h-full object-cover" />
                                     ) : (
-                                        <div className="absolute inset-0 flex items-center justify-center text-slate-300">Brak obrazka</div>
+                                        <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400 bg-slate-200">
+                                            <i className="ph-duotone ph-image text-6xl mb-4 text-slate-300"></i>
+                                            <span className="font-bold">Brak wygenerowanego obrazu</span>
+                                        </div>
                                     )}
                                 </div>
                                 
-                                <div className="absolute bottom-4 right-6 text-slate-500/50 text-sm font-bold uppercase flex gap-4 bg-white/80 px-4 py-1 rounded-full backdrop-blur-sm">
+                                <div className="absolute bottom-4 right-6 text-slate-500/50 text-xs sm:text-sm font-bold uppercase flex gap-4 bg-white/80 px-4 py-1 rounded-full backdrop-blur-sm">
                                     <span>Slajd {currentSlideIndex + 1}/{slides.length}</span>
                                 </div>
+
+                                {/* Pokaż przycisk wyjścia na ostatnim slajdzie */}
+                                {isLastSlide && (
+                                    <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm flex flex-col items-center justify-center z-[100] opacity-0 hover:opacity-100 transition-opacity duration-300">
+                                        <h3 className="text-white text-3xl font-black mb-6 drop-shadow-lg">To już ostatni slajd!</h3>
+                                        <button onClick={exitPresentation} className="bg-rose-600 hover:bg-rose-500 text-white px-10 py-5 rounded-2xl font-black text-xl shadow-2xl btn-bounce flex items-center gap-3">
+                                            <i className="ph-bold ph-x-circle text-3xl"></i> Zakończ Prezentację
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -796,7 +837,7 @@
                                 {!isPremium ? (
                                     <div className="glass-panel p-3 rounded-2xl flex flex-col sm:flex-row justify-between items-center gap-4 border border-blue-500/30 bg-blue-950/20">
                                         <div className="flex flex-col px-2">
-                                            <span className="text-[10px] font-bold text-blue-300 uppercase tracking-widest">Darmowe użycia: {Math.max(0, 5 - usageCount)}/5</span>
+                                            <span className="text-[10px] font-bold text-blue-300 uppercase tracking-widest">Darmowe użycia: {Math.max(0, 1 - usageCount)}/1</span>
                                             <span className="text-[9px] text-slate-400 font-bold">Wersja Free</span>
                                         </div>
                                         <div className="flex items-center gap-2 w-full sm:w-auto">
@@ -867,7 +908,7 @@
                                             className={`w-full py-5 rounded-2xl font-black text-white text-lg transition-all flex items-center justify-center gap-3 shadow-[0_0_20px_rgba(59,130,246,0.3)] btn-bounce uppercase tracking-widest
                                                 ${generatingStep !== 0 ? 'bg-slate-700 cursor-not-allowed' : 'bg-gradient-to-r from-blue-600 to-indigo-500 hover:scale-[1.02]'}`}
                                         >
-                                            <i className="ph-bold ph-magic-wand text-xl"></i> Stwórz Prezentację {!isPremium && `(${Math.max(0, 5 - usageCount)})`}
+                                            <i className="ph-bold ph-magic-wand text-xl"></i> Stwórz Prezentację {!isPremium && `(${Math.max(0, 1 - usageCount)})`}
                                         </button>
                                     </div>
                                 </div>
@@ -878,9 +919,9 @@
                                 <div className="mt-16 fade-in print-hidden">
                                     <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4">
                                         <h2 className="text-3xl font-black text-white">Podgląd Slajdów</h2>
-                                        <div className="flex gap-3">
+                                        <div className="flex flex-wrap justify-center gap-3">
                                             <button onClick={() => setAppMode('presentation')} className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-3 rounded-xl font-bold transition-all shadow-md btn-bounce flex items-center gap-2">
-                                                <i className="ph-fill ph-play text-xl"></i> Odtwórz
+                                                <i className="ph-fill ph-play text-xl"></i> Odtwórz Pokaz
                                             </button>
                                             <button onClick={downloadPPTX} className="bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-3 rounded-xl font-bold transition-all shadow-md btn-bounce flex items-center gap-2">
                                                 <i className="ph-bold ph-download-simple text-xl"></i> Pobierz PPTX
