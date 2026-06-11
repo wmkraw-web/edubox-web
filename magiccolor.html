@@ -4,22 +4,41 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="google" content="notranslate">
-    <title>Magic Color AI - Generator Kolorowanek</title>
+    <title>MagicColor PRO - Generator Kolorowanek</title>
+    
     <!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-3RQ9R0N0K8"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-
-  gtag('config', 'G-3RQ9R0N0K8');
-</script>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-3RQ9R0N0K8"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-3RQ9R0N0K8');
+    </script>
+    
     <!-- Biblioteki -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+    <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['"Plus Jakarta Sans"', 'sans-serif'] },
+                    colors: { slate: { 950: '#020617' } }
+                }
+            }
+        }
+    </script>
+
     <style>
         body { 
             font-family: 'Plus Jakarta Sans', sans-serif; 
@@ -27,13 +46,12 @@
             color: #f8fafc; 
             scroll-behavior: smooth; 
             overflow-x: hidden;
-            margin: 0;
-            padding: 0;
+            margin: 0; padding: 0;
             overscroll-behavior-y: contain; 
         }
         
         .aura-blob {
-            position: absolute;
+            position: fixed;
             border-radius: 50%;
             filter: blur(120px);
             opacity: 0.35;
@@ -43,15 +61,16 @@
         }
         .aura-1 { top: -10%; left: -10%; width: 50vw; height: 600px; background: radial-gradient(circle, #db2777, transparent 70%); }
         .aura-2 { top: 40%; right: -10%; width: 50vw; height: 600px; background: radial-gradient(circle, #f59e0b, transparent 70%); animation-delay: -5s; }
+        .aura-3 { bottom: -10%; left: 20%; width: 55vw; height: 600px; background: radial-gradient(circle, #e11d48, transparent 70%); animation-delay: -10s; }
 
         @keyframes float {
             0% { transform: translate(0, 0) scale(1); }
-            50% { transform: translate(30px, -50px) scale(1.05); }
-            100% { transform: translate(-30px, 30px) scale(0.95); }
+            50% { transform: translate(40px, -40px) scale(1.05); }
+            100% { transform: translate(-20px, 30px) scale(0.95); }
         }
 
         .glass-panel { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(24px); border: 1px solid rgba(255, 255, 255, 0.08); }
-        .glass-nav { background: rgba(2, 6, 23, 0.85); backdrop-filter: blur(24px); border-bottom: 1px solid rgba(255, 255, 255, 0.08); }
+        .glass-nav { background: rgba(2, 6, 23, 0.85); backdrop-filter: blur(24px); border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
         
         .text-gradient { background: linear-gradient(135deg, #f43f5e 0%, #fbbf24 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
         
@@ -59,18 +78,16 @@
         .fade-in { animation: fadeIn 0.4s ease-out forwards; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-        .magic-border {
-            position: relative;
-        }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.5); }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(244, 63, 94, 0.5); border-radius: 4px; }
+
+        .magic-border { position: relative; }
         .magic-border::before {
-            content: '';
-            position: absolute;
-            inset: -4px;
+            content: ''; position: absolute; inset: -4px;
             background: linear-gradient(45deg, #f43f5e, #fbbf24, #f43f5e);
-            border-radius: inherit;
-            z-index: -1;
-            animation: borderGlow 3s linear infinite;
-            background-size: 200% 200%;
+            border-radius: inherit; z-index: -1;
+            animation: borderGlow 3s linear infinite; background-size: 200% 200%;
         }
         @keyframes borderGlow {
             0% { background-position: 0% 50%; }
@@ -78,195 +95,321 @@
             100% { background-position: 0% 50%; }
         }
 
-        canvas {
-            touch-action: none; 
-            cursor: crosshair;
-        }
+        canvas { touch-action: none; cursor: crosshair; }
 
+        /* Print Rules - V3 Standard */
         @media print {
-            body { background-color: white !important; color: black !important; }
+            body { background: white !important; color: black !important; background-image: none !important; }
+            .aura-blob { display: none !important; }
             .print-hidden { display: none !important; }
-            .print-only-image { 
-                display: block !important; 
-                width: 100% !important; 
-                height: auto !important; 
-                max-height: 95vh;
-                object-fit: contain;
-                margin: 0 auto;
-            }
-            .glass-panel, .magic-border::before { display: none !important; }
+            .print-only-image { display: block !important; width: 100% !important; height: auto !important; max-height: 95vh; object-fit: contain; margin: 0 auto; }
+            .glass-panel { background: transparent !important; border: none !important; box-shadow: none !important; color: black !important; filter: none !important; backdrop-filter: none !important; padding: 0 !important; }
+            .magic-border::before { display: none !important; }
+            * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
             @page { margin: 1cm; size: portrait; }
         }
     </style>
 </head>
-<body>
+<body class="custom-scrollbar">
+    
+    <div id="wspolne-menu-kontener" class="print-hidden"></div>
     <div id="root"></div>
 
+    <!-- MOCK EduBoxCore -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
+        import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+        
+        let FIREBASE_CONFIG;
+        try { FIREBASE_CONFIG = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : { apiKey: "mock-key", authDomain: "mock", projectId: "mock", appId: "1:123" }; } catch(e) { FIREBASE_CONFIG = {}; }
+        const APP_ID = typeof __app_id !== 'undefined' ? __app_id : "eduboxpro";
+        
+        let app, auth, db, currentUser = null;
+        let isInitialized = false;
+
+        window.EduBoxCore = {
+            init: async (onUserLoad) => {
+                if (!isInitialized) {
+                    try {
+                        app = initializeApp(FIREBASE_CONFIG);
+                        auth = getAuth(app);
+                        db = getFirestore(app);
+                        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) await signInWithCustomToken(auth, __initial_auth_token);
+                        else await signInAnonymously(auth);
+                        isInitialized = true;
+                        window.EduBoxCore.loadMenu();
+                    } catch(e) { console.warn("Firebase init error", e); }
+                }
+                if (auth) onAuthStateChanged(auth, (user) => { currentUser = user; if(onUserLoad) onUserLoad(user); });
+                else if(onUserLoad) onUserLoad({ uid: 'mock-user-123' });
+            },
+            loadMenu: () => {
+                const container = document.getElementById('wspolne-menu-kontener');
+                if (container) container.innerHTML = `<div class="bg-pink-600 text-white text-xs text-center py-1 font-bold print-hidden">EduBox V3 PRO MAX - System Core Loaded</div>`;
+            },
+            getUsageCount: () => {
+                const today = new Date().toISOString().split('T')[0];
+                let usageStr = localStorage.getItem('eduboxUsage');
+                if (usageStr) { try { const parsed = JSON.parse(usageStr); if (parsed.date === today) return parsed.count; } catch(e) {} }
+                return 0;
+            },
+            executeWithLimitCheck: (isPremium, onSuccess, onLimitReached, onToastUpdate) => {
+                const status = localStorage.getItem('eduboxProStatus');
+                if (status === 'PRO' || isPremium) { onSuccess(window.EduBoxCore.getUsageCount()); return; }
+                let currentCount = window.EduBoxCore.getUsageCount();
+                if (currentCount >= 5) { onLimitReached("⚠️ Dzienny limit użyć (5/5) wyczerpany. Wpisz kod odblokowujący na pasku bocznym!"); return; }
+                const newCount = currentCount + 1;
+                localStorage.setItem('eduboxUsage', JSON.stringify({ date: new Date().toISOString().split('T')[0], count: newCount }));
+                onToastUpdate(`Wykorzystano ${newCount}/5 darmowych działań`);
+                onSuccess(newCount);
+            },
+            verifyPremiumCode: (code) => code.toUpperCase() === 'KAWA2024',
+            saveToGielda: async (collectionName, appType, itemName, config) => {
+                if (!currentUser && !db) throw new Error("Brak połączenia z chmurą.");
+                const publicRef = collection(db, 'artifacts', APP_ID, 'public', 'data', collectionName);
+                const payload = { userId: currentUser?.uid || 'anonymous', createdAt: serverTimestamp(), type: appType, name: itemName, config: config };
+                if (JSON.stringify(payload).length > 950000) throw new Error("🚨 Użyta grafika jest za duża by zapisać ją w chmurze (Max ~1MB)!");
+                await addDoc(publicRef, payload);
+            },
+            subscribeToGielda: (collectionName, onDataLoaded, onError) => {
+                if (!db) return () => {};
+                const publicRef = collection(db, 'artifacts', APP_ID, 'public', 'data', collectionName);
+                return onSnapshot(publicRef, (snapshot) => {
+                    const loaded = [];
+                    snapshot.forEach(doc => loaded.push({ id: doc.id, ...doc.data() }));
+                    loaded.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
+                    onDataLoaded(loaded);
+                }, onError);
+            }
+        };
+    </script>
+
     <script type="text/babel">
-        const { useState, useRef, useEffect } = React;
+        const { useState, useEffect, useRef } = React;
 
         function App() {
-            const SECRET_PIN = "KAWA2024"; 
-            const BUY_COFFEE_LINK = "https://buycoffee.to/magiccolor";
-            const FREE_TRIES_LIMIT = 3;
+            // === SYSTEM & LIMITS STATE ===
+            const [user, setUser] = useState(null);
+            const [appMode, setAppMode] = useState('generator'); // 'generator' | 'gielda'
+            const [isPremium, setIsPremium] = useState(false);
+            const [usages, setUsages] = useState(0);
+            const [accessCode, setAccessCode] = useState('');
+            const [toast, setToast] = useState({ message: '', visible: false, type: 'info' });
 
-            const [isAuthenticated, setIsAuthenticated] = useState(false);
-            const [freeTries, setFreeTries] = useState(0);
-            const [showPaywall, setShowPaywall] = useState(false);
-            const [passwordInput, setPasswordInput] = useState('');
-            
+            // === APP STATE ===
             const [promptInput, setPromptInput] = useState('');
             const [styleOption, setStyleOption] = useState('szkola'); 
             const [generatedImage, setGeneratedImage] = useState(null);
             const [isGenerating, setIsGenerating] = useState(false);
-            const [error, setError] = useState('');
-
+            
+            // === CANVAS STATE ===
             const [selectedColor, setSelectedColor] = useState("#f43f5e"); 
-            const [brushSize, setBrushSize] = useState(10); 
+            const [brushSize, setBrushSize] = useState(15); 
             const canvasRef = useRef(null);
-            const [isDrawing, setIsDrawing] = useState(false); 
             const ctxRef = useRef(null);
-            const resultRef = useRef(null);
+            const [isDrawing, setIsDrawing] = useState(false); 
+            
+            // === GIEŁDA (MARKETPLACE) ===
+            const [gieldaItems, setGieldaItems] = useState([]);
+            const [isSavingToGielda, setIsSavingToGielda] = useState(false);
 
+            const resultRef = useRef(null);
             const colors = ["#f43f5e", "#fbbf24", "#10b981", "#3b82f6", "#8b5cf6", "#ec4899", "#000000", "#ffffff"];
 
+            // === INITIALIZATION ===
             useEffect(() => {
-                const savedAuth = localStorage.getItem('magicColorAuth') === 'true';
-                if (savedAuth) setIsAuthenticated(true);
-                const savedTries = parseInt(localStorage.getItem('magicColorFreeTries') || '0');
-                setFreeTries(savedTries);
+                const checkInterval = setInterval(() => {
+                    if (window.EduBoxCore) {
+                        clearInterval(checkInterval);
+                        window.EduBoxCore.init((u) => {
+                            setUser(u);
+                            setUsages(window.EduBoxCore.getUsageCount());
+                            if (localStorage.getItem('eduboxProStatus') === 'PRO') setIsPremium(true);
+                        });
+                        
+                        const unsubscribe = window.EduBoxCore.subscribeToGielda(
+                            'coloring_market',
+                            (data) => setGieldaItems(data),
+                            (err) => console.error("Gielda error:", err)
+                        );
+                        return () => unsubscribe();
+                    }
+                }, 100);
             }, []);
 
-            const fetchWithRetry = async (url, options, retries = 3, delay = 1000) => {
-                for (let i = 0; i < retries; i++) {
-                    try {
-                        const response = await fetch(url, options);
-                        if (!response.ok) {
-                            const errData = await response.json().catch(() => ({}));
-                            throw new Error(errData.error || `Status API: ${response.status}`);
-                        }
-                        return await response.json();
-                    } catch (e) {
-                        if (i === retries - 1) throw e;
-                        await new Promise(res => setTimeout(res, delay * Math.pow(2, i)));
-                    }
+            const showToast = (msg, type = 'info') => {
+                setToast({ message: msg, visible: true, type });
+                setTimeout(() => setToast(t => ({ ...t, visible: false })), 4000);
+            };
+
+            const handleVerifyCode = () => {
+                if (window.EduBoxCore.verifyPremiumCode(accessCode)) {
+                    localStorage.setItem('eduboxProStatus', 'PRO');
+                    setIsPremium(true);
+                    setAccessCode('');
+                    showToast('Odblokowano wersję PRO MAX! 🚀', 'success');
+                } else {
+                    showToast('Nieprawidłowy kod weryfikacyjny.', 'error');
                 }
             };
 
-            const secureApiCall = async (payload) => {
-                const isProduction = window.location.hostname.includes('vercel.app') || 
-                                     (window.location.hostname !== '' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1');
+            // === PANCERNE API FUNCTIONS ===
+            const fetchWithExponentialBackoff = async (url, options, timeoutMs = 25000) => {
+                const delays = [1000, 2000, 4000, 8000, 16000];
+                let lastErr;
+                for (let i = 0; i < 5; i++) {
+                    try {
+                        const controller = new AbortController();
+                        const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+                        const fetchOptions = { ...options, signal: controller.signal };
+                        
+                        const res = await fetch(url, fetchOptions);
+                        clearTimeout(timeoutId);
+                        
+                        if (!res.ok) {
+                            const errText = await res.text();
+                            throw new Error(`HTTP ${res.status}: ${errText.substring(0, 80)}`);
+                        }
+                        return await res.json();
+                    } catch (err) {
+                        lastErr = err;
+                        if (err.name === 'AbortError') lastErr = new Error("Serwer nie odpowiedział na czas (Timeout).");
+                        if (i < 4) await new Promise(r => setTimeout(r, delays[i]));
+                    }
+                }
+                throw lastErr;
+            };
 
-                if (isProduction) {
-                    return await fetchWithRetry('/api/gemini', {
+            const secureApiImageCall = async (payloadData) => {
+                try {
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 20000);
+                    const res = await fetch('/api/generate', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ payload, type: 'image' })
+                        body: JSON.stringify(payloadData),
+                        signal: controller.signal
                     });
-                } else {
+                    clearTimeout(timeoutId);
+                    
+                    if (res.ok) return await res.json();
+                    throw new Error(`Status API: ${res.status}`);
+                } catch (e) {
+                    console.warn("Przełączam na model awaryjny obrazu (Canvas):", e.message);
                     const apiKey = ""; 
                     const url = `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${apiKey}`;
-                    return await fetchWithRetry(url, {
+                    
+                    const payload = {
+                        instances: { prompt: payloadData.prompt },
+                        parameters: { sampleCount: 1 } 
+                    };
+
+                    return await fetchWithExponentialBackoff(url, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(payload)
-                    });
+                    }, 25000);
                 }
             };
 
-            const generateColoringPage = async () => {
-                if (!isAuthenticated && freeTries >= FREE_TRIES_LIMIT) {
-                    setShowPaywall(true);
-                    return;
-                }
-                if (!promptInput.trim()) {
-                    setError('Musisz wpisać, co chcesz narysować!');
-                    return;
-                }
-
-                setIsGenerating(true);
-                setError('');
-                setGeneratedImage(null);
-
-                try {
-                    // KROK 1: Nowe, wektorowe i "płaskie" modyfikatory (brak szkiców!)
-                    let styleModifier = "";
-                    if (styleOption === 'przedszkole') {
-                        styleModifier = "extremely simple toddler coloring page, thick bold black vector lines, large empty white spaces";
-                    } else if (styleOption === 'szkola') {
-                        styleModifier = "standard kids coloring book page, clean bold black outlines, uncolored, 2D flat vector style";
-                    } else if (styleOption === 'mandala') {
-                        styleModifier = "detailed mandala coloring page, crisp black outlines, uncolored, geometric";
-                    }
-
-                    // KROK 2: Wymuszamy płaską (flat 2d) grafikę, a nie rysunek ołówkiem
-                    const hiddenInstruction = `Monochrome coloring book page of ${promptInput}. ${styleModifier}. Strictly black outlines on pure white background. Flat 2D vector art. No shading, no grayscale, no halftones, no colors.`;
-                    
-                    // KROK 3: Zakazujemy ołówka, cieniowania i realizmu
-                    const negativePrompt = "shading, gradients, grayscale, sketch, pencil, realistic, 3d, colors, shadows, halftone, text, watermark, painted, complex background";
-
-                    const payload = {
-                        prompt: hiddenInstruction, 
-                        negative_prompt: negativePrompt, 
-                        instances: { prompt: hiddenInstruction }, 
-                        parameters: { sampleCount: 1 }
-                    };
-
-                    const data = await secureApiCall(payload);
-                    const base64Image = data.predictions?.[0]?.bytesBase64Encoded || data.artifacts?.[0]?.base64 || data.image; 
-                    
-                    if (base64Image) {
-                        const finalImage = base64Image.startsWith('data:image') ? base64Image : `data:image/png;base64,${base64Image}`;
-                        setGeneratedImage(finalImage);
+            // === LOGIC ===
+            const generateColoringPage = () => {
+                if (!promptInput.trim()) { showToast('Wpisz, co chcesz narysować!', 'error'); return; }
+                
+                window.EduBoxCore.executeWithLimitCheck(isPremium, 
+                    async (newCount) => {
+                        setUsages(newCount);
+                        setIsGenerating(true);
+                        setGeneratedImage(null);
                         
-                        if (!isAuthenticated) {
-                            const newTries = freeTries + 1;
-                            setFreeTries(newTries);
-                            localStorage.setItem('magicColorFreeTries', newTries.toString());
+                        try {
+                            let styleModifier = "";
+                            if (styleOption === 'przedszkole') {
+                                styleModifier = "extremely simple toddler coloring page, thick bold black vector lines, large empty white spaces";
+                            } else if (styleOption === 'szkola') {
+                                styleModifier = "standard kids coloring book page, clean bold black outlines, uncolored, 2D flat vector style";
+                            } else if (styleOption === 'mandala') {
+                                styleModifier = "detailed mandala coloring page, crisp black outlines, uncolored, geometric";
+                            }
+
+                            const hiddenInstruction = `Monochrome coloring book page of ${promptInput}. ${styleModifier}. Strictly black outlines on pure white background. Flat 2D vector art. No shading, no grayscale, no halftones, no colors.`;
+                            const negativePrompt = "shading, gradients, grayscale, sketch, pencil, realistic, 3d, colors, shadows, halftone, text, watermark, painted, complex background";
+
+                            const payload = {
+                                prompt: hiddenInstruction, 
+                                negative_prompt: negativePrompt, 
+                                style_preset: 'line-art',
+                                aspect_ratio: '1:1',
+                                width: 1024,
+                                height: 1024
+                            };
+
+                            const data = await secureApiImageCall(payload);
+                            const base64Image = data.predictions?.[0]?.bytesBase64Encoded || data.artifacts?.[0]?.base64 || data.image || data.imageUrl || data.image_url || data.url; 
+                            
+                            if (base64Image) {
+                                const finalImage = base64Image.startsWith('http') || base64Image.startsWith('data:image') ? base64Image : `data:image/png;base64,${base64Image}`;
+                                setGeneratedImage(finalImage);
+                                setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
+                            } else {
+                                throw new Error("Brak danych obrazu");
+                            }
+
+                        } catch (error) {
+                            console.error("Szczegóły błędu:", error); 
+                            showToast(`Błąd: ${error.message.substring(0, 80)}`, 'error');
+                        } finally { 
+                            setIsGenerating(false); 
                         }
-                        setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
-                    } else {
-                        throw new Error("Pusta odpowiedź API graficznego.");
-                    }
+                    },
+                    (errMsg) => showToast(errMsg, 'error'),
+                    (msg) => showToast(msg, 'info')
+                );
+            };
 
-                } catch (err) {
-                    console.error("Błąd grafiki:", err);
-                    setError('Wystąpił problem z przetworzeniem żądania. Spróbuj ponownie lub zmień trochę opis.');
+            const publishToGielda = async () => {
+                if(!generatedImage) return;
+                setIsSavingToGielda(true);
+                try {
+                    const configToSave = { promptInput, styleOption, imageUrl: generatedImage };
+                    const shortTitle = promptInput.substring(0, 30) + (promptInput.length > 30 ? '...' : '');
+                    
+                    await window.EduBoxCore.saveToGielda('coloring_market', 'MagicColor', shortTitle, configToSave);
+                    showToast("Opublikowano na Giełdzie Kolorowanek! 🎉", "success");
+                } catch(e) {
+                    showToast(e.message, "error");
                 } finally {
-                    setIsGenerating(false);
+                    setIsSavingToGielda(false);
                 }
             };
 
-            const handleLogin = () => {
-                if (passwordInput === SECRET_PIN) {
-                    setIsAuthenticated(true);
-                    setShowPaywall(false);
-                    localStorage.setItem('magicColorAuth', 'true');
-                } else {
-                    alert('Nieprawidłowy kod PIN!');
-                }
+            const loadFromGielda = (item) => {
+                setPromptInput(item.config.promptInput || '');
+                setStyleOption(item.config.styleOption || 'szkola');
+                setGeneratedImage(item.config.imageUrl || null);
+                setAppMode('generator');
+                showToast("Wczytano projekt z Giełdy!", "info");
+                setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
             };
 
-            // =========================================================================
-            // OBSŁUGA PŁÓTNA - Z MATEMATYCZNYM "WYBIELACZEM PIKSELI"
-            // =========================================================================
+            // === CANVAS INTELLIGENT PIXEL WHITENER & DRAWING ===
             useEffect(() => {
                 if (generatedImage && canvasRef.current) {
                     const canvas = canvasRef.current;
                     const ctx = canvas.getContext("2d");
                     const img = new Image();
+                    img.crossOrigin = "Anonymous"; // Na wypadek ładowania z URL zewnętrznego
+                    
                     img.onload = () => {
                         canvas.width = img.width;
                         canvas.height = img.height;
                         
-                        // Krok 1: Wylewamy czystą biel na tło
                         ctx.fillStyle = "#ffffff";
                         ctx.fillRect(0, 0, canvas.width, canvas.height);
-                        
-                        // Krok 2: Rysujemy pobrany obrazek
                         ctx.drawImage(img, 0, 0);
                         
-                        // Krok 3: INTELIGENTNY WYBIELACZ PIKSELI (Złagodzony)
+                        // Inteligentny Wybielacz Pikseli
                         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
                         const data = imageData.data;
                         
@@ -275,30 +418,18 @@
                             const g = data[i + 1];
                             const b = data[i + 2];
                             
-                            // Obliczamy jasność (luminancję) piksela
                             const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
                             
-                            // Zmiana progu z 150 na 220! 
-                            // Kasujemy TYLKO bardzo jasne, szare tło. 
-                            // Linie łap (które mogły mieć np. jasność 170-190) przetrwają!
+                            // Próg kasowania szarości tła (zachowuje linie)
                             if (luminance > 220) { 
-                                data[i] = 255;
-                                data[i + 1] = 255;
-                                data[i + 2] = 255;
+                                data[i] = 255; data[i + 1] = 255; data[i + 2] = 255;
                             } else {
-                                // Zamiast brutalnie robić wszystko na czarno, 
-                                // przyciemniamy naturalny kolor linii. 
-                                // Wygładza to krawędzie (zachowuje antyaliasing).
                                 const darken = Math.max(0, luminance - 100);
-                                data[i] = darken;
-                                data[i + 1] = darken;
-                                data[i + 2] = darken;
+                                data[i] = darken; data[i + 1] = darken; data[i + 2] = darken;
                             }
                         }
-                        // Zapisujemy poprawioną kolorowankę na płótno
                         ctx.putImageData(imageData, 0, 0);
                         
-                        // Przygotowujemy mazaki do malowania przez dzieci
                         ctx.globalCompositeOperation = 'multiply';
                         ctx.lineCap = "round";
                         ctx.lineJoin = "round";
@@ -322,10 +453,7 @@
                     clientX = e.clientX;
                     clientY = e.clientY;
                 }
-                return {
-                    x: (clientX - rect.left) * scaleX,
-                    y: (clientY - rect.top) * scaleY
-                };
+                return { x: (clientX - rect.left) * scaleX, y: (clientY - rect.top) * scaleY };
             };
 
             const startDrawing = (e) => {
@@ -355,162 +483,144 @@
             };
 
             const stopDrawing = () => {
-                ctxRef.current.closePath();
+                if(ctxRef.current) ctxRef.current.closePath();
                 setIsDrawing(false);
             };
 
             const handlePrint = () => {
-                if (canvasRef.current) {
-                    const dataUrl = canvasRef.current.toDataURL("image/png");
-                    const windowContent = `
-                        <!DOCTYPE html>
-                        <html>
-                        <head>
-                            <title>Twoja Kolorowanka - EduBox PRO</title>
-                            <style>
-                                @page { size: A4 portrait; margin: 0; }
-                                html, body { 
-                                    margin: 0; 
-                                    padding: 0; 
-                                    width: 100%; 
-                                    height: 100%; 
-                                    background-color: #fff; 
-                                }
-                                .print-container {
-                                    width: 100%;
-                                    height: 100%;
-                                    padding: 1.5cm;
-                                    box-sizing: border-box;
-                                    display: flex;
-                                    justify-content: center;
-                                    align-items: center;
-                                }
-                                img { 
-                                    max-width: 100%; 
-                                    max-height: 100%; 
-                                    object-fit: contain; 
-                                }
-                            </style>
-                        </head>
-                        <body>
-                            <div class="print-container">
-                                <img src="${dataUrl}" />
-                            </div>
-                        </body>
-                        </html>
-                    `;
-                    const printWin = window.open('', '', 'width=800,height=800');
-                    printWin.document.open();
-                    printWin.document.write(windowContent);
-                    printWin.document.close();
-                    
-                    setTimeout(() => {
-                        printWin.focus();
-                        printWin.print();
-                        printWin.close();
-                    }, 500);
-                }
+                window.print();
             };
 
-            if (showPaywall) {
-                return (
-                    <div className="min-h-screen relative flex items-center justify-center p-4 print-hidden">
-                        <div className="aura-blob aura-1"></div>
-                        <div className="aura-blob aura-2"></div>
-                        
-                        <div className="glass-panel p-10 rounded-3xl max-w-md w-full text-center shadow-[0_0_50px_rgba(244,63,94,0.2)] border border-rose-500/30 fade-in relative z-10">
-                            <div className="w-24 h-24 bg-gradient-to-br from-pink-500 to-amber-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
-                                <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
-                            </div>
-                            <h2 className="text-3xl font-black text-white mb-2">Limit wyczerpany!</h2>
-                            <p className="text-slate-300 text-sm mb-8 font-medium">Wykorzystałeś swoje darmowe próby ({FREE_TRIES_LIMIT}/{FREE_TRIES_LIMIT}). Podaj kod PIN, aby uzyskać nielimitowany dostęp PRO.</p>
-                            
-                            <input 
-                                type="password" value={passwordInput} onChange={(e) => setPasswordInput(e.target.value)}
-                                onKeyPress={(e) => { if (e.key === 'Enter') handleLogin(); }}
-                                placeholder="Wpisz PIN..."
-                                className="w-full bg-slate-900 border border-slate-600 text-center text-white rounded-xl px-5 py-4 focus:ring-2 focus:ring-pink-500 outline-none mb-6 text-2xl tracking-[0.5em] font-bold uppercase"
-                            />
-                            
-                            <button 
-                                onClick={handleLogin}
-                                className="w-full bg-gradient-to-r from-pink-600 to-amber-500 hover:from-pink-500 hover:to-amber-400 text-white font-black py-4 rounded-xl transition-all transform hover:scale-105 btn-bounce text-lg shadow-lg mb-4"
-                            >
-                                Odblokuj System
-                            </button>
-                            <button 
-                                onClick={() => setShowPaywall(false)}
-                                className="text-slate-400 hover:text-white text-sm font-bold mb-8"
-                            >
-                                Wróć do strony głównej
-                            </button>
+            // === RENDERERS ===
+            const renderSidebar = () => (
+                <div className="w-80 bg-slate-900/80 backdrop-blur-xl border-r border-slate-800 flex flex-col h-screen fixed left-0 top-0 z-40 print-hidden hidden md:flex shadow-2xl">
+                    <div className="p-6 border-b border-slate-800 flex items-center gap-3">
+                        <div className="w-10 h-10 bg-gradient-to-br from-pink-500 to-amber-500 rounded-xl flex items-center justify-center shadow-lg shadow-pink-500/20">
+                            <i className="ph-bold ph-palette text-white text-xl"></i>
+                        </div>
+                        <span className="text-xl font-extrabold tracking-tight text-white">MagicColor<span className="text-pink-400">AI</span></span>
+                    </div>
 
-                            <div className="pt-6 border-t border-slate-700/50">
-                                <p className="text-slate-400 text-xs mb-3 font-medium">Nie masz dostępu? Zdobądź kod PIN wspierając projekt!</p>
-                                <a href={BUY_COFFEE_LINK} target="_blank" rel="noopener noreferrer" className="w-full bg-slate-800/80 hover:bg-slate-700 border border-slate-600 text-white font-bold py-3.5 rounded-xl transition-all flex items-center justify-center gap-3 text-sm btn-bounce hover:border-amber-500/50 hover:text-amber-400 shadow-md">
-                                    <span className="text-xl">☕</span> Postaw Kawę i odbierz PIN
-                                </a>
+                    <div className="p-4 flex-1 flex flex-col gap-2 overflow-y-auto custom-scrollbar">
+                        <button onClick={() => setAppMode('generator')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all ${appMode === 'generator' ? 'bg-pink-600/20 text-pink-400 border border-pink-500/50' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>
+                            <i className="ph-bold ph-magic-wand text-lg"></i> Kreator Kolorowanek
+                        </button>
+                        <button onClick={() => setAppMode('gielda')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all ${appMode === 'gielda' ? 'bg-amber-600/20 text-amber-400 border border-amber-500/50' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>
+                            <i className="ph-bold ph-books text-lg"></i> Giełda Kolorowanek
+                        </button>
+
+                        <div className="mt-auto pt-6 border-t border-slate-800 space-y-4">
+                            <div className="bg-slate-950 rounded-xl p-4 border border-slate-800">
+                                <div className="flex justify-between items-center mb-2">
+                                    <span className="text-xs font-bold text-slate-400 uppercase">Status Konta</span>
+                                    {isPremium ? <span className="bg-gradient-to-r from-amber-400 to-orange-500 text-black text-[10px] px-2 py-0.5 rounded-full font-black tracking-wide">PRO MAX</span> 
+                                               : <span className="bg-slate-800 text-slate-300 text-[10px] px-2 py-0.5 rounded-full font-bold">DARMOWE</span>}
+                                </div>
+                                
+                                {!isPremium && (
+                                    <>
+                                        <div className="flex justify-between text-sm mb-1 mt-3">
+                                            <span className="text-slate-400">Wygenerowano:</span>
+                                            <span className="font-bold text-white">{usages} / 5</span>
+                                        </div>
+                                        <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden mb-4">
+                                            <div className="bg-pink-500 h-full" style={{width: `${(usages/5)*100}%`}}></div>
+                                        </div>
+                                        
+                                        <div className="space-y-2">
+                                            <input type="text" value={accessCode} onChange={e=>setAccessCode(e.target.value)} placeholder="Wpisz kod PRO..." className="w-full bg-slate-900 border border-slate-700 text-xs px-3 py-2 rounded-lg text-white outline-none focus:border-pink-500" />
+                                            <button onClick={handleVerifyCode} className="w-full bg-slate-800 hover:bg-pink-600 text-white text-xs font-bold py-2 rounded-lg transition-colors">Odblokuj Limity</button>
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+
+            // === GIEŁDA VIEW ===
+            if (appMode === 'gielda') {
+                return (
+                    <div className="min-h-screen flex pl-0 md:pl-80 bg-transparent font-sans">
+                        <div className="aura-blob aura-1"></div><div className="aura-blob aura-2"></div><div className="aura-blob aura-3"></div>
+                        {renderSidebar()}
+                        {toast.visible && <div className={`fixed top-6 right-6 z-[9999] px-6 py-3 rounded-xl font-bold shadow-2xl transition-all ${toast.type === 'error' ? 'bg-red-500 text-white' : 'bg-emerald-500 text-slate-900'}`}>{toast.message}</div>}
+                        
+                        <div className="flex-1 p-8">
+                            <h2 className="text-3xl font-black mb-2 text-white">Giełda Kolorowanek</h2>
+                            <p className="text-slate-400 mb-8">Pobieraj i modyfikuj kolorowanki stworzone przez innych nauczycieli i dzieci.</p>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                                {gieldaItems.map(item => (
+                                    <div key={item.id} className="glass-panel p-4 rounded-2xl flex flex-col hover:border-pink-500/50 transition-colors group">
+                                        <div className="w-full h-48 bg-white rounded-xl mb-4 overflow-hidden border-2 border-slate-300 relative flex items-center justify-center p-2">
+                                            {item.config.imageUrl ? (
+                                                <img src={item.config.imageUrl} className="max-w-full max-h-full object-contain group-hover:scale-110 transition-transform duration-500 mix-blend-multiply" />
+                                            ) : (
+                                                <div className="w-full h-full flex items-center justify-center text-slate-600"><i className="ph-thin ph-image text-4xl"></i></div>
+                                            )}
+                                        </div>
+                                        <h3 className="text-sm font-bold text-white mb-2 line-clamp-2">"{item.config.promptInput}"</h3>
+                                        <div className="flex gap-2 text-[10px] text-slate-400 mb-4 flex-wrap">
+                                            <span className="bg-slate-800 px-2 py-1 rounded capitalize">{item.config.styleOption}</span>
+                                        </div>
+                                        <div className="mt-auto flex gap-2">
+                                            <button onClick={() => loadFromGielda(item)} className="w-full bg-slate-800 hover:bg-pink-600 text-white py-2 rounded-xl text-sm font-bold transition-colors">
+                                                Maluj na nowo
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                                {gieldaItems.length === 0 && (
+                                    <div className="col-span-full py-12 text-center text-slate-500">
+                                        <i className="ph-thin ph-cloud-slash text-6xl mb-4"></i>
+                                        <p>Brak udostępnionych kolorowanek w bazie.</p>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
                 );
             }
 
+            // === GENERATOR VIEW ===
             return (
-                <div className="min-h-screen relative flex flex-col">
-                    <div className="aura-blob aura-1 print-hidden"></div>
-                    <div className="aura-blob aura-2 print-hidden"></div>
+                <div className="min-h-screen flex pl-0 md:pl-80 bg-transparent font-sans relative">
+                    <div className="aura-blob aura-1 print-hidden"></div><div className="aura-blob aura-2 print-hidden"></div><div className="aura-blob aura-3 print-hidden"></div>
+                    
+                    {renderSidebar()}
+                    
+                    {toast.visible && <div className={`fixed top-6 right-6 z-[9999] px-6 py-3 rounded-xl font-bold shadow-2xl transition-all ${toast.type === 'error' ? 'bg-red-500 text-white' : 'bg-emerald-500 text-slate-900'}`}>{toast.message}</div>}
 
-                    <nav className="fixed top-0 w-full z-50 glass-nav print-hidden">
-                        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-20 flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 bg-gradient-to-br from-pink-500 to-amber-500 rounded-xl flex items-center justify-center shadow-lg">
-                                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"/></svg>
+                    {isGenerating && (
+                        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-[100] flex flex-col items-center justify-center text-white print-hidden">
+                            <div className="glass-panel p-10 rounded-3xl flex flex-col items-center space-y-6 max-w-sm border border-pink-500/20 shadow-[0_0_50px_rgba(244,63,94,0.2)]">
+                                <i className="ph-bold ph-spinner-gap animate-spin text-5xl text-pink-500"></i>
+                                <div className="text-center">
+                                    <h3 className="text-xl font-bold mb-2 text-white">Szkicowanie...</h3>
+                                    <p className="text-xs text-slate-400 font-medium">To potrwa kilkanaście sekund.</p>
                                 </div>
-                                <span className="text-xl font-extrabold tracking-tight text-white hidden sm:block">MagicColor<span className="text-pink-400">AI PRO</span></span>
-                            </div>
-                            <div className="flex items-center gap-4">
-                                {!isAuthenticated ? (
-                                    <div className="bg-slate-800/80 border border-slate-600 px-3 py-1.5 rounded-full text-xs font-bold text-slate-300 flex items-center gap-2">
-                                        <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
-                                        Darmowe próby: {FREE_TRIES_LIMIT - freeTries}
-                                    </div>
-                                ) : (
-                                    <div className="bg-emerald-500/20 border border-emerald-500/50 px-3 py-1.5 rounded-full text-xs font-bold text-emerald-400 flex items-center gap-2">
-                                        <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-                                        Konto PRO Aktywne
-                                    </div>
-                                )}
-                                
-                                {!isAuthenticated && (
-                                    <button onClick={() => setShowPaywall(true)} className="text-pink-400 hover:text-pink-300 text-xs sm:text-sm font-bold transition-colors">
-                                        Zaloguj
-                                    </button>
-                                )}
-                                
-                                <a href="index.html" className="flex items-center gap-2 text-xs sm:text-sm font-bold text-slate-300 hover:text-white transition-colors bg-slate-800 hover:bg-slate-700 px-4 py-2.5 rounded-xl border border-slate-600">
-                                    Wróć
-                                </a>
                             </div>
                         </div>
-                    </nav>
+                    )}
 
-                    <main className="flex-grow pt-32 pb-20 px-4 sm:px-6 print:pt-0 print:pb-0">
-                        <div className="max-w-5xl mx-auto">
+                    <div className="flex-1 p-4 md:p-8 xl:p-12 overflow-y-auto">
+                        <div className="max-w-4xl mx-auto print-hidden">
                             
-                            <div className="text-center mb-12 fade-in print-hidden">
-                                <div className="inline-flex items-center gap-2 bg-pink-900/30 border border-pink-500/30 px-4 py-1.5 rounded-full text-[10px] font-black text-pink-400 uppercase tracking-widest mb-4">
+                            <div className="text-center mb-10 fade-in">
+                                <div className="inline-flex items-center gap-2 bg-pink-900/30 border border-pink-500/30 px-4 py-1.5 rounded-full text-[10px] font-black text-pink-400 uppercase tracking-widest mb-4 backdrop-blur-sm">
                                     Inteligentny Rysownik
                                 </div>
                                 <h1 className="text-4xl md:text-5xl font-black text-white mb-4 tracking-tight">
                                     Narysuj wyobraźnię <span className="text-gradient">dzieci.</span>
                                 </h1>
                                 <p className="text-slate-400 text-lg">
-                                    Wpisz dowolny szalony pomysł, a sztuczna inteligencja narysuje czarno-białą, idealną kolorowankę gotową do wydruku.
+                                    Wpisz dowolny szalony pomysł, a sztuczna inteligencja narysuje czarno-białą, idealną kolorowankę gotową do interaktywnego malowania lub wydruku.
                                 </p>
                             </div>
 
-                            <div className="glass-panel p-6 sm:p-10 rounded-[2.5rem] fade-in border border-slate-700/50 print-hidden max-w-3xl mx-auto" style={{animationDelay: '0.1s'}}>
+                            <div className="glass-panel p-6 sm:p-10 rounded-[2.5rem] fade-in border border-slate-700/50" style={{animationDelay: '0.1s'}}>
                                 
                                 <div className="mb-8">
                                     <label className="block text-slate-300 font-bold mb-3 text-sm uppercase tracking-wider">Wybierz stopień trudności (Styl):</label>
@@ -547,122 +657,125 @@
                                         value={promptInput}
                                         onChange={(e) => setPromptInput(e.target.value)}
                                         onKeyPress={(e) => { if(e.key === 'Enter') generateColoringPage(); }}
-                                        placeholder="Np. Sowa w okularach czytająca książkę..."
+                                        placeholder="Np. Wesoły dinozaur jedzący pizzę..."
                                         className="w-full bg-slate-900/80 border border-slate-600 text-white rounded-2xl px-6 py-5 focus:ring-2 focus:ring-pink-500 outline-none text-lg pr-16"
                                     />
-                                    <span className="absolute right-5 top-1/2 -translate-y-1/2 text-2xl">🪄</span>
+                                    <span className="absolute right-5 top-1/2 -translate-y-1/2 text-2xl"><i className="ph-fill ph-magic-wand text-pink-500"></i></span>
                                 </div>
 
                                 <div className="mt-6 flex flex-wrap gap-2">
                                     <span className="text-xs text-slate-500 font-bold uppercase mt-2 mr-2">Szybkie pomysły:</span>
-                                    {['Wesoły dinozaur jedzący pizzę', 'Zamek księżniczki na chmurze', 'Piesek jadący na deskorolce', 'Sowa w okularach'].map(idea => (
+                                    {['Zamek księżniczki na chmurze', 'Piesek jadący na deskorolce', 'Sowa w okularach'].map(idea => (
                                         <button key={idea} onClick={() => setPromptInput(idea)} className="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs px-3 py-2 rounded-lg border border-slate-700 transition-colors">
                                             {idea}
                                         </button>
                                     ))}
                                 </div>
 
-                                {error && <div className="mt-6 p-4 bg-red-900/30 border border-red-500/50 rounded-xl text-red-400 text-sm font-medium text-center">{error}</div>}
-
-                                <div className="mt-10 flex justify-center">
+                                <div className="mt-10 flex justify-end">
                                     <button 
                                         onClick={generateColoringPage}
                                         disabled={isGenerating || !promptInput}
                                         className={`w-full sm:w-auto px-12 py-5 rounded-2xl font-black text-white text-lg transition-all flex items-center justify-center gap-3 shadow-[0_0_20px_rgba(244,63,94,0.3)] btn-bounce
-                                            ${isGenerating ? 'bg-slate-700 cursor-not-allowed' : 'bg-gradient-to-r from-pink-600 to-amber-500 hover:scale-105'}`}
+                                            ${isGenerating ? 'bg-slate-700 cursor-not-allowed' : 'bg-gradient-to-r from-pink-600 to-amber-500 hover:scale-105 active:scale-95'}`}
                                     >
-                                        {isGenerating ? (
-                                            <><svg className="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Rysowanie w toku...</>
-                                        ) : (!isAuthenticated && freeTries >= FREE_TRIES_LIMIT ? 'Odblokuj dostęp PRO' : 'Wygeneruj Kolorowankę')}
+                                        {isGenerating ? <><i className="ph-bold ph-spinner animate-spin text-xl"></i> Rysowanie w toku...</> : <><i className="ph-bold ph-pencil-simple text-xl"></i> Wygeneruj Kolorowankę</>}
                                     </button>
                                 </div>
                             </div>
-
-                            {generatedImage && (
-                                <div ref={resultRef} className="mt-12 fade-in print:mt-0">
-                                    
-                                    <div className="flex flex-col lg:flex-row gap-8">
-                                        
-                                        <div className="flex-1 flex flex-col items-center">
-                                            <div className="w-full text-center sm:text-left mb-6 print-hidden">
-                                                <h3 className="text-2xl font-bold text-white mb-2">Twoja Kolorowanka</h3>
-                                                <p className="text-slate-400 text-sm">Pokoloruj ją na ekranie używając narzędzi obok, lub wydrukuj czystą!</p>
-                                            </div>
-
-                                            <div className="bg-white p-2 sm:p-4 rounded-3xl magic-border shadow-2xl print:shadow-none print:p-0 w-full max-w-2xl relative">
-                                                <canvas
-                                                    ref={canvasRef}
-                                                    onMouseDown={startDrawing}
-                                                    onMouseMove={draw}
-                                                    onMouseUp={stopDrawing}
-                                                    onMouseOut={stopDrawing}
-                                                    onTouchStart={startDrawing}
-                                                    onTouchMove={draw}
-                                                    onTouchEnd={stopDrawing}
-                                                    className="w-full max-w-2xl rounded-xl touch-none bg-white block mx-auto print-only-image"
-                                                />
-                                            </div>
-                                        </div>
-
-                                        <div className="w-full lg:w-80 print-hidden">
-                                            <div className="glass-panel p-6 rounded-[2rem] border border-slate-700/50 flex flex-col gap-6 sticky top-28">
-                                                
-                                                <div>
-                                                    <h3 className="text-white font-bold mb-4 text-sm uppercase tracking-wider border-b border-slate-700 pb-2">Magiczne pisaki</h3>
-                                                    <div className="flex flex-wrap gap-3">
-                                                        {colors.map((c) => (
-                                                            <button
-                                                                key={c}
-                                                                onClick={() => setSelectedColor(c)}
-                                                                className={`w-10 h-10 rounded-full shadow-md border-2 transition-transform ${
-                                                                    selectedColor === c ? "scale-125 border-white" : "border-slate-700 hover:scale-110"
-                                                                }`}
-                                                                style={{ backgroundColor: c }}
-                                                                title={c === "#ffffff" ? "Gumka" : "Kolor"}
-                                                            >
-                                                                {c === "#ffffff" && <span className="text-slate-500 text-[10px] flex justify-center mt-1.5 font-bold uppercase">Gumka</span>}
-                                                            </button>
-                                                        ))}
-                                                    </div>
-                                                </div>
-
-                                                <div>
-                                                    <h3 className="text-white font-bold mb-3 text-sm uppercase tracking-wider">Grubość pisaka</h3>
-                                                    <input 
-                                                        type="range" 
-                                                        min="5" 
-                                                        max="40" 
-                                                        value={brushSize}
-                                                        onChange={(e) => setBrushSize(e.target.value)}
-                                                        className="w-full accent-pink-500"
-                                                    />
-                                                    <div className="flex justify-between text-xs text-slate-400 mt-1 font-medium">
-                                                        <span>Cienki</span>
-                                                        <span>Gruby</span>
-                                                    </div>
-                                                </div>
-
-                                                <div className="mt-4 pt-6 border-t border-slate-700">
-                                                    <button 
-                                                        onClick={handlePrint}
-                                                        className="w-full bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-4 rounded-xl font-bold flex items-center justify-center gap-2 transition-all btn-bounce shadow-[0_0_15px_rgba(16,185,129,0.3)] text-lg"
-                                                    >
-                                                        🖨️ Wydrukuj Dzieciom
-                                                    </button>
-                                                    <p className="text-xs text-slate-500 text-center mt-4 leading-relaxed font-medium">
-                                                        Wskazówka: Rysuj palcem po ekranie!<br/>Zamalowania nie zasłonią czarnych kresek.
-                                                    </p>
-                                                </div>
-
-                                            </div>
-                                        </div>
-
-                                    </div>
-                                </div>
-                            )}
-
                         </div>
-                    </main>
+
+                        {/* WYNIKI */}
+                        {generatedImage && (
+                            <div ref={resultRef} className="max-w-6xl mx-auto mt-12 print:mt-0 print:block">
+                                
+                                <div className="flex justify-end gap-3 mb-6 print-hidden">
+                                    <button onClick={publishToGielda} disabled={isSavingToGielda} className="bg-purple-900/40 border border-purple-500/40 text-purple-300 hover:bg-purple-800 hover:text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-all text-sm disabled:opacity-50">
+                                        <i className="ph-bold ph-globe text-lg"></i> Zapisz na Giełdzie
+                                    </button>
+                                </div>
+
+                                <div className="flex flex-col lg:flex-row gap-8 items-start">
+                                    
+                                    <div className="flex-1 flex flex-col items-center w-full">
+                                        <div className="w-full text-center sm:text-left mb-6 print-hidden">
+                                            <h3 className="text-2xl font-bold text-white mb-2">Twoja Kolorowanka</h3>
+                                            <p className="text-slate-400 text-sm">Pokoloruj ją na ekranie palcem, używając pisaków obok, lub wydrukuj czystą!</p>
+                                        </div>
+
+                                        <div className="bg-white p-2 sm:p-4 rounded-3xl magic-border shadow-2xl print:shadow-none print:p-0 print:rounded-none w-full max-w-2xl relative">
+                                            {/* Zintegrowane płótno z inteligentnym wybielaczem i malowaniem po liniach (multiply) */}
+                                            <canvas
+                                                ref={canvasRef}
+                                                onMouseDown={startDrawing}
+                                                onMouseMove={draw}
+                                                onMouseUp={stopDrawing}
+                                                onMouseOut={stopDrawing}
+                                                onTouchStart={startDrawing}
+                                                onTouchMove={draw}
+                                                onTouchEnd={stopDrawing}
+                                                className="w-full max-w-2xl rounded-xl bg-white block mx-auto print-only-image"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="w-full lg:w-80 print-hidden sticky top-28">
+                                        <div className="glass-panel p-6 rounded-[2rem] border border-slate-700/50 flex flex-col gap-6">
+                                            
+                                            <div>
+                                                <h3 className="text-white font-bold mb-4 text-sm uppercase tracking-wider border-b border-slate-700 pb-2">Magiczne pisaki</h3>
+                                                <div className="flex flex-wrap gap-3">
+                                                    {colors.map((c) => (
+                                                        <button
+                                                            key={c}
+                                                            onClick={() => setSelectedColor(c)}
+                                                            className={`w-10 h-10 rounded-full shadow-md border-2 transition-transform ${
+                                                                selectedColor === c ? "scale-125 border-white" : "border-slate-700 hover:scale-110"
+                                                            }`}
+                                                            style={{ backgroundColor: c }}
+                                                            title={c === "#ffffff" ? "Gumka" : "Kolor"}
+                                                        >
+                                                            {c === "#ffffff" && <span className="text-slate-500 text-[10px] flex justify-center mt-2.5 font-bold uppercase"><i className="ph-bold ph-eraser"></i></span>}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            <div>
+                                                <h3 className="text-white font-bold mb-3 text-sm uppercase tracking-wider">Grubość pisaka</h3>
+                                                <input 
+                                                    type="range" 
+                                                    min="5" 
+                                                    max="40" 
+                                                    value={brushSize}
+                                                    onChange={(e) => setBrushSize(e.target.value)}
+                                                    className="w-full accent-pink-500"
+                                                />
+                                                <div className="flex justify-between text-xs text-slate-400 mt-1 font-medium">
+                                                    <span>Cienki</span>
+                                                    <span>Gruby</span>
+                                                </div>
+                                            </div>
+
+                                            <div className="mt-4 pt-6 border-t border-slate-700">
+                                                <button 
+                                                    onClick={handlePrint}
+                                                    className="w-full bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-4 rounded-xl font-bold flex items-center justify-center gap-2 transition-all btn-bounce shadow-[0_0_15px_rgba(16,185,129,0.3)] text-lg"
+                                                >
+                                                    <i className="ph-bold ph-printer text-2xl"></i> Wydrukuj 
+                                                </button>
+                                                <p className="text-xs text-slate-500 text-center mt-4 leading-relaxed font-medium">
+                                                    Wskazówka: Zawsze rysuj palcem po ekranie w trybie dotykowym.<br/>Zamalowania nie zasłonią czarnych kresek dzięki trybowi "multiply".
+                                                </p>
+                                            </div>
+
+                                        </div>
+                                    </div>
+
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 </div>
             );
         }
