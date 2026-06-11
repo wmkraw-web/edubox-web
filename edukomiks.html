@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="google" content="notranslate">
-    <title>EduKomiks AI PRO - EduBox</title>
+    <title>EduKomiks AI PRO (V3 PRO MAX) - EduBox</title>
     
     <!-- Wymuszenie HTTPS -->
     <script>
@@ -26,15 +26,24 @@
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    
-    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- Phosphor Icons -->
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
 
     <!-- Fonty Komiksowe -->
     <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Comic+Neue:wght@400;700;900&family=Outfit:wght@400;700;900&display=swap" rel="stylesheet">
+
+    <!-- FIREBASE CONFIG V3 PRO MAX -->
+    <script>
+        window.__firebase_config = JSON.stringify({
+            apiKey: "AIzaSyDL_mvepNJjMmZYQzifN2cXzoKwCE8jNd0",
+            authDomain: "edubox-pro.firebaseapp.com",
+            projectId: "edubox-pro",
+            storageBucket: "edubox-pro.firebasestorage.app",
+            messagingSenderId: "570263845714",
+            appId: "1:570263845714:web:0b029211f7af071b66988b"
+        });
+        window.__app_id = "eduboxpro";
+    </script>
 
     <!-- Tailwind Config -->
     <script>
@@ -84,7 +93,7 @@
             flex-direction: column;
         }
         .narration-bar { 
-            background: #fef08a; /* Żółty Pop-Art */
+            background: #fef08a; 
             color: black; 
             border-bottom: 4px solid black; 
             padding: 10px 14px; 
@@ -96,7 +105,6 @@
             line-height: 1.3;
         }
         
-        /* ZMIANA 1: DYMKI PRZENIESIONE NA GÓRĘ OBRAZKA */
         .comic-bubble { 
             background: white; 
             border: 3px solid black; 
@@ -107,7 +115,7 @@
             font-weight: 900; 
             text-align: center; 
             position: absolute; 
-            top: 15px; /* UMIEJSCOWIENIE NA GÓRZE ZAMIAST BOTTOM */
+            top: 15px; 
             left: 50%; 
             transform: translateX(-50%); 
             width: 85%; 
@@ -118,7 +126,7 @@
         }
         .bubble-tail { 
             position: absolute; 
-            bottom: -15px; /* Ogon wskazuje z góry w dół na postać */
+            bottom: -15px; 
             left: 50%; 
             transform: translateX(-50%);
             width: 18px; 
@@ -142,45 +150,156 @@
         /* Druk */
         @media print {
             body { background: white; color: black; background-image: none; }
-            .no-print { display: none !important; }
+            .print-hidden { display: none !important; }
+            #wspolne-menu-kontener { display: none !important; }
             .print-area { width: 100% !important; max-width: 100% !important; margin: 0 !important; padding: 0 !important; border: none !important; box-shadow: none !important; background: white !important;}
             .comic-grid { gap: 15px !important; }
             .comic-panel { border-width: 3px !important; border-color: black !important; break-inside: avoid; box-shadow: none !important;}
             .narration-bar { border-bottom-width: 3px !important; border-color: black !important; }
             .comic-bubble { border-width: 3px !important; border-color: black !important; box-shadow: none !important; }
-            .bubble-tail-border { display: none !important; } /* Uproszczenie do druku */
+            .bubble-tail-border { display: none !important; }
             @page { margin: 1cm; size: A4 portrait; }
         }
     </style>
 </head>
 <body>
-    ```html
-    <div id="wspolne-menu-kontener"></div>
-    <script>
-        document.addEventListener("DOMContentLoaded", function() {
-            fetch('/menu.html')
-                .then(r => r.text())
-                .then(d => {
-                    document.getElementById('wspolne-menu-kontener').innerHTML = d;
-                    if (typeof window.initMenuLogic === 'function') window.initMenuLogic();
-                });
-        });
+    <!-- KONTENER NA WSPÓLNE MENU V3 PRO MAX -->
+    <div id="wspolne-menu-kontener" class="print-hidden"></div>
+
+    <!-- ========================================================= -->
+    <!-- MODUŁ EDUBOX CORE (Wspólny silnik dla wszystkich apek)    -->
+    <!-- ========================================================= -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
+        import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
+        import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+
+        const FIREBASE_CONFIG = typeof window.__firebase_config !== 'undefined' ? JSON.parse(window.__firebase_config) : {};
+        const APP_ID = window.__app_id || "eduboxpro";
+
+        let app, auth, db, currentUser = null;
+        let isInitialized = false;
+
+        window.EduBoxCore = {
+            init: (onUserLoad) => {
+                if (!isInitialized && FIREBASE_CONFIG.apiKey) {
+                    app = initializeApp(FIREBASE_CONFIG);
+                    auth = getAuth(app);
+                    db = getFirestore(app);
+                    signInAnonymously(auth).catch(e => console.error("Firebase Auth Error:", e));
+                    isInitialized = true;
+                    
+                    window.EduBoxCore.loadMenu();
+                }
+                
+                if (auth) {
+                    onAuthStateChanged(auth, (user) => {
+                        currentUser = user;
+                        if(onUserLoad) onUserLoad(user);
+                    });
+                }
+            },
+
+            loadMenu: () => {
+                const container = document.getElementById('wspolne-menu-kontener');
+                if (container) {
+                    fetch('/menu.html')
+                        .then(r => r.text())
+                        .then(html => { container.innerHTML = html; })
+                        .catch(err => console.log('Brak pliku menu lokalnie.', err));
+                }
+            },
+
+            getUsageCount: () => {
+                const today = new Date().toISOString().split('T')[0];
+                let usageStr = localStorage.getItem('eduboxUsage');
+                if (usageStr) {
+                    try {
+                        const parsed = JSON.parse(usageStr);
+                        if (parsed.date === today) return parsed.count;
+                    } catch(e) {}
+                }
+                return 0;
+            },
+
+            executeWithLimitCheck: (isPremium, onSuccess, onLimitReached, onToastUpdate) => {
+                const status = localStorage.getItem('eduboxProStatus');
+                if (status === 'PRO' || isPremium) {
+                    onSuccess(window.EduBoxCore.getUsageCount());
+                    return;
+                }
+                
+                let currentCount = window.EduBoxCore.getUsageCount();
+                if (currentCount >= 5) {
+                    onLimitReached("⚠️ Dzienny limit użyć (5/5) wyczerpany. Wpisz kod odblokowujący!");
+                    return;
+                }
+                
+                const newCount = currentCount + 1;
+                const today = new Date().toISOString().split('T')[0];
+                localStorage.setItem('eduboxUsage', JSON.stringify({ date: today, count: newCount }));
+                
+                onToastUpdate(`Wykorzystano ${newCount}/5 darmowych działań`);
+                onSuccess(newCount);
+            },
+
+            verifyPremiumCode: (code) => {
+                return code.toUpperCase() === 'KAWA2024';
+            },
+
+            saveToGielda: async (collectionName, appType, itemName, config) => {
+                if (!currentUser) throw new Error("Brak połączenia z chmurą. Odśwież stronę.");
+                
+                const publicRef = collection(db, 'artifacts', APP_ID, 'public', 'data', collectionName);
+                const payload = {
+                    userId: currentUser.uid,
+                    createdAt: serverTimestamp(),
+                    type: appType,
+                    name: itemName,
+                    config: config
+                };
+
+                if (JSON.stringify(payload).length > 950000) {
+                    throw new Error("🚨 Komiks ma za dużo detali, by zapisać go w chmurze (Max ~1MB)!");
+                }
+
+                await addDoc(publicRef, payload);
+            },
+
+            subscribeToGielda: (collectionName, onDataLoaded, onError) => {
+                if (!db) return () => {};
+                
+                const publicRef = collection(db, 'artifacts', APP_ID, 'public', 'data', collectionName);
+                return onSnapshot(publicRef, (snapshot) => {
+                    const loaded = [];
+                    snapshot.forEach(doc => loaded.push({ id: doc.id, ...doc.data() }));
+                    loaded.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
+                    onDataLoaded(loaded);
+                }, onError);
+            }
+        };
+
+        window.dispatchEvent(new Event('EduBoxCoreReady'));
     </script>
+    <!-- ========================================================= -->
 
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useRef } = React;
+        const { useState, useEffect } = React;
 
         function App() {
-            // Freemium State
+            // --- V3 PRO MAX STATES (CORE) ---
+            const [coreReady, setCoreReady] = useState(!!window.EduBoxCore);
+            const [appMode, setAppMode] = useState('editor'); // 'editor' | 'gielda'
             const [isPremium, setIsPremium] = useState(false);
-            const [usagesLeft, setUsagesLeft] = useState(2);
-            const [showPremiumModal, setShowPremiumModal] = useState(false);
             const [accessCode, setAccessCode] = useState('');
-            const [toastMessage, setToastMessage] = useState('');
+            const [user, setUser] = useState(null);
+            const [patterns, setPatterns] = useState([]);
+            const [usageCount, setUsageCount] = useState(0); 
 
-            // Generator State
+            // --- LOCAL STATES ---
+            const [toastMessage, setToastMessage] = useState('');
             const [topic, setTopic] = useState('');
             const [ageGroup, setAgeGroup] = useState('Klasy 1-3');
             const [artStyle, setArtStyle] = useState('Bajkowe 3D (Disney)'); 
@@ -189,29 +308,48 @@
             const [comicData, setComicData] = useState(null);
             const [loadingStatus, setLoadingStatus] = useState('');
             const [loadingProgress, setLoadingProgress] = useState(0);
-
-            // ZMIANA 2: Do regeneracji pojedynczego kadru
             const [regeneratingIndex, setRegeneratingIndex] = useState(null);
 
+            // --- INICJALIZACJA EDUBOX CORE ---
             useEffect(() => {
-                const premiumStatus = localStorage.getItem('edubox_premium_unlocked');
-                const storedUsages = localStorage.getItem('edukomiks_usages');
-                if (premiumStatus === 'true') setIsPremium(true);
-                else {
-                    if (storedUsages !== null) setUsagesLeft(parseInt(storedUsages, 10));
-                    else localStorage.setItem('edukomiks_usages', '2');
+                if (!coreReady) {
+                    const handleReady = () => setCoreReady(true);
+                    window.addEventListener('EduBoxCoreReady', handleReady);
+                    return () => window.removeEventListener('EduBoxCoreReady', handleReady);
                 }
-            }, []);
+            }, [coreReady]);
+
+            useEffect(() => {
+                if (coreReady && window.EduBoxCore) {
+                    window.EduBoxCore.init((loadedUser) => setUser(loadedUser));
+                    setUsageCount(window.EduBoxCore.getUsageCount());
+                    const status = localStorage.getItem('eduboxProStatus');
+                    if(status === 'PRO') setIsPremium(true);
+                }
+            }, [coreReady]);
+
+            // Nasłuchiwanie Giełdy
+            useEffect(() => {
+                if (!user || !coreReady || !window.EduBoxCore) return;
+                const unsubscribe = window.EduBoxCore.subscribeToGielda('gielda_wzorow_edukomiks', 
+                    (loadedData) => setPatterns(loadedData),
+                    (error) => console.error("Błąd odczytu Giełdy:", error)
+                );
+                return () => unsubscribe();
+            }, [user, coreReady]);
 
             const showToast = (msg) => { setToastMessage(msg); setTimeout(() => setToastMessage(''), 4000); };
 
             const handleVerifyCode = (e) => {
                 e?.preventDefault();
-                if (accessCode.trim().toUpperCase() === 'KAWA2024') { 
-                    localStorage.setItem('edubox_premium_unlocked', 'true');
-                    setIsPremium(true); setShowPremiumModal(false); setAccessCode(''); 
+                if (window.EduBoxCore.verifyPremiumCode(accessCode)) {
+                    setIsPremium(true); 
+                    setAccessCode(''); 
+                    localStorage.setItem('eduboxProStatus', 'PRO');
                     showToast('Odblokowano Premium! 🌟'); 
-                } else { showToast('Błędny kod dostępu!'); }
+                } else { 
+                    showToast('Błędny kod dostępu!'); 
+                }
             };
 
             const translateStyle = (styleName) => {
@@ -224,17 +362,60 @@
                 }
             };
 
-            // ETAP 1 & 2: GENEROWANIE ŁAŃCUCHOWE
-            const generateComic = async () => {
-                if (!isPremium && usagesLeft <= 0) return setShowPremiumModal(true);
-                if (!topic.trim()) return showToast('Wpisz temat lub morał komiksu!');
+            // --- GIEŁDA WZORÓW ACTIONS ---
+            const sharePattern = async () => {
+                if (!comicData) return;
+                window.EduBoxCore.executeWithLimitCheck(isPremium, 
+                    async (newCount) => {
+                        setUsageCount(newCount);
+                        try {
+                            const name = comicData.title || `Komiks: ${topic.substring(0, 15)}...`;
+                            const config = { topic, ageGroup, artStyle, comicData };
+                            
+                            await window.EduBoxCore.saveToGielda('gielda_wzorow_edukomiks', 'Komiks AI', name, config);
+                            showToast("✨ Udostępniono Komiks w Giełdzie Wzorów!");
+                        } catch (e) {
+                            showToast(e.message || "🚨 Błąd podczas zapisu w chmurze.");
+                        }
+                    },
+                    (msg) => showToast(msg),
+                    (msg) => showToast(msg)
+                );
+            };
 
+            const loadPattern = (pattern) => {
+                const c = pattern.config;
+                if(c && c.comicData) {
+                    if(c.topic) setTopic(c.topic);
+                    if(c.ageGroup) setAgeGroup(c.ageGroup);
+                    if(c.artStyle) setArtStyle(c.artStyle);
+                    
+                    setComicData(c.comicData);
+                    setAppMode('editor');
+                    setStep('review');
+                    showToast("✨ Załadowano Komiks z Giełdy!");
+                }
+            };
+
+            // --- GENERATOR AI ---
+            const handleGenerateComic = () => {
+                if (!topic.trim()) return showToast('Wpisz temat lub morał komiksu!');
+                window.EduBoxCore.executeWithLimitCheck(isPremium,
+                    (newCount) => {
+                        setUsageCount(newCount);
+                        generateComic();
+                    },
+                    (msg) => showToast(msg),
+                    (msg) => showToast(msg)
+                );
+            };
+
+            const generateComic = async () => {
                 setStep('generating');
                 setLoadingStatus('1/2 Wymyślam scenariusz i dialogi...');
                 setLoadingProgress(10);
                 
                 try {
-                    // 1. SCENARIUSZ Z GPT-4o-mini
                     const systemPrompt = `Jesteś genialnym scenarzystą komiksów edukacyjnych. Twoim zadaniem jest napisanie krótkiej, 4-kadrowej historii.
                     
                     ZASADY JĘZYKOWE:
@@ -255,8 +436,7 @@
                                 "narration": "Tekst narratora (opis sytuacji, krótki, 1 zdanie).",
                                 "dialogue": "Krótka wypowiedź bohatera (max 8 słów!). Jeśli brak, zostaw puste.",
                                 "imagePrompt": "[Tutaj wklej stały opis postaci] is doing [czynność]. Medium shot, full body visible. ABSOLUTELY NO TEXT, NO SPEECH BUBBLES."
-                            },
-                            ... (dokładnie 4 takie obiekty)
+                            }
                         ]
                     }`;
 
@@ -275,7 +455,6 @@
                     if(jsonStr.indexOf('{') !== -1) jsonStr = jsonStr.substring(jsonStr.indexOf('{'), jsonStr.lastIndexOf('}') + 1);
                     let comicObj = JSON.parse(jsonStr);
 
-                    // 2. GENEROWANIE OBRAZÓW (Flux na Vercel API)
                     setLoadingStatus('2/2 Rysuję kadry komiksu we Fluxie...');
                     const engStyle = translateStyle(artStyle);
                     
@@ -291,9 +470,7 @@
                                 prompt: fullPrompt,
                                 negative_prompt: "text, words, speech bubbles, watermark, mutated, bad anatomy, bad hands, extra limbs",
                                 aspect_ratio: '1:1',
-                                size: '1024x1024',
-                                width: 1024,
-                                height: 1024
+                                size: '1024x1024'
                             })
                         });
                         
@@ -311,13 +488,6 @@
 
                     setComicData(comicObj);
                     setLoadingProgress(100);
-                    
-                    if (!isPremium) {
-                        const newUsages = usagesLeft - 1;
-                        setUsagesLeft(newUsages);
-                        localStorage.setItem('edukomiks_usages', newUsages.toString());
-                    }
-
                     setTimeout(() => setStep('review'), 500);
 
                 } catch (error) {
@@ -327,9 +497,19 @@
                 }
             };
 
-            // REGENERACJA JEDNEGO KADRU (Gdy AI zmutuje dłonie/twarz)
+            const handleRegeneratePanel = (index) => {
+                window.EduBoxCore.executeWithLimitCheck(isPremium,
+                    (newCount) => {
+                        setUsageCount(newCount);
+                        regeneratePanel(index);
+                    },
+                    (msg) => showToast(msg),
+                    (msg) => showToast(msg)
+                );
+            };
+
             const regeneratePanel = async (index) => {
-                if (regeneratingIndex !== null) return; // Zapobiega klikaniu wielu na raz
+                if (regeneratingIndex !== null) return; 
                 setRegeneratingIndex(index);
                 showToast("Magia działa... Odświeżam ten kadr!");
                 
@@ -344,9 +524,7 @@
                             prompt: fullPrompt,
                             negative_prompt: "text, words, speech bubbles, watermark, mutated, bad anatomy, deformed",
                             aspect_ratio: '1:1',
-                            size: '1024x1024',
-                            width: 1024,
-                            height: 1024
+                            size: '1024x1024'
                         })
                     });
                     
@@ -371,6 +549,53 @@
                 }
             };
 
+            if (!coreReady) {
+                return <div className="min-h-screen flex items-center justify-center text-white">Trwa ładowanie silnika EduBoxCore...</div>;
+            }
+
+            // RENDER: Giełda Wzorów
+            if (appMode === 'gielda') {
+                return (
+                    <div className="min-h-screen flex flex-col font-sans halftone-bg relative">
+                        {toastMessage && (
+                            <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[300] bg-blue-500 text-white px-6 py-3 rounded-xl font-bold shadow-solid transition-all duration-300 border-2 border-black">
+                                {toastMessage}
+                            </div>
+                        )}
+                        <div className="max-w-4xl mx-auto px-4 pt-32 pb-24 w-full relative z-10 print-hidden">
+                            <div className="bg-white border-4 border-black p-8 rounded-2xl shadow-solid flex flex-col h-[800px]">
+                                <div className="flex justify-between items-center mb-8 border-b-4 border-black pb-4">
+                                    <h2 className="text-4xl font-bangers text-black uppercase tracking-widest"><i className="ph-bold ph-books text-blue-500"></i> Baza Komiksów</h2>
+                                    <button onClick={() => setAppMode('editor')} className="text-black bg-yellow-400 border-4 border-black hover:bg-yellow-300 px-4 py-2 rounded-xl text-xl font-bangers uppercase transition-all active:translate-y-1 shadow-solid-sm"><i className="ph-bold ph-arrow-left"></i> Wróć</button>
+                                </div>
+                                
+                                <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-4 font-comic">Komiksy od innych nauczycieli</h3>
+                                <div className="overflow-y-auto custom-scrollbar flex-1 space-y-4 pr-2">
+                                    {patterns.map(p => (
+                                        <div key={p.id} className="bg-slate-50 border-4 border-black p-5 rounded-xl hover:bg-yellow-100 transition-colors cursor-pointer group flex flex-col gap-3 shadow-solid-sm active:translate-y-1 active:shadow-none" onClick={() => loadPattern(p)}>
+                                            <div className="flex justify-between items-start gap-2">
+                                                <span className="text-xl font-black text-black group-hover:text-blue-600 transition-colors line-clamp-2 leading-tight font-comic">{p.name}</span>
+                                                <span className="text-xs font-bold px-2 py-1 rounded bg-blue-100 border-2 border-black text-blue-800 whitespace-nowrap font-bangers">{p.type}</span>
+                                            </div>
+                                            <div className="flex justify-between items-center font-comic font-bold">
+                                                <p className="text-xs text-slate-500">Autor: <span className="text-black">{p.userId.substring(0,6)}</span></p>
+                                                <p className="text-xs text-slate-500">{p.createdAt?.toDate().toLocaleDateString()}</p>
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {patterns.length === 0 && (
+                                        <div className="text-center py-10 opacity-50 font-comic">
+                                            <i className="ph-bold ph-cloud-arrow-down text-5xl mb-2 text-slate-400 mx-auto block"></i>
+                                            <p className="text-lg text-slate-500 font-bold">Brak komiksów w chmurze...</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
             // RENDER: Konfigurator
             if (step === 'config') {
                 return (
@@ -381,16 +606,34 @@
                             </div>
                         )}
 
-                       
+                        <div className="max-w-3xl mx-auto px-4 pt-28 pb-24 flex-grow w-full relative z-10 print-hidden">
+                            
+                            {/* PANEL LIMITÓW V3 PRO MAX - STYL KOMIKSOWY */}
+                            {!isPremium && (
+                                <div className="bg-white border-4 border-black p-4 rounded-2xl shadow-solid flex flex-col sm:flex-row justify-between items-center gap-4 mb-8 transform rotate-1">
+                                    <div className="flex flex-col font-comic">
+                                        <span className="text-sm font-black text-black uppercase tracking-widest">Darmowe użycia: <span className="text-red-500">{Math.max(0, 5 - usageCount)}/5</span></span>
+                                        <span className="text-[10px] text-slate-500 font-bold">Wersja Demo</span>
+                                    </div>
+                                    <div className="flex items-center gap-2 w-full sm:w-auto">
+                                        <input value={accessCode} onChange={e => setAccessCode(e.target.value)} placeholder="Kod autoryzacji..." className="flex-1 sm:w-40 px-3 py-2 bg-slate-100 border-4 border-black rounded-lg text-sm outline-none text-black font-bold font-comic focus:bg-yellow-50 transition-colors uppercase"/>
+                                        <button onClick={handleVerifyCode} className="px-4 py-2 bg-blue-500 hover:bg-blue-400 text-white border-2 border-black rounded-lg text-sm font-bangers tracking-widest transition-all shadow-solid-sm active:translate-y-1 active:shadow-none">OK</button>
+                                    </div>
+                                </div>
+                            )}
 
-                        <div className="max-w-3xl mx-auto px-4 pt-32 pb-24 flex-grow w-full relative z-10">
+                            <div className="flex justify-end mb-6">
+                                <button onClick={() => setAppMode('gielda')} className="bg-fuchsia-500 border-4 border-black hover:bg-fuchsia-400 text-white px-6 py-3 rounded-xl font-bangers text-xl tracking-widest shadow-solid transition-transform active:translate-y-1 active:shadow-none flex items-center gap-2">
+                                    <i className="ph-bold ph-books"></i> Baza Komiksów
+                                </button>
+                            </div>
+
                             <div className="text-center mb-10 bg-white border-4 border-black p-8 rounded-2xl shadow-solid relative transform -rotate-1">
                                 <div className="absolute -top-6 -right-6 bg-blue-500 text-white font-bangers text-2xl py-2 px-4 border-4 border-black rounded-full rotate-12 shadow-solid-sm">BAM!</div>
                                 <h1 className="text-4xl md:text-5xl font-bangers text-black mb-2 tracking-wide">Twórz Komiksy z EduBox AI!</h1>
                                 <p className="text-slate-600 font-bold font-comic text-lg">Podaj temat, bohatera lub sytuację, a sztuczna inteligencja wygeneruje 4-kadrowy komiks do wydruku.</p>
                             </div>
 
-                            {/* ZMIANA 4: Rozbudowany formularz z wyborem wieku i stylu */}
                             <div className="bg-white p-8 rounded-2xl shadow-solid border-4 border-black space-y-6">
                                 <div>
                                     <label className="text-sm font-black text-black uppercase block mb-2 font-comic">1. Temat lub Morał (o czym ma być komiks?)</label>
@@ -415,34 +658,11 @@
                                     </div>
                                 </div>
 
-                                <button onClick={generateComic} className="w-full mt-4 bg-yellow-400 hover:bg-yellow-300 text-black py-5 rounded-xl font-bangers text-3xl tracking-widest border-4 border-black shadow-solid transition-transform active:translate-y-2 active:shadow-none flex justify-center items-center gap-3">
-                                    <i className="ph-fill ph-lightning"></i> Rysuj Komiks!
+                                <button onClick={handleGenerateComic} className="w-full mt-4 bg-yellow-400 hover:bg-yellow-300 text-black py-5 rounded-xl font-bangers text-3xl tracking-widest border-4 border-black shadow-solid transition-transform active:translate-y-2 active:shadow-none flex justify-center items-center gap-3">
+                                    <i className="ph-fill ph-lightning"></i> Rysuj Komiks! {!isPremium && `(${Math.max(0, 5 - usageCount)})`}
                                 </button>
-                                
-                                {!isPremium && usagesLeft <= 0 && (
-                                    <p className="text-center text-sm text-red-600 font-bold mt-2 cursor-pointer hover:underline font-comic" onClick={() => setShowPremiumModal(true)}>
-                                        Wyczerpano darmowe próby. Kliknij, aby odblokować.
-                                    </p>
-                                )}
                             </div>
                         </div>
-
-                        {/* Paywall ze wsparciem */}
-                        {showPremiumModal && (
-                            <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-                                <div className="bg-white p-8 rounded-2xl border-4 border-black max-w-md w-full text-center shadow-solid relative transform rotate-1">
-                                    <h3 className="text-3xl font-bangers text-black mb-2 tracking-wide">Konto Premium</h3>
-                                    <p className="text-sm text-slate-600 mb-6 font-bold font-comic">Wyczerpałeś darmowe próby rysowania. Wpisz kod KAWA2024, aby tworzyć komiksy bez limitu!</p>
-                                    
-                                    <input type="text" value={accessCode} onChange={e => setAccessCode(e.target.value)} placeholder="Wpisz kod..." className="w-full bg-slate-50 border-4 border-black rounded-xl px-4 py-3 text-center text-xl font-black text-black mb-4 outline-none focus:bg-yellow-50 uppercase tracking-widest font-comic" />
-                                    <button onClick={handleVerifyCode} className="w-full bg-blue-500 text-white font-bangers tracking-widest text-2xl border-4 border-black py-3 rounded-xl shadow-solid-sm active:translate-y-1 active:shadow-none transition-transform mb-4">Aktywuj Kod</button>
-                                    
-                                    <a href="https://buycoffee.to/magiccolor" target="_blank" rel="noopener noreferrer" className="block w-full bg-yellow-400 border-4 border-black py-3 rounded-xl font-bangers text-xl shadow-solid-sm active:translate-y-1 text-black">☕ Zdobądź Kod (Postaw Kawę)</a>
-                                    
-                                    <button onClick={() => setShowPremiumModal(false)} className="mt-4 text-xs font-bold text-slate-400 font-comic uppercase hover:text-black">Anuluj</button>
-                                </div>
-                            </div>
-                        )}
                     </div>
                 );
             }
@@ -450,7 +670,7 @@
             // RENDER: Loading
             if (step === 'generating') {
                 return (
-                    <div className="min-h-screen flex items-center justify-center flex-col text-center px-4 bg-yellow-400 halftone-bg text-black">
+                    <div className="min-h-screen flex items-center justify-center flex-col text-center px-4 bg-yellow-400 halftone-bg text-black print-hidden">
                         <div className="bg-white border-4 border-black p-10 rounded-3xl shadow-solid flex flex-col items-center max-w-md w-full transform rotate-1">
                             <i className="ph-fill ph-palette animate-bounce text-7xl text-blue-500 mb-4 drop-shadow-md"></i>
                             <h2 className="text-4xl font-bangers tracking-widest mb-2">Praca wre!</h2>
@@ -471,22 +691,27 @@
                 return (
                     <div className="min-h-screen flex flex-col halftone-bg text-slate-900 bg-slate-100">
                         {toastMessage && (
-                            <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[9999] bg-green-500 text-white px-6 py-3 border-4 border-black rounded-xl font-bold shadow-solid-sm font-comic">
+                            <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[9999] bg-green-500 text-white px-6 py-3 border-4 border-black rounded-xl font-bold shadow-solid-sm font-comic print-hidden">
                                 {toastMessage}
                             </div>
                         )}
                         
-                        <nav className="bg-white border-b-4 border-black h-16 flex items-center justify-between px-6 shadow-sm no-print sticky top-0 z-50">
+                        <nav className="bg-white border-b-4 border-black min-h-16 flex flex-col md:flex-row items-center justify-between px-6 py-4 shadow-sm print-hidden sticky top-0 z-50 gap-4">
                             <h1 className="text-2xl font-bangers tracking-wide text-black mt-1"><i className="ph-fill ph-check-circle text-green-500"></i> Komiks Gotowy!</h1>
-                            <div className="flex gap-3">
-                                <button onClick={() => window.print()} className="bg-yellow-400 hover:bg-yellow-300 text-black border-2 border-black px-4 py-1.5 rounded-lg font-bold font-comic flex items-center gap-2 shadow-solid-sm active:translate-y-1 active:shadow-none transition-all">
-                                    <i className="ph-bold ph-printer text-lg"></i> Drukuj / PDF
+                            <div className="flex flex-wrap justify-center gap-3">
+                                <button onClick={sharePattern} className="bg-fuchsia-500 hover:bg-fuchsia-400 text-white border-2 border-black px-4 py-1.5 rounded-lg font-bold font-comic flex items-center gap-2 shadow-solid-sm active:translate-y-1 active:shadow-none transition-all">
+                                    <i className="ph-bold ph-cloud-arrow-up text-lg"></i> Do Bazy
                                 </button>
-                                <button onClick={() => setStep('config')} className="bg-white hover:bg-slate-100 text-black border-2 border-black px-4 py-1.5 rounded-lg font-bold font-comic shadow-solid-sm active:translate-y-1 active:shadow-none transition-all">Nowy Komiks</button>
+                                <button onClick={() => window.print()} className="bg-yellow-400 hover:bg-yellow-300 text-black border-2 border-black px-4 py-1.5 rounded-lg font-bold font-comic flex items-center gap-2 shadow-solid-sm active:translate-y-1 active:shadow-none transition-all">
+                                    <i className="ph-bold ph-printer text-lg"></i> Drukuj
+                                </button>
+                                <button onClick={() => setStep('config')} className="bg-white hover:bg-slate-100 text-black border-2 border-black px-4 py-1.5 rounded-lg font-bold font-comic shadow-solid-sm active:translate-y-1 active:shadow-none transition-all">
+                                    Nowy Komiks
+                                </button>
                             </div>
                         </nav>
 
-                        <div className="flex-1 p-4 md:p-8 flex justify-center">
+                        <div className="flex-1 p-4 md:p-8 flex justify-center print:p-0">
                             {/* KONTENER A4 DO DRUKU */}
                             <div className="print-area bg-white border-4 border-black shadow-solid p-6 md:p-10 w-full max-w-4xl mx-auto rounded-xl">
                                 
@@ -499,7 +724,7 @@
                                     {comicData.panels.map((panel, idx) => (
                                         <div key={idx} className="comic-panel group">
                                             
-                                            {/* Narrator (Górna żółta belka) */}
+                                            {/* Narrator */}
                                             {panel.narration && (
                                                 <div className="narration-bar">
                                                     {panel.narration}
@@ -515,7 +740,7 @@
                                                     <span className="relative z-0 font-comic font-bold text-slate-400">Brak obrazka</span>
                                                 )}
 
-                                                {/* Dymek z dialogiem (NA GÓRZE) */}
+                                                {/* Dymek z dialogiem */}
                                                 {panel.dialogue && (
                                                     <div className="comic-bubble">
                                                         {panel.dialogue}
@@ -524,16 +749,16 @@
                                                     </div>
                                                 )}
 
-                                                {/* Numer Kadru (Prawy Dolny Róg) */}
+                                                {/* Numer Kadru */}
                                                 <div className="absolute bottom-3 right-3 bg-black text-white border-2 border-white font-bangers w-8 h-8 flex items-center justify-center rounded-full text-base z-30 shadow-md">
                                                     {idx + 1}
                                                 </div>
 
-                                                {/* PRZYCISK REGENERACJI (Pokazuje się na najechanie kursorem) */}
+                                                {/* PRZYCISK REGENERACJI */}
                                                 <button 
-                                                    onClick={() => regeneratePanel(idx)} 
+                                                    onClick={() => handleRegeneratePanel(idx)} 
                                                     disabled={regeneratingIndex !== null}
-                                                    className={`no-print absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-blue-500 border-4 border-black text-white font-bangers px-4 py-2 text-xl rounded shadow-solid transition-opacity z-[100] hover:bg-blue-400 ${regeneratingIndex === idx ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                                                    className={`print-hidden absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-blue-500 border-4 border-black text-white font-bangers px-4 py-2 text-xl rounded shadow-solid transition-opacity z-[100] hover:bg-blue-400 ${regeneratingIndex === idx ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
                                                 >
                                                     {regeneratingIndex === idx ? (
                                                         <><i className="ph-bold ph-spinner animate-spin mr-1"></i> Rysuję...</>
