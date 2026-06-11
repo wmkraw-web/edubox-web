@@ -169,7 +169,9 @@
                 if (!currentUser && !db) throw new Error("Brak połączenia z chmurą.");
                 const publicRef = collection(db, 'artifacts', APP_ID, 'public', 'data', collectionName);
                 const payload = { userId: currentUser?.uid || 'anonymous', createdAt: serverTimestamp(), type: appType, name: itemName, config: config };
-                if (JSON.stringify(payload).length > 950000) throw new Error("🚨 Użyta grafika jest za duża by zapisać ją w chmurze (Max ~1MB)!");
+                if (JSON.stringify(payload).length > 950000) {
+                    throw new Error("🚨 Użyta grafika jest za duża by zapisać ją w chmurze (Max ~1MB)!");
+                }
                 await addDoc(publicRef, payload);
             },
             subscribeToGielda: (collectionName, onDataLoaded, onError) => {
@@ -201,7 +203,7 @@
             const [promptInput, setPromptInput] = useState('');
             const [styleOption, setStyleOption] = useState('szkola'); 
             const [generatedImage, setGeneratedImage] = useState(null);
-            const [isGenerating, setIsGenerating] = useState(false);
+            const [generationStep, setGenerationStep] = useState(null); // 'translating' | 'generating' | null
             
             // === CANVAS STATE ===
             const [selectedColor, setSelectedColor] = useState("#f43f5e"); 
@@ -281,6 +283,49 @@
                 throw lastErr;
             };
 
+            // TŁUMACZ POLECEŃ (Rozwiązuje problem nierozumienia polskich słów przez generator obrazów)
+            const fetchTranslatedPrompt = async (polishText) => {
+                try {
+                    const res = await fetch('/api/chat', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                            prompt: polishText, 
+                            system: `Translate the following Polish coloring book subject into a highly concise, purely visual English description. Return ONLY the pure English phrase.`,
+                            temperature: 0.3,
+                            model: "gpt-4o-mini"
+                        })
+                    });
+                    if(res.ok) {
+                        const data = await res.json();
+                        return data.text.trim().replace(/['"\n]/g, '');
+                    }
+                    throw new Error("Chat API failed");
+                } catch(e) {
+                    console.warn("Używam awaryjnego tłumacza (Canvas Mode)");
+                    try {
+                        const apiKey = ""; 
+                        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+                        const res = await fetch(url, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                contents: [{ parts: [{ text: polishText }] }],
+                                systemInstruction: { parts: [{ text: "Translate the following Polish coloring book subject into a highly concise, purely visual English description. Return ONLY the English phrase, no quotes." }] },
+                                generationConfig: { temperature: 0.1 }
+                            })
+                        });
+                        if (res.ok) {
+                            const data = await res.json();
+                            return data.candidates[0].content.parts[0].text.trim().replace(/['"\n]/g, '');
+                        }
+                        return polishText; // Fallback
+                    } catch (err) {
+                        return polishText;
+                    }
+                }
+            };
+
             const secureApiImageCall = async (payloadData) => {
                 try {
                     const controller = new AbortController();
@@ -320,10 +365,15 @@
                 window.EduBoxCore.executeWithLimitCheck(isPremium, 
                     async (newCount) => {
                         setUsages(newCount);
-                        setIsGenerating(true);
                         setGeneratedImage(null);
                         
                         try {
+                            // 1. Tłumaczenie polecenia na angielski
+                            setGenerationStep('translating');
+                            const englishSubject = await fetchTranslatedPrompt(promptInput);
+
+                            // 2. Generowanie grafiki
+                            setGenerationStep('generating');
                             let styleModifier = "";
                             if (styleOption === 'przedszkole') {
                                 styleModifier = "extremely simple toddler coloring page, thick bold black vector lines, large empty white spaces";
@@ -333,7 +383,8 @@
                                 styleModifier = "detailed mandala coloring page, crisp black outlines, uncolored, geometric";
                             }
 
-                            const hiddenInstruction = `Monochrome coloring book page of ${promptInput}. ${styleModifier}. Strictly black outlines on pure white background. Flat 2D vector art. No shading, no grayscale, no halftones, no colors.`;
+                            // Używamy PRZETŁUMACZONEGO polecenia (englishSubject), żeby AI nie rysowało "sów" zamiast nierozpoznanych polskich księżniczek
+                            const hiddenInstruction = `Monochrome coloring book page of ${englishSubject}. ${styleModifier}. Strictly black outlines on pure white background. Flat 2D vector art. No shading, no grayscale, no halftones, no colors.`;
                             const negativePrompt = "shading, gradients, grayscale, sketch, pencil, realistic, 3d, colors, shadows, halftone, text, watermark, painted, complex background";
 
                             const payload = {
@@ -360,7 +411,7 @@
                             console.error("Szczegóły błędu:", error); 
                             showToast(`Błąd: ${error.message.substring(0, 80)}`, 'error');
                         } finally { 
-                            setIsGenerating(false); 
+                            setGenerationStep(null); 
                         }
                     },
                     (errMsg) => showToast(errMsg, 'error'),
@@ -593,12 +644,14 @@
                     
                     {toast.visible && <div className={`fixed top-6 right-6 z-[9999] px-6 py-3 rounded-xl font-bold shadow-2xl transition-all ${toast.type === 'error' ? 'bg-red-500 text-white' : 'bg-emerald-500 text-slate-900'}`}>{toast.message}</div>}
 
-                    {isGenerating && (
+                    {generationStep && (
                         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-[100] flex flex-col items-center justify-center text-white print-hidden">
                             <div className="glass-panel p-10 rounded-3xl flex flex-col items-center space-y-6 max-w-sm border border-pink-500/20 shadow-[0_0_50px_rgba(244,63,94,0.2)]">
                                 <i className="ph-bold ph-spinner-gap animate-spin text-5xl text-pink-500"></i>
                                 <div className="text-center">
-                                    <h3 className="text-xl font-bold mb-2 text-white">Szkicowanie...</h3>
+                                    <h3 className="text-xl font-bold mb-2 text-white">
+                                        {generationStep === 'translating' ? 'Tłumaczenie pojęć...' : 'Szkicowanie grafiki...'}
+                                    </h3>
                                     <p className="text-xs text-slate-400 font-medium">To potrwa kilkanaście sekund.</p>
                                 </div>
                             </div>
@@ -616,7 +669,7 @@
                                     Narysuj wyobraźnię <span className="text-gradient">dzieci.</span>
                                 </h1>
                                 <p className="text-slate-400 text-lg">
-                                    Wpisz dowolny szalony pomysł, a sztuczna inteligencja narysuje czarno-białą, idealną kolorowankę gotową do interaktywnego malowania lub wydruku.
+                                    Wpisz dowolny szalony pomysł w języku polskim, a sztuczna inteligencja narysuje czarno-białą, idealną kolorowankę gotową do druku.
                                 </p>
                             </div>
 
@@ -657,7 +710,7 @@
                                         value={promptInput}
                                         onChange={(e) => setPromptInput(e.target.value)}
                                         onKeyPress={(e) => { if(e.key === 'Enter') generateColoringPage(); }}
-                                        placeholder="Np. Wesoły dinozaur jedzący pizzę..."
+                                        placeholder="Np. Wesoła księżniczka z koroną..."
                                         className="w-full bg-slate-900/80 border border-slate-600 text-white rounded-2xl px-6 py-5 focus:ring-2 focus:ring-pink-500 outline-none text-lg pr-16"
                                     />
                                     <span className="absolute right-5 top-1/2 -translate-y-1/2 text-2xl"><i className="ph-fill ph-magic-wand text-pink-500"></i></span>
@@ -665,7 +718,7 @@
 
                                 <div className="mt-6 flex flex-wrap gap-2">
                                     <span className="text-xs text-slate-500 font-bold uppercase mt-2 mr-2">Szybkie pomysły:</span>
-                                    {['Zamek księżniczki na chmurze', 'Piesek jadący na deskorolce', 'Sowa w okularach'].map(idea => (
+                                    {['Wesoły dinozaur jedzący pizzę', 'Zamek księżniczki na chmurze', 'Piesek jadący na deskorolce', 'Sowa w okularach'].map(idea => (
                                         <button key={idea} onClick={() => setPromptInput(idea)} className="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs px-3 py-2 rounded-lg border border-slate-700 transition-colors">
                                             {idea}
                                         </button>
@@ -675,11 +728,15 @@
                                 <div className="mt-10 flex justify-end">
                                     <button 
                                         onClick={generateColoringPage}
-                                        disabled={isGenerating || !promptInput}
+                                        disabled={generationStep !== null || !promptInput}
                                         className={`w-full sm:w-auto px-12 py-5 rounded-2xl font-black text-white text-lg transition-all flex items-center justify-center gap-3 shadow-[0_0_20px_rgba(244,63,94,0.3)] btn-bounce
-                                            ${isGenerating ? 'bg-slate-700 cursor-not-allowed' : 'bg-gradient-to-r from-pink-600 to-amber-500 hover:scale-105 active:scale-95'}`}
+                                            ${generationStep !== null ? 'bg-slate-700 cursor-not-allowed' : 'bg-gradient-to-r from-pink-600 to-amber-500 hover:scale-105 active:scale-95'}`}
                                     >
-                                        {isGenerating ? <><i className="ph-bold ph-spinner animate-spin text-xl"></i> Rysowanie w toku...</> : <><i className="ph-bold ph-pencil-simple text-xl"></i> Wygeneruj Kolorowankę</>}
+                                        {generationStep !== null ? (
+                                            <><i className="ph-bold ph-spinner animate-spin text-xl"></i> Trwa praca ({(generationStep === 'translating' ? '1/2' : '2/2')})...</>
+                                        ) : (
+                                            <><i className="ph-bold ph-pencil-simple text-xl"></i> Wygeneruj Kolorowankę</>
+                                        )}
                                     </button>
                                 </div>
                             </div>
