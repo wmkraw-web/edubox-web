@@ -249,6 +249,16 @@
             };
 
             // === API FUNCTIONS ===
+            const parseAIResponse = (rawText) => {
+                let jsonStr = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
+                const startIdx = jsonStr.indexOf('{');
+                const endIdx = jsonStr.lastIndexOf('}');
+                if (startIdx !== -1 && endIdx !== -1) {
+                    jsonStr = jsonStr.substring(startIdx, endIdx + 1);
+                }
+                return JSON.parse(jsonStr);
+            };
+
             const fetchRhymeText = async (userPrompt, systemInstruction) => {
                 try {
                     const res = await fetch('/api/chat', {
@@ -265,30 +275,34 @@
                     
                     if (!res.ok) throw new Error(`API Error: ${res.status}`);
                     const data = await res.json();
-                    
-                    let jsonStr = data.text.replace(/```json/gi, '').replace(/```/g, '').trim();
-                    const startIdx = jsonStr.indexOf('{');
-                    const endIdx = jsonStr.lastIndexOf('}');
-                    if (startIdx !== -1 && endIdx !== -1) {
-                        jsonStr = jsonStr.substring(startIdx, endIdx + 1);
-                    }
-                    return JSON.parse(jsonStr);
+                    return parseAIResponse(data.text);
                 } catch (e) {
                     console.warn("Przełączam na model awaryjny (Canvas Fallback):", e);
-                    const apiKey = ""; 
-                    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
-                    const res = await fetch(url, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            contents: [{ parts: [{ text: userPrompt }] }],
-                            systemInstruction: { parts: [{ text: systemInstruction }] },
-                            generationConfig: { temperature: 0.7, responseMimeType: "application/json" }
-                        })
-                    });
-                    if (!res.ok) throw new Error("Oba modele AI niedostępne");
-                    const data = await res.json();
-                    return JSON.parse(data.candidates[0].content.parts[0].text);
+                    let attempt = 0;
+                    while (attempt < 3) {
+                        try {
+                            const apiKey = ""; 
+                            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+                            const res = await fetch(url, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    contents: [{ parts: [{ text: userPrompt }] }],
+                                    systemInstruction: { parts: [{ text: systemInstruction }] },
+                                    generationConfig: { temperature: 0.7, responseMimeType: "application/json" }
+                                })
+                            });
+                            if (!res.ok) throw new Error("Awaria modelu zapasowego");
+                            const data = await res.json();
+                            // Bezpieczne parsowanie odpowiedzi, która może zawierać formatowanie markdown
+                            return parseAIResponse(data.candidates[0].content.parts[0].text);
+                        } catch (err) {
+                            attempt++;
+                            if (attempt >= 3) throw new Error("Oba modele AI niedostępne");
+                            // Exponential backoff
+                            await new Promise(r => setTimeout(r, 1000 * attempt));
+                        }
+                    }
                 }
             };
 
@@ -305,18 +319,27 @@
                     throw new Error(errData.error || `Status API: ${res.status}`);
                 } catch (e) {
                     if (e.message === "USE_FALLBACK" || e.message.includes("Failed to fetch") || e.message.includes("Unexpected token")) {
-                        const apiKey = ""; 
-                        const url = `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${apiKey}`;
-                        const fallbackRes = await fetch(url, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                instances: { prompt: payloadData.prompt },
-                                parameters: { sampleCount: 1, aspectRatio: "1:1" }
-                            })
-                        });
-                        if (!fallbackRes.ok) throw new Error("Błąd silnika graficznego Google.");
-                        return await fallbackRes.json();
+                        let attempt = 0;
+                        while(attempt < 3) {
+                            try {
+                                const apiKey = ""; 
+                                const url = `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${apiKey}`;
+                                const fallbackRes = await fetch(url, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                        instances: { prompt: payloadData.prompt },
+                                        parameters: { sampleCount: 1 } // Usunięto aspectRatio dla modelu awaryjnego
+                                    })
+                                });
+                                if (!fallbackRes.ok) throw new Error("Błąd silnika graficznego Google.");
+                                return await fallbackRes.json();
+                            } catch(err) {
+                                attempt++;
+                                if (attempt >= 3) throw err;
+                                await new Promise(r => setTimeout(r, 1000 * attempt));
+                            }
+                        }
                     }
                     throw e;
                 }
@@ -355,8 +378,9 @@ ZWRÓĆ WYŁĄCZNIE POPRAWNY JSON o strukturze:
                             setGenerationStep('image');
                             setBotMessage("Rymowanka gotowa! Teraz maluję do niej przepiękną, kolorową ilustrację...");
                             
-                            // Generowanie obrazka z twardą blokadą tekstu
-                            const hiddenInstruction = `A beautiful, highly detailed 3D Pixar style children's book illustration. MAIN SUBJECT: ${textData.imagePrompt}. Cozy, warm, cheerful environment. Single unified scene. CRITICAL RULE: ABSOLUTELY NO TEXT, NO LETTERS, NO WORDS anywhere on the image. Perfect masterpiece.`;
+                            // Generowanie obrazka z twardą blokadą tekstu i ZABEZPIECZENIEM przed błędami \n (Enter)
+                            const safeImagePrompt = (textData.imagePrompt || '').replace(/['"\n]/g, ' ').trim();
+                            const hiddenInstruction = `A beautiful, highly detailed 3D Pixar style children's book illustration. MAIN SUBJECT: ${safeImagePrompt}. Cozy, warm, cheerful environment. Single unified scene. CRITICAL RULE: ABSOLUTELY NO TEXT, NO LETTERS, NO WORDS anywhere on the image. Perfect masterpiece.`;
                             
                             const payload = {
                                 prompt: hiddenInstruction, 
