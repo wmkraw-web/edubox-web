@@ -199,6 +199,10 @@
             const [generatedData, setGeneratedData] = useState(null);
             const [botMessage, setBotMessage] = useState("Cześć! O czym napiszemy dzisiaj? Podaj mi temat, a ja ułożę rytmiczną rymowankę i narysuję do niej piękną, kolorową ilustrację!");
 
+            // NOWE: Obsługa Studio Nagraniowego (Audio AI)
+            const [audioUrl, setAudioUrl] = useState(null);
+            const [isAudioGenerating, setIsAudioGenerating] = useState(false);
+
             // === GIEŁDA (MARKETPLACE) ===
             const [gieldaItems, setGieldaItems] = useState([]);
             const [isSavingToGielda, setIsSavingToGielda] = useState(false);
@@ -256,6 +260,8 @@
                 if (startIdx !== -1 && endIdx !== -1) {
                     jsonStr = jsonStr.substring(startIdx, endIdx + 1);
                 }
+                // NIEZAWODNY TRIK: Eliminujemy wszystkie "twarde" entery, które model zostawia wewnątrz JSONa, łamiąc kompilator.
+                jsonStr = jsonStr.replace(/\n/g, ' ').replace(/\r/g, '');
                 return JSON.parse(jsonStr);
             };
 
@@ -354,6 +360,7 @@
                         setUsages(newCount);
                         setIsGenerating(true);
                         setGeneratedData(null);
+                        setAudioUrl(null); // Reset audio
                         
                         try {
                             setGenerationStep('text');
@@ -363,12 +370,13 @@
                             const moodDesc = mood === 'zabawny' ? 'śmieszny, wesoły, wywołujący uśmiech' : (mood === 'spokojny' ? 'wyciszający, kojący, idealny do zasypiania' : 'edukacyjny, uczący ważnych wartości lub wiedzy');
                             const audienceDesc = ageGroup === 'maluchy' ? 'najmłodszych dzieci (2-3 lata), bardzo proste słowa, onomatopeje' : (ageGroup === 'przedszkole' ? 'przedszkolaków (4-6 lat), klasyczny rytm' : 'dzieci wczesnoszkolnych (7-9 lat), bogatsze słownictwo');
 
+                            // Wzmocniono zakaz stosowania enterów (\n) aby nigdy więcej nie wykoleić JSONa
                             const sysPrompt = `Jesteś wybitnym polskim autorem literatury dziecięcej (jak Brzechwa czy Tuwim). 
 Twoim zadaniem jest napisanie rymowanki.
 ZWRÓĆ WYŁĄCZNIE POPRAWNY JSON o strukturze:
 {
   "title": "Kreatywny tytuł",
-  "content": "Treść wiersza. Używaj znacznika <br/> do oznaczania nowych linii i enterów. Używaj <strong> do zaznaczania np. [Refren] lub ważnych słów.",
+  "content": "Treść wiersza. Używaj WYŁĄCZNIE znacznika <br/> do oznaczania nowych linii i enterów. Używaj <strong> do zaznaczania np. [Refren]. BARDZO WAŻNE: Nie stawiaj znaków nowej linii (enterów) w samym kodzie JSON!",
   "imagePrompt": "A highly concise, purely visual English description (max 15 words) of the main subject of this poem. E.g. 'a cute little red dog playing with a ball'. No text."
 }`;
                             const usrPrompt = `Napisz utwór na temat: "${topic}".\nFormat: ${formatDesc}.\nOdbiorca: dla ${audienceDesc}.\nNastrój: ${moodDesc}.\nZadbaj o idealny rytm i rymy (AABB lub ABAB).`;
@@ -443,9 +451,96 @@ ZWRÓĆ WYŁĄCZNIE POPRAWNY JSON o strukturze:
                 setContentType(item.config.contentType || 'wierszyk');
                 setMood(item.config.mood || 'zabawny');
                 setGeneratedData(item.config.generatedData);
+                setAudioUrl(null); // Reset audio
                 setAppMode('generator');
                 showToast("Wczytano z Giełdy!", "info");
                 setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
+            };
+
+            // === TEXT TO SPEECH (AUDIO AI) ===
+            const pcmToWav = (base64Pcm, sampleRate) => {
+                const binaryString = atob(base64Pcm);
+                const bytes = new Uint8Array(binaryString.length);
+                for (let i = 0; i < binaryString.length; i++) {
+                    bytes[i] = binaryString.charCodeAt(i);
+                }
+                const pcmData = new Int16Array(bytes.buffer);
+                
+                const numChannels = 1;
+                const byteRate = sampleRate * numChannels * 2;
+                const blockAlign = numChannels * 2;
+                const wavHeader = new ArrayBuffer(44);
+                const view = new DataView(wavHeader);
+                
+                const writeString = (view, offset, string) => {
+                    for (let i = 0; i < string.length; i++) {
+                        view.setUint8(offset + i, string.charCodeAt(i));
+                    }
+                };
+                
+                writeString(view, 0, 'RIFF');
+                view.setUint32(4, 36 + pcmData.length * 2, true);
+                writeString(view, 8, 'WAVE');
+                writeString(view, 12, 'fmt ');
+                view.setUint32(16, 16, true);
+                view.setUint16(20, 1, true); // PCM
+                view.setUint16(22, numChannels, true);
+                view.setUint32(24, sampleRate, true);
+                view.setUint32(28, byteRate, true);
+                view.setUint16(32, blockAlign, true);
+                view.setUint16(34, 16, true); // 16-bit
+                writeString(view, 36, 'data');
+                view.setUint32(40, pcmData.length * 2, true);
+                
+                const wavBlob = new Blob([wavHeader, pcmData], { type: 'audio/wav' });
+                return URL.createObjectURL(wavBlob);
+            };
+
+            const generateAudio = async () => {
+                if (!generatedData || !generatedData.content) return;
+                setIsAudioGenerating(true);
+                try {
+                    // Czyścimy utwór z tagów HTML na potrzeby lektora
+                    const cleanText = generatedData.content.replace(/<br\s*\/?>/gi, '. ').replace(/<[^>]*>?/gm, '').replace(/\[.*?\]/g, ''); 
+                    
+                    // Modulator emocji dla Głosowego AI
+                    const moodPrefix = mood === 'zabawny' ? 'Say playfully and rhythmically in polish: ' : (mood === 'spokojny' ? 'Say in a calm, soothing whisper in polish: ' : 'Say clearly and dynamically in polish: ');
+                    
+                    const apiKey = ""; 
+                    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`;
+                    
+                    const payload = {
+                        contents: [{ parts: [{ text: moodPrefix + cleanText }] }],
+                        generationConfig: {
+                            responseModalities: ["AUDIO"],
+                            speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Aoede" } } }
+                        }
+                    };
+
+                    const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                    if (!res.ok) throw new Error("Audio API failed");
+                    const data = await res.json();
+                    
+                    const pcmBase64 = data.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+                    const mimeType = data.candidates?.[0]?.content?.parts?.[0]?.inlineData?.mimeType || "audio/pcm;rate=24000";
+                    
+                    if (pcmBase64) {
+                        let sampleRate = 24000;
+                        const match = mimeType.match(/rate=(\d+)/);
+                        if (match) sampleRate = parseInt(match[1]);
+                        
+                        const wavUrl = pcmToWav(pcmBase64, sampleRate);
+                        setAudioUrl(wavUrl);
+                        showToast("🎧 Nagranie gotowe! Możesz odtworzyć.");
+                    } else {
+                        throw new Error("Brak danych audio");
+                    }
+                } catch (e) {
+                    console.error("Audio generation error:", e);
+                    showToast("Błąd serwera podczas generowania głosu.", "error");
+                } finally {
+                    setIsAudioGenerating(false);
+                }
             };
 
             const exportToWord = () => {
@@ -696,7 +791,26 @@ ZWRÓĆ WYŁĄCZNIE POPRAWNY JSON o strukturze:
                                                 />
                                             </div>
                                             
-                                            <div className="mt-16 text-center text-xs font-bold text-slate-400 print-hidden border-t border-slate-200 pt-4 font-sans">
+                                            {/* Zintegrowany odtwarzacz Audio */}
+                                            {audioUrl && (
+                                                <div className="mt-10 flex justify-center print-hidden fade-in">
+                                                    <audio controls src={audioUrl} className="w-full max-w-sm rounded-full shadow-[0_10px_20px_rgba(0,0,0,0.15)] border-2 border-cyan-200" />
+                                                </div>
+                                            )}
+                                            {!audioUrl && !isAudioGenerating && (
+                                                <div className="mt-10 flex justify-center print-hidden">
+                                                    <button onClick={generateAudio} className="flex items-center justify-center gap-3 bg-gradient-to-r from-purple-600 to-fuchsia-500 hover:from-purple-500 hover:to-fuchsia-400 text-white px-8 py-4 rounded-xl font-black shadow-lg btn-bounce text-sm uppercase tracking-widest transition-all">
+                                                        <i className="ph-bold ph-speaker-high text-2xl"></i> Przeczytaj Głosowo (Lektor AI)
+                                                    </button>
+                                                </div>
+                                            )}
+                                            {isAudioGenerating && (
+                                                <div className="mt-10 flex items-center justify-center gap-3 text-fuchsia-500 font-bold print-hidden">
+                                                    <i className="ph-bold ph-spinner animate-spin text-3xl"></i> Trwa nagrywanie w studiu głosowym...
+                                                </div>
+                                            )}
+
+                                            <div className="mt-12 text-center text-xs font-bold text-slate-400 print-hidden border-t border-slate-200 pt-4 font-sans">
                                                 Wygenerowano w EduTik AI. Wydrukuj tę kartę i zawieś w sali lub wklej do śpiewnika!
                                             </div>
                                         </div>
