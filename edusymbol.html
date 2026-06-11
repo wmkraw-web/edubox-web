@@ -378,10 +378,13 @@
                             styleModifier = "High quality educational illustration, beautiful and clear, professional textbook artwork, neutral style.";
                         }
 
-                        // Nowy, mądrzejszy prompt, który nie zmusza do rysowania ludzi dla zwykłych przedmiotów
-                        const hiddenInstruction = `Create a single, isolated educational illustration on a pure white background. MAIN SUBJECT TO DRAW: "${promptInput}". 
-CRITICAL RULE: Draw EXACTLY what is requested. If the subject is an inanimate object, animal, or food (like an apple), draw ONLY that object - NO HUMANS, NO FACES. If the subject is specifically a person or an action involving a person, draw a caucasian character.
-Style: ${styleModifier}. Strictly NO background scenery. Highly recognizable, single subject focus. ABSOLUTELY NO TEXT, NO WORDS, NO LETTERS.`;
+                        // Inteligentny prompt - uwzględnia polski język, zmusza do rysowania czynności i mocno zakazuje tekstu
+                        const hiddenInstruction = `Create a single, isolated educational illustration on a pure white background. The subject to illustrate is the Polish word/phrase: "${promptInput}". 
+CRITICAL RULES:
+1. If the word means an ACTION, VERB, or EMOTION, depict a cute caucasian character performing it clearly.
+2. If the word means an OBJECT, ANIMAL, or FOOD, draw ONLY that item (NO HUMANS).
+3. ABSOLUTELY NO TEXT, NO WORDS, NO LETTERS, NO SIGNATURES on the image. Pure visual art.
+Style: ${styleModifier}. Strictly NO background scenery. Highly recognizable, single subject focus.`;
                         
                         try {
                             const imgData = await fetchEduBoxImage(hiddenInstruction);
@@ -405,39 +408,39 @@ Style: ${styleModifier}. Strictly NO background scenery. Highly recognizable, si
 
             const addCard = () => {
                 if (generatedImage) {
-                    // Kompresja obrazu przed zapisaniem do tablicy (Bezpieczne dla iframes)
-                    const img = new Image();
-                    img.onload = () => {
-                        const canvas = document.createElement('canvas');
-                        canvas.width = 400; canvas.height = 400;
-                        const ctx = canvas.getContext('2d');
-                        ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, 400, 400);
-                        ctx.drawImage(img, 0, 0, 400, 400);
-                        
-                        const compressedImg = canvas.toDataURL('image/jpeg', 0.85); 
-                        
+                    const addToList = (imgSrc) => {
                         const newItem = {
-                            id: Date.now(),
-                            img: compressedImg,
-                            label: promptInput.substring(0, 15).toUpperCase()
-                        };
-                        
-                        setSymbolCards(prev => [...prev, newItem]);
-                        setGeneratedImage(null);
-                        setPromptInput('');
-                    };
-                    img.onerror = () => {
-                        // Awaryjne dodanie bez kompresji w razie błędu ładowania Image
-                        const newItem = {
-                            id: Date.now(),
-                            img: generatedImage,
+                            id: Date.now() + Math.random(), // Zabezpieczenie przed dublowaniem ID
+                            img: imgSrc,
                             label: promptInput.substring(0, 15).toUpperCase()
                         };
                         setSymbolCards(prev => [...prev, newItem]);
                         setGeneratedImage(null);
                         setPromptInput('');
                     };
-                    img.src = generatedImage;
+
+                    if (generatedImage.startsWith('data:')) {
+                        // Kompresja obrazu Base64 przed zapisaniem do tablicy
+                        const img = new Image();
+                        img.onload = () => {
+                            try {
+                                const canvas = document.createElement('canvas');
+                                canvas.width = 400; canvas.height = 400;
+                                const ctx = canvas.getContext('2d');
+                                ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, 400, 400);
+                                ctx.drawImage(img, 0, 0, 400, 400);
+                                const compressedImg = canvas.toDataURL('image/jpeg', 0.85); 
+                                addToList(compressedImg);
+                            } catch(e) {
+                                addToList(generatedImage);
+                            }
+                        };
+                        img.onerror = () => addToList(generatedImage);
+                        img.src = generatedImage;
+                    } else {
+                        // Zewnętrzny URL - pomijamy kompresję Canvas aby uniknąć błędu CORS (Tainted Canvas), który blokował dodawanie
+                        addToList(generatedImage);
+                    }
                 }
             };
 
