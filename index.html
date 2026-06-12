@@ -166,12 +166,52 @@
             useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, isOpen]);
 
             const findApps = (query) => {
-                const q = query.toLowerCase();
-                return appsData.filter(app => 
-                    app.title.toLowerCase().includes(q) || 
-                    app.desc.toLowerCase().includes(q) || 
-                    app.tags.some(tag => tag.toLowerCase().includes(q))
-                ).slice(0, 3); // Zwraca max 3 najlepsze wyniki
+                const normalizedQuery = query.toLowerCase();
+                
+                // Krok 1: Wyłapanie pojedynczych słów z całego zdania (np. "dziecko krzyczy na lekcji" -> ["dziecko", "krzyczy", "lekcji"])
+                // match wyciąga tylko polskie litery, filter odrzuca krótkie "śmieciowe" słówka "i", "na", "coś", "jak"
+                const words = normalizedQuery.match(/[a-ząćęłńóśźż]+/g) || [];
+                const searchWords = words.filter(w => w.length > 2 && !['jak', 'coś', 'dla', 'czy', 'masz', 'potrzebuje', 'szukam', 'jest'].includes(w));
+
+                if (searchWords.length === 0) return []; // Zbyt ogólne zapytanie (np. samo "jak to")
+
+                // Krok 2: Wbudowany słownik "intencji" AI - uczy bota mapowania potocznych słów na nasze tagi w systemie
+                const intentMap = {
+                    'krzyczy': 'trudne zachowania', 'bije': 'trudne zachowania', 'agresja': 'sos', 'problem': 'sos', 'wyciszenie': 'terapia',
+                    'oceny': 'ocena', 'ocenianie': 'ocena', 'świadectwo': 'ocena', 'świadectwa': 'ocena', 'półrocze': 'sprawozdanie',
+                    'autyzm': 'aac', 'asperger': 'aac', 'niepełnosprawność': 'spe', 'dysleksja': 'dysleksja', 'adhd': 'dysleksja',
+                    'świetlica': 'gry', 'zabawa': 'gry', 'nudzą': 'grywalizacja', 'zastępstwo': 'zastępstwo', 'okienko': 'zastępstwo',
+                    'dokumenty': 'biurokracja', 'papierologia': 'biurokracja', 'papiery': 'biurokracja', 'opinia': 'ppp', 'poradnia': 'ppp',
+                    'sprawdzian': 'test', 'kartkówka': 'test', 'egzamin': 'test', 'powtórzenie': 'fiszki',
+                    'litery': 'napisy', 'dekoracja': 'gazetka', 'ozdoby': 'gazetka', 'napis': 'girlandy', 'napisy': 'girlandy',
+                    'matma': 'matematyka', 'polski': 'czytanie', 'angielski': 'słówka', 'wycieczka': 'wycieczka', 'zgody': 'rodo'
+                };
+
+                // Krok 3: Ocena (Scoring) - Bot przydziela punkty aplikacjom, które najlepiej pasują do słów
+                const scoredApps = appsData.map(app => {
+                    let score = 0;
+                    const appContent = (app.title + " " + app.desc + " " + app.tags.join(" ")).toLowerCase();
+                    
+                    searchWords.forEach(word => {
+                        // 1. Zwykłe trafienie 1:1 (np. słowo "dyplomy" występuje w nazwie lub opisie)
+                        if (appContent.includes(word)) score += 2;
+                        
+                        // 2. Trafienie po intencji (np. wpisano "krzyczy", więc bot szuka aplikacji oznaczonych jako "trudne zachowania")
+                        const mappedTag = intentMap[word];
+                        if (mappedTag && appContent.includes(mappedTag)) score += 3;
+                        
+                        // 3. Sprytne ucinanie końcówek: dopasuje np. wpisane słowo "oceny" do tagu "ocen"
+                        if (word.length > 4) {
+                            const rootWord = word.substring(0, word.length - 2); 
+                            if (appContent.includes(rootWord)) score += 1;
+                        }
+                    });
+
+                    return { ...app, score };
+                });
+
+                // Krok 4: Sortowanie od najlepszych trafień i zwrócenie top 3 wyników
+                return scoredApps.filter(app => app.score > 0).sort((a, b) => b.score - a.score).slice(0, 3);
             };
 
             const handleSend = () => {
