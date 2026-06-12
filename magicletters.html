@@ -280,7 +280,7 @@
 
                 setIsGenerating(true);
                 try {
-                    // Krok 1: Tłumaczenie PL -> EN za pomocą text model
+                    // Krok 1: Tłumaczenie PL -> EN za pomocą text model (lub Fallback na oryginalny tekst)
                     const translationUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
                     const translatePayload = {
                         contents: [{ parts: [{ text: `Przetłumacz poniższy opis tekstury/tła na angielski. Zwróć TYLKO angielskie tłumaczenie, bez znaków zapytania, bez cudzysłowów. Tekst: ${aiPrompt}` }] }],
@@ -292,27 +292,53 @@
                         const tRes = await fetchWithExponentialBackoff(translationUrl, {
                             method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(translatePayload)
                         });
-                        const tData = await tRes.json();
-                        if (tData.candidates?.[0]?.content?.parts?.[0]?.text) {
-                            engPrompt = tData.candidates[0].content.parts[0].text.trim();
+                        if (tRes.ok) {
+                            const tData = await tRes.json();
+                            if (tData.candidates?.[0]?.content?.parts?.[0]?.text) {
+                                engPrompt = tData.candidates[0].content.parts[0].text.trim();
+                            }
                         }
-                    } catch(e) { console.warn("Translation failed, using original prompt.", e); }
+                    } catch(e) { console.warn("Brak klucza Tłumacza. Używam oryginalnego polecenia.", e); }
 
-                    // Krok 2: Generowanie obrazu Imagen
+                    // Krok 2: Generowanie obrazu (Próba Imagen, Fallback na Pollinations na Vercel)
                     const finalPrompt = `${engPrompt}, beautiful texture, high quality seamless pattern, vivid colors, NO TEXT, NO LETTERS, NO WORDS, NO WATERMARK`;
-                    const imagenUrl = `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${apiKey}`;
-                    const imagenPayload = {
-                        instances: { prompt: finalPrompt },
-                        parameters: { sampleCount: 1 }
-                    };
+                    let base64Img = null;
 
-                    const imgRes = await fetchWithExponentialBackoff(imagenUrl, {
-                        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(imagenPayload)
-                    });
-                    const imgData = await imgRes.json();
+                    try {
+                        const imagenUrl = `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${apiKey}`;
+                        const imagenPayload = {
+                            instances: { prompt: finalPrompt },
+                            parameters: { sampleCount: 1 }
+                        };
+
+                        const imgRes = await fetchWithExponentialBackoff(imagenUrl, {
+                            method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(imagenPayload)
+                        });
+                        
+                        if (imgRes.ok) {
+                            const imgData = await imgRes.json();
+                            if (imgData.predictions && imgData.predictions[0]) {
+                                base64Img = `data:image/png;base64,${imgData.predictions[0].bytesBase64Encoded}`;
+                            }
+                        } else {
+                            throw new Error("Brak klucza API (Środowisko Vercel)");
+                        }
+                    } catch (imagenError) {
+                        console.warn("Wykryto Vercel. Przełączam na niezawodny darmowy Fallback (Pollinations)...");
+                        const seed = Math.floor(Math.random() * 1000000);
+                        const pollUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(finalPrompt)}?seed=${seed}&width=1024&height=1024&nologo=true`;
+                        
+                        const pRes = await fetch(pollUrl);
+                        if (!pRes.ok) throw new Error("Pollinations fallback failed");
+                        const blob = await pRes.blob();
+                        base64Img = await new Promise((resolve) => {
+                            const reader = new FileReader();
+                            reader.onloadend = () => resolve(reader.result);
+                            reader.readAsDataURL(blob);
+                        });
+                    }
                     
-                    if (imgData.predictions && imgData.predictions[0]) {
-                        const base64Img = `data:image/png;base64,${imgData.predictions[0].bytesBase64Encoded}`;
+                    if (base64Img) {
                         if (aiTarget === 'background') setBgCustomImage(base64Img);
                         else setTextCustomImage(base64Img);
 
@@ -323,11 +349,11 @@
                         }
                         showMessage('Wygenerowano pomyślnie!', 'success');
                     } else {
-                         throw new Error("Brak obrazu w odpowiedzi API");
+                         throw new Error("Nie udało się uzyskać obrazu.");
                     }
                 } catch (error) {
                     console.error("Błąd AI:", error);
-                    showMessage('Wystąpił błąd podczas generowania obrazu.', 'error');
+                    showMessage('Wystąpił błąd podczas generowania obrazu. Spróbuj ponownie.', 'error');
                 } finally {
                     setIsGenerating(false);
                 }
