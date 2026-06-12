@@ -280,23 +280,22 @@
 
                 setIsGenerating(true);
                 try {
-                    // Krok 1: Tłumaczenie PL -> EN za pomocą Twojego endpointu (api/gemini)
+                    // Krok 1: PANCERNY TŁUMACZ (Google Translate API - darmowe, bez klucza, 100% skuteczne na Vercel)
                     let engPrompt = aiPrompt;
                     try {
-                        const tRes = await fetch('/api/gemini', {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ prompt: `Przetłumacz poniższy opis tekstury na angielski. Zwróć TYLKO angielskie tłumaczenie, bez znaków zapytania, bez cudzysłowów. Tekst: ${aiPrompt}` })
-                        });
-                        if (tRes.ok) {
-                            const tData = await tRes.json();
-                            // Elastyczne mapowanie odpowiedzi z Twojego backendu
-                            engPrompt = tData.text || tData.response || tData.message || tData.translation || engPrompt;
+                        const translateRes = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=pl&tl=en&dt=t&q=${encodeURIComponent(aiPrompt)}`);
+                        if (translateRes.ok) {
+                            const translateData = await translateRes.json();
+                            engPrompt = translateData[0][0][0]; 
+                            console.log("✅ Tłumacz zrozumiał:", engPrompt);
                         }
-                    } catch(e) { console.warn("Fallback na oryginał – brak responsywnego /api/gemini", e); }
+                    } catch (e) {
+                        console.warn("Błąd tłumacza, używam oryginału:", e);
+                    }
 
                     // Krok 2: Generowanie obrazu przez Twój główny endpoint (api/generate)
-                    const finalPrompt = `${engPrompt.trim()}, beautiful texture, high quality seamless pattern, vivid colors, NO TEXT, NO LETTERS, NO WORDS, NO WATERMARK`;
+                    const finalPrompt = `A seamless background texture of ${engPrompt}, beautiful pattern, high quality, vivid colors, purely visual background, NO TEXT, NO LETTERS, NO WORDS, NO WATERMARK`;
+                    console.log("🎨 Wysyłam prompt do malarza:", finalPrompt);
                     
                     const imgRes = await fetch('/api/generate', {
                         method: "POST",
@@ -340,7 +339,8 @@
                             setAiGenerations(newCount);
                             localStorage.setItem('edubox_magicletters_ai', newCount.toString());
                         }
-                        showMessage('Wygenerowano pomyślnie z API Vercel!', 'success');
+                        // Pokazujemy użytkownikowi jak tłumacz to zrozumiał
+                        showMessage(`Gotowe! (Tłumaczenie: ${engPrompt})`, 'success');
                     } else {
                          throw new Error("Nie udało się uzyskać formatu obrazu z backendu.");
                     }
