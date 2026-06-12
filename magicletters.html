@@ -269,7 +269,7 @@
 
             const handlePrint = () => window.print();
 
-            // AI Generation (Two-Step V3 Standard)
+            // AI Generation (Two-Step V3 Standard via Vercel Serverless API)
             const generateAIImage = async () => {
                 if (!aiPrompt.trim()) return;
                 
@@ -280,64 +280,57 @@
 
                 setIsGenerating(true);
                 try {
-                    // Krok 1: Tłumaczenie PL -> EN za pomocą text model (lub Fallback na oryginalny tekst)
-                    const translationUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
-                    const translatePayload = {
-                        contents: [{ parts: [{ text: `Przetłumacz poniższy opis tekstury/tła na angielski. Zwróć TYLKO angielskie tłumaczenie, bez znaków zapytania, bez cudzysłowów. Tekst: ${aiPrompt}` }] }],
-                        systemInstruction: { parts: [{ text: "You are a direct translator. Output strictly the translation." }] }
-                    };
-                    
+                    // Krok 1: Tłumaczenie PL -> EN za pomocą Twojego endpointu (api/gemini)
                     let engPrompt = aiPrompt;
                     try {
-                        const tRes = await fetchWithExponentialBackoff(translationUrl, {
-                            method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(translatePayload)
+                        const tRes = await fetch('/api/gemini', {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ prompt: `Przetłumacz poniższy opis tekstury na angielski. Zwróć TYLKO angielskie tłumaczenie, bez znaków zapytania, bez cudzysłowów. Tekst: ${aiPrompt}` })
                         });
                         if (tRes.ok) {
                             const tData = await tRes.json();
-                            if (tData.candidates?.[0]?.content?.parts?.[0]?.text) {
-                                engPrompt = tData.candidates[0].content.parts[0].text.trim();
-                            }
+                            // Elastyczne mapowanie odpowiedzi z Twojego backendu
+                            engPrompt = tData.text || tData.response || tData.message || tData.translation || engPrompt;
                         }
-                    } catch(e) { console.warn("Brak klucza Tłumacza. Używam oryginalnego polecenia.", e); }
+                    } catch(e) { console.warn("Fallback na oryginał – brak responsywnego /api/gemini", e); }
 
-                    // Krok 2: Generowanie obrazu (Próba Imagen, Fallback na Pollinations na Vercel)
-                    const finalPrompt = `${engPrompt}, beautiful texture, high quality seamless pattern, vivid colors, NO TEXT, NO LETTERS, NO WORDS, NO WATERMARK`;
+                    // Krok 2: Generowanie obrazu przez Twój główny endpoint (api/generate)
+                    const finalPrompt = `${engPrompt.trim()}, beautiful texture, high quality seamless pattern, vivid colors, NO TEXT, NO LETTERS, NO WORDS, NO WATERMARK`;
+                    
+                    const imgRes = await fetch('/api/generate', {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ prompt: finalPrompt })
+                    });
+                    
+                    if (!imgRes.ok) {
+                        throw new Error(`Błąd z /api/generate: ${imgRes.status}`);
+                    }
+                    
+                    const imgData = await imgRes.json();
+                    
+                    // Bezpieczne wydobycie obrazu (obsługuje OpenAI, FAL, Leonardo i inne formaty)
                     let base64Img = null;
+                    let imageUrl = imgData.url || imgData.imageUrl || imgData.image_url;
+                    
+                    if (imgData.data && imgData.data[0]) {
+                        if (imgData.data[0].b64_json) base64Img = `data:image/png;base64,${imgData.data[0].b64_json}`;
+                        else if (imgData.data[0].url) imageUrl = imgData.data[0].url;
+                    }
+                    if (imgData.image?.url) imageUrl = imgData.image.url;
 
-                    try {
-                        const imagenUrl = `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${apiKey}`;
-                        const imagenPayload = {
-                            instances: { prompt: finalPrompt },
-                            parameters: { sampleCount: 1 }
-                        };
-
-                        const imgRes = await fetchWithExponentialBackoff(imagenUrl, {
-                            method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(imagenPayload)
-                        });
-                        
-                        if (imgRes.ok) {
-                            const imgData = await imgRes.json();
-                            if (imgData.predictions && imgData.predictions[0]) {
-                                base64Img = `data:image/png;base64,${imgData.predictions[0].bytesBase64Encoded}`;
-                            }
-                        } else {
-                            throw new Error("Brak klucza API (Środowisko Vercel)");
-                        }
-                    } catch (imagenError) {
-                        console.warn("Wykryto Vercel. Przełączam na niezawodny darmowy Fallback (Pollinations)...");
-                        const seed = Math.floor(Math.random() * 1000000);
-                        const pollUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(finalPrompt)}?seed=${seed}&width=1024&height=1024&nologo=true`;
-                        
-                        const pRes = await fetch(pollUrl);
-                        if (!pRes.ok) throw new Error("Pollinations fallback failed");
-                        const blob = await pRes.blob();
+                    // Konwersja URL na Base64 jeśli backend zwrócił sam URL (potrzebne do stabilnego zapisu na Giełdzie)
+                    if (!base64Img && imageUrl) {
+                        const blobRes = await fetch(imageUrl);
+                        const blob = await blobRes.blob();
                         base64Img = await new Promise((resolve) => {
                             const reader = new FileReader();
                             reader.onloadend = () => resolve(reader.result);
                             reader.readAsDataURL(blob);
                         });
                     }
-                    
+
                     if (base64Img) {
                         if (aiTarget === 'background') setBgCustomImage(base64Img);
                         else setTextCustomImage(base64Img);
@@ -347,13 +340,13 @@
                             setAiGenerations(newCount);
                             localStorage.setItem('edubox_magicletters_ai', newCount.toString());
                         }
-                        showMessage('Wygenerowano pomyślnie!', 'success');
+                        showMessage('Wygenerowano pomyślnie z API Vercel!', 'success');
                     } else {
-                         throw new Error("Nie udało się uzyskać obrazu.");
+                         throw new Error("Nie udało się uzyskać formatu obrazu z backendu.");
                     }
                 } catch (error) {
-                    console.error("Błąd AI:", error);
-                    showMessage('Wystąpił błąd podczas generowania obrazu. Spróbuj ponownie.', 'error');
+                    console.error("Błąd AI na Giełdzie/API:", error);
+                    showMessage('Wystąpił błąd Vercel API: ' + error.message, 'error');
                 } finally {
                     setIsGenerating(false);
                 }
