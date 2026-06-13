@@ -191,6 +191,7 @@
             const [age, setAge] = useState('7-10 lat');
             const [location, setLocation] = useState('Świetlica');
             const [props, setProps] = useState('Brak rekwizytów');
+            const [specialNeeds, setSpecialNeeds] = useState('Brak (Grupa ogólnodostępna)');
 
             // Market State
             const [marketItems, setMarketItems] = useState([]);
@@ -230,24 +231,24 @@
                 let sysPrompt = "";
 
                 if (activeModule === 'plan') {
-                    sysPrompt = `Jesteś doświadczonym wychowawcą kolonijnym. Stwórz 5-dniowy plan tematycznych półkolonii. Zwróć JSON: { "days": [ { "day": "Poniedziałek", "title": "Tytuł dnia", "morning": "Krótki opis zajęć porannych (np. integracja, plastyka)", "afternoon": "Krótki opis zajęć popołudniowych (np. ruch, gra)" } ] }`;
-                    prompt = `Temat przewodni: ${theme}. Wiek dzieci: ${age}.`;
+                    sysPrompt = `Jesteś doświadczonym wychowawcą kolonijnym i pedagogiem specjalnym. Stwórz 5-dniowy plan tematycznych półkolonii lub zajęć opiekuńczych. Zwróć JSON: { "days": [ { "day": "Poniedziałek", "title": "Tytuł dnia", "morning": "Krótki opis zajęć porannych (np. integracja, plastyka)", "afternoon": "Krótki opis zajęć popołudniowych (np. ruch, gra)" } ] }`;
+                    prompt = `Temat przewodni: ${theme}. Wiek dzieci: ${age}. Specyficzne potrzeby grupy: ${specialNeeds}. (Bezwzględnie dostosuj poziom, tempo i rodzaj aktywności do specyficznych potrzeb dzieci!).`;
                 } else if (activeModule === 'sos') {
-                    sysPrompt = `Jesteś animatorem zabaw. Wymyśl 3 błyskawiczne, genialne gry ratunkowe (Ice-breakery, zabawy ruchowe lub integracyjne). Zwróć JSON: { "games": [ { "name": "Nazwa gry", "rules": "Zasady w 2-3 zdaniach", "duration": "np. 15 min" } ] }`;
-                    prompt = `Lokalizacja (gdzie utknęliśmy): ${location}. Dostępne sprzęty/rekwizyty: ${props}. Wiek: ${age}. Gry muszą idealnie pasować do tego otoczenia i sprzętu!`;
+                    sysPrompt = `Jesteś animatorem zabaw i terapeutą. Wymyśl 3 błyskawiczne, genialne gry ratunkowe (Ice-breakery, zabawy ruchowe, sensoryczne lub integracyjne). Zwróć JSON: { "games": [ { "name": "Nazwa gry", "rules": "Zasady w 2-3 zdaniach", "duration": "np. 15 min" } ] }`;
+                    prompt = `Lokalizacja (gdzie utknęliśmy): ${location}. Dostępne sprzęty/rekwizyty: ${props}. Wiek: ${age}. Specyficzne potrzeby grupy: ${specialNeeds}. Gry muszą idealnie pasować do otoczenia, być bezpieczne i zrozumiałe dla dzieci z tymi potrzebami.`;
                 } else if (activeModule === 'teren') {
-                    sysPrompt = `Jesteś mistrzem gier terenowych. Ułóż 5 rymowanych zagadek/wskazówek do zabawy w podchody, które doprowadzą grupę do celu. Zwróć JSON: { "clues": [ { "step": 1, "rhyme": "Rymowanka (4 linijki)", "hideout": "Gdzie fizycznie schować tę karteczkę np. 'pod dużym dębem'" } ] }`;
-                    prompt = `Teren gry to: ${theme} (potraktuj to pole jako opis terenu). Wiek uczestników: ${age}. Wskazówki niech budują napięcie i pasują do terenu.`;
+                    sysPrompt = `Jesteś mistrzem gier terenowych i pedagogiem. Ułóż 5 rymowanych zagadek/wskazówek do zabawy w podchody, które doprowadzą grupę do celu. Zwróć JSON: { "clues": [ { "step": 1, "rhyme": "Rymowanka (4 linijki)", "hideout": "Gdzie fizycznie schować tę karteczkę np. 'pod dużym dębem'" } ] }`;
+                    prompt = `Teren gry to: ${theme}. Wiek uczestników: ${age}. Specyficzne potrzeby grupy: ${specialNeeds}. (Zadbaj by zagadki i ukrycie wskazówek były dostosowane do możliwości percepcyjnych tych dzieci).`;
                 } else if (activeModule === 'druzyny') {
-                    sysPrompt = `Jesteś kierownikiem kolonii. Wymyśl 4 kreatywne nazwy drużyn oraz rymowane okrzyki motywacyjne dla każdej z nich. Zwróć JSON: { "teams": [ { "name": "Nazwa Drużyny", "cheer": "Rymowany okrzyk (2-4 linijki, rytmiczny)" } ] }`;
-                    prompt = `Tematyka kolonii/obozu: ${theme}. Wiek uczestników: ${age}.`;
+                    sysPrompt = `Jesteś kierownikiem kolonii i pedagogiem. Wymyśl 4 kreatywne nazwy drużyn oraz rymowane okrzyki motywacyjne dla każdej z nich. Zwróć JSON: { "teams": [ { "name": "Nazwa Drużyny", "cheer": "Rymowany okrzyk (2-4 linijki, rytmiczny)" } ] }`;
+                    prompt = `Tematyka: ${theme}. Wiek uczestników: ${age}. Specyficzne potrzeby grupy: ${specialNeeds}. (Okrzyki proste, łatwe do zapamiętania i wymówienia).`;
                 }
 
                 try {
                     const aiText = await fetchTextAI(prompt, sysPrompt);
                     const parsedJson = parseAIResponse(aiText);
                     
-                    setResultData({ type: activeModule, data: parsedJson, params: { theme, age, location, props } });
+                    setResultData({ type: activeModule, data: parsedJson, params: { theme, age, location, props, specialNeeds } });
                     
                     if (!isPremium) {
                         const newCount = aiGenerations + 1;
@@ -305,6 +306,7 @@
                             <div className="text-center mb-8 pb-6 border-b border-slate-800 print:border-slate-300">
                                 <h2 className="text-3xl font-summer text-amber-400 print-text font-black uppercase mb-2">Tydzień: {params.theme}</h2>
                                 <p className="text-sm text-slate-400 print-text font-bold"><i className="ph-bold ph-users"></i> Grupa wiekowa: {params.age}</p>
+                                {params.specialNeeds !== 'Brak (Grupa ogólnodostępna)' && <p className="text-sm text-emerald-400 print:text-emerald-700 print-text font-bold mt-1"><i className="ph-bold ph-wheelchair"></i> SPE: {params.specialNeeds}</p>}
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                 {data.days.map((d, i) => (
@@ -335,6 +337,7 @@
                             <div className="text-center mb-8 pb-6 border-b border-slate-800 print:border-slate-300">
                                 <h2 className="text-3xl font-summer text-cyan-400 print-text font-black uppercase mb-2">Ratunkowe Gry S.O.S</h2>
                                 <p className="text-sm text-slate-400 print-text font-bold"><i className="ph-bold ph-map-pin"></i> {params.location} | <i className="ph-bold ph-backpack"></i> {params.props}</p>
+                                {params.specialNeeds !== 'Brak (Grupa ogólnodostępna)' && <p className="text-sm text-emerald-400 print:text-emerald-700 print-text font-bold mt-1"><i className="ph-bold ph-wheelchair"></i> SPE: {params.specialNeeds}</p>}
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                 {data.games.map((g, i) => (
@@ -356,6 +359,7 @@
                             <div className="text-center mb-8 pb-6 border-b border-slate-800 print:border-slate-300">
                                 <h2 className="text-3xl font-summer text-emerald-400 print-text font-black uppercase mb-2">Terenowe Podchody</h2>
                                 <p className="text-sm text-slate-400 print-text font-bold"><i className="ph-bold ph-compass"></i> Teren: {params.theme}</p>
+                                {params.specialNeeds !== 'Brak (Grupa ogólnodostępna)' && <p className="text-sm text-emerald-400 print:text-emerald-700 print-text font-bold mt-1"><i className="ph-bold ph-wheelchair"></i> SPE: {params.specialNeeds}</p>}
                             </div>
                             <div className="space-y-4 max-w-2xl mx-auto">
                                 {data.clues.map((c, i) => (
@@ -380,6 +384,7 @@
                             <div className="text-center mb-8 pb-6 border-b border-slate-800 print:border-slate-300">
                                 <h2 className="text-3xl font-summer text-purple-400 print-text font-black uppercase mb-2">Baza Drużyn i Okrzyków</h2>
                                 <p className="text-sm text-slate-400 print-text font-bold"><i className="ph-bold ph-palette"></i> Motyw: {params.theme}</p>
+                                {params.specialNeeds !== 'Brak (Grupa ogólnodostępna)' && <p className="text-sm text-emerald-400 print:text-emerald-700 print-text font-bold mt-1"><i className="ph-bold ph-wheelchair"></i> SPE: {params.specialNeeds}</p>}
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 {data.teams.map((t, i) => (
@@ -506,11 +511,24 @@
                                         )}
 
                                         {(activeModule !== 'druzyny' || true) && (
-                                            <div className="space-y-1">
-                                                <label className="text-[10px] font-bold text-slate-400 uppercase">Wiek Dzieci</label>
-                                                <select value={age} onChange={e => setAge(e.target.value)} className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:border-amber-500">
-                                                    <option>Przedszkolaki (4-6 lat)</option><option>7-10 lat</option><option>11-14 lat</option><option>Młodzież (15+)</option>
-                                                </select>
+                                            <div className="space-y-4">
+                                                <div className="space-y-1">
+                                                    <label className="text-[10px] font-bold text-slate-400 uppercase">Wiek Dzieci</label>
+                                                    <select value={age} onChange={e => setAge(e.target.value)} className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:border-amber-500">
+                                                        <option>Przedszkolaki (4-6 lat)</option><option>7-10 lat</option><option>11-14 lat</option><option>Młodzież (15+)</option>
+                                                    </select>
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <label className="text-[10px] font-bold text-slate-400 uppercase text-emerald-400 flex items-center gap-1"><i className="ph-bold ph-wheelchair"></i> Potrzeby Specjalne (SPE)</label>
+                                                    <select value={specialNeeds} onChange={e => setSpecialNeeds(e.target.value)} className="w-full bg-slate-950 border border-emerald-700/50 rounded-lg p-2.5 text-sm text-white focus:border-emerald-500">
+                                                        <option>Brak (Grupa ogólnodostępna)</option>
+                                                        <option>Przedszkolaki z niepełnosprawnością (Ogólne)</option>
+                                                        <option>Spektrum Autyzmu i Asperger</option>
+                                                        <option>Zaburzenia sensoryczne (SI) / Wyciszenie</option>
+                                                        <option>Niepełnosprawność intelektualna</option>
+                                                        <option>Dzieci ze spektrum ADHD</option>
+                                                    </select>
+                                                </div>
                                             </div>
                                         )}
                                     </div>
