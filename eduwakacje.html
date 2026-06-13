@@ -328,7 +328,40 @@
 
                 const { type, data, params } = resultData;
 
-                if (type === 'plan' && data.days) {
+                // 1. Rekurencyjne szukanie tablicy w zagnieżdżonych obiektach JSON
+                const findArrayInObject = (obj) => {
+                    if (Array.isArray(obj)) return obj;
+                    if (obj && typeof obj === 'object') {
+                        for (let key in obj) {
+                            if (Array.isArray(obj[key])) return obj[key];
+                            const nested = findArrayInObject(obj[key]);
+                            if (nested) return nested;
+                        }
+                    }
+                    return null;
+                };
+
+                let itemsList = findArrayInObject(data);
+                
+                // Jeśli AI zwróciło zaledwie pojedynczy obiekt, "na siłę" wsadźmy go w tablicę
+                if (!itemsList && data && typeof data === 'object') {
+                    itemsList = [data];
+                }
+
+                // Bezpiecznik: Jeśli mimo wszystko nie ma tablicy, wyświetl dane surowe
+                if (!itemsList || itemsList.length === 0) {
+                    return (
+                        <div className="bg-red-500/10 border border-red-500/20 p-6 rounded-2xl text-red-400 text-center">
+                            <i className="ph-fill ph-warning-circle text-4xl mb-2"></i>
+                            <p className="font-bold">Zrozumiałem format, ale AI inaczej nazwało dane.</p>
+                            <p className="text-xs mt-2 text-red-400/70">Wciśnij "Generuj Rozwiązanie" jeszcze raz, aby wymusić poprawną strukturę.</p>
+                            <pre className="mt-4 p-2 bg-slate-900 rounded text-left text-[10px] overflow-auto max-h-40 text-slate-500 font-mono">{JSON.stringify(data, null, 2)}</pre>
+                        </div>
+                    );
+                }
+
+                // 2. Normalizacja kluczy (odporność na zmianę wielkości liter i potoczne nazwy np. Day vs day vs dzien)
+                if (type === 'plan') {
                     return (
                         <div className="space-y-6">
                             <div className="text-center mb-8 pb-6 border-b border-slate-800 print:border-slate-300">
@@ -337,29 +370,36 @@
                                 {params.specialNeeds !== 'Brak (Grupa ogólnodostępna)' && <p className="text-sm text-emerald-400 print:text-emerald-700 print-text font-bold mt-1"><i className="ph-bold ph-wheelchair"></i> SPE: {params.specialNeeds}</p>}
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                {data.days.map((d, i) => (
-                                    <div key={i} className="bg-slate-900 border border-slate-800 rounded-3xl p-6 print-card relative overflow-hidden group">
-                                        <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-amber-500 to-orange-500"></div>
-                                        <h3 className="text-xl font-black text-white print-text mb-1">{d.day}</h3>
-                                        <p className="text-sm font-bold text-amber-500 print-text mb-4 uppercase tracking-wide">{d.title}</p>
-                                        <div className="space-y-4">
-                                            <div>
-                                                <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1 mb-1"><i className="ph-bold ph-sun"></i> Poranek</div>
-                                                <p className="text-sm text-slate-300 print-text leading-relaxed">{d.morning}</p>
-                                            </div>
-                                            <div>
-                                                <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1 mb-1"><i className="ph-bold ph-moon"></i> Popołudnie</div>
-                                                <p className="text-sm text-slate-300 print-text leading-relaxed">{d.afternoon}</p>
+                                {itemsList.map((d, i) => {
+                                    const day = d.day || d.Day || d.dzien || d.dzień || `Dzień ${i+1}`;
+                                    const title = d.title || d.Title || d.tytul || d.tytuł || "Zajęcia kreatywne";
+                                    const morning = d.morning || d.Morning || d.poranek || d.rano || d.zajecia_poranne || d.zajeciaPoranne || "Brak opisu";
+                                    const afternoon = d.afternoon || d.Afternoon || d.popoludnie || d.popołudnie || d.zajecia_popoludniowe || d.zajeciaPopoludniowe || "Brak opisu";
+                                    
+                                    return (
+                                        <div key={i} className="bg-slate-900 border border-slate-800 rounded-3xl p-6 print-card relative overflow-hidden group">
+                                            <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-amber-500 to-orange-500"></div>
+                                            <h3 className="text-xl font-black text-white print-text mb-1">{day}</h3>
+                                            <p className="text-sm font-bold text-amber-500 print-text mb-4 uppercase tracking-wide">{title}</p>
+                                            <div className="space-y-4">
+                                                <div>
+                                                    <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1 mb-1"><i className="ph-bold ph-sun"></i> Poranek</div>
+                                                    <p className="text-sm text-slate-300 print-text leading-relaxed">{morning}</p>
+                                                </div>
+                                                <div>
+                                                    <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1 mb-1"><i className="ph-bold ph-moon"></i> Popołudnie</div>
+                                                    <p className="text-sm text-slate-300 print-text leading-relaxed">{afternoon}</p>
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                ))}
+                                    )
+                                })}
                             </div>
                         </div>
                     );
                 }
 
-                if (type === 'sos' && data.games) {
+                if (type === 'sos') {
                     return (
                         <div className="space-y-6">
                             <div className="text-center mb-8 pb-6 border-b border-slate-800 print:border-slate-300">
@@ -368,20 +408,26 @@
                                 {params.specialNeeds !== 'Brak (Grupa ogólnodostępna)' && <p className="text-sm text-emerald-400 print:text-emerald-700 print-text font-bold mt-1"><i className="ph-bold ph-wheelchair"></i> SPE: {params.specialNeeds}</p>}
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                {data.games.map((g, i) => (
-                                    <div key={i} className="bg-slate-900 border border-slate-800 rounded-3xl p-6 print-card relative">
-                                        <div className="w-12 h-12 bg-cyan-500/20 text-cyan-400 rounded-2xl flex items-center justify-center mb-4 text-2xl print:bg-cyan-100 print:text-cyan-800"><i className="ph-bold ph-lightning"></i></div>
-                                        <h3 className="text-lg font-black text-white print-text mb-2">{g.name}</h3>
-                                        <p className="text-[10px] bg-slate-800 print:bg-slate-200 text-slate-300 print-text px-2 py-1 rounded inline-block font-bold mb-4"><i className="ph-bold ph-timer"></i> Czas: {g.duration}</p>
-                                        <p className="text-sm text-slate-300 print-text leading-relaxed">{g.rules}</p>
-                                    </div>
-                                ))}
+                                {itemsList.map((g, i) => {
+                                    const name = g.name || g.Name || g.nazwa || `Gra nr ${i+1}`;
+                                    const rules = g.rules || g.Rules || g.zasady || g.opis || "Brak szczegółowych zasad.";
+                                    const duration = g.duration || g.Duration || g.czas || "Ok. 15 min";
+                                    
+                                    return (
+                                        <div key={i} className="bg-slate-900 border border-slate-800 rounded-3xl p-6 print-card relative">
+                                            <div className="w-12 h-12 bg-cyan-500/20 text-cyan-400 rounded-2xl flex items-center justify-center mb-4 text-2xl print:bg-cyan-100 print:text-cyan-800"><i className="ph-bold ph-lightning"></i></div>
+                                            <h3 className="text-lg font-black text-white print-text mb-2">{name}</h3>
+                                            <p className="text-[10px] bg-slate-800 print:bg-slate-200 text-slate-300 print-text px-2 py-1 rounded inline-block font-bold mb-4"><i className="ph-bold ph-timer"></i> Czas: {duration}</p>
+                                            <p className="text-sm text-slate-300 print-text leading-relaxed">{rules}</p>
+                                        </div>
+                                    )
+                                })}
                             </div>
                         </div>
                     );
                 }
 
-                if (type === 'teren' && data.clues) {
+                if (type === 'teren') {
                     return (
                         <div className="space-y-6">
                             <div className="text-center mb-8 pb-6 border-b border-slate-800 print:border-slate-300">
@@ -390,23 +436,29 @@
                                 {params.specialNeeds !== 'Brak (Grupa ogólnodostępna)' && <p className="text-sm text-emerald-400 print:text-emerald-700 print-text font-bold mt-1"><i className="ph-bold ph-wheelchair"></i> SPE: {params.specialNeeds}</p>}
                             </div>
                             <div className="space-y-4 max-w-2xl mx-auto">
-                                {data.clues.map((c, i) => (
-                                    <div key={i} className="bg-slate-900 border border-slate-800 rounded-3xl p-6 print-card flex gap-6 items-center">
-                                        <div className="text-5xl font-black text-slate-800 print:text-slate-200">{c.step}</div>
-                                        <div className="flex-1">
-                                            <p className="text-lg font-summer text-emerald-300 print-text leading-relaxed italic mb-3">"{c.rhyme}"</p>
-                                            <div className="bg-slate-950 print:bg-slate-100 p-3 rounded-xl border border-dashed border-slate-700 print:border-slate-300 text-xs text-slate-400 print-text font-bold flex items-center gap-2">
-                                                <i className="ph-fill ph-eye"></i> Gdzie schować karteczkę: <span className="text-white print-text">{c.hideout}</span>
+                                {itemsList.map((c, i) => {
+                                    const step = c.step || c.Step || c.krok || c.numer || (i+1);
+                                    const rhyme = c.rhyme || c.Rhyme || c.rymowanka || c.zagadka || "Szukaj dalej bystrookim okiem!";
+                                    const hideout = c.hideout || c.Hideout || c.kryjowka || c.miejsce || "W bezpiecznym i łatwo dostępnym miejscu.";
+                                    
+                                    return (
+                                        <div key={i} className="bg-slate-900 border border-slate-800 rounded-3xl p-6 print-card flex gap-6 items-center">
+                                            <div className="text-5xl font-black text-slate-800 print:text-slate-200">{step}</div>
+                                            <div className="flex-1">
+                                                <p className="text-lg font-summer text-emerald-300 print-text leading-relaxed italic mb-3">"{rhyme}"</p>
+                                                <div className="bg-slate-950 print:bg-slate-100 p-3 rounded-xl border border-dashed border-slate-700 print:border-slate-300 text-xs text-slate-400 print-text font-bold flex items-center gap-2">
+                                                    <i className="ph-fill ph-eye"></i> Gdzie schować karteczkę: <span className="text-white print-text">{hideout}</span>
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                ))}
+                                    )
+                                })}
                             </div>
                         </div>
                     );
                 }
 
-                if (type === 'druzyny' && data.teams) {
+                if (type === 'druzyny') {
                     return (
                         <div className="space-y-6">
                             <div className="text-center mb-8 pb-6 border-b border-slate-800 print:border-slate-300">
@@ -415,22 +467,27 @@
                                 {params.specialNeeds !== 'Brak (Grupa ogólnodostępna)' && <p className="text-sm text-emerald-400 print:text-emerald-700 print-text font-bold mt-1"><i className="ph-bold ph-wheelchair"></i> SPE: {params.specialNeeds}</p>}
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                {data.teams.map((t, i) => (
-                                    <div key={i} className="bg-slate-900 border border-slate-800 rounded-3xl p-6 print-card text-center">
-                                        <div className="w-16 h-16 bg-purple-500/20 text-purple-400 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl print:bg-purple-100 print:text-purple-800"><i className="ph-bold ph-flag-banner"></i></div>
-                                        <h3 className="text-2xl font-black text-white print-text mb-4 uppercase">{t.name}</h3>
-                                        <div className="bg-slate-950 print:bg-slate-100 p-4 rounded-2xl">
-                                            <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Okrzyk:</div>
-                                            <p className="text-base text-purple-300 print-text font-bold italic leading-relaxed whitespace-pre-line">{t.cheer}</p>
+                                {itemsList.map((t, i) => {
+                                    const name = t.name || t.Name || t.nazwa || `Drużyna ${i+1}`;
+                                    const cheer = t.cheer || t.Cheer || t.okrzyk || t.haslo || "Zabawa trwa, wygramy my!";
+                                    
+                                    return (
+                                        <div key={i} className="bg-slate-900 border border-slate-800 rounded-3xl p-6 print-card text-center">
+                                            <div className="w-16 h-16 bg-purple-500/20 text-purple-400 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl print:bg-purple-100 print:text-purple-800"><i className="ph-bold ph-flag-banner"></i></div>
+                                            <h3 className="text-2xl font-black text-white print-text mb-4 uppercase">{name}</h3>
+                                            <div className="bg-slate-950 print:bg-slate-100 p-4 rounded-2xl">
+                                                <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Okrzyk:</div>
+                                                <p className="text-base text-purple-300 print-text font-bold italic leading-relaxed whitespace-pre-line">{cheer}</p>
+                                            </div>
                                         </div>
-                                    </div>
-                                ))}
+                                    )
+                                })}
                             </div>
                         </div>
                     );
                 }
                 
-                return <div className="text-red-500">Błąd renderowania formatu.</div>;
+                return <div className="text-red-500">Nierozpoznany moduł wyników.</div>;
             };
 
             return (
