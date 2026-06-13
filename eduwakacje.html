@@ -114,6 +114,7 @@
     <!-- React App -->
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
+        const apiKey = ""; 
 
         // --- KONFIGURACJA MODUŁÓW ---
         const MODULES = [
@@ -123,7 +124,7 @@
             { id: 'druzyny', icon: 'ph-users-three', title: 'Baza Drużyn', desc: 'Okrzyki dla grup', color: 'from-purple-500 to-pink-500' }
         ];
 
-        // Pancerny Parser JSON
+        // Pancerny Parser JSON 
         const parseAIResponse = (aiOutput) => {
             if (aiOutput && typeof aiOutput === 'object') {
                 if (aiOutput.items || Array.isArray(aiOutput)) return aiOutput;
@@ -160,30 +161,16 @@
             }
         };
 
-        // Fetcher kierujący do Twojego bezpiecznego pliku api/chat.js (OpenAI)
+        // ZAKTUALIZOWANY FETCHER: Dopasowany w 100% do Twojego pliku chat.js
         const fetchTextAI = async (prompt, systemInstruction) => {
-            const finalPrompt = `INSTRUKCJA: Zwróć DOKŁADNIE i WYŁĄCZNIE czysty kod JSON zgodny z poniższym szablonem. 
-Nie używaj znaczników markdown (bez \`\`\`json). Używaj wyłącznie apostrofów ('), unikaj cudzysłowów (") wewnątrz tekstów.
-
-${systemInstruction}
-
-ZADANIE DO WYKONANIA:
-${prompt}`;
-
             try {
-                // Wywołanie OpenAI przez TWÓJ plik /api/chat na Vercelu
                 const res = await fetch('/api/chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    // UNIWERSALNY PAYLOAD:
-                    // Przesyłamy treść we wszystkich możliwych zmiennych, 
-                    // aby Twój chat.js na 100% odnalazł tekst i przekazał go do OpenAI.
                     body: JSON.stringify({ 
-                        prompt: finalPrompt,
-                        message: finalPrompt,
-                        text: finalPrompt,
-                        content: finalPrompt,
-                        messages: [{ role: "user", content: finalPrompt }]
+                        prompt: prompt,                // Przekazanie promptu dla uzytkownika
+                        system: systemInstruction,     // Przekazanie instrukcji systemowych (Tego brakowalo!)
+                        format: "json"                 // Magiczna flaga do Twojego chat.js włączająca response_format="json_object"
                     })
                 });
                 
@@ -257,10 +244,10 @@ ${prompt}`;
                 let prompt = "";
                 let sysPrompt = "";
 
-                // ŻELAZNE SZABLONY DLA OPENAI: Gotowa struktura z wpisanymi kluczami.
+                // ŻELAZNE SZABLONY: Idealne pod JSON_OBJECT w API OpenAI
                 if (activeModule === 'plan') {
                     sysPrompt = `Jesteś doskonałym pedagogiem. Stwórz 5-dniowy plan tematycznych półkolonii.
-WYMÓG: Zwróć DOKŁADNIE TEN SZABLON JSON z pięcioma dniami, uzupełniając teksty:
+WYMÓG: Zwróć DOKŁADNIE TEN SZABLON JSON z pięcioma dniami, uzupełniając teksty wewnątrz kluczy:
 
 {
   "items": [
@@ -271,10 +258,10 @@ WYMÓG: Zwróć DOKŁADNIE TEN SZABLON JSON z pięcioma dniami, uzupełniając t
     { "title": "Piątek", "subtitle": "Tytuł dnia", "text1": "Zajęcia poranne...", "text2": "Zajęcia popołudniowe..." }
   ]
 }`;
-                    prompt = `Temat: ${theme}. Wiek dzieci: ${age}. Specyficzne potrzeby: ${specialNeeds}.`;
+                    prompt = `Temat: ${theme}. Wiek dzieci: ${age}. Specyficzne potrzeby (wymaga dostosowania): ${specialNeeds}.`;
                 } else if (activeModule === 'sos') {
                     sysPrompt = `Jesteś animatorem zabaw. Wymyśl błyskawiczne, genialne gry ratunkowe.
-WYMÓG: Zwróć DOKŁADNIE TEN SZABLON JSON z trzema grami, uzupełniając teksty:
+WYMÓG: Zwróć DOKŁADNIE TEN SZABLON JSON z trzema grami, uzupełniając teksty wewnątrz kluczy:
 
 {
   "items": [
@@ -286,7 +273,7 @@ WYMÓG: Zwróć DOKŁADNIE TEN SZABLON JSON z trzema grami, uzupełniając tekst
                     prompt = `Gdzie utknęliśmy: ${location}. Dostępne rekwizyty: ${props}. Wiek: ${age}. SPE: ${specialNeeds}.`;
                 } else if (activeModule === 'teren') {
                     sysPrompt = `Jesteś mistrzem gier terenowych. Ułóż rymowane zagadki.
-WYMÓG: Zwróć DOKŁADNIE TEN SZABLON JSON z pięcioma krokami, uzupełniając teksty:
+WYMÓG: Zwróć DOKŁADNIE TEN SZABLON JSON z pięcioma krokami, uzupełniając teksty wewnątrz kluczy:
 
 {
   "items": [
@@ -300,7 +287,7 @@ WYMÓG: Zwróć DOKŁADNIE TEN SZABLON JSON z pięcioma krokami, uzupełniając 
                     prompt = `Teren gry: ${theme}. Wiek: ${age}. SPE: ${specialNeeds}.`;
                 } else if (activeModule === 'druzyny') {
                     sysPrompt = `Jesteś kierownikiem kolonii. Wymyśl nazwy i okrzyki drużyn.
-WYMÓG: Zwróć DOKŁADNIE TEN SZABLON JSON z czterema drużynami, uzupełniając teksty:
+WYMÓG: Zwróć DOKŁADNIE TEN SZABLON JSON z czterema drużynami, uzupełniając teksty wewnątrz kluczy:
 
 {
   "items": [
