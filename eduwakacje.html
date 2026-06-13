@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduBox V3 PRO MAX - EduWakacje PRO</title>
+
+    <!-- React & Babel -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #020617; color: #f8fafc; overflow: hidden; }
+        .font-summer { font-family: 'Fredoka', sans-serif; }
+        
+        /* Custom Scrollbar */
+        .custom-scrollbar::-webkit-scrollbar { width: 8px; height: 8px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+        /* Auras - Summer V3 PRO MAX */
+        .aura-container {
+            position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 0;
+        }
+        .aura-blob {
+            position: absolute; filter: blur(120px); border-radius: 50%; opacity: 0.35; animation: float 15s ease-in-out infinite alternate;
+        }
+        /* Słoneczny żółty */
+        .aura-1 { top: -10%; left: -10%; width: 500px; height: 500px; background: radial-gradient(circle, rgba(234, 179, 8, 0.6) 0%, rgba(0,0,0,0) 70%); animation-delay: 0s; }
+        /* Morski błękit */
+        .aura-2 { bottom: -10%; right: -10%; width: 600px; height: 600px; background: radial-gradient(circle, rgba(6, 182, 212, 0.5) 0%, rgba(0,0,0,0) 70%); animation-delay: -5s; }
+        /* Tropikalny pomarańcz */
+        .aura-3 { top: 40%; left: 30%; width: 400px; height: 400px; background: radial-gradient(circle, rgba(249, 115, 22, 0.4) 0%, rgba(0,0,0,0) 70%); animation-delay: -10s; }
+
+        @keyframes float {
+            0% { transform: translate(0, 0) scale(1); }
+            100% { transform: translate(30px, 50px) scale(1.1); }
+        }
+
+        /* Print Styles - Kriticzne dla działania w terenie */
+        @media print {
+            body { background: white !important; color: black !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; overflow: visible !important; }
+            .no-print { display: none !important; }
+            .print-container { background: white !important; color: black !important; padding: 0 !important; width: 100% !important; overflow: visible !important; }
+            .print-card { break-inside: avoid; border: 2px solid #e2e8f0 !important; box-shadow: none !important; color: black !important; background: white !important; margin-bottom: 20px; }
+            .print-text { color: black !important; }
+            #root, main { height: auto !important; overflow: visible !important; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Firebase & Core Logic -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, getDocs, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'edubox-eduwakacje-v3';
+        
+        let app, auth, db;
+        try {
+            app = initializeApp(firebaseConfig);
+            auth = getAuth(app);
+            db = getFirestore(app);
+        } catch (e) { console.warn("Firebase init ignored in dev environment."); }
+
+        window.EduBoxCore = {
+            db, auth, appId,
+            user: null,
+            initAuth: async () => {
+                if (!auth) return null;
+                try {
+                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                        await signInWithCustomToken(auth, __initial_auth_token);
+                    } else {
+                        await signInAnonymously(auth);
+                    }
+                } catch (e) { console.error("Auth error:", e); }
+            },
+            onUserChange: (callback) => {
+                if (!auth) return;
+                onAuthStateChanged(auth, (user) => { window.EduBoxCore.user = user; callback(user); });
+            },
+            publishToMarket: async (data) => {
+                if (!db || !window.EduBoxCore.user) throw new Error("Brak autoryzacji");
+                const marketRef = collection(db, 'artifacts', appId, 'public', 'data', 'market');
+                await addDoc(marketRef, { ...data, authorId: window.EduBoxCore.user.uid, createdAt: serverTimestamp() });
+            },
+            fetchMarket: async () => {
+                if (!db || !window.EduBoxCore.user) return [];
+                const marketRef = collection(db, 'artifacts', appId, 'public', 'data', 'market');
+                const snapshot = await getDocs(marketRef);
+                const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                return items.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
+            }
+        };
+        window.EduBoxCore.initAuth();
+    </script>
+
+    <div id="root" class="h-screen flex flex-col"></div>
+
+    <!-- React App -->
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+        const apiKey = ""; // Canvas fallback
+
+        // --- KONFIGURACJA MODUŁÓW ---
+        const MODULES = [
+            { id: 'plan', icon: 'ph-calendar-check', title: 'Plan Półkolonii', desc: '5-dniowy harmonogram na temat', color: 'from-amber-500 to-orange-500' },
+            { id: 'sos', icon: 'ph-cloud-rain', title: 'Przycisk S.O.S', desc: 'Gry ratunkowe w 10 sekund', color: 'from-cyan-500 to-blue-500' },
+            { id: 'teren', icon: 'ph-compass', title: 'Gra Terenowa', desc: 'Zagadki i podchody w plenerze', color: 'from-emerald-500 to-teal-500' },
+            { id: 'druzyny', icon: 'ph-users-three', title: 'Baza Drużyn', desc: 'Okrzyki i nazwy dla grup', color: 'from-purple-500 to-pink-500' }
+        ];
+
+        // Pancerny Parser JSON V3
+        const parseAIResponse = (text) => {
+            try {
+                let jsonStr = text.replace(/```json/g, '').replace(/```/g, '').trim();
+                jsonStr = jsonStr.replace(/[\u0000-\u001F]+/g, ' '); // Usuń twarde entery i znaki kontrolne
+                return JSON.parse(jsonStr);
+            } catch (e) {
+                console.error("Błąd parsowania JSON:", e, text);
+                throw new Error("Sztuczna Inteligencja wygenerowała nieprawidłowy format. Spróbuj jeszcze raz!");
+            }
+        };
+
+        // Pancerny Fetcher z Vercel Fallback
+        const fetchTextAI = async (prompt, systemInstruction) => {
+            const finalPrompt = `Zwróć odpowiedź WYŁĄCZNIE W FORMACIE JSON. Żadnego innego tekstu przed i po.\n\n${systemInstruction}\n\n${prompt}`;
+            
+            // 1. Próba Twojego API na Vercelu
+            try {
+                const res = await fetch('/api/gemini', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt: finalPrompt })
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    return data.text || data.response || data.message;
+                }
+            } catch(e) { console.warn("Vercel API niedostępne, używam Fallback Canvas...", e); }
+
+            // 2. Fallback Canvas (Z eksponencjalnym backoffem)
+            const delays = [1000, 2000, 4000, 8000];
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+            const payload = {
+                contents: [{ parts: [{ text: finalPrompt }] }],
+                generationConfig: { responseMimeType: "application/json" }
+            };
+
+            for (let i = 0; i < delays.length; i++) {
+                try {
+                    const response = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                    const data = await response.json();
+                    return data.candidates[0].content.parts[0].text;
+                } catch (error) {
+                    if (i === delays.length - 1) throw error;
+                    await new Promise(r => setTimeout(r, delays[i]));
+                }
+            }
+        };
+
+        // --- GŁÓWNA APLIKACJA ---
+        function App() {
+            const [user, setUser] = useState(null);
+            const [appMode, setAppMode] = useState('kreator'); // kreator | gielda
+            const [activeModule, setActiveModule] = useState('plan');
+            const [isPremium, setIsPremium] = useState(false);
+            const [premiumCode, setPremiumCode] = useState('');
+            const [aiGenerations, setAiGenerations] = useState(0);
+            const [message, setMessage] = useState(null);
+            const [isGenerating, setIsGenerating] = useState(false);
+            const [resultData, setResultData] = useState(null);
+
+            // Form States
+            const [theme, setTheme] = useState('Tropikalna Wyspa');
+            const [age, setAge] = useState('7-10 lat');
+            const [location, setLocation] = useState('Świetlica');
+            const [props, setProps] = useState('Brak rekwizytów');
+
+            // Market State
+            const [marketItems, setMarketItems] = useState([]);
+            const [isFetchingMarket, setIsFetchingMarket] = useState(false);
+            const [isPublishing, setIsPublishing] = useState(false);
+
+            useEffect(() => {
+                if (window.EduBoxCore) window.EduBoxCore.onUserChange((u) => setUser(u));
+                const savedGens = localStorage.getItem('edubox_eduwakacje_ai');
+                if (savedGens) setAiGenerations(parseInt(savedGens));
+                const savedPremium = localStorage.getItem('edubox_premium');
+                if (savedPremium === 'KAWA2024') setIsPremium(true);
+            }, []);
+
+            const showMessage = (text, type = 'success') => {
+                setMessage({ text, type });
+                setTimeout(() => setMessage(null), 3000);
+            };
+
+            const handlePremiumCheck = () => {
+                if (premiumCode.toUpperCase() === 'KAWA2024') {
+                    setIsPremium(true); localStorage.setItem('edubox_premium', 'KAWA2024'); setPremiumCode('');
+                    showMessage('Kod Premium zaakceptowany!', 'success');
+                } else { showMessage('Nieprawidłowy kod', 'error'); }
+            };
+
+            const generateContent = async () => {
+                if (!isPremium && aiGenerations >= 3) {
+                    showMessage('Limit darmowych generacji wyczerpany. Wpisz kod KAWA2024.', 'error');
+                    return;
+                }
+                
+                setIsGenerating(true);
+                setResultData(null);
+                
+                let prompt = "";
+                let sysPrompt = "";
+
+                if (activeModule === 'plan') {
+                    sysPrompt = `Jesteś doświadczonym wychowawcą kolonijnym. Stwórz 5-dniowy plan tematycznych półkolonii. Zwróć JSON: { "days": [ { "day": "Poniedziałek", "title": "Tytuł dnia", "morning": "Krótki opis zajęć porannych (np. integracja, plastyka)", "afternoon": "Krótki opis zajęć popołudniowych (np. ruch, gra)" } ] }`;
+                    prompt = `Temat przewodni: ${theme}. Wiek dzieci: ${age}.`;
+                } else if (activeModule === 'sos') {
+                    sysPrompt = `Jesteś animatorem zabaw. Wymyśl 3 błyskawiczne, genialne gry ratunkowe (Ice-breakery, zabawy ruchowe lub integracyjne). Zwróć JSON: { "games": [ { "name": "Nazwa gry", "rules": "Zasady w 2-3 zdaniach", "duration": "np. 15 min" } ] }`;
+                    prompt = `Lokalizacja (gdzie utknęliśmy): ${location}. Dostępne sprzęty/rekwizyty: ${props}. Wiek: ${age}. Gry muszą idealnie pasować do tego otoczenia i sprzętu!`;
+                } else if (activeModule === 'teren') {
+                    sysPrompt = `Jesteś mistrzem gier terenowych. Ułóż 5 rymowanych zagadek/wskazówek do zabawy w podchody, które doprowadzą grupę do celu. Zwróć JSON: { "clues": [ { "step": 1, "rhyme": "Rymowanka (4 linijki)", "hideout": "Gdzie fizycznie schować tę karteczkę np. 'pod dużym dębem'" } ] }`;
+                    prompt = `Teren gry to: ${theme} (potraktuj to pole jako opis terenu). Wiek uczestników: ${age}. Wskazówki niech budują napięcie i pasują do terenu.`;
+                } else if (activeModule === 'druzyny') {
+                    sysPrompt = `Jesteś kierownikiem kolonii. Wymyśl 4 kreatywne nazwy drużyn oraz rymowane okrzyki motywacyjne dla każdej z nich. Zwróć JSON: { "teams": [ { "name": "Nazwa Drużyny", "cheer": "Rymowany okrzyk (2-4 linijki, rytmiczny)" } ] }`;
+                    prompt = `Tematyka kolonii/obozu: ${theme}. Wiek uczestników: ${age}.`;
+                }
+
+                try {
+                    const aiText = await fetchTextAI(prompt, sysPrompt);
+                    const parsedJson = parseAIResponse(aiText);
+                    
+                    setResultData({ type: activeModule, data: parsedJson, params: { theme, age, location, props } });
+                    
+                    if (!isPremium) {
+                        const newCount = aiGenerations + 1;
+                        setAiGenerations(newCount);
+                        localStorage.setItem('edubox_eduwakacje_ai', newCount.toString());
+                    }
+                    showMessage('Gotowe!', 'success');
+                } catch (error) {
+                    showMessage(error.message, 'error');
+                } finally {
+                    setIsGenerating(false);
+                }
+            };
+
+            const publishToMarket = async () => {
+                if (!resultData || !user) { showMessage('Musisz najpierw wygenerować wynik i poczekać na połączenie.', 'error'); return; }
+                setIsPublishing(true);
+                try {
+                    await window.EduBoxCore.publishToMarket(resultData);
+                    showMessage('Opublikowano na Giełdzie!', 'success');
+                    setAppMode('gielda');
+                    loadMarket();
+                } catch (error) {
+                    showMessage('Błąd publikacji.', 'error');
+                } finally {
+                    setIsPublishing(false);
+                }
+            };
+
+            const loadMarket = async () => {
+                setIsFetchingMarket(true);
+                try {
+                    const items = await window.EduBoxCore.fetchMarket();
+                    setMarketItems(items);
+                } catch (error) { showMessage('Błąd ładowania.', 'error'); } 
+                finally { setIsFetchingMarket(false); }
+            };
+
+            useEffect(() => { if (appMode === 'gielda') loadMarket(); }, [appMode]);
+
+            // --- KOMPONENTY RENDERUJĄCE WYNIKI ---
+            const renderResult = () => {
+                if (!resultData) return (
+                    <div className="h-full flex flex-col items-center justify-center text-slate-500 opacity-50 no-print">
+                        <i className="ph-fill ph-sun text-6xl mb-4"></i>
+                        <p className="font-bold text-center">Skonfiguruj ustawienia po lewej stronie<br/>i kliknij Wygeneruj.</p>
+                    </div>
+                );
+
+                const { type, data, params } = resultData;
+
+                if (type === 'plan' && data.days) {
+                    return (
+                        <div className="space-y-6">
+                            <div className="text-center mb-8 pb-6 border-b border-slate-800 print:border-slate-300">
+                                <h2 className="text-3xl font-summer text-amber-400 print-text font-black uppercase mb-2">Tydzień: {params.theme}</h2>
+                                <p className="text-sm text-slate-400 print-text font-bold"><i className="ph-bold ph-users"></i> Grupa wiekowa: {params.age}</p>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                {data.days.map((d, i) => (
+                                    <div key={i} className="bg-slate-900 border border-slate-800 rounded-3xl p-6 print-card relative overflow-hidden group">
+                                        <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-amber-500 to-orange-500"></div>
+                                        <h3 className="text-xl font-black text-white print-text mb-1">{d.day}</h3>
+                                        <p className="text-sm font-bold text-amber-500 print-text mb-4 uppercase tracking-wide">{d.title}</p>
+                                        <div className="space-y-4">
+                                            <div>
+                                                <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1 mb-1"><i className="ph-bold ph-sun"></i> Poranek</div>
+                                                <p className="text-sm text-slate-300 print-text leading-relaxed">{d.morning}</p>
+                                            </div>
+                                            <div>
+                                                <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1 mb-1"><i className="ph-bold ph-moon"></i> Popołudnie</div>
+                                                <p className="text-sm text-slate-300 print-text leading-relaxed">{d.afternoon}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    );
+                }
+
+                if (type === 'sos' && data.games) {
+                    return (
+                        <div className="space-y-6">
+                            <div className="text-center mb-8 pb-6 border-b border-slate-800 print:border-slate-300">
+                                <h2 className="text-3xl font-summer text-cyan-400 print-text font-black uppercase mb-2">Ratunkowe Gry S.O.S</h2>
+                                <p className="text-sm text-slate-400 print-text font-bold"><i className="ph-bold ph-map-pin"></i> {params.location} | <i className="ph-bold ph-backpack"></i> {params.props}</p>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                {data.games.map((g, i) => (
+                                    <div key={i} className="bg-slate-900 border border-slate-800 rounded-3xl p-6 print-card relative">
+                                        <div className="w-12 h-12 bg-cyan-500/20 text-cyan-400 rounded-2xl flex items-center justify-center mb-4 text-2xl print:bg-cyan-100 print:text-cyan-800"><i className="ph-bold ph-lightning"></i></div>
+                                        <h3 className="text-lg font-black text-white print-text mb-2">{g.name}</h3>
+                                        <p className="text-[10px] bg-slate-800 print:bg-slate-200 text-slate-300 print-text px-2 py-1 rounded inline-block font-bold mb-4"><i className="ph-bold ph-timer"></i> Czas: {g.duration}</p>
+                                        <p className="text-sm text-slate-300 print-text leading-relaxed">{g.rules}</p>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    );
+                }
+
+                if (type === 'teren' && data.clues) {
+                    return (
+                        <div className="space-y-6">
+                            <div className="text-center mb-8 pb-6 border-b border-slate-800 print:border-slate-300">
+                                <h2 className="text-3xl font-summer text-emerald-400 print-text font-black uppercase mb-2">Terenowe Podchody</h2>
+                                <p className="text-sm text-slate-400 print-text font-bold"><i className="ph-bold ph-compass"></i> Teren: {params.theme}</p>
+                            </div>
+                            <div className="space-y-4 max-w-2xl mx-auto">
+                                {data.clues.map((c, i) => (
+                                    <div key={i} className="bg-slate-900 border border-slate-800 rounded-3xl p-6 print-card flex gap-6 items-center">
+                                        <div className="text-5xl font-black text-slate-800 print:text-slate-200">{c.step}</div>
+                                        <div className="flex-1">
+                                            <p className="text-lg font-summer text-emerald-300 print-text leading-relaxed italic mb-3">"{c.rhyme}"</p>
+                                            <div className="bg-slate-950 print:bg-slate-100 p-3 rounded-xl border border-dashed border-slate-700 print:border-slate-300 text-xs text-slate-400 print-text font-bold flex items-center gap-2">
+                                                <i className="ph-fill ph-eye"></i> Gdzie schować karteczkę: <span className="text-white print-text">{c.hideout}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    );
+                }
+
+                if (type === 'druzyny' && data.teams) {
+                    return (
+                        <div className="space-y-6">
+                            <div className="text-center mb-8 pb-6 border-b border-slate-800 print:border-slate-300">
+                                <h2 className="text-3xl font-summer text-purple-400 print-text font-black uppercase mb-2">Baza Drużyn i Okrzyków</h2>
+                                <p className="text-sm text-slate-400 print-text font-bold"><i className="ph-bold ph-palette"></i> Motyw: {params.theme}</p>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                {data.teams.map((t, i) => (
+                                    <div key={i} className="bg-slate-900 border border-slate-800 rounded-3xl p-6 print-card text-center">
+                                        <div className="w-16 h-16 bg-purple-500/20 text-purple-400 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl print:bg-purple-100 print:text-purple-800"><i className="ph-bold ph-flag-banner"></i></div>
+                                        <h3 className="text-2xl font-black text-white print-text mb-4 uppercase">{t.name}</h3>
+                                        <div className="bg-slate-950 print:bg-slate-100 p-4 rounded-2xl">
+                                            <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Okrzyk:</div>
+                                            <p className="text-base text-purple-300 print-text font-bold italic leading-relaxed whitespace-pre-line">{t.cheer}</p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    );
+                }
+                
+                return <div className="text-red-500">Błąd renderowania formatu.</div>;
+            };
+
+            return (
+                <div className="flex h-screen w-full bg-slate-950 text-slate-200 overflow-hidden relative selection:bg-amber-500/30">
+                    
+                    {/* Auras rendering in background */}
+                    <div className="aura-container no-print">
+                        <div className="aura-blob aura-1"></div>
+                        <div className="aura-blob aura-2"></div>
+                        <div className="aura-blob aura-3"></div>
+                    </div>
+
+                    {/* Global Notifications */}
+                    {message && (
+                        <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 px-6 py-3 rounded-full text-sm font-bold shadow-2xl flex items-center gap-2 animate-bounce ${message.type === 'error' ? 'bg-red-500 text-white' : 'bg-green-500 text-white'}`}>
+                            <i className={`ph-bold ${message.type === 'error' ? 'ph-warning-circle' : 'ph-check-circle'} text-lg`}></i>
+                            {message.text}
+                        </div>
+                    )}
+
+                    {/* Left Sidebar (No Print) */}
+                    <aside className="w-80 flex-shrink-0 bg-slate-900/80 backdrop-blur-xl border-r border-slate-800 flex flex-col h-full z-10 no-print transition-all duration-300">
+                        {/* Header */}
+                        <div className="p-6 border-b border-slate-800 flex items-center gap-3">
+                            <div className="w-10 h-10 bg-gradient-to-br from-amber-400 to-orange-500 rounded-xl flex items-center justify-center shadow-lg shadow-amber-500/20">
+                                <i className="ph-bold ph-sun text-white text-xl"></i>
+                            </div>
+                            <div>
+                                <h1 className="text-xl font-summer font-bold tracking-tight text-white leading-none uppercase">EduWakacje</h1>
+                                <p className="text-[10px] text-amber-500 font-bold tracking-wider uppercase mt-1">Zero-Prep PRO MAX</p>
+                            </div>
+                        </div>
+
+                        {/* Navigation */}
+                        <div className="px-4 py-3 flex gap-2 border-b border-slate-800">
+                            <button 
+                                onClick={() => setAppMode('kreator')} 
+                                className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${appMode === 'kreator' ? 'bg-amber-500 text-slate-900 shadow-lg shadow-amber-500/30' : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white'}`}
+                            >
+                                <i className="ph-bold ph-paint-brush"></i> Asystent
+                            </button>
+                            <button 
+                                onClick={() => setAppMode('gielda')} 
+                                className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${appMode === 'gielda' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30' : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white'}`}
+                            >
+                                <i className="ph-bold ph-globe"></i> Giełda
+                            </button>
+                        </div>
+
+                        {/* Sidebar Content Scrollable */}
+                        <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-6">
+                            
+                            {/* KREATOR MODE */}
+                            {appMode === 'kreator' && (
+                                <>
+                                    {/* Module Selector */}
+                                    <div className="grid grid-cols-2 gap-2">
+                                        {MODULES.map(m => (
+                                            <button 
+                                                key={m.id} onClick={() => setActiveModule(m.id)}
+                                                className={`p-3 rounded-xl flex flex-col items-center text-center gap-2 transition-all border ${activeModule === m.id ? 'bg-slate-800 border-slate-600 shadow-lg' : 'bg-slate-900/50 border-transparent text-slate-500 hover:bg-slate-800 hover:text-slate-300'}`}
+                                            >
+                                                <div className={`w-10 h-10 rounded-full flex items-center justify-center bg-gradient-to-br ${m.color} ${activeModule === m.id ? 'opacity-100' : 'opacity-50 grayscale'}`}>
+                                                    <i className={`text-xl text-white ${activeModule === m.id ? 'ph-fill' : 'ph-bold'} ${m.icon}`}></i>
+                                                </div>
+                                                <span className={`text-[10px] font-bold uppercase leading-tight ${activeModule === m.id ? 'text-white' : ''}`}>{m.title}</span>
+                                            </button>
+                                        ))}
+                                    </div>
+
+                                    {/* Dynamic Forms based on Module */}
+                                    <div className="space-y-4 bg-slate-900 border border-slate-800 rounded-2xl p-4">
+                                        <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest border-b border-slate-800 pb-2 mb-2 flex items-center gap-2">
+                                            <i className="ph-bold ph-sliders"></i> Ustawienia Parametrów
+                                        </div>
+
+                                        {(activeModule === 'plan' || activeModule === 'druzyny') && (
+                                            <div className="space-y-1">
+                                                <label className="text-[10px] font-bold text-slate-400 uppercase">Temat / Motyw przewodni</label>
+                                                <input type="text" value={theme} onChange={e => setTheme(e.target.value)} className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:border-amber-500 transition-colors" placeholder="np. Piraci z Karaibów" />
+                                            </div>
+                                        )}
+
+                                        {(activeModule === 'teren') && (
+                                            <div className="space-y-1">
+                                                <label className="text-[10px] font-bold text-slate-400 uppercase">Opis Terenu Gry</label>
+                                                <textarea value={theme} onChange={e => setTheme(e.target.value)} className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:border-amber-500 transition-colors resize-none" rows="2" placeholder="np. Stary park z dębami i fontanną" />
+                                            </div>
+                                        )}
+
+                                        {(activeModule === 'sos') && (
+                                            <>
+                                                <div className="space-y-1">
+                                                    <label className="text-[10px] font-bold text-slate-400 uppercase">Gdzie jesteśmy?</label>
+                                                    <select value={location} onChange={e => setLocation(e.target.value)} className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:border-amber-500">
+                                                        <option>Mała Świetlica</option><option>Autokar / Pociąg</option><option>Las / Plener</option><option>Sala gimnastyczna</option>
+                                                    </select>
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <label className="text-[10px] font-bold text-slate-400 uppercase">Co mamy do dyspozycji?</label>
+                                                    <select value={props} onChange={e => setProps(e.target.value)} className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:border-amber-500">
+                                                        <option>Kompletnie nic (Zero-prep)</option><option>Kartki i długopisy</option><option>Piłka i skakanka</option><option>Chusta Klanzy</option>
+                                                    </select>
+                                                </div>
+                                            </>
+                                        )}
+
+                                        {(activeModule !== 'druzyny' || true) && (
+                                            <div className="space-y-1">
+                                                <label className="text-[10px] font-bold text-slate-400 uppercase">Wiek Dzieci</label>
+                                                <select value={age} onChange={e => setAge(e.target.value)} className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:border-amber-500">
+                                                    <option>Przedszkolaki (4-6 lat)</option><option>7-10 lat</option><option>11-14 lat</option><option>Młodzież (15+)</option>
+                                                </select>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Akcje */}
+                                    <div className="space-y-3 pt-2">
+                                        <button 
+                                            onClick={generateContent} disabled={isGenerating}
+                                            className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-900 font-black py-4 rounded-2xl shadow-lg transition-all flex items-center justify-center gap-2"
+                                        >
+                                            {isGenerating ? <i className="ph-bold ph-spinner animate-spin text-xl"></i> : <i className="ph-bold ph-magic-wand text-xl"></i>} 
+                                            Generuj Rozwiązanie
+                                        </button>
+                                        
+                                        {resultData && (
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <button onClick={() => window.print()} className="bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 rounded-xl transition-all flex justify-center items-center gap-2 text-xs">
+                                                    <i className="ph-bold ph-printer text-lg"></i> Drukuj
+                                                </button>
+                                                <button onClick={publishToMarket} disabled={isPublishing} className="bg-blue-600/20 border border-blue-500 hover:bg-blue-600 text-blue-400 hover:text-white font-bold py-3 rounded-xl transition-all flex justify-center items-center gap-2 text-xs">
+                                                    {isPublishing ? <i className="ph-bold ph-spinner animate-spin"></i> : <i className="ph-bold ph-share-network"></i>} Na Giełdę
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                </>
+                            )}
+
+                            {/* GIEŁDA MODE */}
+                            {appMode === 'gielda' && (
+                                <div className="space-y-4 pb-6">
+                                    <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4 text-center">
+                                        <i className="ph-fill ph-sun-horizon text-3xl text-blue-400 mb-2"></i>
+                                        <h3 className="text-sm font-bold text-white mb-1">Letnie Inspiracje</h3>
+                                        <p className="text-[10px] text-slate-400">Pobieraj plany i gry stworzone przez innych wychowawców.</p>
+                                    </div>
+
+                                    {isFetchingMarket ? (
+                                        <div className="flex justify-center py-10"><i className="ph-bold ph-spinner animate-spin text-3xl text-slate-500"></i></div>
+                                    ) : marketItems.length === 0 ? (
+                                        <div className="text-center py-10 text-slate-500 text-xs font-bold">Brak projektów. Opublikuj pierwszy!</div>
+                                    ) : (
+                                        <div className="space-y-3">
+                                            {marketItems.map(item => {
+                                                const mod = MODULES.find(m => m.id === item.type);
+                                                return (
+                                                    <div key={item.id} className="bg-slate-800 rounded-xl p-3 border border-slate-700 hover:border-blue-500 transition-colors group cursor-pointer" onClick={() => { setResultData(item); setAppMode('kreator'); showMessage('Wczytano z Giełdy!', 'success'); }}>
+                                                        <div className="flex justify-between items-start mb-2">
+                                                            <div className="flex items-center gap-2 overflow-hidden">
+                                                                <i className={`ph-fill ${mod?.icon} text-amber-500`}></i>
+                                                                <span className="text-xs font-black text-white truncate">{item.params?.theme || item.params?.location || 'Gra Terenowa'}</span>
+                                                            </div>
+                                                            <span className="text-[9px] bg-slate-900 text-slate-400 px-2 py-0.5 rounded-full whitespace-nowrap shrink-0">{item.params?.age || 'Wszystkie'}</span>
+                                                        </div>
+                                                        <p className="text-[10px] text-slate-400 line-clamp-2 leading-relaxed">
+                                                            Pobierz gotowe materiały jednym kliknięciem.
+                                                        </p>
+                                                    </div>
+                                                )
+                                            })}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                        </div>
+
+                        {/* Premium Footer */}
+                        <div className="p-4 border-t border-slate-800 bg-slate-950/50">
+                            {!isPremium ? (
+                                <div className="space-y-2">
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-[10px] font-bold text-slate-400 uppercase">Status PRO</span>
+                                        <span className="text-[10px] font-bold text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded-full">{3 - aiGenerations} darmowe</span>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <input 
+                                            type="text" value={premiumCode} onChange={(e) => setPremiumCode(e.target.value)}
+                                            placeholder="Kod Premium" 
+                                            className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:border-amber-500 uppercase"
+                                        />
+                                        <button onClick={handlePremiumCheck} className="bg-slate-800 hover:bg-slate-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold border border-slate-700 transition-all">OK</button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="flex items-center gap-3 bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/30 p-3 rounded-xl">
+                                    <i className="ph-fill ph-crown text-2xl text-amber-400"></i>
+                                    <div>
+                                        <p className="text-xs font-bold text-white">Wersja PRO MAX</p>
+                                        <p className="text-[9px] text-amber-300">Wszystkie limity odblokowane</p>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </aside>
+
+                    {/* Main Workspace (Preview Area) */}
+                    <main className="flex-1 flex flex-col relative z-10 overflow-hidden">
+                        <div className="flex-1 overflow-y-auto custom-scrollbar p-6 lg:p-12 print-container relative">
+                            <div className="max-w-4xl mx-auto pb-32">
+                                {renderResult()}
+                            </div>
+                        </div>
+                    </main>
+
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
