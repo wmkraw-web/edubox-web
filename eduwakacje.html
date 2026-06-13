@@ -130,6 +130,8 @@
                 if (aiOutput.items || Array.isArray(aiOutput)) return aiOutput;
                 if (aiOutput.text) aiOutput = aiOutput.text;
                 else if (aiOutput.content) aiOutput = aiOutput.content;
+                else if (aiOutput.response) aiOutput = aiOutput.response;
+                else return aiOutput; // Zwróć obiekt awaryjnie
             }
 
             let text = String(aiOutput || "").trim();
@@ -140,24 +142,40 @@
                 const startObj = text.indexOf('{');
                 const endObj = text.lastIndexOf('}');
                 
-                if (startObj !== -1 && endObj !== -1) {
+                if (startObj !== -1 && endObj !== -1 && startObj < endObj) {
                     let jsonStr = text.substring(startObj, endObj + 1);
-                    // Usuwamy niekontrolowane znaki nowej linii psujące JSON
-                    jsonStr = jsonStr.replace(/[\n\r]+/g, ' ').replace(/\t/g, ' ');
-                    return JSON.parse(jsonStr);
+                    // 1. Usuwamy trailing commas (częsty błąd AI, np. ,] lub ,})
+                    jsonStr = jsonStr.replace(/,\s*([\]}])/g, '$1');
+                    
+                    try {
+                        return JSON.parse(jsonStr);
+                    } catch (e1) {
+                        // 2. Usuwamy niekontrolowane znaki nowej linii wewnątrz stringów
+                        jsonStr = jsonStr.replace(/[\n\r\t]+/g, ' ');
+                        return JSON.parse(jsonStr);
+                    }
                 }
 
                 const startArr = text.indexOf('[');
                 const endArr = text.lastIndexOf(']');
-                if (startArr !== -1 && endArr !== -1) {
-                    let jsonStr = text.substring(startArr, endArr + 1).replace(/[\n\r]+/g, ' ').replace(/\t/g, ' ');
-                    return { items: JSON.parse(jsonStr) };
+                if (startArr !== -1 && endArr !== -1 && startArr < endArr) {
+                    let jsonStr = text.substring(startArr, endArr + 1);
+                    jsonStr = jsonStr.replace(/,\s*([\]}])/g, '$1');
+                    try {
+                        return { items: JSON.parse(jsonStr) };
+                    } catch (e1) {
+                        jsonStr = jsonStr.replace(/[\n\r\t]+/g, ' ');
+                        return { items: JSON.parse(jsonStr) };
+                    }
                 }
 
-                throw new Error("Nie znaleziono nawiasów JSON.");
+                throw new Error("Brak nawiasów JSON.");
             } catch (e) {
                 console.error("Błąd parsowania:", text, e);
-                throw new Error("AI nie zastosowało się do szablonu. Kliknij przycisk jeszcze raz!");
+                // DETEKTYW: Pokażemy Ci na ekranie dokładnie to, co zwrócił Twój serwer Vercel
+                const preview = text.length > 100 ? text.substring(0, 100) + "..." : text;
+                if (preview.length === 0) throw new Error("Serwer na Vercelu zwrócił całkowicie PUSTĄ odpowiedź!");
+                throw new Error("SERWER ZWRÓCIŁ: " + preview);
             }
         };
 
@@ -166,6 +184,7 @@
             const finalPrompt = `INSTRUKCJA DLA AI:
 Musisz zwrócić odpowiedź WYŁĄCZNIE W FORMACIE JSON.
 Nie używaj znaczników markdown. Zwróć sam czysty kod JSON rozpoczynający się od klamry {.
+WYMÓG ABSOLUTNY: Nie używaj znaków podwójnego cudzysłowu (") wewnątrz swoich tekstów. Zastąp je apostrofami ('), aby nie zepsuć parsowania JSON!
 
 ${systemInstruction}
 
