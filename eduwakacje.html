@@ -124,15 +124,28 @@
             { id: 'druzyny', icon: 'ph-users-three', title: 'Baza Drużyn', desc: 'Okrzyki i nazwy dla grup', color: 'from-purple-500 to-pink-500' }
         ];
 
-        // Pancerny Parser JSON V3
+        // Pancerny Parser JSON V3 (Wersja ULTRA)
         const parseAIResponse = (text) => {
             try {
-                let jsonStr = text.replace(/```json/g, '').replace(/```/g, '').trim();
-                jsonStr = jsonStr.replace(/[\u0000-\u001F]+/g, ' '); // Usuń twarde entery i znaki kontrolne
+                // 1. Znajdź początek i koniec prawdziwego JSONa (ignoruje gadulstwo bota przed i po)
+                const startIndex = text.indexOf('{');
+                const endIndex = text.lastIndexOf('}');
+                
+                if (startIndex === -1 || endIndex === -1) {
+                    throw new Error("Brak struktury w odpowiedzi.");
+                }
+                
+                let jsonStr = text.substring(startIndex, endIndex + 1);
+                
+                // 2. Wyczyść znaki kontrolne i twarde entery, które niszczą format (np. przy rymowankach)
+                jsonStr = jsonStr.replace(/[\n\r\t]+/g, ' '); 
+                
+                // 3. Zwróć czysty, przetworzony obiekt
                 return JSON.parse(jsonStr);
             } catch (e) {
-                console.error("Błąd parsowania JSON:", e, text);
-                throw new Error("Sztuczna Inteligencja wygenerowała nieprawidłowy format. Spróbuj jeszcze raz!");
+                console.error("Błąd parsowania JSON. Odpowiedź bota:", text);
+                console.error("Szczegóły:", e);
+                throw new Error("Sztuczna Inteligencja wygenerowała format z błędem w pisowni. Kliknij Generuj jeszcze raz!");
             }
         };
 
