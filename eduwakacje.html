@@ -126,42 +126,45 @@
 
         // Pancerny Parser JSON V3 (Wersja OSTATECZNA)
         const parseAIResponse = (aiOutput) => {
-            // 1. Jeśli backend automatycznie sparsował JSON-a i odesłał gotowy obiekt:
+            // 1. Jeśli Vercel sam sparsował i odesłał obiekt
             if (aiOutput && typeof aiOutput === 'object') {
                 return aiOutput;
             }
 
-            // 2. Jeśli z jakiegoś powodu to nie string, zmień na string
-            let text = String(aiOutput || "");
+            // 2. Parsowanie ze stringa (wycinamy śmieci, szukamy klamr)
+            let text = String(aiOutput || "").trim();
+            // Usuwamy potencjalne znaczniki markdown
+            text = text.replace(/```json/gi, '').replace(/```/g, '').trim();
 
             try {
-                // Szukamy klamr
-                const startIndex = text.indexOf('{');
-                const endIndex = text.lastIndexOf('}');
+                // Najpierw sprawdzamy czy to obiekt {...}
+                const startObj = text.indexOf('{');
+                const endObj = text.lastIndexOf('}');
                 
-                if (startIndex === -1 || endIndex === -1) {
-                    throw new Error("Brak struktury { } w odpowiedzi.");
+                // Jeśli nie, może to czysta tablica [...]
+                const startArr = text.indexOf('[');
+                const endArr = text.lastIndexOf(']');
+
+                if (startObj !== -1 && endObj !== -1 && (startArr === -1 || startObj < startArr)) {
+                    // AI zwróciło prawidłowy obiekt
+                    let jsonStr = text.substring(startObj, endObj + 1).replace(/[\n\r\t]+/g, ' ');
+                    return JSON.parse(jsonStr);
+                } else if (startArr !== -1 && endArr !== -1) {
+                    // AI zwróciło czystą tablicę - pakujemy ją w obiekt z kluczem "items"
+                    let jsonStr = text.substring(startArr, endArr + 1).replace(/[\n\r\t]+/g, ' ');
+                    return { items: JSON.parse(jsonStr) };
                 }
-                
-                let jsonStr = text.substring(startIndex, endIndex + 1);
-                
-                // Usuwamy twarde entery (psują JSON) i ewentualne niewidzialne znaki
-                jsonStr = jsonStr.replace(/[\n\r\t]+/g, ' '); 
-                
-                return JSON.parse(jsonStr);
+
+                throw new Error("Brak struktury JSON.");
             } catch (e) {
-                console.error("Błąd parsowania. Oryginał:", text);
-                console.error("Szczegóły błędu:", e);
-                // Wyciągamy fragment odpowiedzi, żeby pokazać użytkownikowi na ekranie, co faktycznie AI zwróciło!
-                const preview = text.length > 60 ? text.substring(0, 60) + "..." : text;
-                throw new Error("Serwer zwrócił zły format: " + preview);
+                console.error("Błąd parsowania:", text, e);
+                throw new Error("AI nie zastosowało się do formatu. Spróbuj jeszcze raz.");
             }
         };
 
-        // Pancerny Fetcher z Vercel Fallback
+        // Fetcher AI z Twardym Promptem
         const fetchTextAI = async (prompt, systemInstruction) => {
-            // Wymuszamy najtwardszymi słowami brak gadulstwa
-            const finalPrompt = `WYMÓG KRYTYCZNY: Zwróć odpowiedź WYŁĄCZNIE jako czysty kod JSON. Żadnego tekstu przed ani po! Żadnych formatowań markdown (bez \`\`\`json).\n\nINSTRUKCJA:\n${systemInstruction}\n\nZAPYTANIE:\n${prompt}`;
+            const finalPrompt = `WYMÓG ABSOLUTNY: Nie pisz żadnych powitań. Zwróć DOKŁADNIE i WYŁĄCZNIE czysty kod JSON zgodny z podanym formatem.\n\nINSTRUKCJA:\n${systemInstruction}\n\nZAPYTANIE:\n${prompt}`;
             
             try {
                 const res = await fetch('/api/gemini', {
@@ -172,17 +175,16 @@
                 
                 if (res.ok) {
                     const data = await res.json();
-                    // Wyłapuje różne struktury z Twojego backendu Vercel (string lub bezpośredni obiekt z danymi)
                     return data.text || data.response || data.message || data.content || data;
                 } else {
                     throw new Error(`HTTP ${res.status}`);
                 }
             } catch(e) { 
-                console.warn("Vercel API niedostępne lub zwróciło błąd:", e); 
+                console.warn("Vercel API niedostępne, używam Fallback Canvas..."); 
             }
 
-            // Fallback Canvas (Z eksponencjalnym backoffem)
-            const delays = [1000, 2000, 4000, 8000];
+            // Fallback (z ponowieniami)
+            const delays = [1000, 2000, 4000];
             const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
             const payload = {
                 contents: [{ parts: [{ text: finalPrompt }] }],
@@ -258,55 +260,42 @@
                 let prompt = "";
                 let sysPrompt = "";
 
+                // USTANDARYZOWANY FORMAT JSON - Zapobiega "wariacjom" AI
+                const jsonTemplate = `{
+  "items": [
+    {
+      "title": "Tytuł (np. Dzień, Nazwa Gry)",
+      "subtitle": "Podtytuł (np. Temat dnia, Czas trwania)",
+      "text1": "Tekst 1 (np. Poranek, Zasady gry, Rymowanka)",
+      "text2": "Tekst 2 (np. Popołudnie, Kryjówka, puste jeśli brak)"
+    }
+  ]
+}`;
+
                 if (activeModule === 'plan') {
                     sysPrompt = `Jesteś doświadczonym wychowawcą kolonijnym i pedagogiem specjalnym. Stwórz 5-dniowy plan tematycznych półkolonii.
-WYMÓG KRYTYCZNY: Zwróć JSON zawierający DOKŁADNIE 5 DNI (od poniedziałku do piątku). Musisz użyć DOKŁADNIE tych angielskich kluczy:
-{
-  "days": [
-    { "day": "Poniedziałek", "title": "Tytuł dnia", "morning": "Opis poranka", "afternoon": "Opis popołudnia" },
-    { "day": "Wtorek", "title": "Tytuł dnia", "morning": "Opis poranka", "afternoon": "Opis popołudnia" },
-    { "day": "Środa", "title": "Tytuł dnia", "morning": "Opis poranka", "afternoon": "Opis popołudnia" },
-    { "day": "Czwartek", "title": "Tytuł dnia", "morning": "Opis poranka", "afternoon": "Opis popołudnia" },
-    { "day": "Piątek", "title": "Tytuł dnia", "morning": "Opis poranka", "afternoon": "Opis popołudnia" }
-  ]
-}`;
-                    prompt = `Temat przewodni: ${theme}. Wiek dzieci: ${age}. Specyficzne potrzeby: ${specialNeeds}.`;
+WYMÓG: Musisz zwrócić DOKŁADNIE 5 elementów w tablicy "items" (od poniedziałku do piątku). 
+Oczekiwany Format JSON: ${jsonTemplate}
+Zmapuj dane: title=Dzień, subtitle=Temat dnia, text1=Zajęcia poranne, text2=Zajęcia popołudniowe.`;
+                    prompt = `Temat przewodni: ${theme}. Wiek dzieci: ${age}. Specyficzne potrzeby: ${specialNeeds}. (Bezwzględnie dostosuj poziom aktywności do potrzeb dzieci).`;
                 } else if (activeModule === 'sos') {
-                    sysPrompt = `Jesteś animatorem zabaw. Wymyśl błyskawiczne gry ratunkowe.
-WYMÓG KRYTYCZNY: Zwróć JSON zawierający DOKŁADNIE 3 GRY. Musisz użyć DOKŁADNIE tych angielskich kluczy:
-{
-  "games": [
-    { "name": "Nazwa gry", "rules": "Zasady", "duration": "np. 15 min" },
-    { "name": "Nazwa gry", "rules": "Zasady", "duration": "np. 15 min" },
-    { "name": "Nazwa gry", "rules": "Zasady", "duration": "np. 15 min" }
-  ]
-}`;
-                    prompt = `Lokalizacja: ${location}. Sprzęt: ${props}. Wiek: ${age}. SPE: ${specialNeeds}.`;
+                    sysPrompt = `Jesteś animatorem zabaw. Wymyśl błyskawiczne, genialne gry ratunkowe.
+WYMÓG: Musisz zwrócić DOKŁADNIE 3 elementy w tablicy "items". 
+Oczekiwany Format JSON: ${jsonTemplate}
+Zmapuj dane: title=Nazwa gry, subtitle=Czas trwania (np. 15 min), text1=Zasady gry, text2="".`;
+                    prompt = `Gdzie utknęliśmy: ${location}. Dostępne rekwizyty: ${props}. Wiek: ${age}. SPE: ${specialNeeds}. Gry muszą idealnie pasować do tego otoczenia!`;
                 } else if (activeModule === 'teren') {
-                    sysPrompt = `Jesteś mistrzem gier terenowych. Ułóż rymowane zagadki.
-WYMÓG KRYTYCZNY: Zwróć JSON zawierający DOKŁADNIE 5 ZAGADEK. Musisz użyć DOKŁADNIE tych angielskich kluczy:
-{
-  "clues": [
-    { "step": 1, "rhyme": "Rymowanka", "hideout": "Kryjówka" },
-    { "step": 2, "rhyme": "Rymowanka", "hideout": "Kryjówka" },
-    { "step": 3, "rhyme": "Rymowanka", "hideout": "Kryjówka" },
-    { "step": 4, "rhyme": "Rymowanka", "hideout": "Kryjówka" },
-    { "step": 5, "rhyme": "Rymowanka", "hideout": "Kryjówka" }
-  ]
-}`;
-                    prompt = `Teren: ${theme}. Wiek: ${age}. SPE: ${specialNeeds}.`;
+                    sysPrompt = `Jesteś mistrzem gier terenowych. Ułóż rymowane zagadki do gry w podchody.
+WYMÓG: Musisz zwrócić DOKŁADNIE 5 elementów w tablicy "items". 
+Oczekiwany Format JSON: ${jsonTemplate}
+Zmapuj dane: title=Krok (np. Krok 1), subtitle=Kryjówka (gdzie schować), text1=Rymowanka (4 linijki), text2="".`;
+                    prompt = `Teren gry: ${theme}. Wiek: ${age}. SPE: ${specialNeeds}. Zagadki muszą pasować do terenu!`;
                 } else if (activeModule === 'druzyny') {
-                    sysPrompt = `Jesteś kierownikiem kolonii. Wymyśl nazwy i okrzyki drużyn.
-WYMÓG KRYTYCZNY: Zwróć JSON zawierający DOKŁADNIE 4 DRUŻYNY. Musisz użyć DOKŁADNIE tych angielskich kluczy:
-{
-  "teams": [
-    { "name": "Nazwa", "cheer": "Okrzyk" },
-    { "name": "Nazwa", "cheer": "Okrzyk" },
-    { "name": "Nazwa", "cheer": "Okrzyk" },
-    { "name": "Nazwa", "cheer": "Okrzyk" }
-  ]
-}`;
-                    prompt = `Tematyka: ${theme}. Wiek: ${age}. SPE: ${specialNeeds}.`;
+                    sysPrompt = `Jesteś kierownikiem kolonii. Wymyśl kreatywne nazwy drużyn oraz rymowane okrzyki.
+WYMÓG: Musisz zwrócić DOKŁADNIE 4 elementy w tablicy "items". 
+Oczekiwany Format JSON: ${jsonTemplate}
+Zmapuj dane: title=Nazwa Drużyny, subtitle="", text1=Rymowany okrzyk (2-4 linijki), text2="".`;
+                    prompt = `Tematyka kolonii: ${theme}. Wiek: ${age}. SPE: ${specialNeeds}.`;
                 }
 
                 try {
@@ -365,7 +354,7 @@ WYMÓG KRYTYCZNY: Zwróć JSON zawierający DOKŁADNIE 4 DRUŻYNY. Musisz użyć
 
                 const { type, data, params } = resultData;
 
-                // 1. Rekurencyjne szukanie tablicy w zagnieżdżonych obiektach JSON
+                // Ekstrakcja tablicy elementów bez względu na to, jak zagnieździło to AI
                 const findArrayInObject = (obj) => {
                     if (Array.isArray(obj)) return obj;
                     if (obj && typeof obj === 'object') {
@@ -379,25 +368,19 @@ WYMÓG KRYTYCZNY: Zwróć JSON zawierający DOKŁADNIE 4 DRUŻYNY. Musisz użyć
                 };
 
                 let itemsList = findArrayInObject(data);
-                
-                // Jeśli AI zwróciło zaledwie pojedynczy obiekt, "na siłę" wsadźmy go w tablicę
-                if (!itemsList && data && typeof data === 'object') {
-                    itemsList = [data];
-                }
+                if (!itemsList && data && typeof data === 'object') itemsList = [data]; // Awaryjne
 
-                // Bezpiecznik: Jeśli mimo wszystko nie ma tablicy, wyświetl dane surowe
                 if (!itemsList || itemsList.length === 0) {
                     return (
                         <div className="bg-red-500/10 border border-red-500/20 p-6 rounded-2xl text-red-400 text-center">
                             <i className="ph-fill ph-warning-circle text-4xl mb-2"></i>
-                            <p className="font-bold">Zrozumiałem format, ale AI inaczej nazwało dane.</p>
-                            <p className="text-xs mt-2 text-red-400/70">Wciśnij "Generuj Rozwiązanie" jeszcze raz, aby wymusić poprawną strukturę.</p>
-                            <pre className="mt-4 p-2 bg-slate-900 rounded text-left text-[10px] overflow-auto max-h-40 text-slate-500 font-mono">{JSON.stringify(data, null, 2)}</pre>
+                            <p className="font-bold">Zrozumiałem odpowiedź, ale nie zawiera ona listy elementów.</p>
+                            <button onClick={generateContent} className="mt-4 bg-red-500 text-white px-4 py-2 rounded font-bold">Spróbuj ponownie</button>
                         </div>
                     );
                 }
 
-                // 2. Normalizacja kluczy (odporność na zmianę wielkości liter i potoczne nazwy np. Day vs day vs dzien)
+                // Renderowanie w oparciu o uniwersalne klucze (title, subtitle, text1, text2) z fallbackiem do starych nazw
                 if (type === 'plan') {
                     return (
                         <div className="space-y-6">
@@ -407,17 +390,17 @@ WYMÓG KRYTYCZNY: Zwróć JSON zawierający DOKŁADNIE 4 DRUŻYNY. Musisz użyć
                                 {params.specialNeeds !== 'Brak (Grupa ogólnodostępna)' && <p className="text-sm text-emerald-400 print:text-emerald-700 print-text font-bold mt-1"><i className="ph-bold ph-wheelchair"></i> SPE: {params.specialNeeds}</p>}
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                {itemsList.map((d, i) => {
-                                    const day = d.day || d.Day || d.dzien || d.dzień || `Dzień ${i+1}`;
-                                    const title = d.title || d.Title || d.tytul || d.tytuł || "Zajęcia kreatywne";
-                                    const morning = d.morning || d.Morning || d.poranek || d.rano || d.zajecia_poranne || d.zajeciaPoranne || "Brak opisu";
-                                    const afternoon = d.afternoon || d.Afternoon || d.popoludnie || d.popołudnie || d.zajecia_popoludniowe || d.zajeciaPopoludniowe || "Brak opisu";
+                                {itemsList.map((item, i) => {
+                                    const day = item.title || item.day || item.Day || `Dzień ${i+1}`;
+                                    const themeOfDay = item.subtitle || item.title || item.Title || "Zajęcia zapoznawcze";
+                                    const morning = item.text1 || item.morning || item.Morning || "Brak danych porannych";
+                                    const afternoon = item.text2 || item.afternoon || item.Afternoon || "Brak danych popołudniowych";
                                     
                                     return (
                                         <div key={i} className="bg-slate-900 border border-slate-800 rounded-3xl p-6 print-card relative overflow-hidden group">
                                             <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-amber-500 to-orange-500"></div>
                                             <h3 className="text-xl font-black text-white print-text mb-1">{day}</h3>
-                                            <p className="text-sm font-bold text-amber-500 print-text mb-4 uppercase tracking-wide">{title}</p>
+                                            <p className="text-sm font-bold text-amber-500 print-text mb-4 uppercase tracking-wide">{themeOfDay}</p>
                                             <div className="space-y-4">
                                                 <div>
                                                     <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1 mb-1"><i className="ph-bold ph-sun"></i> Poranek</div>
@@ -445,10 +428,10 @@ WYMÓG KRYTYCZNY: Zwróć JSON zawierający DOKŁADNIE 4 DRUŻYNY. Musisz użyć
                                 {params.specialNeeds !== 'Brak (Grupa ogólnodostępna)' && <p className="text-sm text-emerald-400 print:text-emerald-700 print-text font-bold mt-1"><i className="ph-bold ph-wheelchair"></i> SPE: {params.specialNeeds}</p>}
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                {itemsList.map((g, i) => {
-                                    const name = g.name || g.Name || g.nazwa || `Gra nr ${i+1}`;
-                                    const rules = g.rules || g.Rules || g.zasady || g.opis || "Brak szczegółowych zasad.";
-                                    const duration = g.duration || g.Duration || g.czas || "Ok. 15 min";
+                                {itemsList.map((item, i) => {
+                                    const name = item.title || item.name || `Gra nr ${i+1}`;
+                                    const duration = item.subtitle || item.duration || "15 min";
+                                    const rules = item.text1 || item.rules || item.text || "Rozpocznij zabawę w ustalonym miejscu.";
                                     
                                     return (
                                         <div key={i} className="bg-slate-900 border border-slate-800 rounded-3xl p-6 print-card relative">
@@ -473,18 +456,18 @@ WYMÓG KRYTYCZNY: Zwróć JSON zawierający DOKŁADNIE 4 DRUŻYNY. Musisz użyć
                                 {params.specialNeeds !== 'Brak (Grupa ogólnodostępna)' && <p className="text-sm text-emerald-400 print:text-emerald-700 print-text font-bold mt-1"><i className="ph-bold ph-wheelchair"></i> SPE: {params.specialNeeds}</p>}
                             </div>
                             <div className="space-y-4 max-w-2xl mx-auto">
-                                {itemsList.map((c, i) => {
-                                    const step = c.step || c.Step || c.krok || c.numer || (i+1);
-                                    const rhyme = c.rhyme || c.Rhyme || c.rymowanka || c.zagadka || "Szukaj dalej bystrookim okiem!";
-                                    const hideout = c.hideout || c.Hideout || c.kryjowka || c.miejsce || "W bezpiecznym i łatwo dostępnym miejscu.";
+                                {itemsList.map((item, i) => {
+                                    const step = item.title || item.step || `Krok ${i+1}`;
+                                    const hideout = item.subtitle || item.hideout || "Schowaj tutaj";
+                                    const rhyme = item.text1 || item.rhyme || "Idź przed siebie, nie patrz w tył...";
                                     
                                     return (
                                         <div key={i} className="bg-slate-900 border border-slate-800 rounded-3xl p-6 print-card flex gap-6 items-center">
-                                            <div className="text-5xl font-black text-slate-800 print:text-slate-200">{step}</div>
+                                            <div className="text-5xl font-black text-slate-800 print:text-slate-200">{i+1}</div>
                                             <div className="flex-1">
                                                 <p className="text-lg font-summer text-emerald-300 print-text leading-relaxed italic mb-3">"{rhyme}"</p>
                                                 <div className="bg-slate-950 print:bg-slate-100 p-3 rounded-xl border border-dashed border-slate-700 print:border-slate-300 text-xs text-slate-400 print-text font-bold flex items-center gap-2">
-                                                    <i className="ph-fill ph-eye"></i> Gdzie schować karteczkę: <span className="text-white print-text">{hideout}</span>
+                                                    <i className="ph-fill ph-eye"></i> Kryjówka: <span className="text-white print-text">{hideout}</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -504,9 +487,9 @@ WYMÓG KRYTYCZNY: Zwróć JSON zawierający DOKŁADNIE 4 DRUŻYNY. Musisz użyć
                                 {params.specialNeeds !== 'Brak (Grupa ogólnodostępna)' && <p className="text-sm text-emerald-400 print:text-emerald-700 print-text font-bold mt-1"><i className="ph-bold ph-wheelchair"></i> SPE: {params.specialNeeds}</p>}
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                {itemsList.map((t, i) => {
-                                    const name = t.name || t.Name || t.nazwa || `Drużyna ${i+1}`;
-                                    const cheer = t.cheer || t.Cheer || t.okrzyk || t.haslo || "Zabawa trwa, wygramy my!";
+                                {itemsList.map((item, i) => {
+                                    const name = item.title || item.name || `Drużyna ${i+1}`;
+                                    const cheer = item.text1 || item.cheer || "Hej ho, drużyna nasza gra w to!";
                                     
                                     return (
                                         <div key={i} className="bg-slate-900 border border-slate-800 rounded-3xl p-6 print-card text-center">
