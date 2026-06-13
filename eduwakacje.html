@@ -124,49 +124,64 @@
             { id: 'druzyny', icon: 'ph-users-three', title: 'Baza Drużyn', desc: 'Okrzyki i nazwy dla grup', color: 'from-purple-500 to-pink-500' }
         ];
 
-        // Pancerny Parser JSON V3 (Wersja ULTRA)
-        const parseAIResponse = (text) => {
+        // Pancerny Parser JSON V3 (Wersja OSTATECZNA)
+        const parseAIResponse = (aiOutput) => {
+            // 1. Jeśli backend automatycznie sparsował JSON-a i odesłał gotowy obiekt:
+            if (aiOutput && typeof aiOutput === 'object') {
+                return aiOutput;
+            }
+
+            // 2. Jeśli z jakiegoś powodu to nie string, zmień na string
+            let text = String(aiOutput || "");
+
             try {
-                // 1. Znajdź początek i koniec prawdziwego JSONa (ignoruje gadulstwo bota przed i po)
+                // Szukamy klamr
                 const startIndex = text.indexOf('{');
                 const endIndex = text.lastIndexOf('}');
                 
                 if (startIndex === -1 || endIndex === -1) {
-                    throw new Error("Brak struktury w odpowiedzi.");
+                    throw new Error("Brak struktury { } w odpowiedzi.");
                 }
                 
                 let jsonStr = text.substring(startIndex, endIndex + 1);
                 
-                // 2. Wyczyść znaki kontrolne i twarde entery, które niszczą format (np. przy rymowankach)
+                // Usuwamy twarde entery (psują JSON) i ewentualne niewidzialne znaki
                 jsonStr = jsonStr.replace(/[\n\r\t]+/g, ' '); 
                 
-                // 3. Zwróć czysty, przetworzony obiekt
                 return JSON.parse(jsonStr);
             } catch (e) {
-                console.error("Błąd parsowania JSON. Odpowiedź bota:", text);
-                console.error("Szczegóły:", e);
-                throw new Error("Sztuczna Inteligencja wygenerowała format z błędem w pisowni. Kliknij Generuj jeszcze raz!");
+                console.error("Błąd parsowania. Oryginał:", text);
+                console.error("Szczegóły błędu:", e);
+                // Wyciągamy fragment odpowiedzi, żeby pokazać użytkownikowi na ekranie, co faktycznie AI zwróciło!
+                const preview = text.length > 60 ? text.substring(0, 60) + "..." : text;
+                throw new Error("Serwer zwrócił zły format: " + preview);
             }
         };
 
         // Pancerny Fetcher z Vercel Fallback
         const fetchTextAI = async (prompt, systemInstruction) => {
-            const finalPrompt = `Zwróć odpowiedź WYŁĄCZNIE W FORMACIE JSON. Żadnego innego tekstu przed i po.\n\n${systemInstruction}\n\n${prompt}`;
+            // Wymuszamy najtwardszymi słowami brak gadulstwa
+            const finalPrompt = `WYMÓG KRYTYCZNY: Zwróć odpowiedź WYŁĄCZNIE jako czysty kod JSON. Żadnego tekstu przed ani po! Żadnych formatowań markdown (bez \`\`\`json).\n\nINSTRUKCJA:\n${systemInstruction}\n\nZAPYTANIE:\n${prompt}`;
             
-            // 1. Próba Twojego API na Vercelu
             try {
                 const res = await fetch('/api/gemini', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ prompt: finalPrompt })
                 });
+                
                 if (res.ok) {
                     const data = await res.json();
-                    return data.text || data.response || data.message;
+                    // Wyłapuje różne struktury z Twojego backendu Vercel (string lub bezpośredni obiekt z danymi)
+                    return data.text || data.response || data.message || data.content || data;
+                } else {
+                    throw new Error(`HTTP ${res.status}`);
                 }
-            } catch(e) { console.warn("Vercel API niedostępne, używam Fallback Canvas...", e); }
+            } catch(e) { 
+                console.warn("Vercel API niedostępne lub zwróciło błąd:", e); 
+            }
 
-            // 2. Fallback Canvas (Z eksponencjalnym backoffem)
+            // Fallback Canvas (Z eksponencjalnym backoffem)
             const delays = [1000, 2000, 4000, 8000];
             const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
             const payload = {
