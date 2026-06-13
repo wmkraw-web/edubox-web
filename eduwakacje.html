@@ -124,33 +124,23 @@
             { id: 'druzyny', icon: 'ph-users-three', title: 'Baza Drużyn', desc: 'Okrzyki i nazwy dla grup', color: 'from-purple-500 to-pink-500' }
         ];
 
-        // Pancerny Parser JSON V3 (Wersja OSTATECZNA)
+        // Pancerny Parser JSON
         const parseAIResponse = (aiOutput) => {
-            // 1. Jeśli Vercel sam sparsował i odesłał obiekt
-            if (aiOutput && typeof aiOutput === 'object') {
-                return aiOutput;
-            }
+            if (aiOutput && typeof aiOutput === 'object') return aiOutput;
 
-            // 2. Parsowanie ze stringa (wycinamy śmieci, szukamy klamr)
             let text = String(aiOutput || "").trim();
-            // Usuwamy potencjalne znaczniki markdown
             text = text.replace(/```json/gi, '').replace(/```/g, '').trim();
 
             try {
-                // Najpierw sprawdzamy czy to obiekt {...}
                 const startObj = text.indexOf('{');
                 const endObj = text.lastIndexOf('}');
-                
-                // Jeśli nie, może to czysta tablica [...]
                 const startArr = text.indexOf('[');
                 const endArr = text.lastIndexOf(']');
 
                 if (startObj !== -1 && endObj !== -1 && (startArr === -1 || startObj < startArr)) {
-                    // AI zwróciło prawidłowy obiekt
                     let jsonStr = text.substring(startObj, endObj + 1).replace(/[\n\r\t]+/g, ' ');
                     return JSON.parse(jsonStr);
                 } else if (startArr !== -1 && endArr !== -1) {
-                    // AI zwróciło czystą tablicę - pakujemy ją w obiekt z kluczem "items"
                     let jsonStr = text.substring(startArr, endArr + 1).replace(/[\n\r\t]+/g, ' ');
                     return { items: JSON.parse(jsonStr) };
                 }
@@ -162,10 +152,44 @@
             }
         };
 
-        // Fetcher AI z Twardym Promptem
-        const fetchTextAI = async (prompt, systemInstruction) => {
-            const finalPrompt = `WYMÓG ABSOLUTNY: Nie pisz żadnych powitań. Zwróć DOKŁADNIE i WYŁĄCZNIE czysty kod JSON zgodny z podanym formatem.\n\nINSTRUKCJA:\n${systemInstruction}\n\nZAPYTANIE:\n${prompt}`;
+        // Fetcher AI z Natywną Integracją OpenAI
+        const fetchTextAI = async (prompt, systemInstruction, openAiKey) => {
+            const finalPrompt = `WYMÓG ABSOLUTNY: Zwróć WYŁĄCZNIE czysty kod JSON w formacie obiektu zawierającego klucz "items" jako tablicę.\n\nINSTRUKCJA:\n${systemInstruction}\n\nZAPYTANIE:\n${prompt}`;
             
+            // JEŚLI JEST KLUCZ OPENAI - KORZYSTAMY Z POTĘŻNEGO GPT-4o (Z trybem JSON Mode)
+            if (openAiKey) {
+                try {
+                    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${openAiKey}`
+                        },
+                        body: JSON.stringify({
+                            model: "gpt-4o", // Najwyższa jakość, bezbłędna struktura
+                            messages: [
+                                { role: "system", content: systemInstruction + "\n\nOczekiwany wynik to zawsze jeden obiekt JSON z kluczem 'items', który zawiera tablicę wyników." },
+                                { role: "user", content: finalPrompt }
+                            ],
+                            response_format: { type: "json_object" }, // Wymuszamy na poziomie API bezwzględny JSON
+                            temperature: 0.7
+                        })
+                    });
+                    
+                    if (!res.ok) {
+                        const err = await res.json();
+                        throw new Error(err.error?.message || `HTTP ${res.status}`);
+                    }
+                    
+                    const data = await res.json();
+                    return data.choices[0].message.content; // Zwraca perfekcyjny JSON
+                } catch (error) {
+                    console.error("Błąd OpenAI:", error);
+                    throw new Error("Błąd autoryzacji OpenAI. Sprawdź klucz: " + error.message);
+                }
+            }
+
+            // FALLBACK DO VERCEL / GEMINI (Jeśli nie wpisano klucza)
             try {
                 const res = await fetch('/api/gemini', {
                     method: 'POST',
@@ -176,15 +200,13 @@
                 if (res.ok) {
                     const data = await res.json();
                     return data.text || data.response || data.message || data.content || data;
-                } else {
-                    throw new Error(`HTTP ${res.status}`);
                 }
             } catch(e) { 
                 console.warn("Vercel API niedostępne, używam Fallback Canvas..."); 
             }
 
-            // Fallback (z ponowieniami)
-            const delays = [1000, 2000, 4000];
+            // Canvas Fallback
+            const delays = [1000, 2000];
             const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
             const payload = {
                 contents: [{ parts: [{ text: finalPrompt }] }],
@@ -207,11 +229,12 @@
         // --- GŁÓWNA APLIKACJA ---
         function App() {
             const [user, setUser] = useState(null);
-            const [appMode, setAppMode] = useState('kreator'); // kreator | gielda
+            const [appMode, setAppMode] = useState('kreator'); 
             const [activeModule, setActiveModule] = useState('plan');
             const [isPremium, setIsPremium] = useState(false);
             const [premiumCode, setPremiumCode] = useState('');
             const [aiGenerations, setAiGenerations] = useState(0);
+            const [openAiKey, setOpenAiKey] = useState(''); // Nowy Stan klucza OpenAI
             const [message, setMessage] = useState(null);
             const [isGenerating, setIsGenerating] = useState(false);
             const [resultData, setResultData] = useState(null);
@@ -232,8 +255,13 @@
                 if (window.EduBoxCore) window.EduBoxCore.onUserChange((u) => setUser(u));
                 const savedGens = localStorage.getItem('edubox_eduwakacje_ai');
                 if (savedGens) setAiGenerations(parseInt(savedGens));
+                
                 const savedPremium = localStorage.getItem('edubox_premium');
                 if (savedPremium === 'KAWA2024') setIsPremium(true);
+                
+                // Załadowanie zapisanego klucza OpenAI
+                const savedOAI = localStorage.getItem('edubox_openai_key');
+                if (savedOAI) setOpenAiKey(savedOAI);
             }, []);
 
             const showMessage = (text, type = 'success') => {
@@ -249,8 +277,9 @@
             };
 
             const generateContent = async () => {
-                if (!isPremium && aiGenerations >= 3) {
-                    showMessage('Limit darmowych generacji wyczerpany. Wpisz kod KAWA2024.', 'error');
+                // Jeśli nie wpisano klucza OpenAI i wyczerpano limity - blokujemy
+                if (!openAiKey && !isPremium && aiGenerations >= 3) {
+                    showMessage('Limit darmowych generacji wyczerpany. Wpisz kod KAWA2024 lub wklej własny klucz OpenAI poniżej.', 'error');
                     return;
                 }
                 
@@ -261,67 +290,69 @@
                 let sysPrompt = "";
 
                 if (activeModule === 'plan') {
-                    sysPrompt = `Jesteś pedagogiem. Stwórz 5-dniowy plan tematycznych półkolonii.
-WYMÓG ABSOLUTNY: Musisz zwrócić DOKŁADNIE 5 elementów (Dni) i używać WYŁĄCZNIE kluczy: title, subtitle, text1, text2. 
-Skopiuj i wypełnij ten DOKŁADNY SZABLON JSON:
+                    sysPrompt = `Jesteś doświadczonym pedagogiem. Stwórz 5-dniowy plan tematycznych półkolonii w formacie JSON.
+WYMÓG ABSOLUTNY: Tablica "items" MUSI zawierać DOKŁADNIE 5 elementów (dni). Użyj WYŁĄCZNIE kluczy: title, subtitle, text1, text2.
+Wzór struktury:
 {
   "items": [
-    { "title": "Poniedziałek", "subtitle": "Tytuł dla tego dnia", "text1": "Szczegółowe zajęcia poranne...", "text2": "Szczegółowe zajęcia popołudniowe..." },
-    { "title": "Wtorek", "subtitle": "Tytuł dla tego dnia", "text1": "Szczegółowe zajęcia poranne...", "text2": "Szczegółowe zajęcia popołudniowe..." },
-    { "title": "Środa", "subtitle": "Tytuł dla tego dnia", "text1": "Szczegółowe zajęcia poranne...", "text2": "Szczegółowe zajęcia popołudniowe..." },
-    { "title": "Czwartek", "subtitle": "Tytuł dla tego dnia", "text1": "Szczegółowe zajęcia poranne...", "text2": "Szczegółowe zajęcia popołudniowe..." },
-    { "title": "Piątek", "subtitle": "Tytuł dla tego dnia", "text1": "Szczegółowe zajęcia poranne...", "text2": "Szczegółowe zajęcia popołudniowe..." }
+    { "title": "Poniedziałek", "subtitle": "Tytuł dnia", "text1": "Zajęcia poranne...", "text2": "Zajęcia popołudniowe..." },
+    { "title": "Wtorek", "subtitle": "Tytuł dnia", "text1": "Zajęcia poranne...", "text2": "Zajęcia popołudniowe..." },
+    { "title": "Środa", "subtitle": "Tytuł dnia", "text1": "Zajęcia poranne...", "text2": "Zajęcia popołudniowe..." },
+    { "title": "Czwartek", "subtitle": "Tytuł dnia", "text1": "Zajęcia poranne...", "text2": "Zajęcia popołudniowe..." },
+    { "title": "Piątek", "subtitle": "Tytuł dnia", "text1": "Zajęcia poranne...", "text2": "Zajęcia popołudniowe..." }
   ]
 }`;
-                    prompt = `Temat przewodni: ${theme}. Wiek dzieci: ${age}. Specyficzne potrzeby SPE: ${specialNeeds}.`;
+                    prompt = `Temat: ${theme}. Wiek dzieci: ${age}. Specyficzne potrzeby: ${specialNeeds}.`;
                 } else if (activeModule === 'sos') {
-                    sysPrompt = `Jesteś animatorem zabaw. Wymyśl błyskawiczne, genialne gry ratunkowe.
-WYMÓG ABSOLUTNY: Zwróć DOKŁADNIE 3 elementy i używaj WYŁĄCZNIE kluczy: title, subtitle, text1, text2.
-Skopiuj i wypełnij ten DOKŁADNY SZABLON JSON:
+                    sysPrompt = `Jesteś animatorem zabaw. Wymyśl błyskawiczne, genialne gry ratunkowe w formacie JSON.
+WYMÓG ABSOLUTNY: Tablica "items" MUSI zawierać DOKŁADNIE 3 elementy (gry). Użyj WYŁĄCZNIE kluczy: title, subtitle, text1, text2.
+Wzór struktury:
 {
   "items": [
-    { "title": "Nazwa pierwszej gry", "subtitle": "Czas trwania: np. 15 min", "text1": "Szczegółowe zasady gry i jak w nią zagrać...", "text2": "" },
-    { "title": "Nazwa drugiej gry", "subtitle": "Czas trwania: np. 20 min", "text1": "Szczegółowe zasady gry i jak w nią zagrać...", "text2": "" },
-    { "title": "Nazwa trzeciej gry", "subtitle": "Czas trwania: np. 10 min", "text1": "Szczegółowe zasady gry i jak w nią zagrać...", "text2": "" }
+    { "title": "Nazwa pierwszej gry", "subtitle": "Czas: np. 15 min", "text1": "Zasady...", "text2": "" },
+    { "title": "Nazwa drugiej gry", "subtitle": "Czas: np. 20 min", "text1": "Zasady...", "text2": "" },
+    { "title": "Nazwa trzeciej gry", "subtitle": "Czas: np. 10 min", "text1": "Zasady...", "text2": "" }
   ]
 }`;
                     prompt = `Gdzie utknęliśmy: ${location}. Dostępne rekwizyty: ${props}. Wiek: ${age}. SPE: ${specialNeeds}.`;
                 } else if (activeModule === 'teren') {
-                    sysPrompt = `Jesteś mistrzem gier terenowych. Ułóż rymowane zagadki do gry w podchody.
-WYMÓG ABSOLUTNY: Zwróć DOKŁADNIE 5 elementów i używaj WYŁĄCZNIE kluczy: title, subtitle, text1, text2.
-Skopiuj i wypełnij ten DOKŁADNY SZABLON JSON:
+                    sysPrompt = `Jesteś mistrzem gier terenowych. Ułóż rymowane zagadki w formacie JSON.
+WYMÓG ABSOLUTNY: Tablica "items" MUSI zawierać DOKŁADNIE 5 elementów (kroków). Użyj WYŁĄCZNIE kluczy: title, subtitle, text1, text2.
+Wzór struktury:
 {
   "items": [
-    { "title": "Krok 1", "subtitle": "Gdzie fizycznie schować kartkę np. pod ławką", "text1": "Rymowanka-zagadka prowadząca do tego miejsca (4 linijki)...", "text2": "" },
-    { "title": "Krok 2", "subtitle": "Gdzie fizycznie schować kartkę", "text1": "Rymowanka-zagadka prowadząca do tego miejsca (4 linijki)...", "text2": "" },
-    { "title": "Krok 3", "subtitle": "Gdzie fizycznie schować kartkę", "text1": "Rymowanka-zagadka prowadząca do tego miejsca (4 linijki)...", "text2": "" },
-    { "title": "Krok 4", "subtitle": "Gdzie fizycznie schować kartkę", "text1": "Rymowanka-zagadka prowadząca do tego miejsca (4 linijki)...", "text2": "" },
-    { "title": "Krok 5", "subtitle": "MIEJSCE SKARBU", "text1": "Ostatnia rymowanka-zagadka...", "text2": "" }
+    { "title": "Krok 1", "subtitle": "Kryjówka np. pod ławką", "text1": "Rymowanka-zagadka (4 linijki)...", "text2": "" },
+    { "title": "Krok 2", "subtitle": "Kryjówka", "text1": "Rymowanka-zagadka...", "text2": "" },
+    { "title": "Krok 3", "subtitle": "Kryjówka", "text1": "Rymowanka-zagadka...", "text2": "" },
+    { "title": "Krok 4", "subtitle": "Kryjówka", "text1": "Rymowanka-zagadka...", "text2": "" },
+    { "title": "Krok 5", "subtitle": "MIEJSCE SKARBU", "text1": "Ostatnia zagadka...", "text2": "" }
   ]
 }`;
                     prompt = `Teren gry: ${theme}. Wiek: ${age}. SPE: ${specialNeeds}.`;
                 } else if (activeModule === 'druzyny') {
-                    sysPrompt = `Jesteś kierownikiem kolonii. Wymyśl kreatywne nazwy drużyn oraz rymowane okrzyki.
-WYMÓG ABSOLUTNY: Zwróć DOKŁADNIE 4 elementy i używaj WYŁĄCZNIE kluczy: title, subtitle, text1, text2.
-Skopiuj i wypełnij ten DOKŁADNY SZABLON JSON:
+                    sysPrompt = `Jesteś kierownikiem kolonii. Wymyśl nazwy i okrzyki drużyn w formacie JSON.
+WYMÓG ABSOLUTNY: Tablica "items" MUSI zawierać DOKŁADNIE 4 elementy (drużyny). Użyj WYŁĄCZNIE kluczy: title, subtitle, text1, text2.
+Wzór struktury:
 {
   "items": [
-    { "title": "Nazwa pierwszej drużyny", "subtitle": "", "text1": "Rymowany okrzyk drużyny...", "text2": "" },
-    { "title": "Nazwa drugiej drużyny", "subtitle": "", "text1": "Rymowany okrzyk drużyny...", "text2": "" },
-    { "title": "Nazwa trzeciej drużyny", "subtitle": "", "text1": "Rymowany okrzyk drużyny...", "text2": "" },
-    { "title": "Nazwa czwartej drużyny", "subtitle": "", "text1": "Rymowany okrzyk drużyny...", "text2": "" }
+    { "title": "Nazwa pierwszej drużyny", "subtitle": "", "text1": "Okrzyk...", "text2": "" },
+    { "title": "Nazwa drugiej drużyny", "subtitle": "", "text1": "Okrzyk...", "text2": "" },
+    { "title": "Nazwa trzeciej drużyny", "subtitle": "", "text1": "Okrzyk...", "text2": "" },
+    { "title": "Nazwa czwartej drużyny", "subtitle": "", "text1": "Okrzyk...", "text2": "" }
   ]
 }`;
                     prompt = `Tematyka kolonii/obozu: ${theme}. Wiek: ${age}. SPE: ${specialNeeds}.`;
                 }
 
                 try {
-                    const aiText = await fetchTextAI(prompt, sysPrompt);
+                    // Przekazujemy klucz OpenAI do super-fetchera
+                    const aiText = await fetchTextAI(prompt, sysPrompt, openAiKey);
                     const parsedJson = parseAIResponse(aiText);
                     
                     setResultData({ type: activeModule, data: parsedJson, params: { theme, age, location, props, specialNeeds } });
                     
-                    if (!isPremium) {
+                    // Zliczamy tylko jeśli nie korzystamy z własnego klucza i nie mamy PRO
+                    if (!openAiKey && !isPremium) {
                         const newCount = aiGenerations + 1;
                         setAiGenerations(newCount);
                         localStorage.setItem('edubox_eduwakacje_ai', newCount.toString());
@@ -371,7 +402,6 @@ Skopiuj i wypełnij ten DOKŁADNY SZABLON JSON:
 
                 const { type, data, params } = resultData;
 
-                // Ekstrakcja tablicy elementów bez względu na to, jak zagnieździło to AI
                 const findArrayInObject = (obj) => {
                     if (Array.isArray(obj)) return obj;
                     if (obj && typeof obj === 'object') {
@@ -385,33 +415,32 @@ Skopiuj i wypełnij ten DOKŁADNY SZABLON JSON:
                 };
 
                 let itemsList = findArrayInObject(data);
-                if (!itemsList && data && typeof data === 'object') itemsList = [data]; // Awaryjne
+                if (!itemsList && data && typeof data === 'object') itemsList = [data]; 
 
                 if (!itemsList || itemsList.length === 0) {
                     return (
                         <div className="bg-red-500/10 border border-red-500/20 p-6 rounded-2xl text-red-400 text-center">
                             <i className="ph-fill ph-warning-circle text-4xl mb-2"></i>
-                            <p className="font-bold">Zrozumiałem odpowiedź, ale nie zawiera ona listy elementów.</p>
+                            <p className="font-bold">Brak wyników do wyrysowania.</p>
                             <button onClick={generateContent} className="mt-4 bg-red-500 text-white px-4 py-2 rounded font-bold">Spróbuj ponownie</button>
                         </div>
                     );
                 }
 
-                // Renderowanie w oparciu o uniwersalne klucze (title, subtitle, text1, text2) z fallbackiem do starych nazw
                 if (type === 'plan') {
                     return (
                         <div className="space-y-6">
                             <div className="text-center mb-8 pb-6 border-b border-slate-800 print:border-slate-300">
                                 <h2 className="text-3xl font-summer text-amber-400 print-text font-black uppercase mb-2">Tydzień: {params.theme}</h2>
                                 <p className="text-sm text-slate-400 print-text font-bold"><i className="ph-bold ph-users"></i> Grupa wiekowa: {params.age}</p>
-                                {params.specialNeeds !== 'Brak (Grupa ogólnodostępna)' && <p className="text-sm text-emerald-400 print:text-emerald-700 print-text font-bold mt-1"><i className="ph-bold ph-wheelchair"></i> SPE: {params.specialNeeds}</p>}
+                                {params.specialNeeds && params.specialNeeds !== 'Brak (Grupa ogólnodostępna)' && <p className="text-sm text-emerald-400 print:text-emerald-700 print-text font-bold mt-1"><i className="ph-bold ph-wheelchair"></i> SPE: {params.specialNeeds}</p>}
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                 {itemsList.map((item, i) => {
                                     const day = item.title || item.day || item.Day || `Dzień ${i+1}`;
-                                    const themeOfDay = item.subtitle || item.title || item.Title || "Zajęcia zapoznawcze";
-                                    const morning = item.text1 || item.morning || item.Morning || "Brak danych porannych";
-                                    const afternoon = item.text2 || item.afternoon || item.Afternoon || "Brak danych popołudniowych";
+                                    const themeOfDay = item.subtitle || item.title || "Zajęcia";
+                                    const morning = item.text1 || item.morning || item.Morning || "Brak opisu";
+                                    const afternoon = item.text2 || item.afternoon || item.Afternoon || "Brak opisu";
                                     
                                     return (
                                         <div key={i} className="bg-slate-900 border border-slate-800 rounded-3xl p-6 print-card relative overflow-hidden group">
@@ -442,13 +471,13 @@ Skopiuj i wypełnij ten DOKŁADNY SZABLON JSON:
                             <div className="text-center mb-8 pb-6 border-b border-slate-800 print:border-slate-300">
                                 <h2 className="text-3xl font-summer text-cyan-400 print-text font-black uppercase mb-2">Ratunkowe Gry S.O.S</h2>
                                 <p className="text-sm text-slate-400 print-text font-bold"><i className="ph-bold ph-map-pin"></i> {params.location} | <i className="ph-bold ph-backpack"></i> {params.props}</p>
-                                {params.specialNeeds !== 'Brak (Grupa ogólnodostępna)' && <p className="text-sm text-emerald-400 print:text-emerald-700 print-text font-bold mt-1"><i className="ph-bold ph-wheelchair"></i> SPE: {params.specialNeeds}</p>}
+                                {params.specialNeeds && params.specialNeeds !== 'Brak (Grupa ogólnodostępna)' && <p className="text-sm text-emerald-400 print:text-emerald-700 print-text font-bold mt-1"><i className="ph-bold ph-wheelchair"></i> SPE: {params.specialNeeds}</p>}
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                 {itemsList.map((item, i) => {
                                     const name = item.title || item.name || `Gra nr ${i+1}`;
                                     const duration = item.subtitle || item.duration || "15 min";
-                                    const rules = item.text1 || item.rules || item.text || "Rozpocznij zabawę w ustalonym miejscu.";
+                                    const rules = item.text1 || item.rules || "Zasady gry";
                                     
                                     return (
                                         <div key={i} className="bg-slate-900 border border-slate-800 rounded-3xl p-6 print-card relative">
@@ -470,13 +499,13 @@ Skopiuj i wypełnij ten DOKŁADNY SZABLON JSON:
                             <div className="text-center mb-8 pb-6 border-b border-slate-800 print:border-slate-300">
                                 <h2 className="text-3xl font-summer text-emerald-400 print-text font-black uppercase mb-2">Terenowe Podchody</h2>
                                 <p className="text-sm text-slate-400 print-text font-bold"><i className="ph-bold ph-compass"></i> Teren: {params.theme}</p>
-                                {params.specialNeeds !== 'Brak (Grupa ogólnodostępna)' && <p className="text-sm text-emerald-400 print:text-emerald-700 print-text font-bold mt-1"><i className="ph-bold ph-wheelchair"></i> SPE: {params.specialNeeds}</p>}
+                                {params.specialNeeds && params.specialNeeds !== 'Brak (Grupa ogólnodostępna)' && <p className="text-sm text-emerald-400 print:text-emerald-700 print-text font-bold mt-1"><i className="ph-bold ph-wheelchair"></i> SPE: {params.specialNeeds}</p>}
                             </div>
                             <div className="space-y-4 max-w-2xl mx-auto">
                                 {itemsList.map((item, i) => {
                                     const step = item.title || item.step || `Krok ${i+1}`;
-                                    const hideout = item.subtitle || item.hideout || "Schowaj tutaj";
-                                    const rhyme = item.text1 || item.rhyme || "Idź przed siebie, nie patrz w tył...";
+                                    const hideout = item.subtitle || item.hideout || "Kryjówka";
+                                    const rhyme = item.text1 || item.rhyme || "Zagadka...";
                                     
                                     return (
                                         <div key={i} className="bg-slate-900 border border-slate-800 rounded-3xl p-6 print-card flex gap-6 items-center">
@@ -501,12 +530,12 @@ Skopiuj i wypełnij ten DOKŁADNY SZABLON JSON:
                             <div className="text-center mb-8 pb-6 border-b border-slate-800 print:border-slate-300">
                                 <h2 className="text-3xl font-summer text-purple-400 print-text font-black uppercase mb-2">Baza Drużyn i Okrzyków</h2>
                                 <p className="text-sm text-slate-400 print-text font-bold"><i className="ph-bold ph-palette"></i> Motyw: {params.theme}</p>
-                                {params.specialNeeds !== 'Brak (Grupa ogólnodostępna)' && <p className="text-sm text-emerald-400 print:text-emerald-700 print-text font-bold mt-1"><i className="ph-bold ph-wheelchair"></i> SPE: {params.specialNeeds}</p>}
+                                {params.specialNeeds && params.specialNeeds !== 'Brak (Grupa ogólnodostępna)' && <p className="text-sm text-emerald-400 print:text-emerald-700 print-text font-bold mt-1"><i className="ph-bold ph-wheelchair"></i> SPE: {params.specialNeeds}</p>}
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 {itemsList.map((item, i) => {
                                     const name = item.title || item.name || `Drużyna ${i+1}`;
-                                    const cheer = item.text1 || item.cheer || "Hej ho, drużyna nasza gra w to!";
+                                    const cheer = item.text1 || item.cheer || "Okrzyk";
                                     
                                     return (
                                         <div key={i} className="bg-slate-900 border border-slate-800 rounded-3xl p-6 print-card text-center">
@@ -718,10 +747,11 @@ Skopiuj i wypełnij ten DOKŁADNY SZABLON JSON:
 
                         </div>
 
-                        {/* Premium Footer */}
+                        {/* Premium Footer & Własne API */}
                         <div className="p-4 border-t border-slate-800 bg-slate-950/50">
+                            {/* Kod PRO */}
                             {!isPremium ? (
-                                <div className="space-y-2">
+                                <div className="space-y-2 mb-4">
                                     <div className="flex justify-between items-center">
                                         <span className="text-[10px] font-bold text-slate-400 uppercase">Status PRO</span>
                                         <span className="text-[10px] font-bold text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded-full">{3 - aiGenerations} darmowe</span>
@@ -736,7 +766,7 @@ Skopiuj i wypełnij ten DOKŁADNY SZABLON JSON:
                                     </div>
                                 </div>
                             ) : (
-                                <div className="flex items-center gap-3 bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/30 p-3 rounded-xl">
+                                <div className="flex items-center gap-3 bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/30 p-3 rounded-xl mb-4">
                                     <i className="ph-fill ph-crown text-2xl text-amber-400"></i>
                                     <div>
                                         <p className="text-xs font-bold text-white">Wersja PRO MAX</p>
@@ -744,6 +774,21 @@ Skopiuj i wypełnij ten DOKŁADNY SZABLON JSON:
                                     </div>
                                 </div>
                             )}
+
+                            {/* Własny Klucz OpenAI (Gwarancja perfekcji JSON) */}
+                            <div className="pt-3 border-t border-slate-800">
+                                <label className="text-[10px] font-bold text-emerald-400 flex items-center gap-1 uppercase tracking-wider mb-2">
+                                    <i className="ph-bold ph-key"></i> Integracja OpenAI (GPT-4o)
+                                </label>
+                                <input 
+                                    type="password" 
+                                    value={openAiKey} 
+                                    onChange={(e) => { setOpenAiKey(e.target.value); localStorage.setItem('edubox_openai_key', e.target.value); }}
+                                    placeholder="Wklej tu klucz sk-..." 
+                                    className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white focus:border-emerald-500 transition-colors"
+                                />
+                                <p className="text-[9px] text-slate-500 mt-1 leading-tight">Użyj klucza, by wymusić bezbłędny model GPT-4o ("JSON Mode"). Klucz zapisuje się tylko w przeglądarce.</p>
+                            </div>
                         </div>
                     </aside>
 
