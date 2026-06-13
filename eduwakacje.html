@@ -48,7 +48,7 @@
             100% { transform: translate(30px, 50px) scale(1.1); }
         }
 
-        /* Print Styles - Kriticzne dla działania w terenie */
+        /* Print Styles */
         @media print {
             body { background: white !important; color: black !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; overflow: visible !important; }
             .no-print { display: none !important; }
@@ -114,83 +114,66 @@
     <!-- React App -->
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
-        const apiKey = ""; // Canvas fallback
+        const apiKey = ""; // Puste, ponieważ uderzamy do Vercel API
 
         // --- KONFIGURACJA MODUŁÓW ---
         const MODULES = [
-            { id: 'plan', icon: 'ph-calendar-check', title: 'Plan Półkolonii', desc: '5-dniowy harmonogram na temat', color: 'from-amber-500 to-orange-500' },
-            { id: 'sos', icon: 'ph-cloud-rain', title: 'Przycisk S.O.S', desc: 'Gry ratunkowe w 10 sekund', color: 'from-cyan-500 to-blue-500' },
-            { id: 'teren', icon: 'ph-compass', title: 'Gra Terenowa', desc: 'Zagadki i podchody w plenerze', color: 'from-emerald-500 to-teal-500' },
-            { id: 'druzyny', icon: 'ph-users-three', title: 'Baza Drużyn', desc: 'Okrzyki i nazwy dla grup', color: 'from-purple-500 to-pink-500' }
+            { id: 'plan', icon: 'ph-calendar-check', title: 'Plan Półkolonii', desc: '5-dniowy harmonogram', color: 'from-amber-500 to-orange-500' },
+            { id: 'sos', icon: 'ph-cloud-rain', title: 'Przycisk S.O.S', desc: 'Gry ratunkowe', color: 'from-cyan-500 to-blue-500' },
+            { id: 'teren', icon: 'ph-compass', title: 'Gra Terenowa', desc: 'Zagadki w plenerze', color: 'from-emerald-500 to-teal-500' },
+            { id: 'druzyny', icon: 'ph-users-three', title: 'Baza Drużyn', desc: 'Okrzyki dla grup', color: 'from-purple-500 to-pink-500' }
         ];
 
-        // Pancerny Parser JSON
+        // Pancerny Parser JSON - Odporny na śmieci przed/po JSONie
         const parseAIResponse = (aiOutput) => {
-            if (aiOutput && typeof aiOutput === 'object') return aiOutput;
+            if (aiOutput && typeof aiOutput === 'object') {
+                if (aiOutput.items || Array.isArray(aiOutput)) return aiOutput;
+                if (aiOutput.text) aiOutput = aiOutput.text;
+                else if (aiOutput.content) aiOutput = aiOutput.content;
+            }
 
             let text = String(aiOutput || "").trim();
+            // Czystka z markdowna
             text = text.replace(/```json/gi, '').replace(/```/g, '').trim();
 
             try {
                 const startObj = text.indexOf('{');
                 const endObj = text.lastIndexOf('}');
+                
+                if (startObj !== -1 && endObj !== -1) {
+                    let jsonStr = text.substring(startObj, endObj + 1);
+                    // Usuwamy niekontrolowane znaki nowej linii psujące JSON
+                    jsonStr = jsonStr.replace(/[\n\r]+/g, ' ').replace(/\t/g, ' ');
+                    return JSON.parse(jsonStr);
+                }
+
                 const startArr = text.indexOf('[');
                 const endArr = text.lastIndexOf(']');
-
-                if (startObj !== -1 && endObj !== -1 && (startArr === -1 || startObj < startArr)) {
-                    let jsonStr = text.substring(startObj, endObj + 1).replace(/[\n\r\t]+/g, ' ');
-                    return JSON.parse(jsonStr);
-                } else if (startArr !== -1 && endArr !== -1) {
-                    let jsonStr = text.substring(startArr, endArr + 1).replace(/[\n\r\t]+/g, ' ');
+                if (startArr !== -1 && endArr !== -1) {
+                    let jsonStr = text.substring(startArr, endArr + 1).replace(/[\n\r]+/g, ' ').replace(/\t/g, ' ');
                     return { items: JSON.parse(jsonStr) };
                 }
 
-                throw new Error("Brak struktury JSON.");
+                throw new Error("Nie znaleziono nawiasów JSON.");
             } catch (e) {
                 console.error("Błąd parsowania:", text, e);
-                throw new Error("AI nie zastosowało się do formatu. Spróbuj jeszcze raz.");
+                throw new Error("AI nie zastosowało się do szablonu. Kliknij przycisk jeszcze raz!");
             }
         };
 
-        // Fetcher AI z Natywną Integracją OpenAI
-        const fetchTextAI = async (prompt, systemInstruction, openAiKey) => {
-            const finalPrompt = `WYMÓG ABSOLUTNY: Zwróć WYŁĄCZNIE czysty kod JSON w formacie obiektu zawierającego klucz "items" jako tablicę.\n\nINSTRUKCJA:\n${systemInstruction}\n\nZAPYTANIE:\n${prompt}`;
-            
-            // JEŚLI JEST KLUCZ OPENAI - KORZYSTAMY Z POTĘŻNEGO GPT-4o (Z trybem JSON Mode)
-            if (openAiKey) {
-                try {
-                    const res = await fetch('https://api.openai.com/v1/chat/completions', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${openAiKey}`
-                        },
-                        body: JSON.stringify({
-                            model: "gpt-4o", // Najwyższa jakość, bezbłędna struktura
-                            messages: [
-                                { role: "system", content: systemInstruction + "\n\nOczekiwany wynik to zawsze jeden obiekt JSON z kluczem 'items', który zawiera tablicę wyników." },
-                                { role: "user", content: finalPrompt }
-                            ],
-                            response_format: { type: "json_object" }, // Wymuszamy na poziomie API bezwzględny JSON
-                            temperature: 0.7
-                        })
-                    });
-                    
-                    if (!res.ok) {
-                        const err = await res.json();
-                        throw new Error(err.error?.message || `HTTP ${res.status}`);
-                    }
-                    
-                    const data = await res.json();
-                    return data.choices[0].message.content; // Zwraca perfekcyjny JSON
-                } catch (error) {
-                    console.error("Błąd OpenAI:", error);
-                    throw new Error("Błąd autoryzacji OpenAI. Sprawdź klucz: " + error.message);
-                }
-            }
+        // Twój bezpieczny Fetcher (Zwraca się do /api/gemini z potężnym promptem)
+        const fetchTextAI = async (prompt, systemInstruction) => {
+            const finalPrompt = `INSTRUKCJA DLA AI:
+Musisz zwrócić odpowiedź WYŁĄCZNIE W FORMACIE JSON.
+Nie używaj znaczników markdown. Zwróć sam czysty kod JSON rozpoczynający się od klamry {.
 
-            // FALLBACK DO VERCEL / GEMINI (Jeśli nie wpisano klucza)
+${systemInstruction}
+
+ZADANIE DO WYKONANIA:
+${prompt}`;
+
             try {
+                // Bezpośrednie wywołanie Twojego API na Vercelu (Zaszyte klucze)
                 const res = await fetch('/api/gemini', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -200,29 +183,26 @@
                 if (res.ok) {
                     const data = await res.json();
                     return data.text || data.response || data.message || data.content || data;
+                } else {
+                    throw new Error(`Błąd serwera Vercel HTTP ${res.status}`);
                 }
             } catch(e) { 
-                console.warn("Vercel API niedostępne, używam Fallback Canvas..."); 
-            }
-
-            // Canvas Fallback
-            const delays = [1000, 2000];
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
-            const payload = {
-                contents: [{ parts: [{ text: finalPrompt }] }],
-                generationConfig: { responseMimeType: "application/json" }
-            };
-
-            for (let i = 0; i < delays.length; i++) {
-                try {
-                    const response = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                console.warn("Vercel API zawiodło:", e);
+                
+                // FALLBACK NA CANVAS (Awaryjnie dla przeglądarki)
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+                if (apiKey) {
+                    const response = await fetch(url, { 
+                        method: "POST", headers: { "Content-Type": "application/json" }, 
+                        body: JSON.stringify({
+                            contents: [{ parts: [{ text: finalPrompt }] }],
+                            generationConfig: { responseMimeType: "application/json" }
+                        })
+                    });
                     const data = await response.json();
                     return data.candidates[0].content.parts[0].text;
-                } catch (error) {
-                    if (i === delays.length - 1) throw error;
-                    await new Promise(r => setTimeout(r, delays[i]));
                 }
+                throw e;
             }
         };
 
@@ -234,7 +214,6 @@
             const [isPremium, setIsPremium] = useState(false);
             const [premiumCode, setPremiumCode] = useState('');
             const [aiGenerations, setAiGenerations] = useState(0);
-            const [openAiKey, setOpenAiKey] = useState(''); // Nowy Stan klucza OpenAI
             const [message, setMessage] = useState(null);
             const [isGenerating, setIsGenerating] = useState(false);
             const [resultData, setResultData] = useState(null);
@@ -258,10 +237,6 @@
                 
                 const savedPremium = localStorage.getItem('edubox_premium');
                 if (savedPremium === 'KAWA2024') setIsPremium(true);
-                
-                // Załadowanie zapisanego klucza OpenAI
-                const savedOAI = localStorage.getItem('edubox_openai_key');
-                if (savedOAI) setOpenAiKey(savedOAI);
             }, []);
 
             const showMessage = (text, type = 'success') => {
@@ -277,9 +252,8 @@
             };
 
             const generateContent = async () => {
-                // Jeśli nie wpisano klucza OpenAI i wyczerpano limity - blokujemy
-                if (!openAiKey && !isPremium && aiGenerations >= 3) {
-                    showMessage('Limit darmowych generacji wyczerpany. Wpisz kod KAWA2024 lub wklej własny klucz OpenAI poniżej.', 'error');
+                if (!isPremium && aiGenerations >= 3) {
+                    showMessage('Limit darmowych generacji wyczerpany. Wpisz kod KAWA2024.', 'error');
                     return;
                 }
                 
@@ -289,70 +263,73 @@
                 let prompt = "";
                 let sysPrompt = "";
 
+                // ŻELAZNE SZABLONY: AI dostaje gotową strukturę z wpisanymi kluczami, musi tylko zmienić "Opis..." na właściwy tekst!
                 if (activeModule === 'plan') {
-                    sysPrompt = `Jesteś doświadczonym pedagogiem. Stwórz 5-dniowy plan tematycznych półkolonii w formacie JSON.
-WYMÓG ABSOLUTNY: Tablica "items" MUSI zawierać DOKŁADNIE 5 elementów (dni). Użyj WYŁĄCZNIE kluczy: title, subtitle, text1, text2.
-Wzór struktury:
+                    sysPrompt = `Jesteś doskonałym pedagogiem. Stwórz 5-dniowy plan tematycznych półkolonii.
+WYMÓG: Musisz zwrócić DOKŁADNIE TEN PONIŻSZY SZABLON JSON, wstawiając w miejsce opisów właściwe teksty.
+NIE ZMIENIAJ KLUCZY (title, subtitle, text1, text2).
+
 {
   "items": [
-    { "title": "Poniedziałek", "subtitle": "Tytuł dnia", "text1": "Zajęcia poranne...", "text2": "Zajęcia popołudniowe..." },
-    { "title": "Wtorek", "subtitle": "Tytuł dnia", "text1": "Zajęcia poranne...", "text2": "Zajęcia popołudniowe..." },
-    { "title": "Środa", "subtitle": "Tytuł dnia", "text1": "Zajęcia poranne...", "text2": "Zajęcia popołudniowe..." },
-    { "title": "Czwartek", "subtitle": "Tytuł dnia", "text1": "Zajęcia poranne...", "text2": "Zajęcia popołudniowe..." },
-    { "title": "Piątek", "subtitle": "Tytuł dnia", "text1": "Zajęcia poranne...", "text2": "Zajęcia popołudniowe..." }
+    { "title": "Poniedziałek", "subtitle": "Tytuł dnia", "text1": "Opisz szczegółowo zajęcia poranne...", "text2": "Opisz szczegółowo zajęcia popołudniowe..." },
+    { "title": "Wtorek", "subtitle": "Tytuł dnia", "text1": "Opisz szczegółowo zajęcia poranne...", "text2": "Opisz szczegółowo zajęcia popołudniowe..." },
+    { "title": "Środa", "subtitle": "Tytuł dnia", "text1": "Opisz szczegółowo zajęcia poranne...", "text2": "Opisz szczegółowo zajęcia popołudniowe..." },
+    { "title": "Czwartek", "subtitle": "Tytuł dnia", "text1": "Opisz szczegółowo zajęcia poranne...", "text2": "Opisz szczegółowo zajęcia popołudniowe..." },
+    { "title": "Piątek", "subtitle": "Tytuł dnia", "text1": "Opisz szczegółowo zajęcia poranne...", "text2": "Opisz szczegółowo zajęcia popołudniowe..." }
   ]
 }`;
                     prompt = `Temat: ${theme}. Wiek dzieci: ${age}. Specyficzne potrzeby: ${specialNeeds}.`;
                 } else if (activeModule === 'sos') {
-                    sysPrompt = `Jesteś animatorem zabaw. Wymyśl błyskawiczne, genialne gry ratunkowe w formacie JSON.
-WYMÓG ABSOLUTNY: Tablica "items" MUSI zawierać DOKŁADNIE 3 elementy (gry). Użyj WYŁĄCZNIE kluczy: title, subtitle, text1, text2.
-Wzór struktury:
+                    sysPrompt = `Jesteś animatorem zabaw. Wymyśl błyskawiczne, genialne gry ratunkowe.
+WYMÓG: Musisz zwrócić DOKŁADNIE TEN PONIŻSZY SZABLON JSON, wstawiając w miejsce opisów właściwe teksty.
+NIE ZMIENIAJ KLUCZY (title, subtitle, text1, text2).
+
 {
   "items": [
-    { "title": "Nazwa pierwszej gry", "subtitle": "Czas: np. 15 min", "text1": "Zasady...", "text2": "" },
-    { "title": "Nazwa drugiej gry", "subtitle": "Czas: np. 20 min", "text1": "Zasady...", "text2": "" },
-    { "title": "Nazwa trzeciej gry", "subtitle": "Czas: np. 10 min", "text1": "Zasady...", "text2": "" }
+    { "title": "Nazwa pierwszej gry", "subtitle": "Czas np. 15 min", "text1": "Opisz zasady gry w 3 zdaniach...", "text2": "" },
+    { "title": "Nazwa drugiej gry", "subtitle": "Czas np. 20 min", "text1": "Opisz zasady gry w 3 zdaniach...", "text2": "" },
+    { "title": "Nazwa trzeciej gry", "subtitle": "Czas np. 10 min", "text1": "Opisz zasady gry w 3 zdaniach...", "text2": "" }
   ]
 }`;
                     prompt = `Gdzie utknęliśmy: ${location}. Dostępne rekwizyty: ${props}. Wiek: ${age}. SPE: ${specialNeeds}.`;
                 } else if (activeModule === 'teren') {
-                    sysPrompt = `Jesteś mistrzem gier terenowych. Ułóż rymowane zagadki w formacie JSON.
-WYMÓG ABSOLUTNY: Tablica "items" MUSI zawierać DOKŁADNIE 5 elementów (kroków). Użyj WYŁĄCZNIE kluczy: title, subtitle, text1, text2.
-Wzór struktury:
+                    sysPrompt = `Jesteś mistrzem gier terenowych. Ułóż rymowane zagadki.
+WYMÓG: Musisz zwrócić DOKŁADNIE TEN PONIŻSZY SZABLON JSON, wstawiając w miejsce opisów właściwe teksty.
+NIE ZMIENIAJ KLUCZY (title, subtitle, text1, text2).
+
 {
   "items": [
     { "title": "Krok 1", "subtitle": "Kryjówka np. pod ławką", "text1": "Rymowanka-zagadka (4 linijki)...", "text2": "" },
-    { "title": "Krok 2", "subtitle": "Kryjówka", "text1": "Rymowanka-zagadka...", "text2": "" },
-    { "title": "Krok 3", "subtitle": "Kryjówka", "text1": "Rymowanka-zagadka...", "text2": "" },
-    { "title": "Krok 4", "subtitle": "Kryjówka", "text1": "Rymowanka-zagadka...", "text2": "" },
-    { "title": "Krok 5", "subtitle": "MIEJSCE SKARBU", "text1": "Ostatnia zagadka...", "text2": "" }
+    { "title": "Krok 2", "subtitle": "Kryjówka (gdzie to schować)", "text1": "Rymowanka-zagadka...", "text2": "" },
+    { "title": "Krok 3", "subtitle": "Kryjówka (gdzie to schować)", "text1": "Rymowanka-zagadka...", "text2": "" },
+    { "title": "Krok 4", "subtitle": "Kryjówka (gdzie to schować)", "text1": "Rymowanka-zagadka...", "text2": "" },
+    { "title": "Krok 5", "subtitle": "MIEJSCE SKARBU", "text1": "Ostatnia rymowanka...", "text2": "" }
   ]
 }`;
                     prompt = `Teren gry: ${theme}. Wiek: ${age}. SPE: ${specialNeeds}.`;
                 } else if (activeModule === 'druzyny') {
-                    sysPrompt = `Jesteś kierownikiem kolonii. Wymyśl nazwy i okrzyki drużyn w formacie JSON.
-WYMÓG ABSOLUTNY: Tablica "items" MUSI zawierać DOKŁADNIE 4 elementy (drużyny). Użyj WYŁĄCZNIE kluczy: title, subtitle, text1, text2.
-Wzór struktury:
+                    sysPrompt = `Jesteś kierownikiem kolonii. Wymyśl nazwy i okrzyki drużyn.
+WYMÓG: Musisz zwrócić DOKŁADNIE TEN PONIŻSZY SZABLON JSON, wstawiając w miejsce opisów właściwe teksty.
+NIE ZMIENIAJ KLUCZY (title, subtitle, text1, text2).
+
 {
   "items": [
-    { "title": "Nazwa pierwszej drużyny", "subtitle": "", "text1": "Okrzyk...", "text2": "" },
-    { "title": "Nazwa drugiej drużyny", "subtitle": "", "text1": "Okrzyk...", "text2": "" },
-    { "title": "Nazwa trzeciej drużyny", "subtitle": "", "text1": "Okrzyk...", "text2": "" },
-    { "title": "Nazwa czwartej drużyny", "subtitle": "", "text1": "Okrzyk...", "text2": "" }
+    { "title": "Nazwa 1 drużyny", "subtitle": "", "text1": "Rymowany okrzyk drużyny...", "text2": "" },
+    { "title": "Nazwa 2 drużyny", "subtitle": "", "text1": "Rymowany okrzyk drużyny...", "text2": "" },
+    { "title": "Nazwa 3 drużyny", "subtitle": "", "text1": "Rymowany okrzyk drużyny...", "text2": "" },
+    { "title": "Nazwa 4 drużyny", "subtitle": "", "text1": "Rymowany okrzyk drużyny...", "text2": "" }
   ]
 }`;
                     prompt = `Tematyka kolonii/obozu: ${theme}. Wiek: ${age}. SPE: ${specialNeeds}.`;
                 }
 
                 try {
-                    // Przekazujemy klucz OpenAI do super-fetchera
-                    const aiText = await fetchTextAI(prompt, sysPrompt, openAiKey);
+                    const aiText = await fetchTextAI(prompt, sysPrompt);
                     const parsedJson = parseAIResponse(aiText);
                     
                     setResultData({ type: activeModule, data: parsedJson, params: { theme, age, location, props, specialNeeds } });
                     
-                    // Zliczamy tylko jeśli nie korzystamy z własnego klucza i nie mamy PRO
-                    if (!openAiKey && !isPremium) {
+                    if (!isPremium) {
                         const newCount = aiGenerations + 1;
                         setAiGenerations(newCount);
                         localStorage.setItem('edubox_eduwakacje_ai', newCount.toString());
@@ -747,9 +724,8 @@ Wzór struktury:
 
                         </div>
 
-                        {/* Premium Footer & Własne API */}
+                        {/* Premium Footer */}
                         <div className="p-4 border-t border-slate-800 bg-slate-950/50">
-                            {/* Kod PRO */}
                             {!isPremium ? (
                                 <div className="space-y-2 mb-4">
                                     <div className="flex justify-between items-center">
@@ -774,21 +750,6 @@ Wzór struktury:
                                     </div>
                                 </div>
                             )}
-
-                            {/* Własny Klucz OpenAI (Gwarancja perfekcji JSON) */}
-                            <div className="pt-3 border-t border-slate-800">
-                                <label className="text-[10px] font-bold text-emerald-400 flex items-center gap-1 uppercase tracking-wider mb-2">
-                                    <i className="ph-bold ph-key"></i> Integracja OpenAI (GPT-4o)
-                                </label>
-                                <input 
-                                    type="password" 
-                                    value={openAiKey} 
-                                    onChange={(e) => { setOpenAiKey(e.target.value); localStorage.setItem('edubox_openai_key', e.target.value); }}
-                                    placeholder="Wklej tu klucz sk-..." 
-                                    className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white focus:border-emerald-500 transition-colors"
-                                />
-                                <p className="text-[9px] text-slate-500 mt-1 leading-tight">Użyj klucza, by wymusić bezbłędny model GPT-4o ("JSON Mode"). Klucz zapisuje się tylko w przeglądarce.</p>
-                            </div>
                         </div>
                     </aside>
 
