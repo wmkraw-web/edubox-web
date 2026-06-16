@@ -152,6 +152,7 @@ ${prompt}`;
             const [message, setMessage] = useState(null);
             const [isGenerating, setIsGenerating] = useState(false);
             const [resultData, setResultData] = useState(null);
+            const [isCoreReady, setIsCoreReady] = useState(false);
 
             // Form States
             const [subject, setSubject] = useState('Edukacja wczesnoszkolna');
@@ -168,6 +169,7 @@ ${prompt}`;
                 // Bezpieczne wczytywanie bazy danych z Twojego pliku global-core.js
                 const initCore = () => {
                     if (window.EduBoxCore) {
+                        setIsCoreReady(true);
                         if (window.EduBoxCore.user) setUser(window.EduBoxCore.user);
                         window.EduBoxCore.onUserChange((u) => setUser(u));
                     } else {
@@ -252,16 +254,16 @@ WYMÓG ABSOLUTNY: Zwróć obszerny, pełen detali i przezabawny tekst w formacie
                 
                 setIsPublishing(true);
                 try {
-                    // Czystka z wartości undefined
+                    // Czystka z wartości undefined przed zapisem
                     const cleanData = JSON.parse(JSON.stringify(resultData));
                     
-                    if (window.EduBoxCore && typeof window.EduBoxCore.publishToMarket === 'function') {
+                    if (isCoreReady && typeof window.EduBoxCore.publishToMarket === 'function') {
                         await window.EduBoxCore.publishToMarket(cleanData);
                         showMessage('Opublikowano na Giełdzie Humorów!', 'success');
                         setAppMode('gielda');
                         loadMarket();
                     } else {
-                        throw new Error("Moduł bazy danych nie jest podłączony.");
+                        throw new Error("Moduł bazy danych nie jest podłączony lub gotowy.");
                     }
                 } catch (error) {
                     console.error("Szczegóły błędu publikacji:", error);
@@ -274,7 +276,7 @@ WYMÓG ABSOLUTNY: Zwróć obszerny, pełen detali i przezabawny tekst w formacie
             const loadMarket = async () => {
                 setIsFetchingMarket(true);
                 try {
-                    if (window.EduBoxCore && typeof window.EduBoxCore.fetchMarket === 'function') {
+                    if (isCoreReady && typeof window.EduBoxCore.fetchMarket === 'function') {
                         const items = await window.EduBoxCore.fetchMarket();
                         setMarketItems(items);
                     }
@@ -285,7 +287,7 @@ WYMÓG ABSOLUTNY: Zwróć obszerny, pełen detali i przezabawny tekst w formacie
                 }
             };
 
-            useEffect(() => { if (appMode === 'gielda') loadMarket(); }, [appMode]);
+            useEffect(() => { if (appMode === 'gielda' && isCoreReady) loadMarket(); }, [appMode, isCoreReady]);
 
             // --- KOMPONENT RENDERUJĄCY WYNIKI ---
             const renderResult = () => {
