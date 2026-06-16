@@ -344,16 +344,22 @@ WYMÓG ABSOLUTNY: Zwróć obszerny, pełen detali i przezabawny tekst w formacie
             };
 
             const publishToMarket = async () => {
-                if (!resultData) { showMessage('Wygeneruj najpierw plan detoksu.', 'error'); return; }
-                
+                if (!resultData || !user) { showMessage('Zaloguj się i poczekaj na połączenie z bazą.', 'error'); return; }
                 setIsPublishing(true);
                 try {
-                    await window.EduBoxCore.publishToMarket(resultData);
-                    showMessage('Opublikowano na Giełdzie Humorów!', 'success');
-                    setAppMode('gielda');
-                    loadMarket();
+                    // Czystka z wartości 'undefined', które krytycznie wysadzają bazę Firebase
+                    const cleanData = JSON.parse(JSON.stringify(resultData));
+                    
+                    if (window.EduBoxCore && typeof window.EduBoxCore.publishToMarket === 'function') {
+                        await window.EduBoxCore.publishToMarket(cleanData);
+                        showMessage('Opublikowano na Giełdzie Humorów!', 'success');
+                        setAppMode('gielda');
+                        loadMarket();
+                    } else {
+                        throw new Error("Brak dostępu do pliku global-core.js");
+                    }
                 } catch (error) {
-                    console.error("Błąd publikacji:", error);
+                    console.error("Szczegóły błędu publikacji:", error);
                     showMessage('Błąd publikacji: ' + error.message, 'error');
                 } finally {
                     setIsPublishing(false);
