@@ -207,7 +207,11 @@ ${prompt}`;
             const [isPublishing, setIsPublishing] = useState(false);
 
             useEffect(() => {
-                if (window.EduBoxCore) window.EduBoxCore.onUserChange((u) => setUser(u));
+                if (window.EduBoxCore) {
+                    // NAPRAWA GIEŁDY: Natychmiastowe przypisanie usera, jeśli Firebase załadował się szybciej niż React
+                    if (window.EduBoxCore.user) setUser(window.EduBoxCore.user);
+                    window.EduBoxCore.onUserChange((u) => setUser(u));
+                }
                 const savedGens = localStorage.getItem('edubox_edudetox_ai');
                 if (savedGens) setAiGenerations(parseInt(savedGens));
                 
@@ -242,23 +246,24 @@ ${prompt}`;
                 setIsGenerating(true);
                 setResultData(null);
 
-                const sysPrompt = `Jesteś humorystycznym ekspertem od work-life balance dla zmęczonych nauczycieli. Twoim celem jest przygotowanie "Recepty na Detoks" po ciężkim roku szkolnym.
-WYMÓG: Zwróć DOKŁADNIE TEN SZABLON JSON (nie zmieniaj kluczy!):
+                // NAPRAWA OPISÓW: Agresywny prompt wymuszający długie, satyryczne i kreatywne teksty
+                const sysPrompt = `Jesteś wybitnym, sarkastycznym ekspertem od work-life balance dla skrajnie wyczerpanych nauczycieli. Twoim zadaniem jest stworzenie "Recepty na Detoks" po morderczym roku szkolnym.
+WYMÓG ABSOLUTNY: Zwróć obszerny, pełen detali i przezabawny tekst w formacie JSON (nie zmieniaj kluczy!). Używaj wyszukanego słownictwa, odniesień do szkolnej rzeczywistości (dziennik, wywiadówki, hałas) i czarnego humoru.
 
 {
   "autoresponder": {
-    "subject": "Zabawny temat maila (np. Wyjechałam w Bieszczady)",
-    "body": "Humorystyczna treść autorespondera na maile i Librusa informująca rodziców, że nauczyciel ma wakacje i nie odpisuje..."
+    "subject": "Zabawny, chwytliwy temat maila (np. Opuściłam galaktykę edukacji)",
+    "body": "BARDZO DŁUGA (min. 5 zdań), przezabawna i lekko sarkastyczna treść autorespondera na Librusa informująca rodziców i dyrekcję, że nauczyciel jest w trybie offline i ignoruje szkolne dramaty."
   },
   "recommendations": [
-    { "type": "Książka", "title": "Tytuł książki (nie o szkole!)", "reason": "Zabawny powód..." },
-    { "type": "Film/Serial", "title": "Tytuł filmu", "reason": "Zabawny powód..." },
-    { "type": "Aktywność", "title": "Nazwa aktywności", "reason": "Zabawny powód..." }
+    { "type": "Książka", "title": "Zabawny tytuł (nie o szkole!)", "reason": "Szczegółowy, przezabawny powód (min. 3 zdania), dla którego to dzieło uleczy zszargane nerwy." },
+    { "type": "Film/Serial", "title": "Zabawny tytuł", "reason": "Szczegółowy, przezabawny powód (min. 3 zdania)..." },
+    { "type": "Aktywność", "title": "Abstrakcyjna aktywność relaksacyjna", "reason": "Szczegółowy, przezabawny powód (min. 3 zdania)..." }
   ],
-  "quote": "Zabawny, krótki cytat-certyfikat za przetrwanie roku szkolnego (do udostępnienia na FB)"
+  "quote": "Błyskotliwy, sarkastyczny cytat-certyfikat za przetrwanie roku (do udostępnienia na FB, min. 2 zdania)"
 }`;
 
-                const prompt = `Moje dane:\nPrzedmiot: ${subject}\nStaż pracy: ${years}\nPoziom stresu po czerwcu: ${stress}\nUlubione rzeczy (aby dopasować odtrutkę): ${hobbies}. \nDziałaj! Ratuj moje nerwy!`;
+                const prompt = `Moje dane:\nPrzedmiot: ${subject}\nStaż pracy: ${years}\nPoziom stresu po czerwcu: ${stress}\nUlubione rzeczy (aby dopasować odtrutkę): ${hobbies}. \nDziałaj! Stwórz epicki, wyczerpujący i mega zabawny plan detoksu!`;
 
                 try {
                     const aiText = await fetchTextAI(prompt, sysPrompt);
@@ -280,7 +285,9 @@ WYMÓG: Zwróć DOKŁADNIE TEN SZABLON JSON (nie zmieniaj kluczy!):
             };
 
             const publishToMarket = async () => {
-                if (!resultData || !user) { showMessage('Zaloguj się i wygeneruj plan.', 'error'); return; }
+                if (!resultData) { showMessage('Wygeneruj najpierw plan detoksu.', 'error'); return; }
+                if (!user && !window.EduBoxCore?.user) { showMessage('Brak autoryzacji z serwerem. Odśwież stronę.', 'error'); return; }
+                
                 setIsPublishing(true);
                 try {
                     await window.EduBoxCore.publishToMarket(resultData);
@@ -288,7 +295,8 @@ WYMÓG: Zwróć DOKŁADNIE TEN SZABLON JSON (nie zmieniaj kluczy!):
                     setAppMode('gielda');
                     loadMarket();
                 } catch (error) {
-                    showMessage('Błąd publikacji.', 'error');
+                    console.error("Błąd publikacji:", error);
+                    showMessage('Błąd publikacji: ' + error.message, 'error');
                 } finally {
                     setIsPublishing(false);
                 }
