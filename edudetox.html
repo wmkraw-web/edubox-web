@@ -3,564 +3,255 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EduBox V3 PRO MAX - EduDetox AI</title>
-
-    <!-- React & Babel -->
-    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-
-    <!-- Tailwind CSS -->
+    <title>EduDetox AI - EduBox PRO</title>
+    
     <script src="https://cdn.tailwindcss.com"></script>
-
-    <!-- Phosphor Icons -->
+    
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
 
-    <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Caveat:wght@600;700&display=swap" rel="stylesheet">
-
-    <style>
-        body { font-family: 'Inter', sans-serif; background-color: #020617; color: #f8fafc; overflow: hidden; }
-        .font-hand { font-family: 'Caveat', cursive; }
-        
-        /* Custom Scrollbar */
-        .custom-scrollbar::-webkit-scrollbar { width: 8px; height: 8px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #475569; }
-
-        /* Auras - Spa / Relax V3 PRO MAX */
-        .aura-container {
-            position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 0;
-        }
-        .aura-blob {
-            position: absolute; filter: blur(120px); border-radius: 50%; opacity: 0.35; animation: float 20s ease-in-out infinite alternate;
-        }
-        /* Morski / Mięta */
-        .aura-1 { top: -10%; left: -10%; width: 50vw; height: 50vw; background: radial-gradient(circle, rgba(45, 212, 191, 0.4) 0%, rgba(0,0,0,0) 70%); animation-delay: 0s; }
-        /* Lawenda / Fiolet */
-        .aura-2 { bottom: -10%; right: -10%; width: 60vw; height: 60vw; background: radial-gradient(circle, rgba(168, 85, 247, 0.3) 0%, rgba(0,0,0,0) 70%); animation-delay: -5s; }
-        /* Głęboki błękit */
-        .aura-3 { top: 40%; left: 20%; width: 40vw; height: 40vw; background: radial-gradient(circle, rgba(59, 130, 246, 0.3) 0%, rgba(0,0,0,0) 70%); animation-delay: -10s; }
-
-        @keyframes float {
-            0% { transform: translate(0, 0) scale(1); }
-            100% { transform: translate(30px, -50px) scale(1.05); }
-        }
-
-        @media print {
-            body { background: white !important; color: black !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; overflow: visible !important; }
-            .no-print { display: none !important; }
-            .print-container { background: white !important; color: black !important; padding: 0 !important; width: 100% !important; overflow: visible !important; }
-            .print-card { break-inside: avoid; border: 2px solid #e2e8f0 !important; box-shadow: none !important; color: black !important; background: white !important; margin-bottom: 20px; }
-            .print-text { color: black !important; }
-            #root, main { height: auto !important; overflow: visible !important; }
-        }
-    </style>
-</head>
-<body>
-    
-    <!-- PRAWDZIWA BAZA DANYCH (Korzysta z Twojego global-core.js) -->
-    <script>window.__app_id = 'edubox-edudetox-v3';</script>
     <script src="global-core.js"></script>
+</head>
+<body class="bg-gray-50 text-gray-900 min-h-screen">
+    <div id="root"></div>
 
-    <div id="root" class="h-screen flex flex-col"></div>
-
-    <!-- React App -->
     <script type="text/babel">
-        const { useState, useEffect, useRef } = React;
+        const { useState } = React;
 
-        // Pancerny Parser JSON 
-        const parseAIResponse = (aiOutput) => {
-            if (aiOutput && typeof aiOutput === 'object') {
-                if (aiOutput.autoresponder) return aiOutput; 
-                if (aiOutput.text) aiOutput = aiOutput.text;
-                else if (aiOutput.content) aiOutput = aiOutput.content;
-                else if (aiOutput.response) aiOutput = aiOutput.response;
-            }
-
-            let text = String(aiOutput || "").trim();
-            text = text.replace(/```json/gi, '').replace(/```/g, '').trim();
-
-            try {
-                const startObj = text.indexOf('{');
-                const endObj = text.lastIndexOf('}');
-                
-                if (startObj !== -1 && endObj !== -1 && startObj < endObj) {
-                    let jsonStr = text.substring(startObj, endObj + 1);
-                    jsonStr = jsonStr.replace(/,\s*([\]}])/g, '$1');
-                    try {
-                        return JSON.parse(jsonStr);
-                    } catch (e1) {
-                        jsonStr = jsonStr.replace(/[\n\r\t]+/g, ' ');
-                        return JSON.parse(jsonStr);
-                    }
-                }
-                throw new Error("Brak nawiasów JSON w odpowiedzi.");
-            } catch (e) {
-                console.error("Błąd parsowania:", text, e);
-                const preview = text.length > 100 ? text.substring(0, 100) + "..." : text;
-                throw new Error("AI nie zastosowało formatu. Odpowiedź: " + preview);
-            }
-        };
-
-        // Fetcher OpenAI - Oparty na Twoim bezbłędnym /api/chat.js (Uniwersalny payload)
-        const fetchTextAI = async (prompt, systemInstruction) => {
-            const finalPrompt = `WYMÓG ABSOLUTNY: Zwróć DOKŁADNIE i WYŁĄCZNIE czysty kod JSON.
-Nie używaj znaczników markdown (bez \`\`\`json). Używaj wyłącznie apostrofów ('), unikaj cudzysłowów (") wewnątrz tekstów.
-
-${systemInstruction}
-
-ZADANIE DO WYKONANIA:
-${prompt}`;
-
-            try {
-                const res = await fetch('/api/chat', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        prompt: finalPrompt,
-                        message: finalPrompt,
-                        text: finalPrompt,
-                        content: finalPrompt,
-                        messages: [{ role: "user", content: finalPrompt }],
-                        system: systemInstruction,
-                        format: "json" // Flaga do Twojego chat.js włączająca response_format="json_object"
-                    })
-                });
-                
-                if (res.ok) {
-                    const data = await res.json();
-                    return data.text || data.response || data.message || data.content || data;
-                } else {
-                    const errData = await res.text();
-                    throw new Error(`Błąd Vercel HTTP ${res.status}: ${errData}`);
-                }
-            } catch(e) { 
-                console.error("Vercel API (/api/chat) zawiodło:", e);
-                throw new Error("Brak połączenia z serwerem API. Szczegóły: " + e.message);
-            }
-        };
-
-        // --- GŁÓWNA APLIKACJA ---
-        function App() {
-            const [user, setUser] = useState(null);
-            const [appMode, setAppMode] = useState('kreator'); 
-            const [isPremium, setIsPremium] = useState(false);
-            const [premiumCode, setPremiumCode] = useState('');
-            const [aiGenerations, setAiGenerations] = useState(0);
-            const [message, setMessage] = useState(null);
-            const [isGenerating, setIsGenerating] = useState(false);
+        const EduDetoxApp = () => {
+            const [input, setInput] = useState('');
+            const [loading, setLoading] = useState(false);
             const [resultData, setResultData] = useState(null);
-            const [isCoreReady, setIsCoreReady] = useState(false);
+            const [error, setError] = useState(null);
+            const [marketStatus, setMarketStatus] = useState({ message: '', type: '' });
 
-            // Form States
-            const [subject, setSubject] = useState('Edukacja wczesnoszkolna');
-            const [years, setYears] = useState('5 lat');
-            const [stress, setStress] = useState('Poziom 10/10 (Tryb Zombie)');
-            const [hobbies, setHobbies] = useState('Kawa, Netflix, Spanie');
+            const handleGenerate = async (e) => {
+                e.preventDefault();
+                if (!input.trim()) return;
 
-            // Market State
-            const [marketItems, setMarketItems] = useState([]);
-            const [isFetchingMarket, setIsFetchingMarket] = useState(false);
-            const [isPublishing, setIsPublishing] = useState(false);
+                setLoading(true);
+                setError(null);
+                setResultData(null);
+                setMarketStatus({ message: '', type: '' });
 
-            useEffect(() => {
-                // Bezpieczne wczytywanie bazy danych z Twojego pliku global-core.js
-                const initCore = () => {
-                    if (window.EduBoxCore) {
-                        setIsCoreReady(true);
-                        if (window.EduBoxCore.user) setUser(window.EduBoxCore.user);
-                        window.EduBoxCore.onUserChange((u) => setUser(u));
-                    } else {
-                        setTimeout(initCore, 500); // Czeka, aż global-core.js załaduje się w tle
+                try {
+                    const systemPrompt = `Jesteś asystentem wspierającym nauczycieli. Zwróć obiekt JSON z polami: 'email' (profesjonalna, spokojna odpowiedź na opisany problem/mail), 'prescription' (krótka, żartobliwa "recepta" na odstresowanie dla nauczyciela) oraz 'quote' (motywacyjny, krótki cytat na "Certyfikat Przetrwania" potwierdzający, że nauczyciel poradził sobie z trudną sytuacją).`;
+
+                    const response = await fetch('/api/chat', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            prompt: `Trudna sytuacja nauczyciela: ${input}`,
+                            system: systemPrompt,
+                            format: "json"
+                        })
+                    });
+
+                    if (!response.ok) throw new Error('Błąd połączenia z serwerem API Vercel.');
+
+                    const data = await response.json();
+                    
+                    // Normalizacja formatu odpowiedzi: wyłuskanie JSON-a niezależnie od tego, jak został owinięty przez backend
+                    let parsedContent = data;
+                    if (typeof data.content === 'string') {
+                        parsedContent = JSON.parse(data.content);
+                    } else if (typeof data === 'string') {
+                        parsedContent = JSON.parse(data);
                     }
-                };
-                initCore();
 
-                const savedGens = localStorage.getItem('edubox_edudetox_ai');
-                if (savedGens) setAiGenerations(parseInt(savedGens));
-                
-                const savedPremium = localStorage.getItem('edubox_premium');
-                if (savedPremium === 'KAWA2024') setIsPremium(true);
-            }, []);
-
-            const showMessage = (text, type = 'success') => {
-                setMessage({ text, type });
-                setTimeout(() => setMessage(null), 3000);
+                    // Zabezpieczenie przed obiektem zagnieżdżonym w "data"
+                    const finalResult = parsedContent.data ? parsedContent.data : parsedContent;
+                    
+                    setResultData(finalResult);
+                } catch (err) {
+                    console.error("Błąd podczas generowania:", err);
+                    setError('Nie udało się wygenerować rozwiązania. Sprawdź połączenie lub spróbuj ponownie.');
+                } finally {
+                    setLoading(false);
+                }
             };
 
-            const handlePremiumCheck = () => {
-                if (premiumCode.toUpperCase() === 'KAWA2024') {
-                    setIsPremium(true); localStorage.setItem('edubox_premium', 'KAWA2024'); setPremiumCode('');
-                    showMessage('Kod Premium zaakceptowany!', 'success');
-                } else { showMessage('Nieprawidłowy kod', 'error'); }
+            const handlePublish = async () => {
+                if (!resultData) return;
+                
+                // Upewniamy się, że obiekt window.EduBoxCore z global-core.js istnieje
+                if (!window.EduBoxCore || typeof window.EduBoxCore.publishToMarket !== 'function') {
+                    setMarketStatus({ message: 'Błąd: Moduł EduBoxCore nie został załadowany. Sprawdź plik global-core.js.', type: 'error' });
+                    return;
+                }
+
+                try {
+                    setMarketStatus({ message: 'Zapisywanie w chmurze...', type: 'info' });
+                    await window.EduBoxCore.publishToMarket({
+                        type: 'edudetox',
+                        content: resultData,
+                        timestamp: new Date().toISOString()
+                    });
+                    setMarketStatus({ message: 'Zapisano na Giełdzie pomyślnie!', type: 'success' });
+                } catch (err) {
+                    console.error('Błąd publikacji:', err);
+                    setMarketStatus({ message: 'Wystąpił błąd podczas komunikacji z Firebase.', type: 'error' });
+                }
             };
 
             const copyToClipboard = (text) => {
-                navigator.clipboard.writeText(text).then(() => {
-                    showMessage('Skopiowano do schowka!', 'success');
-                });
-            };
-
-            const generateContent = async () => {
-                if (!isPremium && aiGenerations >= 3) {
-                    showMessage('Limit darmowych generacji wyczerpany. Wpisz kod KAWA2024.', 'error');
-                    return;
-                }
-                
-                setIsGenerating(true);
-                setResultData(null);
-
-                const sysPrompt = `Jesteś wybitnym, sarkastycznym ekspertem od work-life balance dla skrajnie wyczerpanych nauczycieli. Twoim zadaniem jest stworzenie "Recepty na Detoks" po morderczym roku szkolnym.
-WYMÓG ABSOLUTNY: Zwróć obszerny, pełen detali i przezabawny tekst w formacie JSON (nie zmieniaj kluczy!). Używaj wyszukanego słownictwa, odniesień do szkolnej rzeczywistości (dziennik, wywiadówki, hałas) i czarnego humoru.
-
-{
-  "autoresponder": {
-    "subject": "Zabawny, chwytliwy temat maila (np. Opuściłam galaktykę edukacji)",
-    "body": "BARDZO DŁUGA (min. 5 zdań), przezabawna i lekko sarkastyczna treść autorespondera na Librusa informująca rodziców i dyrekcję, że nauczyciel jest w trybie offline i ignoruje szkolne dramaty."
-  },
-  "recommendations": [
-    { "type": "Książka", "title": "Zabawny tytuł (nie o szkole!)", "reason": "Szczegółowy, przezabawny powód (min. 3 zdania), dla którego to dzieło uleczy zszargane nerwy." },
-    { "type": "Film/Serial", "title": "Zabawny tytuł", "reason": "Szczegółowy, przezabawny powód (min. 3 zdania)..." },
-    { "type": "Aktywność", "title": "Abstrakcyjna aktywność relaksacyjna", "reason": "Szczegółowy, przezabawny powód (min. 3 zdania)..." }
-  ],
-  "quote": "Błyskotliwy, sarkastyczny cytat-certyfikat za przetrwanie roku (do udostępnienia na FB, min. 2 zdania)"
-}`;
-
-                const prompt = `Moje dane:\nPrzedmiot: ${subject}\nStaż pracy: ${years}\nPoziom stresu po czerwcu: ${stress}\nUlubione rzeczy (aby dopasować odtrutkę): ${hobbies}. \nDziałaj! Stwórz epicki, wyczerpujący i mega zabawny plan detoksu!`;
-
-                try {
-                    const aiText = await fetchTextAI(prompt, sysPrompt);
-                    const parsedJson = parseAIResponse(aiText);
-                    
-                    setResultData({ data: parsedJson, params: { subject, years, stress, hobbies } });
-                    
-                    if (!isPremium) {
-                        const newCount = aiGenerations + 1;
-                        setAiGenerations(newCount);
-                        localStorage.setItem('edubox_edudetox_ai', newCount.toString());
-                    }
-                    showMessage('Wygenerowano plan ratunkowy!', 'success');
-                } catch (error) {
-                    showMessage(error.message, 'error');
-                } finally {
-                    setIsGenerating(false);
+                if (text) {
+                    navigator.clipboard.writeText(text);
+                    alert('Cytat skopiowany do schowka!');
                 }
             };
 
-            const publishToMarket = async () => {
-                if (!resultData) { showMessage('Najpierw wygeneruj plan!', 'error'); return; }
-                
-                setIsPublishing(true);
-                try {
-                    // Czystka z wartości undefined przed zapisem
-                    const cleanData = JSON.parse(JSON.stringify(resultData));
-                    
-                    if (isCoreReady && typeof window.EduBoxCore.publishToMarket === 'function') {
-                        await window.EduBoxCore.publishToMarket(cleanData);
-                        showMessage('Opublikowano na Giełdzie Humorów!', 'success');
-                        setAppMode('gielda');
-                        loadMarket();
-                    } else {
-                        throw new Error("Moduł bazy danych nie jest podłączony lub gotowy.");
-                    }
-                } catch (error) {
-                    console.error("Szczegóły błędu publikacji:", error);
-                    showMessage('Błąd publikacji: Zaloguj się lub spróbuj ponownie.', 'error');
-                } finally {
-                    setIsPublishing(false);
-                }
-            };
-
-            const loadMarket = async () => {
-                setIsFetchingMarket(true);
-                try {
-                    if (isCoreReady && typeof window.EduBoxCore.fetchMarket === 'function') {
-                        const items = await window.EduBoxCore.fetchMarket();
-                        setMarketItems(items);
-                    }
-                } catch (error) { 
-                    showMessage('Błąd ładowania Giełdy.', 'error'); 
-                } finally { 
-                    setIsFetchingMarket(false); 
-                }
-            };
-
-            useEffect(() => { if (appMode === 'gielda' && isCoreReady) loadMarket(); }, [appMode, isCoreReady]);
-
-            // --- KOMPONENT RENDERUJĄCY WYNIKI ---
-            const renderResult = () => {
-                if (!resultData || !resultData.data) return (
-                    <div className="h-full flex flex-col items-center justify-center text-teal-500/50 no-print">
-                        <i className="ph-fill ph-plant text-6xl mb-4 animate-pulse"></i>
-                        <p className="font-bold text-center">Wpisz swoje dane ratunkowe po lewej stronie<br/>i kliknij "Rozpocznij Detoks".</p>
-                    </div>
-                );
-
-                const { autoresponder, recommendations, quote } = resultData.data;
-                const { subject, years } = resultData.params;
-
-                return (
-                    <div className="space-y-8 animate-[reveal_0.4s_ease-out]">
-                        
-                        {/* Karta 1: Autoresponder (Mockup maila) */}
-                        {autoresponder && (
-                            <div className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden print-card shadow-xl shadow-teal-900/10 relative group">
-                                <div className="bg-slate-800/80 p-3 border-b border-slate-700 flex items-center gap-2">
-                                    <div className="flex gap-1.5 mr-4">
-                                        <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                                        <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-                                        <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                                    </div>
-                                    <div className="text-xs text-slate-400 font-medium">Nowa wiadomość (Autoresponder)</div>
-                                </div>
-                                <div className="p-6 md:p-8 relative">
-                                    <button onClick={() => copyToClipboard(`Temat: ${autoresponder.subject}\n\n${autoresponder.body}`)} className="absolute top-4 right-4 bg-teal-500/20 text-teal-400 hover:bg-teal-500 hover:text-slate-900 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-1 no-print opacity-0 group-hover:opacity-100">
-                                        <i className="ph-bold ph-copy"></i> Kopiuj
-                                    </button>
-                                    <div className="border-b border-slate-800 pb-4 mb-4">
-                                        <p className="text-sm text-slate-400 mb-1">Do: <span className="text-slate-200">Wszyscy zmartwieni rodzice</span></p>
-                                        <p className="text-sm text-slate-400">Temat: <span className="text-teal-400 font-bold">{autoresponder.subject}</span></p>
-                                    </div>
-                                    <div className="text-slate-300 print-text leading-relaxed whitespace-pre-wrap font-medium">
-                                        {autoresponder.body}
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                            {/* Karta 2: Recepta */}
-                            {recommendations && (
-                                <div className="bg-gradient-to-br from-slate-900 to-slate-800 border border-slate-700 rounded-3xl p-6 print-card relative">
-                                    <div className="absolute top-4 right-4 text-4xl opacity-10">💊</div>
-                                    <h3 className="text-xl font-black text-white print-text mb-6 flex items-center gap-2">
-                                        <i className="ph-fill ph-prescription text-teal-400"></i> Recepta na Zapomnienie
-                                    </h3>
-                                    <div className="space-y-4">
-                                        {Array.isArray(recommendations) && recommendations.map((rec, i) => (
-                                            <div key={i} className="bg-slate-950/50 print:bg-slate-100 p-4 rounded-2xl border border-slate-800 print:border-slate-300">
-                                                <div className="text-[10px] font-black text-teal-500 uppercase tracking-widest mb-1">{rec.type}</div>
-                                                <p className="font-bold text-white print-text text-sm mb-2">{rec.title}</p>
-                                                <p className="text-xs text-slate-400 print-text leading-relaxed">{rec.reason}</p>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Karta 3: Certyfikat Przetrwania */}
-                            {quote && (
-                                <div className="bg-slate-900 border-2 border-dashed border-purple-500/30 rounded-3xl p-8 print-card text-center flex flex-col justify-center relative overflow-hidden group">
-                                    <div className="absolute -inset-10 bg-gradient-to-br from-purple-500/5 to-transparent blur-2xl -z-10"></div>
-                                    <i className="ph-fill ph-medal text-5xl text-purple-400 mb-4 mx-auto"></i>
-                                    <p className="text-xs text-purple-400 font-bold uppercase tracking-widest mb-4">Certyfikat Przetrwania</p>
-                                    <p className="text-2xl font-hand text-white print-text leading-tight mb-6 px-4">"{quote}"</p>
-                                    <div className="text-[10px] text-slate-500 uppercase font-black">Weteran: {subject} • Staż: {years}</div>
-                                    
-                                    <button onClick={() => copyToClipboard(quote)} className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-purple-500/20 text-purple-400 hover:bg-purple-500 hover:text-white px-4 py-1.5 rounded-full text-xs font-bold transition-colors flex items-center gap-1 no-print opacity-0 group-hover:opacity-100">
-                                        <i className="ph-bold ph-copy"></i> Skopiuj na Facebooka
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                );
+            // Bezpieczne wyciąganie cytatu (naprawa błędu 3)
+            const getQuote = () => {
+                if (!resultData) return '';
+                return resultData.quote || resultData?.data?.quote || 'Przetrwałeś! To był trudny dzień, ale jesteś świetnym nauczycielem.';
             };
 
             return (
-                <div className="flex h-screen w-full bg-slate-950 text-slate-200 overflow-hidden relative selection:bg-teal-500/30">
-                    
-                    {/* Auras rendering in background */}
-                    <div className="aura-container no-print">
-                        <div className="aura-blob aura-1"></div>
-                        <div className="aura-blob aura-2"></div>
-                        <div className="aura-blob aura-3"></div>
+                <div className="max-w-4xl mx-auto p-6 pt-10">
+                    <a href="index.html" className="inline-flex items-center text-gray-500 hover:text-blue-600 transition font-medium mb-8">
+                        <i className="ph ph-arrow-left mr-2 text-xl"></i> Wróć do Panelu Głównego
+                    </a>
+
+                    <div className="bg-white rounded-3xl shadow-sm border border-gray-200 p-8 mb-10 relative overflow-hidden">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-green-50 rounded-bl-full -z-0"></div>
+                        <h1 className="text-4xl font-extrabold text-gray-900 mb-3 flex items-center relative z-10">
+                            <i className="ph-fill ph-shield-check text-green-500 mr-4"></i>
+                            EduDetox AI
+                        </h1>
+                        <p className="text-gray-600 text-lg mb-8 relative z-10">Zresetuj emocje. Opisz trudną sytuację (np. roszczeniowy mail od rodzica), a asystent przygotuje spokojną, profesjonalną odpowiedź, receptę na relaks i Twój certyfikat przetrwania.</p>
+
+                        <form onSubmit={handleGenerate} className="space-y-5 relative z-10">
+                            <textarea
+                                value={input}
+                                onChange={(e) => setInput(e.target.value)}
+                                placeholder="Wklej treść wiadomości, na którą musisz odpisać, lub po prostu opisz sytuację z dzisiejszego dnia..."
+                                className="w-full h-40 p-5 bg-gray-50 border border-gray-300 rounded-2xl focus:ring-4 focus:ring-green-500/20 focus:border-green-500 outline-none resize-none transition-all text-gray-800"
+                                disabled={loading}
+                            />
+                            <button
+                                type="submit"
+                                disabled={loading || !input.trim()}
+                                className="w-full bg-green-600 text-white font-bold py-4 px-6 rounded-2xl hover:bg-green-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed flex justify-center items-center text-lg shadow-md hover:shadow-lg"
+                            >
+                                {loading ? (
+                                    <><i className="ph ph-spinner animate-spin text-2xl mr-3"></i> Analiza sytuacji i generowanie...</>
+                                ) : (
+                                    <><i className="ph-fill ph-magic-wand text-2xl mr-3"></i> Wygeneruj Zestaw Ratunkowy</>
+                                )}
+                            </button>
+                        </form>
+                        {error && (
+                            <div className="mt-6 p-4 bg-red-50 text-red-700 rounded-xl flex items-center">
+                                <i className="ph-fill ph-warning-circle text-2xl mr-3"></i> {error}
+                            </div>
+                        )}
                     </div>
 
-                    {/* Global Notifications */}
-                    {message && (
-                        <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 px-6 py-3 rounded-full text-sm font-bold shadow-2xl flex items-center gap-2 animate-bounce ${message.type === 'error' ? 'bg-red-500 text-white' : 'bg-green-500 text-white'}`}>
-                            <i className={`ph-bold ${message.type === 'error' ? 'ph-warning-circle' : 'ph-check-circle'} text-lg`}></i>
-                            {message.text}
+                    {resultData && (
+                        <div className="space-y-8 animate-fade-in pb-20">
+                            
+                            {/* Sekcja: Mail */}
+                            <div className="bg-white rounded-3xl shadow-sm border border-gray-200 p-8">
+                                <h2 className="text-2xl font-bold mb-5 flex items-center text-gray-900">
+                                    <span className="w-10 h-10 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center mr-3">
+                                        <i className="ph-fill ph-envelope-open text-2xl"></i>
+                                    </span>
+                                    Proponowana Odpowiedź
+                                </h2>
+                                <div className="bg-gray-50 p-6 rounded-2xl text-gray-800 whitespace-pre-wrap leading-relaxed border border-gray-100">
+                                    {resultData.email}
+                                </div>
+                            </div>
+
+                            {/* Sekcja: Recepta */}
+                            <div className="bg-white rounded-3xl shadow-sm border border-gray-200 p-8">
+                                <h2 className="text-2xl font-bold mb-5 flex items-center text-gray-900">
+                                    <span className="w-10 h-10 bg-pink-100 text-pink-500 rounded-lg flex items-center justify-center mr-3">
+                                        <i className="ph-fill ph-pill text-2xl"></i>
+                                    </span>
+                                    Recepta na Odstresowanie
+                                </h2>
+                                <div className="bg-pink-50 border border-pink-100 p-6 rounded-2xl text-pink-900 font-medium italic text-lg leading-relaxed shadow-inner">
+                                    {resultData.prescription}
+                                </div>
+                            </div>
+
+                            {/* Sekcja: Certyfikat (NAPRAWIONY BŁĄD 3) */}
+                            <div className="bg-gradient-to-br from-yellow-100 via-amber-50 to-yellow-100 rounded-3xl shadow-md border border-yellow-300 p-10 text-center relative overflow-hidden group">
+                                <div className="absolute -top-10 -right-10 opacity-10 transform rotate-12 group-hover:rotate-0 transition-transform duration-700">
+                                    <i className="ph-fill ph-medal text-[15rem] text-yellow-600"></i>
+                                </div>
+                                
+                                <div className="relative z-10">
+                                    <div className="inline-flex items-center justify-center w-20 h-20 bg-yellow-200 rounded-full mb-4 shadow-inner">
+                                        <i className="ph-fill ph-certificate text-5xl text-yellow-700"></i>
+                                    </div>
+                                    <h2 className="text-3xl font-black text-yellow-800 mb-3 uppercase tracking-widest">
+                                        Certyfikat Przetrwania
+                                    </h2>
+                                    <div className="w-24 h-1 bg-yellow-400 mx-auto mb-8 rounded-full"></div>
+                                    
+                                    <p className="text-2xl text-yellow-900 font-serif italic mb-10 px-4 md:px-12 leading-relaxed">
+                                        "{getQuote()}"
+                                    </p>
+                                    
+                                    <button
+                                        onClick={() => copyToClipboard(getQuote())}
+                                        className="bg-yellow-600 text-white py-3 px-8 rounded-xl font-bold hover:bg-yellow-700 transition shadow-md inline-flex items-center"
+                                    >
+                                        <i className="ph-bold ph-copy mr-2 text-xl"></i> Kopiuj do schowka
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Akcja: Udostępnij na Giełdzie (NAPRAWIONY BŁĄD 2) */}
+                            <div className="flex flex-col items-center mt-12 bg-white p-8 rounded-3xl shadow-sm border border-gray-200">
+                                <h3 className="text-xl font-bold mb-2 text-gray-800">Zachowaj dla innych</h3>
+                                <p className="text-gray-500 mb-6 text-center max-w-lg">Podziel się wygenerowanym rozwiązaniem na Giełdzie, aby wesprzeć innych nauczycieli mierzących się z podobnymi wyzwaniami.</p>
+                                <button
+                                    onClick={handlePublish}
+                                    className="bg-blue-600 text-white font-bold py-4 px-10 rounded-2xl hover:bg-blue-700 transition shadow-lg flex items-center text-lg hover:-translate-y-1 transform duration-200"
+                                >
+                                    <i className="ph-bold ph-cloud-arrow-up text-2xl mr-3"></i>
+                                    Udostępnij na Giełdzie
+                                </button>
+                                
+                                {marketStatus.message && (
+                                    <div className={`mt-5 px-6 py-3 rounded-xl font-medium flex items-center ${
+                                        marketStatus.type === 'error' ? 'bg-red-50 text-red-700' : 
+                                        marketStatus.type === 'success' ? 'bg-green-50 text-green-700' : 
+                                        'bg-blue-50 text-blue-700'
+                                    }`}>
+                                        <i className={`ph-fill mr-2 text-xl ${
+                                            marketStatus.type === 'error' ? 'ph-warning-circle' : 
+                                            marketStatus.type === 'success' ? 'ph-check-circle' : 
+                                            'ph-info'
+                                        }`}></i>
+                                        {marketStatus.message}
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     )}
-
-                    {/* Left Sidebar (No Print) */}
-                    <aside className="w-80 flex-shrink-0 bg-slate-900/80 backdrop-blur-xl border-r border-slate-800 flex flex-col h-full z-10 no-print transition-all duration-300">
-                        {/* Header */}
-                        <div className="p-6 border-b border-slate-800 flex items-center gap-3">
-                            <div className="w-10 h-10 bg-gradient-to-br from-teal-400 to-emerald-500 rounded-xl flex items-center justify-center shadow-lg shadow-teal-500/20">
-                                <i className="ph-bold ph-plant text-white text-xl"></i>
-                            </div>
-                            <div>
-                                <h1 className="text-xl font-black tracking-tight text-white leading-none uppercase">EduDetox</h1>
-                                <p className="text-[10px] text-teal-400 font-bold tracking-wider uppercase mt-1">Wakacyjny Reset</p>
-                            </div>
-                        </div>
-
-                        {/* Navigation */}
-                        <div className="px-4 py-3 flex gap-2 border-b border-slate-800">
-                            <button 
-                                onClick={() => setAppMode('kreator')} 
-                                className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${appMode === 'kreator' ? 'bg-teal-500 text-slate-900 shadow-lg shadow-teal-500/30' : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white'}`}
-                            >
-                                <i className="ph-bold ph-first-aid-kit"></i> Klinika
-                            </button>
-                            <button 
-                                onClick={() => setAppMode('gielda')} 
-                                className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${appMode === 'gielda' ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30' : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white'}`}
-                            >
-                                <i className="ph-bold ph-smiley-wink"></i> Giełda Śmiechu
-                            </button>
-                        </div>
-
-                        {/* Sidebar Content Scrollable */}
-                        <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-6">
-                            
-                            {/* KREATOR MODE */}
-                            {appMode === 'kreator' && (
-                                <>
-                                    <div className="text-center px-2 py-4 border border-dashed border-teal-500/30 rounded-2xl bg-teal-500/5">
-                                        <h3 className="text-sm font-bold text-teal-400 mb-1">Czas na Detoks! 💆‍♀️</h3>
-                                        <p className="text-[10px] text-slate-400">Podaj swoje dane, a AI wygeneruje Ci zabawną odpowiedź zwrotną (Librus/Email) i plan odtrucia od szkoły.</p>
-                                    </div>
-
-                                    {/* Dynamic Forms */}
-                                    <div className="space-y-4 bg-slate-900 border border-slate-800 rounded-2xl p-4">
-                                        <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest border-b border-slate-800 pb-2 mb-2 flex items-center gap-2">
-                                            <i className="ph-bold ph-clipboard-text"></i> Wywiad środowiskowy
-                                        </div>
-
-                                        <div className="space-y-1">
-                                            <label className="text-[10px] font-bold text-slate-400 uppercase">Czego uczyłeś/aś?</label>
-                                            <input type="text" value={subject} onChange={e => setSubject(e.target.value)} className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:border-teal-500 transition-colors" placeholder="np. Matematyka i Fizyka" />
-                                        </div>
-
-                                        <div className="space-y-1">
-                                            <label className="text-[10px] font-bold text-slate-400 uppercase">Staż przetrwania (lata pracy)</label>
-                                            <input type="text" value={years} onChange={e => setYears(e.target.value)} className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:border-teal-500 transition-colors" placeholder="np. 5 lat" />
-                                        </div>
-
-                                        <div className="space-y-1">
-                                            <label className="text-[10px] font-bold text-slate-400 uppercase">Obecny poziom stresu</label>
-                                            <select value={stress} onChange={e => setStress(e.target.value)} className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:border-teal-500">
-                                                <option>Lekkie zmęczenie</option>
-                                                <option>Drganie powieki na słowo "Librus"</option>
-                                                <option>Poziom 10/10 (Tryb Zombie)</option>
-                                                <option>Chcę rzucić to i wyjechać w Bieszczady</option>
-                                            </select>
-                                        </div>
-
-                                        <div className="space-y-1">
-                                            <label className="text-[10px] font-bold text-slate-400 uppercase">Ulubione odskocznie (hobby)</label>
-                                            <input type="text" value={hobbies} onChange={e => setHobbies(e.target.value)} className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:border-teal-500 transition-colors" placeholder="np. Kawa, spanie do 11, Netflix" />
-                                        </div>
-                                    </div>
-
-                                    {/* Akcje */}
-                                    <div className="space-y-3 pt-2">
-                                        <button 
-                                            onClick={generateContent} disabled={isGenerating}
-                                            className="w-full bg-gradient-to-r from-teal-400 to-emerald-500 hover:from-teal-300 hover:to-emerald-400 text-slate-900 font-black py-4 rounded-2xl shadow-[0_0_20px_rgba(45,212,191,0.3)] transition-all flex items-center justify-center gap-2"
-                                        >
-                                            {isGenerating ? <i className="ph-bold ph-spinner animate-spin text-xl"></i> : <i className="ph-bold ph-magic-wand text-xl"></i>} 
-                                            Rozpocznij Detoks
-                                        </button>
-                                        
-                                        {resultData && (
-                                            <div className="grid grid-cols-2 gap-2">
-                                                <button onClick={() => window.print()} className="bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 rounded-xl transition-all flex justify-center items-center gap-2 text-xs">
-                                                    <i className="ph-bold ph-printer text-lg"></i> Drukuj 
-                                                </button>
-                                                <button onClick={publishToMarket} disabled={isPublishing} className="bg-purple-600/20 border border-purple-500 hover:bg-purple-600 text-purple-400 hover:text-white font-bold py-3 rounded-xl transition-all flex justify-center items-center gap-2 text-xs">
-                                                    {isPublishing ? <i className="ph-bold ph-spinner animate-spin"></i> : <i className="ph-bold ph-share-network"></i>} Udostępnij
-                                                </button>
-                                            </div>
-                                        )}
-                                    </div>
-                                </>
-                            )}
-
-                            {/* GIEŁDA MODE */}
-                            {appMode === 'gielda' && (
-                                <div className="space-y-4 pb-6">
-                                    <div className="bg-purple-500/10 border border-purple-500/20 rounded-xl p-4 text-center">
-                                        <i className="ph-fill ph-confetti text-3xl text-purple-400 mb-2"></i>
-                                        <h3 className="text-sm font-bold text-white mb-1">Giełda Śmiechu</h3>
-                                        <p className="text-[10px] text-slate-400">Poczytaj zabawne autorespondery i cytaty innych zmęczonych nauczycieli!</p>
-                                    </div>
-
-                                    {isFetchingMarket ? (
-                                        <div className="flex justify-center py-10"><i className="ph-bold ph-spinner animate-spin text-3xl text-slate-500"></i></div>
-                                    ) : marketItems.length === 0 ? (
-                                        <div className="text-center py-10 text-slate-500 text-xs font-bold">Brak wpisów. Wrzuć swój plan detoksu!</div>
-                                    ) : (
-                                        <div className="space-y-3">
-                                            {marketItems.map(item => (
-                                                <div key={item.id} className="bg-slate-800 rounded-xl p-4 border border-slate-700 hover:border-purple-500 transition-colors group cursor-pointer" onClick={() => { setResultData(item); setAppMode('kreator'); showMessage('Wczytano plan!', 'success'); }}>
-                                                    <div className="flex justify-between items-start mb-2">
-                                                        <span className="text-xs font-black text-white flex items-center gap-1"><i className="ph-fill ph-user-circle text-purple-400"></i> {item.params?.subject}</span>
-                                                        <span className="text-[9px] bg-slate-900 text-slate-400 px-2 py-0.5 rounded-full">{item.params?.years}</span>
-                                                    </div>
-                                                    <p className="text-[10px] text-slate-300 font-bold italic line-clamp-3 mb-2">"{item.data?.quote}"</p>
-                                                    <div className="text-[9px] text-teal-400 flex items-center gap-1">
-                                                        <i className="ph-bold ph-envelope"></i> Zobacz autoresponder
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-
-                        </div>
-
-                        {/* Premium Footer */}
-                        <div className="p-4 border-t border-slate-800 bg-slate-950/50">
-                            {!isPremium ? (
-                                <div className="space-y-2 mb-2">
-                                    <div className="flex justify-between items-center">
-                                        <span className="text-[10px] font-bold text-slate-400 uppercase">Status PRO</span>
-                                        <span className="text-[10px] font-bold text-teal-500 bg-teal-500/10 px-2 py-0.5 rounded-full">{3 - aiGenerations} darmowe</span>
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <input 
-                                            type="text" value={premiumCode} onChange={(e) => setPremiumCode(e.target.value)}
-                                            placeholder="Kod Premium" 
-                                            className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:border-teal-500 uppercase"
-                                        />
-                                        <button onClick={handlePremiumCheck} className="bg-slate-800 hover:bg-slate-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold border border-slate-700 transition-all">OK</button>
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className="flex items-center gap-3 bg-gradient-to-r from-teal-500/10 to-emerald-500/10 border border-teal-500/30 p-3 rounded-xl mb-2">
-                                    <i className="ph-fill ph-crown text-2xl text-teal-400"></i>
-                                    <div>
-                                        <p className="text-xs font-bold text-white">Wersja PRO MAX</p>
-                                        <p className="text-[9px] text-teal-300">Wszystkie limity odblokowane</p>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    </aside>
-
-                    {/* Main Workspace (Preview Area) */}
-                    <main className="flex-1 flex flex-col relative z-10 overflow-hidden">
-                        <div className="flex-1 overflow-y-auto custom-scrollbar p-6 lg:p-12 print-container relative">
-                            <div className="max-w-4xl mx-auto pb-32">
-                                {renderResult()}
-                            </div>
-                        </div>
-                    </main>
-
                 </div>
             );
-        }
+        };
 
         const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
+        root.render(<EduDetoxApp />);
     </script>
+    <style>
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in {
+            animation: fadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+    </style>
 </body>
 </html>
