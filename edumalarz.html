@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduBox V3 PRO MAX - EduMalarz AI</title>
+
+    <script src="https://unpkg.com/react@18.2.0/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone@7.23.6/babel.min.js"></script>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Playfair+Display:ital,wght@0,600;1,600&display=swap" rel="stylesheet">
+
+    <script type="module">
+        import { EduBoxCore } from './global-core.js';
+        window.EduBoxCore = EduBoxCore;
+    </script>
+
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #1e1b4b; color: #f8fafc; overflow: hidden; }
+        .custom-scrollbar::-webkit-scrollbar { width: 8px; height: 8px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #4c1d95; border-radius: 10px; }
+        
+        .aura-container { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; }
+        .aura-blob { position: absolute; filter: blur(140px); border-radius: 50%; opacity: 0.35; animation: float 25s ease-in-out infinite alternate; }
+        .aura-1 { top: -10%; left: -10%; width: 50vw; height: 50vw; background: radial-gradient(circle, rgba(236, 72, 153, 0.4) 0%, rgba(0,0,0,0) 70%); animation-delay: 0s; }
+        .aura-2 { bottom: -10%; right: -10%; width: 60vw; height: 60vw; background: radial-gradient(circle, rgba(139, 92, 246, 0.3) 0%, rgba(0,0,0,0) 70%); animation-delay: -5s; }
+        .aura-3 { top: 40%; left: 30%; width: 40vw; height: 40vw; background: radial-gradient(circle, rgba(217, 70, 239, 0.5) 0%, rgba(0,0,0,0) 70%); animation-delay: -10s; }
+
+        @keyframes float {
+            0% { transform: translate(0, 0) scale(1); }
+            100% { transform: translate(30px, -50px) scale(1.05); }
+        }
+
+        @media print {
+            body { background: white !important; color: black !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; overflow: visible !important; }
+            .no-print { display: none !important; }
+            .print-container { background: white !important; color: black !important; padding: 0 !important; width: 100% !important; overflow: visible !important; }
+            #root, main { height: auto !important; overflow: visible !important; }
+        }
+    </style>
+</head>
+<body>
+    <div id="root" class="h-screen flex flex-col"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        function App() {
+            const [user, setUser] = useState(null);
+            const [appMode, setAppMode] = useState('kreator'); 
+            const [isPremium, setIsPremium] = useState(false);
+            const [premiumCode, setPremiumCode] = useState('');
+            const [aiGenerations, setAiGenerations] = useState(0);
+            const [message, setMessage] = useState(null);
+            const [isGenerating, setIsGenerating] = useState(false);
+            
+            // Image State
+            const [prompt, setPrompt] = useState('');
+            const [imageStyle, setImageStyle] = useState('akwarela');
+            const [format, setFormat] = useState('medal');
+            const [resultImageUrl, setResultImageUrl] = useState(null);
+
+            const [marketItems, setMarketItems] = useState([]);
+            const [isFetchingMarket, setIsFetchingMarket] = useState(false);
+            const [isPublishing, setIsPublishing] = useState(false);
+
+            useEffect(() => {
+                const initDb = () => {
+                    if (typeof window !== 'undefined' && window.EduBoxCore) window.EduBoxCore.init((u) => setUser(u));
+                    else setTimeout(initDb, 100);
+                };
+                initDb();
+                
+                try {
+                    const savedGens = window.localStorage.getItem('edubox_edumalarz_ai');
+                    if (savedGens) setAiGenerations(parseInt(savedGens));
+                    const savedPremium = window.localStorage.getItem('edubox_premium');
+                    if (savedPremium === 'KAWA2024') setIsPremium(true);
+                } catch (e) {}
+            }, []);
+
+            const showMessage = (text, type = 'success') => {
+                setMessage({ text, type });
+                setTimeout(() => setMessage(null), 3000);
+            };
+
+            const handlePremiumCheck = () => {
+                if (premiumCode.toUpperCase() === 'KAWA2024') {
+                    setIsPremium(true); 
+                    try { window.localStorage.setItem('edubox_premium', 'KAWA2024'); } catch(e) {}
+                    setPremiumCode('');
+                    showMessage('Kod Premium zaakceptowany!', 'success');
+                } else { showMessage('Nieprawidłowy kod', 'error'); }
+            };
+
+            const generateContent = async () => {
+                if (!prompt.trim()) { showMessage('Opisz, co chcesz wygenerować.', 'error'); return; }
+                if (!isPremium && aiGenerations >= 3) { showMessage('Limit darmowych generacji wyczerpany.', 'error'); return; }
+                
+                setIsGenerating(true);
+                setResultImageUrl(null);
+
+                try {
+                    const res = await fetch('/api/malarz', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ prompt, style: imageStyle, format })
+                    });
+                    
+                    if (!res.ok) {
+                        const err = await res.json();
+                        throw new Error(err.error || 'Błąd generowania');
+                    }
+                    
+                    const data = await res.json();
+                    setResultImageUrl(data.url);
+                    
+                    if (!isPremium) {
+                        const newCount = aiGenerations + 1;
+                        setAiGenerations(newCount);
+                        try { window.localStorage.setItem('edubox_edumalarz_ai', newCount.toString()); } catch(e) {}
+                    }
+                    showMessage('Wygenerowano arcydzieło!', 'success');
+                } catch (error) { 
+                    showMessage(error.message, 'error'); 
+                } finally { 
+                    setIsGenerating(false); 
+                }
+            };
+
+            const publishToMarket = async () => {
+                if (!resultImageUrl || !user) { showMessage('Błąd autoryzacji bazy.', 'error'); return; }
+                setIsPublishing(true);
+                try {
+                    // Na giełdę zapisujemy tylko adres URL do chmury Fal.ai i parametry (jest to ekstremalnie lekkie)
+                    const payload = { url: resultImageUrl, params: { prompt, imageStyle, format } };
+                    await window.EduBoxCore.saveToGielda('edumalarz_market', 'edumalarz', prompt.substring(0, 30), payload);
+                    showMessage('Opublikowano w Galerii!', 'success');
+                    setAppMode('gielda');
+                } catch (error) { showMessage(error.message || 'Błąd publikacji.', 'error'); } 
+                finally { setIsPublishing(false); }
+            };
+
+            useEffect(() => {
+                let unsubscribe = null;
+                if (appMode === 'gielda') {
+                    setIsFetchingMarket(true);
+                    const checkAndSub = () => {
+                        if(window.EduBoxCore && window.EduBoxCore.subscribeToGielda) {
+                            unsubscribe = window.EduBoxCore.subscribeToGielda('edumalarz_market', (items) => {
+                                setMarketItems(items);
+                                setIsFetchingMarket(false);
+                            }, (err) => { setIsFetchingMarket(false); });
+                        } else { setTimeout(checkAndSub, 100); }
+                    };
+                    checkAndSub();
+                }
+                return () => { if (unsubscribe) unsubscribe(); }
+            }, [appMode]);
+
+            return (
+                <div className="flex h-screen w-full bg-slate-950 text-slate-200 overflow-hidden relative selection:bg-pink-500/30">
+                    <div className="aura-container no-print"><div className="aura-blob aura-1"></div><div className="aura-blob aura-2"></div><div className="aura-blob aura-3"></div></div>
+
+                    {message && (
+                        <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 px-6 py-3 rounded-full text-sm font-bold shadow-2xl flex items-center gap-2 animate-bounce ${message.type === 'error' ? 'bg-red-500 text-white' : 'bg-pink-500 text-white'}`}>
+                            <i className={`ph-bold ${message.type === 'error' ? 'ph-warning-circle' : 'ph-check-circle'} text-lg`}></i> {message.text}
+                        </div>
+                    )}
+
+                    <aside className="w-80 flex-shrink-0 bg-slate-900/90 backdrop-blur-xl border-r border-slate-800 flex flex-col h-full z-10 no-print transition-all duration-300">
+                        <div className="p-6 border-b border-slate-800 flex items-center gap-3">
+                            <div className="w-10 h-10 bg-gradient-to-br from-pink-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg shadow-pink-500/20">
+                                <i className="ph-bold ph-palette text-white text-xl"></i>
+                            </div>
+                            <div>
+                                <h1 className="text-xl font-black tracking-tight text-white leading-none uppercase">EduMalarz</h1>
+                                <p className="text-[10px] text-pink-400 font-bold tracking-wider uppercase mt-1">PRO Dekorator</p>
+                            </div>
+                        </div>
+
+                        <div className="px-4 py-3 flex gap-2 border-b border-slate-800">
+                            <button onClick={() => setAppMode('kreator')} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${appMode === 'kreator' ? 'bg-pink-600 text-white shadow-lg shadow-pink-600/30' : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white'}`}>
+                                <i className="ph-bold ph-pencil-simple"></i> Stwórz
+                            </button>
+                            <button onClick={() => setAppMode('gielda')} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${appMode === 'gielda' ? 'bg-pink-600 text-white shadow-lg shadow-pink-600/30' : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white'}`}>
+                                <i className="ph-bold ph-image"></i> Galeria
+                            </button>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-6">
+                            {appMode === 'kreator' && (
+                                <>
+                                    <div className="space-y-4 bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-inner">
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase">Format Grafiki</label>
+                                            <select value={format} onChange={e => setFormat(e.target.value)} className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:border-pink-500 outline-none">
+                                                <option value="medal">🏅 Medal (Okrągły, białe tło)</option>
+                                                <option value="zaproszenie">💌 Zaproszenie (Pionowe)</option>
+                                                <option value="dyplom">📜 Ramka / Dyplom (Poziomy)</option>
+                                                <option value="naklejka">⭐ Naklejka (Kwadrat)</option>
+                                            </select>
+                                        </div>
+
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase">Styl Artystyczny</label>
+                                            <select value={imageStyle} onChange={e => setImageStyle(e.target.value)} className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:border-pink-500 outline-none">
+                                                <option value="akwarela">🎨 Akwarela (Delikatna)</option>
+                                                <option value="disney">✨ Pixar / Disney (3D)</option>
+                                                <option value="wektor">📐 Ilustracja Wektorowa (Płaska)</option>
+                                                <option value="kolorowanka">🖍️ Kolorowanka (Czarno-białe kontury)</option>
+                                            </select>
+                                        </div>
+
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase">Opisz motyw przewodni</label>
+                                            <textarea 
+                                                value={prompt} 
+                                                onChange={e => setPrompt(e.target.value)} 
+                                                className="w-full h-32 bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:border-pink-500 transition-colors resize-none" 
+                                                placeholder="np. Uśmiechnięta pszczółka z kwiatkiem, pasowanie na przedszkolaka..." 
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-3 pt-2">
+                                        <button onClick={generateContent} disabled={isGenerating} className="w-full bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-400 hover:to-purple-400 text-white font-black py-4 rounded-2xl shadow-[0_0_20px_rgba(236,72,153,0.3)] transition-all flex items-center justify-center gap-2 disabled:opacity-50">
+                                            {isGenerating ? <><i className="ph-bold ph-spinner animate-spin text-xl"></i> Malowanie detali...</> : <><i className="ph-bold ph-magic-wand text-xl"></i> Wygeneruj Grafikę</>}
+                                        </button>
+                                        
+                                        {resultImageUrl && (
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <button onClick={() => window.print()} className="bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 rounded-xl transition-all flex justify-center items-center gap-2 text-xs">
+                                                    <i className="ph-bold ph-printer text-lg"></i> Drukuj 
+                                                </button>
+                                                <a href={resultImageUrl} target="_blank" download className="bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 rounded-xl transition-all flex justify-center items-center gap-2 text-xs">
+                                                    <i className="ph-bold ph-download-simple text-lg"></i> Pobierz
+                                                </a>
+                                            </div>
+                                        )}
+                                    </div>
+                                </>
+                            )}
+
+                            {appMode === 'gielda' && (
+                                <div className="space-y-4 pb-6">
+                                    <div className="bg-pink-500/10 border border-pink-500/20 rounded-xl p-4 text-center">
+                                        <i className="ph-fill ph-image text-3xl text-pink-400 mb-2"></i>
+                                        <h3 className="text-sm font-bold text-white mb-1">Galeria Sztuki</h3>
+                                        <p className="text-[10px] text-slate-400">Pobierz przepiękne szablony przygotowane przez innych nauczycieli.</p>
+                                    </div>
+
+                                    {isFetchingMarket ? (
+                                        <div className="flex justify-center py-10"><i className="ph-bold ph-spinner animate-spin text-3xl text-slate-500"></i></div>
+                                    ) : marketItems.length === 0 ? (
+                                        <div className="text-center py-10 text-slate-500 text-xs font-bold">Brak grafik w bazie.</div>
+                                    ) : (
+                                        <div className="grid grid-cols-2 gap-3">
+                                            {marketItems.map(item => (
+                                                <div key={item.id} className="bg-slate-800 rounded-xl overflow-hidden border border-slate-700 hover:border-pink-500 transition-colors group cursor-pointer" onClick={() => { setResultImageUrl(item.config.url); setAppMode('kreator'); }}>
+                                                    <div className="aspect-square bg-slate-900 w-full relative">
+                                                        <img src={item.config.url} className="w-full h-full object-cover" loading="lazy" />
+                                                    </div>
+                                                    <div className="p-2">
+                                                        <p className="text-[10px] text-slate-300 truncate font-bold">{item.name}</p>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="p-4 border-t border-slate-800 bg-slate-950/50">
+                            {!isPremium ? (
+                                <div className="space-y-2 mb-2">
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-[10px] font-bold text-slate-400 uppercase">Status PRO</span>
+                                        <span className="text-[10px] font-bold text-pink-500 bg-pink-500/10 px-2 py-0.5 rounded-full">{3 - aiGenerations} darmowe</span>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <input type="text" value={premiumCode} onChange={(e) => setPremiumCode(e.target.value)} placeholder="Kod Premium" className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:border-pink-500 uppercase" />
+                                        <button onClick={handlePremiumCheck} className="bg-slate-800 hover:bg-slate-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold border border-slate-700 transition-all">OK</button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="flex items-center gap-3 bg-gradient-to-r from-pink-500/10 to-purple-500/10 border border-pink-500/30 p-3 rounded-xl mb-2">
+                                    <i className="ph-fill ph-crown text-2xl text-pink-400"></i>
+                                    <div><p className="text-xs font-bold text-white">Wersja PRO MAX</p><p className="text-[9px] text-pink-300">Wszystkie limity odblokowane</p></div>
+                                </div>
+                            )}
+                        </div>
+                    </aside>
+
+                    <main className="flex-1 flex flex-col relative z-10 overflow-hidden">
+                        <div className="flex-1 overflow-y-auto custom-scrollbar p-6 lg:p-12 print-container relative flex items-center justify-center">
+                            
+                            {!resultImageUrl ? (
+                                <div className="text-center text-pink-500/30 no-print max-w-md mx-auto">
+                                    <i className="ph-fill ph-image-square text-7xl mb-6 animate-pulse"></i>
+                                    <p className="font-bold text-lg text-pink-100/50">Wybierz kształt, opisz motyw po lewej stronie, a stworzymy dla Ciebie wektorowe arcydzieło do druku.</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-8 animate-[reveal_0.4s_ease-out] w-full max-w-2xl text-center">
+                                    
+                                    <div className="bg-white p-4 rounded-2xl shadow-2xl inline-block print-card mx-auto">
+                                        <img src={resultImageUrl} alt="Wygenerowana grafika" className={`w-full max-w-lg object-contain ${format === 'medal' ? 'rounded-full' : 'rounded-lg'}`} />
+                                    </div>
+
+                                    <div className="mt-10 bg-slate-900/50 border border-pink-500/30 rounded-3xl p-8 text-center relative overflow-hidden group no-print shadow-xl backdrop-blur-sm">
+                                        <div className="relative z-10">
+                                            <h3 className="text-xl font-bold text-white mb-2">Piękne, prawda?</h3>
+                                            <p className="text-slate-400 text-sm mb-6 max-w-lg mx-auto">Dodaj ten obraz do publicznej Galerii, aby inni nauczyciele mogli szybko pobrać gotowy szablon.</p>
+                                            <button 
+                                                onClick={publishToMarket} disabled={isPublishing}
+                                                className="bg-pink-600 hover:bg-pink-500 text-white font-bold py-4 px-10 rounded-xl shadow-[0_0_20px_rgba(236,72,153,0.4)] transition-all flex items-center justify-center gap-3 mx-auto disabled:opacity-50"
+                                            >
+                                                {isPublishing ? <i className="ph-bold ph-spinner animate-spin text-2xl"></i> : <i className="ph-bold ph-cloud-arrow-up text-2xl"></i>} 
+                                                Udostępnij w Galerii
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                        </div>
+                    </main>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
