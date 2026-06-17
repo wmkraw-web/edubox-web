@@ -111,6 +111,7 @@
             // Stan formularza
             const [reportType, setReportType] = useState('Sprawozdanie z wycieczki / wydarzenia');
             const [eventName, setEventName] = useState('');
+            const [eventDate, setEventDate] = useState(new Date().toISOString().split('T')[0]); // Pole daty
             const [groupName, setGroupName] = useState('Pszczółki');
             const [rawNotes, setRawNotes] = useState('');
 
@@ -159,13 +160,13 @@
                 setResultData(null);
 
                 const sysPrompt = `Jesteś doradcą metodycznym i ekspertem ds. dokumentacji w edukacji przedszkolnej i wczesnoszkolnej. Twoim zadaniem jest zamienić luźne notatki nauczyciela na profesjonalne, wielostronicowe sprawozdanie / ewaluację (gotowe do przedstawienia Radzie Pedagogicznej lub do teczki awansu).
-Używaj bogatego słownictwa pedagogicznego (np. 'rozwój motoryki małej', 'integracja sensoryczna', 'kompetencje społeczne', 'postawy prospołeczne'). Pisz w sposób podniosły i formalny. Odnoś się do realizacji podstawy programowej.
+Używaj bogatego słownictwa pedagogicznego (np. 'rozwój motoryki małej', 'integracja sensoryczna', 'kompetencje społeczne', 'postawy prospołeczne'). Pisz w sposób podniosły i formalny. Zwróć szczególną uwagę na podaną datę realizacji i użyj odpowiednich form gramatycznych (czasu przeszłego dla minionych wydarzeń). Odnoś się do realizacji podstawy programowej.
 
 WYMÓG: Zwróć DOKŁADNIE TEN SZABLON JSON:
 {
   "report": {
     "title": "Oficjalny tytuł sprawozdania (np. Sprawozdanie z realizacji wycieczki...)",
-    "introduction": "Wstęp i ramy organizacyjne. Formalny opis kto, gdzie, kiedy i dlaczego wziął udział w wydarzeniu.",
+    "introduction": "Wstęp i ramy organizacyjne. Formalny opis kto, gdzie, kiedy i dlaczego wziął udział w wydarzeniu. Uwzględnij datę realizacji podaną przez użytkownika.",
     "objectives": ["Cel główny 1 (napisany profesjonalnie)", "Cel szczegółowy 1", "Cel szczegółowy 2", "Cel szczegółowy 3"],
     "description": "Obszerny, wielozdaniowy opis przebiegu wydarzenia ubrany w język pedagogiczny (np. zamiast 'dzieci się bawiły' -> 'wychowankowie mieli możliwość swobodnej eksploracji, co sprzyjało integracji grupy'). Minimum 3 rozbudowane akapity.",
     "conclusions": "Wypunktowane wnioski z realizacji, osiągnięte rezultaty edukacyjne i wychowawcze. Co to wydarzenie dało dzieciom (lub nauczycielowi w przypadku mentoringu)."
@@ -175,6 +176,7 @@ WYMÓG: Zwróć DOKŁADNIE TEN SZABLON JSON:
 
                 const prompt = `Typ dokumentu: ${reportType}
 Nazwa wydarzenia / Imię osoby: ${eventName}
+Data realizacji wydarzenia: ${eventDate}
 Grupa: ${groupName}
 Luźne notatki (rozbuduj je, ułóż chronologicznie i ubierz w język metodyczny): ${rawNotes}`;
 
@@ -182,7 +184,7 @@ Luźne notatki (rozbuduj je, ułóż chronologicznie i ubierz w język metodyczn
                     const aiText = await fetchTextAI(prompt, sysPrompt);
                     const parsedJson = parseAIResponse(aiText);
                     
-                    setResultData({ data: parsedJson, params: { reportType, eventName, groupName } });
+                    setResultData({ data: parsedJson, params: { reportType, eventName, groupName, eventDate } });
                     
                     if (!isPremium) {
                         const newCount = aiGenerations + 1;
@@ -222,6 +224,13 @@ Luźne notatki (rozbuduj je, ułóż chronologicznie i ubierz w język metodyczn
                 return () => { if (unsubscribe) unsubscribe(); }
             }, [appMode]);
 
+            // Funkcja do formatowania daty w czytelny sposób
+            const formatDate = (dateStr) => {
+                if (!dateStr) return '---';
+                const d = new Date(dateStr);
+                return isNaN(d.getTime()) ? dateStr : d.toLocaleDateString('pl-PL');
+            };
+
             const renderResult = () => {
                 if (!resultData || !resultData.data) return (
                     <div className="h-full flex flex-col items-center justify-center text-emerald-500/30 no-print">
@@ -231,16 +240,21 @@ Luźne notatki (rozbuduj je, ułóż chronologicznie i ubierz w język metodyczn
                 );
 
                 const { report, tip } = resultData.data;
+                const { groupName, eventDate } = resultData.params;
 
                 return (
                     <div className="space-y-8 animate-[reveal_0.4s_ease-out]">
                         <div className="bg-white text-slate-900 rounded-lg overflow-hidden print-card shadow-2xl relative">
                             <div className="p-10 md:p-14">
-                                <div className="text-center border-b border-slate-300 pb-6 mb-8">
+                                <div className="text-center border-b-2 border-slate-900 pb-6 mb-8">
                                     <h2 className="text-3xl font-black uppercase tracking-widest font-serif leading-tight">{report.title}</h2>
-                                    <p className="text-sm mt-3 font-semibold text-slate-600 uppercase tracking-widest">
-                                        Grupa / Oddział: <span className="text-slate-900 font-bold">{resultData.params.groupName}</span>
-                                    </p>
+                                    <div className="flex flex-col sm:flex-row justify-center items-center gap-2 sm:gap-8 text-xs mt-4 font-semibold text-slate-600 uppercase tracking-wider">
+                                        <p>Data sporządzenia: <span className="text-slate-900 font-bold">{formatDate(new Date())}</span></p>
+                                        <p className="hidden sm:block text-slate-300">•</p>
+                                        <p>Data realizacji: <span className="text-emerald-700 font-bold">{formatDate(eventDate)}</span></p>
+                                        <p className="hidden sm:block text-slate-300">•</p>
+                                        <p>Grupa: <span className="text-slate-900 font-bold">{groupName}</span></p>
+                                    </div>
                                 </div>
                                 
                                 <div className="mb-8">
@@ -350,6 +364,17 @@ Luźne notatki (rozbuduj je, ułóż chronologicznie i ubierz w język metodyczn
                                         <div className="space-y-1">
                                             <label className="text-[10px] font-bold text-slate-400 uppercase">Nazwa wycieczki / wydarzenia / nauczyciela</label>
                                             <input type="text" value={eventName} onChange={e => setEventName(e.target.value)} className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:border-emerald-500 transition-colors" placeholder="np. Wycieczka na Farmę Rzeszowską, Niebieskie Igrzyska" />
+                                        </div>
+                                        
+                                        {/* ZMIANA: NOWE POLE WYBORU DATY WYDARZENIA */}
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase">Data wydarzenia / realizacji</label>
+                                            <input 
+                                                type="date" 
+                                                value={eventDate} 
+                                                onChange={e => setEventDate(e.target.value)} 
+                                                className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:border-emerald-500 transition-colors" 
+                                            />
                                         </div>
 
                                         <div className="space-y-1">
