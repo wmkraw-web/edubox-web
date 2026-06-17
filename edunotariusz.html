@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduBox V3 PRO MAX - EduNotariusz AI</title>
+
+    <script src="https://unpkg.com/react@18.2.0/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone@7.23.6/babel.min.js"></script>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Playfair+Display:ital,wght@0,600;1,600&display=swap" rel="stylesheet">
+
+    <script type="module" src="global-core.js"></script>
+
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #0f172a; color: #f8fafc; overflow: hidden; }
+        .font-serif { font-family: 'Playfair Display', serif; }
+        
+        /* Custom Scrollbar */
+        .custom-scrollbar::-webkit-scrollbar { width: 8px; height: 8px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+        /* Auras - Urzędowy / Profesjonalny V3 PRO MAX */
+        .aura-container {
+            position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 0;
+        }
+        .aura-blob {
+            position: absolute; filter: blur(130px); border-radius: 50%; opacity: 0.25; animation: float 25s ease-in-out infinite alternate;
+        }
+        /* Złoty / Miedziany */
+        .aura-1 { top: -10%; left: -10%; width: 50vw; height: 50vw; background: radial-gradient(circle, rgba(217, 119, 6, 0.4) 0%, rgba(0,0,0,0) 70%); animation-delay: 0s; }
+        /* Głęboki Granat */
+        .aura-2 { bottom: -10%; right: -10%; width: 60vw; height: 60vw; background: radial-gradient(circle, rgba(30, 64, 175, 0.4) 0%, rgba(0,0,0,0) 70%); animation-delay: -5s; }
+        /* Szaroniebieski */
+        .aura-3 { top: 40%; left: 20%; width: 40vw; height: 40vw; background: radial-gradient(circle, rgba(71, 85, 105, 0.4) 0%, rgba(0,0,0,0) 70%); animation-delay: -10s; }
+
+        @keyframes float {
+            0% { transform: translate(0, 0) scale(1); }
+            100% { transform: translate(30px, -50px) scale(1.05); }
+        }
+
+        @media print {
+            body { background: white !important; color: black !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; overflow: visible !important; }
+            .no-print { display: none !important; }
+            .print-container { background: white !important; color: black !important; padding: 0 !important; width: 100% !important; overflow: visible !important; }
+            .print-card { break-inside: avoid; border: 1px solid #cbd5e1 !important; box-shadow: none !important; color: black !important; background: white !important; margin-bottom: 20px; border-radius: 0 !important; padding: 40px !important;}
+            .print-text { color: black !important; }
+            #root, main { height: auto !important; overflow: visible !important; }
+        }
+    </style>
+</head>
+<body>
+    <div id="root" class="h-screen flex flex-col"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // Pancerny Parser JSON 
+        const parseAIResponse = (aiOutput) => {
+            if (aiOutput && typeof aiOutput === 'object') {
+                if (aiOutput.document) return aiOutput;
+                if (aiOutput.text) aiOutput = aiOutput.text;
+                else if (aiOutput.content) aiOutput = aiOutput.content;
+            }
+
+            let text = String(aiOutput || "").trim();
+            text = text.replace(/```json/gi, '').replace(/```/g, '').trim();
+
+            try {
+                const startObj = text.indexOf('{');
+                const endObj = text.lastIndexOf('}');
+                
+                if (startObj !== -1 && endObj !== -1 && startObj < endObj) {
+                    let jsonStr = text.substring(startObj, endObj + 1);
+                    jsonStr = jsonStr.replace(/,\s*([\]}])/g, '$1');
+                    try {
+                        return JSON.parse(jsonStr);
+                    } catch (e1) {
+                        jsonStr = jsonStr.replace(/[\n\r\t]+/g, ' ');
+                        return JSON.parse(jsonStr);
+                    }
+                }
+                throw new Error("Brak nawiasów JSON.");
+            } catch (e) {
+                console.error("Błąd parsowania:", text, e);
+                throw new Error("BŁĄD Z SERWERA: Niepoprawny format dokumentu.");
+            }
+        };
+
+        // Fetcher OpenAI 
+        const fetchTextAI = async (prompt, systemInstruction) => {
+            const finalPrompt = `INSTRUKCJA: Zwróć DOKŁADNIE i WYŁĄCZNIE czysty kod JSON. Nie używaj znaczników markdown. Używaj wyłącznie apostrofów ('), unikaj cudzysłowów (") wewnątrz tekstów.
+${systemInstruction}
+ZADANIE DO WYKONANIA:
+${prompt}`;
+
+            try {
+                const res = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt: finalPrompt, system: systemInstruction, format: "json" })
+                });
+                
+                if (res.ok) {
+                    const data = await res.json();
+                    return data.text || data.response || data.message || data.content || data;
+                } else {
+                    const errData = await res.text();
+                    throw new Error(`Błąd API ${res.status}: ${errData}`);
+                }
+            } catch(e) { 
+                throw new Error("Brak połączenia z serwerem API. " + e.message);
+            }
+        };
+
+        function App() {
+            const [user, setUser] = useState(null);
+            const [appMode, setAppMode] = useState('kreator'); 
+            const [isPremium, setIsPremium] = useState(false);
+            const [premiumCode, setPremiumCode] = useState('');
+            const [aiGenerations, setAiGenerations] = useState(0);
+            const [message, setMessage] = useState(null);
+            const [isGenerating, setIsGenerating] = useState(false);
+            const [resultData, setResultData] = useState(null);
+
+            // Form States
+            const [docType, setDocType] = useState('Notatka służbowa z trudnej rozmowy');
+            const [participants, setParticipants] = useState('');
+            const [rawNotes, setRawNotes] = useState('');
+
+            const [marketItems, setMarketItems] = useState([]);
+            const [isFetchingMarket, setIsFetchingMarket] = useState(false);
+            const [isPublishing, setIsPublishing] = useState(false);
+
+            useEffect(() => {
+                const initDb = () => {
+                    if (typeof window !== 'undefined' && window.EduBoxCore) {
+                        window.EduBoxCore.init((u) => setUser(u));
+                    } else {
+                        setTimeout(initDb, 100);
+                    }
+                };
+                initDb();
+                
+                try {
+                    const savedGens = window.localStorage.getItem('edubox_edunotariusz_ai');
+                    if (savedGens) setAiGenerations(parseInt(savedGens));
+                    const savedPremium = window.localStorage.getItem('edubox_premium');
+                    if (savedPremium === 'KAWA2024') setIsPremium(true);
+                } catch (e) {}
+            }, []);
+
+            const showMessage = (text, type = 'success') => {
+                setMessage({ text, type });
+                setTimeout(() => setMessage(null), 3000);
+            };
+
+            const handlePremiumCheck = () => {
+                if (premiumCode.toUpperCase() === 'KAWA2024') {
+                    setIsPremium(true); 
+                    try { window.localStorage.setItem('edubox_premium', 'KAWA2024'); } catch(e) {}
+                    setPremiumCode('');
+                    showMessage('Kod Premium zaakceptowany!', 'success');
+                } else { showMessage('Nieprawidłowy kod', 'error'); }
+            };
+
+            const copyToClipboard = (text) => {
+                navigator.clipboard.writeText(text).then(() => showMessage('Skopiowano do schowka!', 'success'));
+            };
+
+            const generateContent = async () => {
+                if (!rawNotes.trim()) {
+                    showMessage('Opisz krótko sytuację.', 'error');
+                    return;
+                }
+
+                if (!isPremium && aiGenerations >= 3) {
+                    showMessage('Limit darmowych generacji wyczerpany.', 'error');
+                    return;
+                }
+                
+                setIsGenerating(true);
+                setResultData(null);
+
+                const sysPrompt = `Jesteś prawnikiem oświatowym i wybitnym metodykiem. Twoim zadaniem jest zamienić chaotyczne, emocjonalne notatki nauczyciela na chłodny, ultra-profesjonalny, obiektywny dokument urzędowy (notatkę służbową, protokół), który w razie konfliktu będzie stanowił żelazną tarcze ochronną dla nauczyciela.
+Używaj strony biernej, form bezosobowych ("ustalono", "poinformowano") i chłodnego języka. Usuń wszelkie nacechowanie emocjonalne.
+
+WYMÓG: Zwróć DOKŁADNIE TEN SZABLON JSON:
+{
+  "document": {
+    "title": "Oficjalny tytuł dokumentu (np. Notatka służbowa z dnia...)",
+    "participants": "Sformalizowana lista uczestników (np. Wychowawca grupy, prawny opiekun dziecka)",
+    "content": "Główna, bardzo obszerna treść dokumentu. Rzeczowy opis sytuacji, przebieg zdarzenia/rozmowy zapisany językiem formalnym i obiektywnym. Powinno to składać się z minimum 3 rozbudowanych akapitów.",
+    "conclusions": "Wypunktowane ustalenia końcowe, zobowiązania stron lub podjęte kroki (np. 1. Zobowiązano rodzica do... 2. Poinformowano o możliwości...)"
+  },
+  "legal_shield": "Krótka, jednozdaniowa porada od AI dla nauczyciela (np. Pamiętaj, aby dokument został podpisany przez wszystkich obecnych, a w razie odmowy sporządź adnotację 'Rodzic odmówił podpisu')."
+}`;
+
+                const prompt = `Typ dokumentu: ${docType}
+Osoby zaangażowane: ${participants}
+Chaotyczne notatki od nauczyciela (ZAMIEŃ TO NA JĘZYK FORMALNY): ${rawNotes}`;
+
+                try {
+                    const aiText = await fetchTextAI(prompt, sysPrompt);
+                    const parsedJson = parseAIResponse(aiText);
+                    
+                    setResultData({ data: parsedJson, params: { docType, participants } });
+                    
+                    if (!isPremium) {
+                        const newCount = aiGenerations + 1;
+                        setAiGenerations(newCount);
+                        try { window.localStorage.setItem('edubox_edunotariusz_ai', newCount.toString()); } catch(e) {}
+                    }
+                    showMessage('Wygenerowano profesjonalny dokument!', 'success');
+                } catch (error) {
+                    showMessage(error.message, 'error');
+                } finally {
+                    setIsGenerating(false);
+                }
+            };
+
+            const publishToMarket = async () => {
+                if (!resultData || !user) { showMessage('Błąd autoryzacji bazy.', 'error'); return; }
+                setIsPublishing(true);
+                try {
+                    await window.EduBoxCore.saveToGielda('edunotariusz_market', 'edunotariusz', docType, resultData);
+                    showMessage('Opublikowano w Bazie Wzorów!', 'success');
+                    setAppMode('gielda');
+                } catch (error) {
+                    showMessage(error.message || 'Błąd publikacji.', 'error');
+                } finally {
+                    setIsPublishing(false);
+                }
+            };
+
+            useEffect(() => {
+                let unsubscribe = null;
+                if (appMode === 'gielda') {
+                    setIsFetchingMarket(true);
+                    const checkAndSub = () => {
+                        if(window.EduBoxCore && window.EduBoxCore.subscribeToGielda) {
+                            unsubscribe = window.EduBoxCore.subscribeToGielda('edunotariusz_market', (items) => {
+                                setMarketItems(items);
+                                setIsFetchingMarket(false);
+                            }, (err) => { setIsFetchingMarket(false); });
+                        } else { setTimeout(checkAndSub, 100); }
+                    };
+                    checkAndSub();
+                }
+                return () => { if (unsubscribe) unsubscribe(); }
+            }, [appMode]);
+
+            const renderResult = () => {
+                if (!resultData || !resultData.data) return (
+                    <div className="h-full flex flex-col items-center justify-center text-amber-500/30 no-print">
+                        <i className="ph-fill ph-shield-check text-7xl mb-6 animate-pulse"></i>
+                        <p className="font-bold text-center text-lg text-slate-400">Opisz trudną sytuację w panelu bocznym,<br/>a my przekujemy to w urzędową tarczę ochronną.</p>
+                    </div>
+                );
+
+                const { document, legal_shield } = resultData.data;
+
+                return (
+                    <div className="space-y-8 animate-[reveal_0.4s_ease-out]">
+                        
+                        {/* Karta Dokumentu */}
+                        <div className="bg-white text-slate-900 rounded-lg overflow-hidden print-card shadow-2xl relative">
+                            <div className="p-10 md:p-14">
+                                <div className="text-center border-b-2 border-slate-900 pb-6 mb-8">
+                                    <h2 className="text-2xl font-black uppercase tracking-widest font-serif">{document.title}</h2>
+                                    <p className="text-sm mt-2 font-medium text-slate-600">Sporządzono dnia: {new Date().toLocaleDateString('pl-PL')}</p>
+                                </div>
+                                
+                                <div className="mb-8">
+                                    <h3 className="font-bold uppercase text-xs tracking-wider text-slate-500 mb-2">Obecni:</h3>
+                                    <p className="font-medium text-slate-800">{document.participants}</p>
+                                </div>
+
+                                <div className="mb-8">
+                                    <h3 className="font-bold uppercase text-xs tracking-wider text-slate-500 mb-2">Przebieg zdarzenia / rozmowy:</h3>
+                                    <div className="text-slate-800 leading-relaxed whitespace-pre-wrap text-justify">
+                                        {document.content}
+                                    </div>
+                                </div>
+
+                                <div className="mb-16">
+                                    <h3 className="font-bold uppercase text-xs tracking-wider text-slate-500 mb-2">Ustalenia i wnioski końcowe:</h3>
+                                    <div className="text-slate-800 leading-relaxed whitespace-pre-wrap bg-slate-50 p-6 border border-slate-200 rounded-md">
+                                        {document.conclusions}
+                                    </div>
+                                </div>
+
+                                <div className="flex justify-between mt-20 pt-10 border-t border-slate-300">
+                                    <div className="text-center w-1/3">
+                                        <div className="border-b border-slate-400 h-10 mb-2"></div>
+                                        <p className="text-xs text-slate-500 uppercase tracking-wider">Podpis Nauczyciela</p>
+                                    </div>
+                                    <div className="text-center w-1/3">
+                                        <div className="border-b border-slate-400 h-10 mb-2"></div>
+                                        <p className="text-xs text-slate-500 uppercase tracking-wider">Podpis Rodzica / Świadka</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Legal Shield Note (No Print) */}
+                        <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-6 flex gap-4 no-print shadow-lg">
+                            <i className="ph-fill ph-warning-circle text-amber-500 text-3xl shrink-0"></i>
+                            <div>
+                                <h4 className="font-bold text-amber-400 mb-1 uppercase tracking-widest text-xs">Porada Prawno-Metodyczna</h4>
+                                <p className="text-sm text-amber-200/80 leading-relaxed">{legal_shield}</p>
+                            </div>
+                        </div>
+
+                        {/* ZMIANA: PRZYCISK DO CHMURY W GŁÓWNYM WIDOKU */}
+                        <div className="mt-10 bg-slate-900 border border-blue-500/30 rounded-3xl p-8 text-center relative overflow-hidden group no-print shadow-xl">
+                            <div className="absolute inset-0 bg-gradient-to-r from-blue-600/10 to-amber-500/10 z-0"></div>
+                            <div className="relative z-10">
+                                <h3 className="text-xl font-bold text-white mb-2">Zapisz wzór dokumentu</h3>
+                                <p className="text-slate-400 text-sm mb-6 max-w-lg mx-auto">Dodaj ten zanonimizowany profesjonalny wzór do naszej Bazy Wzorów, aby pomóc innym w konstruowaniu poprawnych pism.</p>
+                                <button 
+                                    onClick={publishToMarket} 
+                                    disabled={isPublishing}
+                                    className="bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 px-10 rounded-xl shadow-[0_0_20px_rgba(37,99,235,0.4)] hover:shadow-[0_0_30px_rgba(37,99,235,0.6)] transition-all flex items-center justify-center gap-3 mx-auto disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {isPublishing ? <i className="ph-bold ph-spinner animate-spin text-2xl"></i> : <i className="ph-bold ph-cloud-arrow-up text-2xl"></i>} 
+                                    Opublikuj wzór w Bazie
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            };
+
+            return (
+                <div className="flex h-screen w-full bg-slate-950 text-slate-200 overflow-hidden relative selection:bg-amber-500/30">
+                    
+                    <div className="aura-container no-print">
+                        <div className="aura-blob aura-1"></div>
+                        <div className="aura-blob aura-2"></div>
+                        <div className="aura-blob aura-3"></div>
+                    </div>
+
+                    {message && (
+                        <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 px-6 py-3 rounded-full text-sm font-bold shadow-2xl flex items-center gap-2 animate-bounce ${message.type === 'error' ? 'bg-red-500 text-white' : 'bg-green-500 text-white'}`}>
+                            <i className={`ph-bold ${message.type === 'error' ? 'ph-warning-circle' : 'ph-check-circle'} text-lg`}></i>
+                            {message.text}
+                        </div>
+                    )}
+
+                    <aside className="w-80 flex-shrink-0 bg-slate-900/80 backdrop-blur-xl border-r border-slate-800 flex flex-col h-full z-10 no-print transition-all duration-300">
+                        <div className="p-6 border-b border-slate-800 flex items-center gap-3">
+                            <div className="w-10 h-10 bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl flex items-center justify-center shadow-lg shadow-amber-500/20">
+                                <i className="ph-bold ph-scales text-white text-xl"></i>
+                            </div>
+                            <div>
+                                <h1 className="text-xl font-black tracking-tight text-white leading-none uppercase">EduNotariusz</h1>
+                                <p className="text-[10px] text-amber-400 font-bold tracking-wider uppercase mt-1">Tarcza Nauczyciela</p>
+                            </div>
+                        </div>
+
+                        <div className="px-4 py-3 flex gap-2 border-b border-slate-800">
+                            <button 
+                                onClick={() => setAppMode('kreator')} 
+                                className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${appMode === 'kreator' ? 'bg-amber-500 text-slate-900 shadow-lg shadow-amber-500/30' : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white'}`}
+                            >
+                                <i className="ph-bold ph-file-text"></i> Nowe Pismo
+                            </button>
+                            <button 
+                                onClick={() => setAppMode('gielda')} 
+                                className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${appMode === 'gielda' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30' : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white'}`}
+                            >
+                                <i className="ph-bold ph-folder-open"></i> Baza Wzorów
+                            </button>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-6">
+                            
+                            {appMode === 'kreator' && (
+                                <>
+                                    <div className="space-y-4 bg-slate-900 border border-slate-800 rounded-2xl p-4">
+                                        <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest border-b border-slate-800 pb-2 mb-2 flex items-center gap-2">
+                                            <i className="ph-bold ph-pencil-simple"></i> Dane Dokumentu
+                                        </div>
+
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase">Typ dokumentu</label>
+                                            <select value={docType} onChange={e => setDocType(e.target.value)} className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:border-amber-500">
+                                                <option>Notatka służbowa z trudnej rozmowy</option>
+                                                <option>Protokół z zebrania z rodzicami</option>
+                                                <option>Wniosek o wsparcie psychologiczne ucznia</option>
+                                                <option>Zgłoszenie naruszenia dyscypliny</option>
+                                            </select>
+                                        </div>
+
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase">Kto brał udział?</label>
+                                            <input type="text" value={participants} onChange={e => setParticipants(e.target.value)} className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:border-amber-500 transition-colors" placeholder="np. Wychowawca Pszczółek, mama Ani" />
+                                        </div>
+
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase">Twoje chaotyczne notatki</label>
+                                            <textarea 
+                                                value={rawNotes} 
+                                                onChange={e => setRawNotes(e.target.value)} 
+                                                className="w-full h-32 bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:border-amber-500 transition-colors resize-none" 
+                                                placeholder="Opisz tu swoimi słowami, nawet na szybko, z błędami i emocjami, co się dokładnie wydarzyło..." 
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-3 pt-2">
+                                        <button 
+                                            onClick={generateContent} disabled={isGenerating}
+                                            className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-900 font-black py-4 rounded-2xl shadow-[0_0_20px_rgba(245,158,11,0.3)] transition-all flex items-center justify-center gap-2"
+                                        >
+                                            {isGenerating ? <i className="ph-bold ph-spinner animate-spin text-xl"></i> : <i className="ph-bold ph-magic-wand text-xl"></i>} 
+                                            Generuj Dokument
+                                        </button>
+                                        
+                                        {resultData && (
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <button onClick={() => window.print()} className="bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 rounded-xl transition-all flex justify-center items-center gap-2 text-xs">
+                                                    <i className="ph-bold ph-printer text-lg"></i> PDF 
+                                                </button>
+                                                <button onClick={() => copyToClipboard(resultData.data.document.content)} className="bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 rounded-xl transition-all flex justify-center items-center gap-2 text-xs">
+                                                    <i className="ph-bold ph-copy text-lg"></i> Kopiuj 
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                </>
+                            )}
+
+                            {appMode === 'gielda' && (
+                                <div className="space-y-4 pb-6">
+                                    <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4 text-center">
+                                        <i className="ph-fill ph-folder-open text-3xl text-blue-400 mb-2"></i>
+                                        <h3 className="text-sm font-bold text-white mb-1">Baza Wzorów</h3>
+                                        <p className="text-[10px] text-slate-400">Skorzystaj z gotowych, zanonimizowanych szablonów przygotowanych przez innych.</p>
+                                    </div>
+
+                                    {isFetchingMarket ? (
+                                        <div className="flex justify-center py-10"><i className="ph-bold ph-spinner animate-spin text-3xl text-slate-500"></i></div>
+                                    ) : marketItems.length === 0 ? (
+                                        <div className="text-center py-10 text-slate-500 text-xs font-bold">Brak wzorów w bazie.</div>
+                                    ) : (
+                                        <div className="space-y-3">
+                                            {marketItems.map(item => (
+                                                <div key={item.id} className="bg-slate-800 rounded-xl p-4 border border-slate-700 hover:border-blue-500 transition-colors group cursor-pointer" onClick={() => { setResultData(item.config); setAppMode('kreator'); showMessage('Wczytano dokument!', 'success'); }}>
+                                                    <div className="flex justify-between items-start mb-2">
+                                                        <span className="text-xs font-black text-white flex items-center gap-1 line-clamp-1"><i className="ph-fill ph-file-text text-blue-400"></i> {item.config?.data?.document?.title || item.name}</span>
+                                                    </div>
+                                                    <p className="text-[10px] text-slate-300 italic line-clamp-2 mb-2">{item.config?.data?.document?.conclusions}</p>
+                                                    <div className="text-[9px] text-amber-400 flex items-center gap-1">
+                                                        <i className="ph-bold ph-eye"></i> Podgląd dokumentu
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                        </div>
+
+                        <div className="p-4 border-t border-slate-800 bg-slate-950/50">
+                            {!isPremium ? (
+                                <div className="space-y-2 mb-2">
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-[10px] font-bold text-slate-400 uppercase">Status PRO</span>
+                                        <span className="text-[10px] font-bold text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded-full">{3 - aiGenerations} darmowe</span>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <input 
+                                            type="text" value={premiumCode} onChange={(e) => setPremiumCode(e.target.value)}
+                                            placeholder="Kod Premium" 
+                                            className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:border-amber-500 uppercase"
+                                        />
+                                        <button onClick={handlePremiumCheck} className="bg-slate-800 hover:bg-slate-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold border border-slate-700 transition-all">OK</button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="flex items-center gap-3 bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/30 p-3 rounded-xl mb-2">
+                                    <i className="ph-fill ph-crown text-2xl text-amber-400"></i>
+                                    <div>
+                                        <p className="text-xs font-bold text-white">Wersja PRO MAX</p>
+                                        <p className="text-[9px] text-amber-300">Wszystkie limity odblokowane</p>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </aside>
+
+                    <main className="flex-1 flex flex-col relative z-10 overflow-hidden">
+                        <div className="flex-1 overflow-y-auto custom-scrollbar p-6 lg:p-12 print-container relative">
+                            <div className="max-w-4xl mx-auto pb-32">
+                                {renderResult()}
+                            </div>
+                        </div>
+                    </main>
+
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
