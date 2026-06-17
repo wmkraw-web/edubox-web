@@ -15,7 +15,10 @@
 
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Caveat:wght@600;700&display=swap" rel="stylesheet">
 
-    <script type="module" src="global-core.js"></script>
+    <script type="module">
+        import { EduBoxCore } from './global-core.js';
+        window.EduBoxCore = EduBoxCore;
+    </script>
 
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #020617; color: #f8fafc; overflow: hidden; }
@@ -58,7 +61,6 @@
 
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
-        const apiKey = ""; 
 
         // Pancerny Parser JSON 
         const parseAIResponse = (aiOutput) => {
@@ -125,7 +127,7 @@ ${prompt}`;
                 }
             } catch(e) { 
                 console.error("Vercel API (/api/chat) zawiodło:", e);
-                throw new Error("Brak połączenia z Twoim serwerem OpenAI na Vercelu. Szczegóły: " + e.message);
+                throw new Error("Brak połączenia z serwerem API. Szczegóły: " + e.message);
             }
         };
 
@@ -152,9 +154,15 @@ ${prompt}`;
             const [isPublishing, setIsPublishing] = useState(false);
 
             useEffect(() => {
-                if (typeof window !== 'undefined' && window.EduBoxCore && window.EduBoxCore.onUserChange) {
-                    window.EduBoxCore.onUserChange((u) => setUser(u));
-                }
+                // Bezpieczne wczytanie bazy z modułu (dopasowane do global-core.js)
+                const initDb = () => {
+                    if (typeof window !== 'undefined' && window.EduBoxCore) {
+                        window.EduBoxCore.init((u) => setUser(u));
+                    } else {
+                        setTimeout(initDb, 100);
+                    }
+                };
+                initDb();
                 
                 try {
                     const savedGens = window.localStorage.getItem('edubox_edudetox_ai');
@@ -198,7 +206,6 @@ ${prompt}`;
                 setIsGenerating(true);
                 setResultData(null);
 
-                // ZMIANA: Mocno rozbudowany prompt systemowy zmuszający AI do generowania długich tekstów
                 const sysPrompt = `Jesteś wybitnym, sarkastycznym, ale pełnym ciepła ekspertem od work-life balance dla skrajnie wyczerpanych nauczycieli. Twoim celem jest przygotowanie "Recepty na Detoks" po ciężkim roku szkolnym.
 Bądź BARDZO kreatywny, rozpisz się, używaj bogatego słownictwa, trafnych szkolnych nawiązań i solidnej dawki inteligentnego humoru. Odpowiedzi mają być obszerne i szczegółowe.
 
@@ -238,30 +245,42 @@ WYMÓG: Zwróć DOKŁADNIE TEN SZABLON JSON (nie zmieniaj kluczy!):
             };
 
             const publishToMarket = async () => {
-                if (!resultData || !user) { showMessage('Błąd autoryzacji bazy. Sprawdź plik global-core.js.', 'error'); return; }
+                if (!resultData || !user) { showMessage('Błąd autoryzacji bazy. Zaloguj się lub odśwież stronę.', 'error'); return; }
                 setIsPublishing(true);
                 try {
-                    await window.EduBoxCore.publishToMarket(resultData);
+                    // Integracja z plikiem global-core.js: (collectionName, appType, itemName, config)
+                    await window.EduBoxCore.saveToGielda('edudetox_market', 'edudetox', subject, resultData);
                     showMessage('Opublikowano na Giełdzie Humorów!', 'success');
                     setAppMode('gielda');
-                    loadMarket();
                 } catch (error) {
-                    showMessage('Błąd publikacji na giełdzie.', 'error');
+                    showMessage(error.message || 'Błąd publikacji na giełdzie.', 'error');
                 } finally {
                     setIsPublishing(false);
                 }
             };
 
-            const loadMarket = async () => {
-                setIsFetchingMarket(true);
-                try {
-                    const items = await window.EduBoxCore.fetchMarket();
-                    setMarketItems(items);
-                } catch (error) { showMessage('Błąd ładowania giełdy.', 'error'); } 
-                finally { setIsFetchingMarket(false); }
-            };
-
-            useEffect(() => { if (appMode === 'gielda') loadMarket(); }, [appMode]);
+            // Nasłuch na giełdę (integracja z plikiem global-core.js)
+            useEffect(() => {
+                let unsubscribe = null;
+                if (appMode === 'gielda') {
+                    setIsFetchingMarket(true);
+                    const checkAndSub = () => {
+                        if(window.EduBoxCore) {
+                            unsubscribe = window.EduBoxCore.subscribeToGielda('edudetox_market', (items) => {
+                                setMarketItems(items);
+                                setIsFetchingMarket(false);
+                            }, (err) => {
+                                showMessage('Błąd ładowania giełdy.', 'error');
+                                setIsFetchingMarket(false);
+                            });
+                        } else {
+                            setTimeout(checkAndSub, 100);
+                        }
+                    };
+                    checkAndSub();
+                }
+                return () => { if (unsubscribe) unsubscribe(); }
+            }, [appMode]);
 
             // --- KOMPONENT RENDERUJĄCY WYNIKI ---
             const renderResult = () => {
@@ -340,7 +359,7 @@ WYMÓG: Zwróć DOKŁADNIE TEN SZABLON JSON (nie zmieniaj kluczy!):
                             )}
                         </div>
 
-                        {/* ZMIANA: PRZYCISK DO CHMURY W GŁÓWNYM WIDOKU */}
+                        {/* Duży Przycisk Giełdy na dole ekranu */}
                         <div className="mt-10 bg-slate-900 border border-purple-500/30 rounded-3xl p-8 text-center relative overflow-hidden group no-print shadow-xl">
                             <div className="absolute inset-0 bg-gradient-to-r from-purple-600/10 to-teal-500/10 z-0"></div>
                             <div className="relative z-10">
@@ -464,7 +483,7 @@ WYMÓG: Zwróć DOKŁADNIE TEN SZABLON JSON (nie zmieniaj kluczy!):
                                         {resultData && (
                                             <div className="grid grid-cols-1 gap-2">
                                                 <button onClick={() => window.print()} className="bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 rounded-xl transition-all flex justify-center items-center gap-2 text-xs">
-                                                    <i className="ph-bold ph-printer text-lg"></i> Drukuj 
+                                                    <i className="ph-bold ph-printer text-lg"></i> Drukuj do PDF
                                                 </button>
                                             </div>
                                         )}
@@ -488,12 +507,12 @@ WYMÓG: Zwróć DOKŁADNIE TEN SZABLON JSON (nie zmieniaj kluczy!):
                                     ) : (
                                         <div className="space-y-3">
                                             {marketItems.map(item => (
-                                                <div key={item.id} className="bg-slate-800 rounded-xl p-4 border border-slate-700 hover:border-purple-500 transition-colors group cursor-pointer" onClick={() => { setResultData(item); setAppMode('kreator'); showMessage('Wczytano plan!', 'success'); }}>
+                                                <div key={item.id} className="bg-slate-800 rounded-xl p-4 border border-slate-700 hover:border-purple-500 transition-colors group cursor-pointer" onClick={() => { setResultData(item.config); setAppMode('kreator'); showMessage('Wczytano plan!', 'success'); }}>
                                                     <div className="flex justify-between items-start mb-2">
-                                                        <span className="text-xs font-black text-white flex items-center gap-1"><i className="ph-fill ph-user-circle text-purple-400"></i> {item.params?.subject}</span>
-                                                        <span className="text-[9px] bg-slate-900 text-slate-400 px-2 py-0.5 rounded-full">{item.params?.years}</span>
+                                                        <span className="text-xs font-black text-white flex items-center gap-1"><i className="ph-fill ph-user-circle text-purple-400"></i> {item.config?.params?.subject || item.name}</span>
+                                                        <span className="text-[9px] bg-slate-900 text-slate-400 px-2 py-0.5 rounded-full">{item.config?.params?.years || 'Brak danych'}</span>
                                                     </div>
-                                                    <p className="text-[10px] text-slate-300 font-bold italic line-clamp-3 mb-2">"{item.data?.quote}"</p>
+                                                    <p className="text-[10px] text-slate-300 font-bold italic line-clamp-3 mb-2">"{item.config?.data?.quote}"</p>
                                                     <div className="text-[9px] text-teal-400 flex items-center gap-1">
                                                         <i className="ph-bold ph-envelope"></i> Zobacz autoresponder
                                                     </div>
