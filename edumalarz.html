@@ -35,11 +35,34 @@
             100% { transform: translate(30px, -50px) scale(1.05); }
         }
 
+        /* Ustawienia Studia Wydruku A4 */
+        @media screen {
+            .print-only { display: none !important; }
+        }
+
         @media print {
-            body { background: white !important; color: black !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; overflow: visible !important; }
+            @page { size: A4 portrait; margin: 10mm; }
+            body { background: white !important; margin: 0; padding: 0; }
             .no-print { display: none !important; }
-            .print-container { background: white !important; color: black !important; padding: 0 !important; width: 100% !important; overflow: visible !important; }
-            #root, main { height: auto !important; overflow: visible !important; }
+            .print-only { display: block !important; width: 100%; height: 100%; }
+            
+            .a4-grid {
+                display: grid;
+                width: 100%;
+                height: 100%;
+                gap: 15px;
+                justify-items: center;
+                align-items: center;
+            }
+            
+            /* Siatki w zależności od wyboru użytkownika */
+            .grid-1 { grid-template-columns: 1fr; grid-template-rows: 1fr; } /* 1 na A4 (Dyplom) */
+            .grid-2 { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; } /* 2 na A4 (A5) */
+            .grid-4 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; } /* 4 na A4 (A6) */
+            .grid-6 { grid-template-columns: repeat(2, 1fr); grid-template-rows: repeat(3, 1fr); } /* 6 na A4 (Duże medale) */
+            .grid-9 { grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); } /* 9 na A4 (Naklejki) */
+            
+            .print-item { max-width: 100%; max-height: 100%; object-fit: contain; }
         }
     </style>
 </head>
@@ -49,6 +72,48 @@
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
 
+        // Pancerny Parser JSON 
+        const parseAIResponse = (aiOutput) => {
+            if (aiOutput && typeof aiOutput === 'object') {
+                if (aiOutput.english_prompt) return aiOutput;
+                if (aiOutput.text) aiOutput = aiOutput.text;
+                else if (aiOutput.content) aiOutput = aiOutput.content;
+            }
+            let text = String(aiOutput || "").trim();
+            text = text.replace(/```json/gi, '').replace(/```/g, '').trim();
+            try {
+                const startObj = text.indexOf('{');
+                const endObj = text.lastIndexOf('}');
+                if (startObj !== -1 && endObj !== -1 && startObj < endObj) {
+                    let jsonStr = text.substring(startObj, endObj + 1);
+                    jsonStr = jsonStr.replace(/,\s*([\]}])/g, '$1');
+                    try { return JSON.parse(jsonStr); } catch (e1) { return JSON.parse(jsonStr.replace(/[\n\r\t]+/g, ' ')); }
+                }
+                throw new Error("Brak nawiasów JSON.");
+            } catch (e) {
+                console.error("Błąd parsowania:", text, e);
+                throw new Error("BŁĄD Z SERWERA: Niepoprawny format dokumentu.");
+            }
+        };
+
+        // Fetcher OpenAI dla Tłumacza
+        const fetchTextAI = async (prompt, systemInstruction) => {
+            const finalPrompt = `INSTRUKCJA: Zwróć DOKŁADNIE i WYŁĄCZNIE czysty kod JSON. Nie używaj znaczników markdown.\n\n${systemInstruction}\n\nZADANIE DO WYKONANIA:\n${prompt}`;
+            try {
+                const res = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt: finalPrompt, system: systemInstruction, format: "json" })
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    return data.text || data.response || data.message || data.content || data;
+                } else {
+                    throw new Error(`Błąd Tłumacza API`);
+                }
+            } catch(e) { throw new Error("Brak połączenia z Tłumaczem. " + e.message); }
+        };
+
         function App() {
             const [user, setUser] = useState(null);
             const [appMode, setAppMode] = useState('kreator'); 
@@ -56,14 +121,19 @@
             const [premiumCode, setPremiumCode] = useState('');
             const [aiGenerations, setAiGenerations] = useState(0);
             const [message, setMessage] = useState(null);
+            
             const [isGenerating, setIsGenerating] = useState(false);
+            const [genStatus, setGenStatus] = useState('');
             
             // Image State
             const [prompt, setPrompt] = useState('');
-            const [customText, setCustomText] = useState(''); // NOWE POLE NA TEKST
+            const [customText, setCustomText] = useState('');
             const [imageStyle, setImageStyle] = useState('akwarela');
             const [format, setFormat] = useState('medal');
             const [resultImageUrl, setResultImageUrl] = useState(null);
+            
+            // Print State
+            const [printLayout, setPrintLayout] = useState(6);
 
             const [marketItems, setMarketItems] = useState([]);
             const [isFetchingMarket, setIsFetchingMarket] = useState(false);
@@ -84,9 +154,17 @@
                 } catch (e) {}
             }, []);
 
+            // Automatyczne dopasowanie siatki wydruku do wybranego formatu
+            useEffect(() => {
+                if (format === 'medal') setPrintLayout(6);
+                else if (format === 'naklejka') setPrintLayout(9);
+                else if (format === 'zaproszenie') setPrintLayout(4);
+                else if (format === 'dyplom') setPrintLayout(1);
+            }, [format]);
+
             const showMessage = (text, type = 'success') => {
                 setMessage({ text, type });
-                setTimeout(() => setMessage(null), 3000);
+                setTimeout(() => setMessage(null), 3500);
             };
 
             const handlePremiumCheck = () => {
@@ -106,11 +184,22 @@
                 setResultImageUrl(null);
 
                 try {
+                    // ETAP 1: TŁUMACZ (OpenAI)
+                    setGenStatus('Tłumaczenie na język AI...');
+                    const transSys = `Jesteś ekspertem od promptów graficznych. Przetłumacz poniższy opis polskiego użytkownika na perfekcyjny, bogaty w detale język angielski. Skup się wyłącznie na wizualnych aspektach.
+WYMÓG: Zwróć DOKŁADNIE TEN SZABLON JSON:
+{ "english_prompt": "english translation here" }`;
+                    
+                    const aiText = await fetchTextAI(prompt, transSys);
+                    const parsedTrans = parseAIResponse(aiText);
+                    const englishPrompt = parsedTrans.english_prompt || prompt;
+
+                    // ETAP 2: MALARZ (Fal.ai Flux)
+                    setGenStatus('Malowanie arcydzieła...');
                     const res = await fetch('/api/malarz', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        // DODANO customText DO WYSYŁKI
-                        body: JSON.stringify({ prompt, style: imageStyle, format, customText })
+                        body: JSON.stringify({ prompt: englishPrompt, style: imageStyle, format, customText })
                     });
                     
                     if (!res.ok) {
@@ -131,6 +220,7 @@
                     showMessage(error.message, 'error'); 
                 } finally { 
                     setIsGenerating(false); 
+                    setGenStatus('');
                 }
             };
 
@@ -165,10 +255,22 @@
 
             return (
                 <div className="flex h-screen w-full bg-slate-950 text-slate-200 overflow-hidden relative selection:bg-pink-500/30">
+                    
+                    {/* Elementy drukowane pojawiające się tylko podczas CTRL+P */}
+                    {resultImageUrl && (
+                        <div className="print-only">
+                            <div className={`a4-grid grid-${printLayout}`}>
+                                {Array.from({ length: printLayout }).map((_, i) => (
+                                    <img key={i} src={resultImageUrl} className="print-item" alt="Druk" />
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
                     <div className="aura-container no-print"><div className="aura-blob aura-1"></div><div className="aura-blob aura-2"></div><div className="aura-blob aura-3"></div></div>
 
                     {message && (
-                        <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 px-6 py-3 rounded-full text-sm font-bold shadow-2xl flex items-center gap-2 animate-bounce ${message.type === 'error' ? 'bg-red-500 text-white' : 'bg-pink-500 text-white'}`}>
+                        <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 px-6 py-3 rounded-full text-sm font-bold shadow-2xl flex items-center gap-2 animate-bounce ${message.type === 'error' ? 'bg-red-500 text-white' : 'bg-pink-500 text-white'} no-print`}>
                             <i className={`ph-bold ${message.type === 'error' ? 'ph-warning-circle' : 'ph-check-circle'} text-lg`}></i> {message.text}
                         </div>
                     )}
@@ -234,26 +336,15 @@
                                                 value={prompt} 
                                                 onChange={e => setPrompt(e.target.value)} 
                                                 className="w-full h-24 bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:border-pink-500 transition-colors resize-none" 
-                                                placeholder="np. Uśmiechnięta, żółto-czarna pszczółka z kwiatkiem w łapce..." 
+                                                placeholder="Wpisz po polsku, np. Uśmiechnięta pszczółka z kwiatkiem..." 
                                             />
                                         </div>
                                     </div>
 
                                     <div className="space-y-3 pt-2">
                                         <button onClick={generateContent} disabled={isGenerating} className="w-full bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-400 hover:to-purple-400 text-white font-black py-4 rounded-2xl shadow-[0_0_20px_rgba(236,72,153,0.3)] transition-all flex items-center justify-center gap-2 disabled:opacity-50">
-                                            {isGenerating ? <><i className="ph-bold ph-spinner animate-spin text-xl"></i> Malowanie detali...</> : <><i className="ph-bold ph-magic-wand text-xl"></i> Wygeneruj Grafikę</>}
+                                            {isGenerating ? <><i className="ph-bold ph-spinner animate-spin text-xl"></i> <span className="text-xs">{genStatus}</span></> : <><i className="ph-bold ph-magic-wand text-xl"></i> Wygeneruj Grafikę</>}
                                         </button>
-                                        
-                                        {resultImageUrl && (
-                                            <div className="grid grid-cols-2 gap-2">
-                                                <button onClick={() => window.print()} className="bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 rounded-xl transition-all flex justify-center items-center gap-2 text-xs">
-                                                    <i className="ph-bold ph-printer text-lg"></i> Drukuj 
-                                                </button>
-                                                <a href={resultImageUrl} target="_blank" download className="bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 rounded-xl transition-all flex justify-center items-center gap-2 text-xs">
-                                                    <i className="ph-bold ph-download-simple text-lg"></i> Pobierz
-                                                </a>
-                                            </div>
-                                        )}
                                     </div>
                                 </>
                             )}
@@ -273,7 +364,7 @@
                                     ) : (
                                         <div className="grid grid-cols-2 gap-3">
                                             {marketItems.map(item => (
-                                                <div key={item.id} className="bg-slate-800 rounded-xl overflow-hidden border border-slate-700 hover:border-pink-500 transition-colors group cursor-pointer" onClick={() => { setResultImageUrl(item.config.url); setAppMode('kreator'); }}>
+                                                <div key={item.id} className="bg-slate-800 rounded-xl overflow-hidden border border-slate-700 hover:border-pink-500 transition-colors group cursor-pointer" onClick={() => { setResultImageUrl(item.config.url); setFormat(item.config.params.format || 'medal'); setAppMode('kreator'); }}>
                                                     <div className="aspect-square bg-slate-900 w-full relative">
                                                         <img src={item.config.url} className="w-full h-full object-cover" loading="lazy" />
                                                     </div>
@@ -309,33 +400,50 @@
                         </div>
                     </aside>
 
-                    <main className="flex-1 flex flex-col relative z-10 overflow-hidden">
-                        <div className="flex-1 overflow-y-auto custom-scrollbar p-6 lg:p-12 print-container relative flex items-center justify-center">
+                    <main className="flex-1 flex flex-col relative z-10 overflow-hidden no-print">
+                        <div className="flex-1 overflow-y-auto custom-scrollbar p-6 lg:p-12 relative flex items-center justify-center">
                             
                             {!resultImageUrl ? (
-                                <div className="text-center text-pink-500/30 no-print max-w-md mx-auto">
+                                <div className="text-center text-pink-500/30 max-w-md mx-auto">
                                     <i className="ph-fill ph-image-square text-7xl mb-6 animate-pulse"></i>
                                     <p className="font-bold text-lg text-pink-100/50">Wybierz kształt, wpisz napis i opisz motyw, a stworzymy dla Ciebie wektorowe arcydzieło do druku.</p>
                                 </div>
                             ) : (
                                 <div className="space-y-8 animate-[reveal_0.4s_ease-out] w-full max-w-2xl text-center">
                                     
-                                    <div className="bg-white p-4 rounded-2xl shadow-2xl inline-block print-card mx-auto">
-                                        <img src={resultImageUrl} alt="Wygenerowana grafika" className={`w-full max-w-lg object-contain ${format === 'medal' ? 'rounded-full' : 'rounded-lg'}`} />
+                                    <div className="bg-white p-4 rounded-2xl shadow-2xl inline-block mx-auto border-4 border-white">
+                                        <img src={resultImageUrl} alt="Wygenerowana grafika" className={`w-full max-w-md object-contain ${format === 'medal' ? 'rounded-full' : 'rounded-lg'}`} />
                                     </div>
 
-                                    <div className="mt-10 bg-slate-900/50 border border-pink-500/30 rounded-3xl p-8 text-center relative overflow-hidden group no-print shadow-xl backdrop-blur-sm">
-                                        <div className="relative z-10">
-                                            <h3 className="text-xl font-bold text-white mb-2">Piękne, prawda?</h3>
-                                            <p className="text-slate-400 text-sm mb-6 max-w-lg mx-auto">Dodaj ten obraz do publicznej Galerii, aby inni nauczyciele mogli szybko pobrać gotowy szablon.</p>
-                                            <button 
-                                                onClick={publishToMarket} disabled={isPublishing}
-                                                className="bg-pink-600 hover:bg-pink-500 text-white font-bold py-4 px-10 rounded-xl shadow-[0_0_20px_rgba(236,72,153,0.4)] transition-all flex items-center justify-center gap-3 mx-auto disabled:opacity-50"
-                                            >
-                                                {isPublishing ? <i className="ph-bold ph-spinner animate-spin text-2xl"></i> : <i className="ph-bold ph-cloud-arrow-up text-2xl"></i>} 
-                                                Udostępnij w Galerii
-                                            </button>
+                                    {/* STUDIO WYDRUKU */}
+                                    <div className="mt-10 bg-slate-900 border border-pink-500/30 rounded-3xl p-8 text-center shadow-xl">
+                                        <h3 className="text-xl font-bold text-white mb-2 flex justify-center items-center gap-2"><i className="ph-bold ph-printer text-pink-500"></i> Studio Wydruku A4</h3>
+                                        <p className="text-slate-400 text-xs mb-6 max-w-md mx-auto">Wybierz, ile kopii grafiki chcesz zmieścić na jednej stronie A4, a my ułożymy z tego idealną siatkę do wycięcia.</p>
+                                        
+                                        <div className="flex flex-wrap justify-center gap-3 mb-8">
+                                            <button onClick={() => setPrintLayout(1)} className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${printLayout === 1 ? 'bg-pink-600 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}>1 (Wielki Dyplom)</button>
+                                            <button onClick={() => setPrintLayout(2)} className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${printLayout === 2 ? 'bg-pink-600 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}>2 (Połowa A4)</button>
+                                            <button onClick={() => setPrintLayout(4)} className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${printLayout === 4 ? 'bg-pink-600 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}>4 (Zaproszenia)</button>
+                                            <button onClick={() => setPrintLayout(6)} className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${printLayout === 6 ? 'bg-pink-600 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}>6 (Duże Medale)</button>
+                                            <button onClick={() => setPrintLayout(9)} className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${printLayout === 9 ? 'bg-pink-600 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}>9 (Naklejki)</button>
                                         </div>
+
+                                        <div className="grid grid-cols-2 gap-4 max-w-sm mx-auto">
+                                            <button onClick={() => window.print()} className="bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 px-6 rounded-xl transition-all flex items-center justify-center gap-2">
+                                                <i className="ph-bold ph-printer text-lg"></i> Drukuj A4
+                                            </button>
+                                            <a href={resultImageUrl} target="_blank" download className="bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 px-6 rounded-xl transition-all flex items-center justify-center gap-2">
+                                                <i className="ph-bold ph-download-simple text-lg"></i> Zapisz Plik
+                                            </a>
+                                        </div>
+                                    </div>
+
+                                    {/* SEKCJA GIEŁDY */}
+                                    <div className="mt-6 bg-slate-900/50 border border-purple-500/30 rounded-3xl p-6 text-center shadow-xl backdrop-blur-sm">
+                                        <button onClick={publishToMarket} disabled={isPublishing} className="bg-purple-600/20 border border-purple-500 hover:bg-purple-600 text-purple-300 hover:text-white font-bold py-3 px-8 rounded-xl transition-all flex items-center justify-center gap-3 mx-auto disabled:opacity-50 text-sm">
+                                            {isPublishing ? <i className="ph-bold ph-spinner animate-spin text-lg"></i> : <i className="ph-bold ph-cloud-arrow-up text-lg"></i>} 
+                                            Udostępnij projekt w Galerii
+                                        </button>
                                     </div>
                                 </div>
                             )}
