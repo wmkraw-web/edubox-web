@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EduBox V3 PRO MAX - EduWystrój AI</title>
+    <title>EduBox V3 PRO MAX - EduWystrój AI (Ilustrowany)</title>
 
     <!-- React & Babel -->
     <script src="https://unpkg.com/react@18.2.0/umd/react.production.min.js" crossorigin></script>
@@ -14,64 +14,13 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     
-    <!-- Piękne, dziecięce czcionki -->
+    <!-- Dziecięce i urzędowe czcionki Premium -->
     <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@400;600;700;800;900&family=Caveat:wght@700&display=swap" rel="stylesheet">
 
-    <!-- WBUDOWANA BAZA DANYCH (Omija błędy z ładowaniem modułów z dysku) -->
+    <!-- Globalny Core Bazy Danych -->
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, serverTimestamp, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        const FIREBASE_CONFIG = {
-            apiKey: "AIzaSyDL_mvepNJjMmZYQzifN2cXzoKwCE8jNd0",
-            authDomain: "edubox-pro.firebaseapp.com",
-            projectId: "edubox-pro",
-            storageBucket: "edubox-pro.firebasestorage.app",
-            messagingSenderId: "570263845714",
-            appId: "1:570263845714:web:0b029211f7af071b66988b"
-        };
-        const APP_ID = "eduboxpro";
-
-        let app, auth, db;
-        try {
-            app = initializeApp(FIREBASE_CONFIG);
-            auth = getAuth(app);
-            db = getFirestore(app);
-        } catch (e) { console.warn("Firebase init failed", e); }
-
-        window.EduBoxCore = {
-            user: null,
-            init: (callback) => {
-                if (!auth) return;
-                signInAnonymously(auth).catch(e => console.error(e));
-                onAuthStateChanged(auth, (user) => {
-                    window.EduBoxCore.user = user;
-                    if(callback) callback(user);
-                });
-            },
-            saveToGielda: async (collectionName, appType, itemName, config) => {
-                if (!db || !window.EduBoxCore.user) throw new Error("Brak połączenia z chmurą.");
-                const publicRef = collection(db, 'artifacts', APP_ID, 'public', 'data', collectionName);
-                await addDoc(publicRef, {
-                    userId: window.EduBoxCore.user.uid,
-                    createdAt: serverTimestamp(),
-                    type: appType,
-                    name: itemName,
-                    config: config
-                });
-            },
-            subscribeToGielda: (collectionName, onDataLoaded, onError) => {
-                if (!db) return () => {};
-                const publicRef = collection(db, 'artifacts', APP_ID, 'public', 'data', collectionName);
-                return onSnapshot(publicRef, (snapshot) => {
-                    const loaded = [];
-                    snapshot.forEach(doc => loaded.push({ id: doc.id, ...doc.data() }));
-                    loaded.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
-                    onDataLoaded(loaded);
-                }, onError);
-            }
-        };
+        import { EduBoxCore } from './global-core.js';
+        window.EduBoxCore = EduBoxCore;
     </script>
 
     <style>
@@ -83,7 +32,6 @@
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #10b981; border-radius: 10px; }
         
-        /* Auras - Wiosenny / Radosny klimat */
         .aura-container { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; }
         .aura-blob { position: absolute; filter: blur(130px); border-radius: 50%; opacity: 0.4; animation: float 20s ease-in-out infinite alternate; }
         .aura-1 { top: -10%; left: -10%; width: 50vw; height: 50vw; background: radial-gradient(circle, rgba(16, 185, 129, 0.4) 0%, rgba(0,0,0,0) 70%); }
@@ -93,6 +41,14 @@
         @keyframes float {
             0% { transform: translate(0, 0) scale(1); }
             100% { transform: translate(30px, -50px) scale(1.05); }
+        }
+
+        /* --- PREMIUM BORDERS & STYLES --- */
+        .premium-border {
+            border: 6px solid white;
+            outline: 4px dashed rgba(0,0,0,0.1);
+            outline-offset: -8px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
         }
 
         /* --- STUDIO WYDRUKU: JAKOŚĆ PREMIUM (Jak z PDF z Facebooka) --- */
@@ -115,13 +71,9 @@
             }
             * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
             
-            /* Zapobieganie ucinaniu elementów wpół strony */
             .print-break-inside-avoid { break-inside: avoid; page-break-inside: avoid; }
             .page-break-after { break-after: page; page-break-after: always; }
         }
-        
-        /* Dekoracyjne klasy na podstawie przysłanych zdjęć */
-        .dash-border { border: 3px dashed currentColor; padding: 4px; border-radius: inherit; }
     </style>
 </head>
 <body>
@@ -130,6 +82,7 @@
     <script type="text/babel">
         const { useState, useEffect } = React;
 
+        // Obejście problemów z parsowaniem JSON-a
         const parseAIResponse = (aiOutput) => {
             let text = String(aiOutput?.text || aiOutput?.response || aiOutput?.content || aiOutput || "").trim();
             text = text.replace(/```json/gi, '').replace(/```/g, '').trim();
@@ -142,10 +95,11 @@
                 }
                 throw new Error("Brak nawiasów JSON.");
             } catch (e) {
-                throw new Error("BŁĄD Z SERWERA: Niepoprawny format dokumentu.");
+                throw new Error("BŁĄD Z SERWERA: Niepoprawny format dokumentu. Spróbuj ponownie.");
             }
         };
 
+        // Krok 1: Wymyślanie tekstów i promptów (OpenAI)
         const fetchTextAI = async (prompt, systemInstruction) => {
             const finalPrompt = `INSTRUKCJA: Zwróć DOKŁADNIE i WYŁĄCZNIE czysty kod JSON. Nie używaj znaczników markdown.\n\n${systemInstruction}\n\nZADANIE:\n${prompt}`;
             try {
@@ -158,9 +112,33 @@
                     const data = await res.json();
                     return data.text || data.response || data.content || data;
                 } else {
-                    throw new Error(`Błąd API`);
+                    throw new Error(`Błąd API Text`);
                 }
             } catch(e) { throw new Error("Brak połączenia z AI. " + e.message); }
+        };
+
+        // Krok 2: Generowanie ilustracji w locie (Fal.ai - Malarz)
+        const fetchImageAI = async (imagePrompt) => {
+            try {
+                const res = await fetch('/api/malarz', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        prompt: `${imagePrompt}. Cute children's book illustration style, flat vector, highly detailed, joyful, pure white background, perfectly centered.`, 
+                        style: 'wektor', 
+                        format: 'naklejka', 
+                        customText: '' // Puste pole, bo tekst nakładamy w HTML-u!
+                    })
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    return data.url;
+                }
+                return null;
+            } catch (e) {
+                console.error("Błąd generowania obrazka:", e);
+                return null;
+            }
         };
 
         function App() {
@@ -170,7 +148,9 @@
             const [premiumCode, setPremiumCode] = useState('');
             const [aiGenerations, setAiGenerations] = useState(0);
             const [message, setMessage] = useState(null);
+            
             const [isGenerating, setIsGenerating] = useState(false);
+            const [genStatus, setGenStatus] = useState(''); // Status dla wielu kroków
             
             // Konfigurator Wystroju
             const [layoutType, setLayoutType] = useState('drzwi');
@@ -200,10 +180,9 @@
 
             const showMessage = (text, type = 'success') => {
                 setMessage({ text, type });
-                setTimeout(() => setMessage(null), 3500);
+                setTimeout(() => setMessage(null), 4000);
             };
 
-            // DODANA FUNKCJA OBSŁUGUJĄCA KOD PREMIUM!
             const handlePremiumCheck = () => {
                 if (premiumCode.toUpperCase() === 'KAWA2024') {
                     setIsPremium(true); 
@@ -221,62 +200,85 @@
                 setResultData(null);
 
                 let sysPrompt = "";
+                // Redukujemy ilość elementów, żeby serwer Fal.ai i Vercel nie dostały zadyszki przy generowaniu zdjęć.
+                // 5 reguł dla Drzwi, 6 dla Kodeksu, 4 dla Kącików, 4 dla Plakatu
                 if (layoutType === 'drzwi') {
-                    sysPrompt = `Jesteś projektantem dekoracji przedszkolnych. Użytkownik chce stworzyć zestaw banerów na drzwi (jak z Facebooka) z napisem głownym "W naszej sali dzieci są:" oraz 10 cechami (każda na osobny baner).
-Wybierz kolorowe, radosne emoji, które świetnie wyglądają w druku. Dobierz jasne, pastelowe tła Tailwind (np. bg-pink-100, bg-blue-100).
+                    sysPrompt = `Jesteś projektantem premium dekoracji przedszkolnych. Użytkownik chce stworzyć ekskluzywny zestaw na drzwi z głównym hasłem i 5 cechami dzieci na osobnych kafelkach.
+Dla każdego elementu wymyśl angielski 'image_prompt' opisujący piękną, wektorową ilustrację przedstawiającą radosne dziecko wykonujące daną czynność (np. malujące, dzielące się zabawką). Dobierz pastelowe kolory Tailwind.
 WYMÓG JSON:
 {
   "title": "W naszej sali dzieci są:",
+  "header_img_prompt": "Cute vector illustration of three happy kindergarten kids waving hands, full body, white background",
   "items": [
-    { "text": "Szczęśliwe", "emoji": "😊", "bgColor": "bg-pink-100", "textColor": "text-pink-600", "borderColor": "border-pink-300" },
-    { "text": "Kreatywne", "emoji": "🎨", "bgColor": "bg-green-100", "textColor": "text-green-600", "borderColor": "border-green-300" }
-    // wygeneruj łącznie 10 takich obiektów
+    { "text": "Kreatywne", "image_prompt": "Cute vector illustration of a happy little girl painting a rainbow on an easel, white background", "bgColor": "bg-green-100", "textColor": "text-green-700" }
+    // wygeneruj dokładnie 5 takich kafelków
   ]
 }`;
                 } else if (layoutType === 'kodeks') {
-                    sysPrompt = `Projektujesz "Kodeks Przedszkolaka" na tablicę korkową. Wymyśl 9 pozytywnych zasad dostosowanych do podanej grupy.
-Zasady mają być krótkie i w pierwszej osobie liczby mnogiej (np. "Pomagamy sobie nawzajem").
+                    sysPrompt = `Projektujesz "Kodeks Przedszkolaka". Wymyśl 6 krótkich, pozytywnych zasad.
+Dla każdej zasady podaj angielski 'image_prompt' opisujący wektorową, uroczą ilustrację dzieci demonstrujących tę zasadę.
 WYMÓG JSON:
 {
   "title": "Nasz Kodeks",
+  "header_img_prompt": "Cute vector illustration of a group of kindergarten kids hugging and smiling, white background",
   "items": [
-    { "text": "Mówimy sobie 'Dzień dobry'", "emoji": "👋", "bgColor": "bg-blue-50", "borderColor": "border-blue-300", "textColor": "text-blue-800" },
-    { "text": "Sprzątamy po zabawie", "emoji": "🧸", "bgColor": "bg-yellow-50", "borderColor": "border-yellow-300", "textColor": "text-yellow-800" }
-    // łącznie 9 zasad
+    { "text": "Pomagamy sobie nawzajem", "image_prompt": "Cute vector illustration of two kids sharing a teddy bear toy, white background", "bgColor": "bg-blue-50", "textColor": "text-blue-800" }
+    // dokładnie 6 zasad
   ]
 }`;
                 } else if (layoutType === 'kaciki') {
-                    sysPrompt = `Projektujesz duże, piękne szyldy do kącików tematycznych w sali (np. Kącik Majsterkowicza, Kącik Lalek). Wygeneruj 6 różnych kącików pasujących do tematu/grupy.
+                    sysPrompt = `Projektujesz luksusowe szyldy do kącików tematycznych (np. Kącik Plastyczny, Kącik Lalek). Wygeneruj 4 różne kąciki.
+Dla każdego podaj angielski 'image_prompt' opisujący duże, piękne ilustracje zabawek i dzieci w danym kąciku.
 WYMÓG JSON:
 {
   "title": "Nasze Kąciki",
   "items": [
-    { "text": "KĄCIK PLASTYCZNY", "emoji": "🖌️", "bgColor": "bg-red-50", "borderColor": "border-red-400", "textColor": "text-red-700" },
-    { "text": "KĄCIK KONSTRUKTORA", "emoji": "🔨", "bgColor": "bg-blue-50", "borderColor": "border-blue-400", "textColor": "text-blue-700" }
-    // łącznie 6 kącików
+    { "text": "Kącik Majsterkowicza", "image_prompt": "Cute vector illustration of a little boy wearing safety goggles building a birdhouse with a toy hammer, white background", "bgColor": "bg-amber-100", "textColor": "text-amber-800" }
+    // dokładnie 4 kąciki
   ]
 }`;
                 } else if (layoutType === 'plakat_choroba') {
-                    sysPrompt = `Projektujesz plakat edukacyjny na drzwi o tytule "Drogi Rodzicu! Zostaw dziecko w domu, gdy:". Plakat ma mieć 4 kafelki opisujące najczęstsze objawy (gorączka, katar/kaszel, wymioty, wysypka) napisane życzliwie, ale stanowczo.
+                    sysPrompt = `Projektujesz plakat "Zostaw dziecko w domu, gdy:". Plakat ma 4 kafelki objawów.
+Dla każdego objawu podaj 'image_prompt' ilustrujący urocze dziecko z danym objawem (z termometrem, kichające itp.).
 WYMÓG JSON:
 {
-  "title": "Drogi Rodzicu! Zostaw dziecko w domu, gdy:",
-  "subtitle": "Dbajmy wspólnie o zdrowie wszystkich dzieci w naszym przedszkolu ❤️",
-  "footer": "DZIĘKUJEMY ZA ZROZUMIENIE I WSPÓŁPRACĘ!",
+  "title": "Zostaw dziecko w domu, gdy:",
+  "subtitle": "Dbajmy wspólnie o zdrowie wszystkich dzieci",
+  "footer": "DZIĘKUJEMY ZA WSPÓŁPRACĘ!",
   "items": [
-    { "title": "MA GORĄCZKĘ LUB DRESZCZE", "desc": "Podwyższona temperatura to sygnał, że organizm walczy z infekcją...", "emoji": "🤒", "bgColor": "bg-green-100", "headerColor": "bg-green-600" },
-    { "title": "MA MOCNY KATAR LUB KASZEL", "desc": "Objawy te mogą się nasilać i zarażać inne dzieci...", "emoji": "🤧", "bgColor": "bg-blue-100", "headerColor": "bg-blue-500" },
-    { "title": "MA BÓLE BRZUCHA LUB WYMIOTY", "desc": "Mogą być objawem infekcji jelitowej...", "emoji": "🤢", "bgColor": "bg-orange-100", "headerColor": "bg-orange-500" },
-    { "title": "MA WYSYPKĘ LUB ZMIANY SKÓRNE", "desc": "Zaczerwienienie i wysypki mogą sugerować chorobę zakaźną...", "emoji": "🤕", "bgColor": "bg-purple-100", "headerColor": "bg-purple-500" }
+    { "title": "Ma Gorączkę", "desc": "Podwyższona temperatura to sygnał...", "image_prompt": "Cute vector illustration of a sad little boy with a thermometer in his mouth in bed, white background", "bgColor": "bg-red-50", "headerColor": "bg-red-500" }
+    // dokładnie 4 objawy
   ]
 }`;
                 }
 
-                const prompt = `Motyw przewodni / Nazwa Grupy: ${theme}. Wiek dzieci: ${groupAge}. Stwórz piękny pakiet dekoracyjny.`;
+                const prompt = `Motyw przewodni / Nazwa Grupy: ${theme}. Wiek dzieci: ${groupAge}. Stwórz profesjonalny i szczegółowy pakiet.`;
 
                 try {
+                    // 1. ZBUDUJ KONCEPCJĘ (OpenAI)
+                    setGenStatus('Krok 1: Wymyślanie tekstów i scen scenografii...');
                     const aiText = await fetchTextAI(prompt, sysPrompt);
                     const parsedJson = parseAIResponse(aiText);
+                    
+                    // 2. MALUJ ILUSTRACJE (Fal.ai Flux)
+                    setGenStatus('Krok 2: Malowanie głównych grafik. Proszę czekać...');
+                    
+                    // Pobieramy nagłówek (jeśli istnieje)
+                    if (parsedJson.header_img_prompt) {
+                        parsedJson.headerImgUrl = await fetchImageAI(parsedJson.header_img_prompt);
+                    }
+
+                    // Pobieramy obrazki dla elementów w równoległych żądaniach (Dzięki Fal.ai jest to bardzo szybkie!)
+                    setGenStatus(`Krok 3: Rysowanie ${parsedJson.items.length} unikalnych ilustracji do zestawu...`);
+                    const itemsWithImages = await Promise.all(
+                        parsedJson.items.map(async (item) => {
+                            const imgUrl = await fetchImageAI(item.image_prompt);
+                            return { ...item, imgUrl: imgUrl || 'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?q=80&w=400&auto=format&fit=crop' }; // Fallback w razie błędu
+                        })
+                    );
+                    
+                    parsedJson.items = itemsWithImages;
+
                     setResultData({ type: layoutType, data: parsedJson, params: { theme, groupAge } });
                     
                     if (!isPremium) {
@@ -284,9 +286,13 @@ WYMÓG JSON:
                         setAiGenerations(newCount);
                         try { window.localStorage.setItem('edubox_eduwystroj_ai', newCount.toString()); } catch(e) {}
                     }
-                    showMessage('Wygenerowano Pakiet Dekoracyjny!', 'success');
-                } catch (error) { showMessage(error.message, 'error'); } 
-                finally { setIsGenerating(false); }
+                    showMessage('Pakiet Dekoracyjny gotowy do druku!', 'success');
+                } catch (error) { 
+                    showMessage(error.message, 'error'); 
+                } finally { 
+                    setIsGenerating(false); 
+                    setGenStatus('');
+                }
             };
 
             const publishToMarket = async () => {
@@ -313,31 +319,35 @@ WYMÓG JSON:
                 return () => { if (unsubscribe) unsubscribe(); }
             }, [appMode]);
 
-            // --- RENDEROWANIE PIĘKNYCH UKŁADÓW (HTML/CSS) ---
+            // --- RENDEROWANIE PIĘKNYCH UKŁADÓW (Z PRAWDZIWYMI GRAFIKAMI) ---
             const renderLayout = () => {
                 if (!resultData || !resultData.data) return null;
                 const { type, data } = resultData;
 
                 if (type === 'drzwi') {
                     return (
-                        <div className="flex flex-col items-center gap-4 bg-white p-8 w-full max-w-2xl mx-auto rounded-xl">
-                            {/* Nagłówek (Chmurka) */}
-                            <div className="bg-sky-50 border-[4px] border-sky-300 rounded-[50px] px-12 py-6 text-center shadow-md relative w-[90%] mb-4 print-break-inside-avoid">
-                                <div className="absolute top-2 left-4 text-3xl">☀️</div>
-                                <div className="absolute top-2 right-4 text-3xl">☁️</div>
-                                <h1 className="text-3xl md:text-5xl font-kids font-black text-sky-700 leading-tight">
+                        <div className="flex flex-col items-center gap-6 bg-white p-10 w-full max-w-3xl mx-auto rounded-xl">
+                            {/* Nagłówek Dekoracyjny (Chmurka z ilustracją) */}
+                            <div className="bg-sky-50 premium-border rounded-[60px] p-8 text-center relative w-full print-break-inside-avoid">
+                                {data.headerImgUrl && (
+                                    <div className="w-48 h-32 mx-auto mb-4 overflow-hidden rounded-full border-4 border-white shadow-inner">
+                                        <img src={data.headerImgUrl} className="w-full h-full object-cover" />
+                                    </div>
+                                )}
+                                <h1 className="text-4xl md:text-5xl font-kids font-black text-sky-700 leading-tight drop-shadow-sm">
                                     {data.title}
                                 </h1>
                             </div>
 
-                            {/* Banery Cech */}
+                            {/* Banery Cech z obrazkami */}
                             {data.items.map((item, i) => (
-                                <div key={i} className={`w-[85%] ${item.bgColor} border-[4px] ${item.borderColor} rounded-full py-4 px-8 flex items-center justify-between shadow-sm transform hover:scale-105 transition-transform print-break-inside-avoid`}>
-                                    <div className="text-4xl drop-shadow-md">{item.emoji}</div>
+                                <div key={i} className={`w-[90%] ${item.bgColor} premium-border rounded-full p-2 pr-10 flex items-center shadow-md print-break-inside-avoid`}>
+                                    <div className="w-24 h-24 rounded-full border-4 border-white shadow-sm overflow-hidden shrink-0 bg-white">
+                                        <img src={item.imgUrl} className="w-full h-full object-cover" />
+                                    </div>
                                     <div className={`font-kids font-black text-3xl md:text-4xl ${item.textColor} tracking-wide text-center flex-1`}>
                                         {item.text}
                                     </div>
-                                    <div className="text-4xl drop-shadow-md">{item.emoji}</div>
                                 </div>
                             ))}
                         </div>
@@ -346,20 +356,22 @@ WYMÓG JSON:
 
                 if (type === 'kodeks') {
                     return (
-                        <div className="bg-[#e7d5b8] p-8 w-full max-w-4xl mx-auto rounded-xl shadow-inner relative" style={{backgroundImage: 'url("https://www.transparenttextures.com/patterns/cork-board.png")'}}>
-                            <div className="text-center mb-10 print-break-inside-avoid">
-                                <div className="inline-block bg-white/90 backdrop-blur-sm border-4 border-amber-300 rounded-[40px] px-12 py-6 shadow-lg rotate-1 relative">
-                                    <div className="absolute -top-4 -left-4 text-4xl transform -rotate-12">📌</div>
-                                    <h1 className="text-4xl md:text-6xl font-kids font-black text-amber-600 drop-shadow-sm">{data.title}</h1>
+                        <div className="bg-[#e7d5b8] p-10 w-full max-w-5xl mx-auto rounded-xl shadow-inner relative" style={{backgroundImage: 'url("https://www.transparenttextures.com/patterns/cork-board.png")'}}>
+                            <div className="text-center mb-12 print-break-inside-avoid">
+                                <div className="inline-block bg-white/95 premium-border rounded-[40px] px-16 py-6 shadow-xl rotate-1 relative">
+                                    <div className="absolute -top-6 -left-6 text-5xl transform -rotate-12 drop-shadow-md">📌</div>
+                                    <h1 className="text-5xl md:text-7xl font-kids font-black text-amber-600 drop-shadow-sm">{data.title}</h1>
                                 </div>
                             </div>
                             
-                            <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-8">
                                 {data.items.map((item, i) => (
-                                    <div key={i} className={`${item.bgColor} border-[3px] ${item.borderColor} rounded-3xl p-6 flex flex-col items-center text-center shadow-lg relative print-break-inside-avoid transform ${i%2 === 0 ? '-rotate-1' : 'rotate-2'}`}>
-                                        <div className="absolute -top-3 left-1/2 -translate-x-1/2 text-2xl">📍</div>
-                                        <div className="text-6xl mb-4 drop-shadow-lg">{item.emoji}</div>
-                                        <div className={`font-kids font-bold text-xl leading-snug ${item.textColor}`}>
+                                    <div key={i} className={`${item.bgColor} premium-border rounded-3xl p-4 flex flex-col items-center text-center shadow-lg relative print-break-inside-avoid transform ${i%2 === 0 ? '-rotate-1' : 'rotate-2'}`}>
+                                        <div className="absolute -top-4 left-1/2 -translate-x-1/2 text-3xl drop-shadow-md">📍</div>
+                                        <div className="w-full aspect-square rounded-2xl bg-white border-2 border-white/50 shadow-inner overflow-hidden mb-4">
+                                            <img src={item.imgUrl} className="w-full h-full object-cover" />
+                                        </div>
+                                        <div className={`font-kids font-bold text-xl md:text-2xl leading-snug px-2 pb-2 ${item.textColor}`}>
                                             {item.text}
                                         </div>
                                     </div>
@@ -371,14 +383,15 @@ WYMÓG JSON:
 
                 if (type === 'kaciki') {
                     return (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-white p-8 w-full max-w-4xl mx-auto rounded-xl">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-white p-8 w-full max-w-5xl mx-auto rounded-xl">
                             {data.items.map((item, i) => (
-                                <div key={i} className={`${item.bgColor} border-4 ${item.borderColor} rounded-[40px] p-6 relative flex items-center shadow-md print-break-inside-avoid h-[200px]`}>
-                                    <div className="absolute inset-2 border-[3px] border-dashed border-white/60 rounded-[32px]"></div>
+                                <div key={i} className={`${item.bgColor} premium-border rounded-[40px] p-4 relative flex items-center shadow-lg print-break-inside-avoid`}>
+                                    <div className="w-40 h-40 rounded-3xl bg-white shadow-inner overflow-hidden shrink-0 border-4 border-white/60 z-10 relative left-2">
+                                        <img src={item.imgUrl} className="w-full h-full object-cover" />
+                                    </div>
                                     
-                                    <div className="flex-1 text-center px-4 relative z-10">
-                                        <div className="text-6xl mb-2 drop-shadow-md">{item.emoji}</div>
-                                        <h2 className={`font-kids font-black text-3xl md:text-4xl ${item.textColor} uppercase leading-none`}>
+                                    <div className="flex-1 text-center pr-6 pl-4 relative z-10">
+                                        <h2 className={`font-kids font-black text-3xl md:text-4xl ${item.textColor} uppercase leading-tight drop-shadow-sm`}>
                                             {item.text}
                                         </h2>
                                     </div>
@@ -390,31 +403,31 @@ WYMÓG JSON:
 
                 if (type === 'plakat_choroba') {
                     return (
-                        <div className="bg-white p-6 md:p-10 w-full max-w-4xl mx-auto rounded-xl shadow-2xl print-break-inside-avoid border-8 border-sky-200">
-                            <div className="text-center mb-8 bg-sky-50 rounded-[40px] border-[3px] border-dashed border-sky-300 p-6 relative">
-                                <div className="absolute top-4 left-6 text-5xl">☀️</div>
-                                <div className="absolute top-4 right-6 text-5xl">☁️</div>
-                                <h1 className="text-4xl md:text-6xl font-kids font-black text-red-600 uppercase tracking-tight mb-2 drop-shadow-md leading-none">{data.title}</h1>
-                                <p className="text-xl font-kids font-bold text-sky-800">{data.subtitle}</p>
+                        <div className="bg-white p-8 md:p-12 w-full max-w-5xl mx-auto rounded-xl shadow-2xl print-break-inside-avoid border-8 border-sky-100">
+                            <div className="text-center mb-10 bg-sky-50 rounded-[50px] premium-border p-8 relative">
+                                <h1 className="text-5xl md:text-6xl font-kids font-black text-red-600 uppercase tracking-tight mb-4 drop-shadow-md leading-none">{data.title}</h1>
+                                <p className="text-2xl font-kids font-bold text-sky-800">{data.subtitle}</p>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                 {data.items.map((item, i) => (
-                                    <div key={i} className={`${item.bgColor} border-4 border-white outline outline-[3px] outline-slate-200 rounded-3xl overflow-hidden shadow-sm flex flex-col h-full print-break-inside-avoid`}>
-                                        <div className={`${item.headerColor} text-white p-4 flex items-center gap-4`}>
-                                            <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center text-3xl font-black text-slate-800 shadow-inner shrink-0">{i+1}</div>
-                                            <h2 className="font-kids font-black text-xl md:text-2xl leading-tight">{item.title}</h2>
+                                    <div key={i} className={`${item.bgColor} premium-border rounded-[40px] overflow-hidden shadow-lg flex flex-col h-full print-break-inside-avoid`}>
+                                        <div className={`${item.headerColor} text-white p-5 flex items-center gap-4 border-b-4 border-white/20`}>
+                                            <div className="w-14 h-14 bg-white rounded-full flex items-center justify-center text-3xl font-black text-slate-800 shadow-inner shrink-0">{i+1}</div>
+                                            <h2 className="font-kids font-black text-2xl md:text-3xl leading-tight drop-shadow-sm">{item.title}</h2>
                                         </div>
                                         <div className="p-6 flex items-center gap-6 grow">
-                                            <p className="font-sans font-semibold text-slate-700 leading-relaxed text-sm md:text-base flex-1">{item.desc}</p>
-                                            <div className="text-7xl drop-shadow-xl">{item.emoji}</div>
+                                            <p className="font-sans font-semibold text-slate-800 leading-relaxed text-lg flex-1">{item.desc}</p>
+                                            <div className="w-32 h-32 shrink-0 rounded-full border-4 border-white shadow-md overflow-hidden bg-white">
+                                                <img src={item.imgUrl} className="w-full h-full object-cover" />
+                                            </div>
                                         </div>
                                     </div>
                                 ))}
                             </div>
 
-                            <div className="mt-8 text-center bg-pink-100 rounded-full py-4 px-8 border-[3px] border-dashed border-pink-300">
-                                <p className="font-kids font-black text-2xl text-pink-600">💖 {data.footer} 💖</p>
+                            <div className="mt-10 text-center bg-pink-50 rounded-full py-6 px-10 premium-border">
+                                <p className="font-kids font-black text-3xl text-pink-600 drop-shadow-sm">💖 {data.footer} 💖</p>
                             </div>
                         </div>
                     );
@@ -433,7 +446,7 @@ WYMÓG JSON:
                         </div>
                     )}
 
-                    {/* Widok Drukowania - ukryty normalnie, zajmuje 100% ekranu podczas druku */}
+                    {/* Widok Drukowania */}
                     <div className="print-only">
                         {renderLayout()}
                     </div>
@@ -495,14 +508,18 @@ WYMÓG JSON:
                                         </div>
                                     </div>
 
-                                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-[10px] font-bold text-amber-700 flex gap-2">
-                                        <i className="ph-fill ph-info text-xl shrink-0"></i>
-                                        Aplikacja automatycznie dobierze teksty, ramki, pastelowe tła i urocze emotikony HD do wydruku.
+                                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-[10px] font-bold text-amber-700 flex flex-col gap-2 shadow-inner">
+                                        <div className="flex gap-2 items-center"><i className="ph-fill ph-magic-wand text-xl shrink-0"></i> <span>Aplikacja połączy kreatywność GPT z generatorem obrazków Fal.ai (Flux).</span></div>
+                                        <span className="text-amber-600">Proces potrwa ok. 15 sekund – malujemy dla Ciebie od 5 do 7 oryginalnych ilustracji!</span>
                                     </div>
 
                                     <div className="space-y-3 pt-2">
-                                        <button onClick={generateContent} disabled={isGenerating} className="w-full bg-gradient-to-r from-emerald-400 to-teal-500 hover:from-emerald-500 hover:to-teal-600 text-white font-black py-4 rounded-2xl shadow-[0_0_20px_rgba(16,185,129,0.3)] transition-all flex items-center justify-center gap-2 disabled:opacity-50">
-                                            {isGenerating ? <><i className="ph-bold ph-spinner animate-spin text-xl"></i> Składanie layoutu...</> : <><i className="ph-bold ph-magic-wand text-xl"></i> Wygeneruj Zestaw</>}
+                                        <button onClick={generateContent} disabled={isGenerating} className="w-full bg-gradient-to-r from-emerald-400 to-teal-500 hover:from-emerald-500 hover:to-teal-600 text-white font-black py-4 rounded-2xl shadow-[0_0_20px_rgba(16,185,129,0.3)] transition-all flex flex-col items-center justify-center gap-1 disabled:opacity-50 min-h-[70px]">
+                                            {isGenerating ? (
+                                                <><i className="ph-bold ph-spinner animate-spin text-xl"></i><span className="text-xs font-semibold">{genStatus}</span></>
+                                            ) : (
+                                                <span className="flex items-center gap-2"><i className="ph-bold ph-magic-wand text-xl"></i> Wygeneruj Ilustrowany Zestaw</span>
+                                            )}
                                         </button>
                                     </div>
                                 </>
@@ -561,25 +578,25 @@ WYMÓG JSON:
                             {!resultData ? (
                                 <div className="text-center text-emerald-900/20 max-w-md mx-auto my-auto">
                                     <i className="ph-fill ph-layout text-7xl mb-6 animate-pulse"></i>
-                                    <p className="font-bold text-lg text-emerald-900/40">Wybierz moduł dekoracji w panelu bocznym. Sztuczna Inteligencja przygotuje kompletny, gotowy do druku układ z wektorowymi emojis.</p>
+                                    <p className="font-bold text-lg text-emerald-900/40">Wybierz moduł dekoracji w panelu bocznym. Sztuczna Inteligencja sama wymyśli tekst, a następnie wygeneruje i nałoży na layout przepiękne, unikalne ilustracje.</p>
                                 </div>
                             ) : (
                                 <div className="space-y-8 animate-[reveal_0.4s_ease-out] w-full max-w-5xl">
                                     
                                     {/* PODGLĄD NA ŻYWO (Zupełnie jak wydruk) */}
-                                    <div className="shadow-2xl rounded-2xl overflow-hidden border border-slate-300 bg-white/50 backdrop-blur-md pb-10">
+                                    <div className="shadow-2xl rounded-2xl overflow-hidden border border-slate-300 bg-slate-100/80 backdrop-blur-md pb-10">
                                         <div className="bg-slate-800 text-slate-300 text-xs font-bold px-4 py-2 flex items-center justify-between">
                                             <span className="flex items-center gap-2"><i className="ph-bold ph-eye"></i> Podgląd Układu (Jak w PDF)</span>
                                             <span className="flex gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-red-500"></div><div className="w-2.5 h-2.5 rounded-full bg-yellow-500"></div><div className="w-2.5 h-2.5 rounded-full bg-green-500"></div></span>
                                         </div>
-                                        <div className="p-8 overflow-x-auto">
+                                        <div className="p-4 md:p-8 overflow-x-auto">
                                             {renderLayout()}
                                         </div>
                                     </div>
 
                                     {/* AKCJE */}
                                     <div className="mt-10 bg-white border border-slate-200 rounded-3xl p-8 text-center shadow-xl flex flex-col items-center">
-                                        <h3 className="text-xl font-bold text-slate-800 mb-2">Plik gotowy do cięcia! ✂️</h3>
+                                        <h3 className="text-xl font-bold text-slate-800 mb-2">Plik gotowy do druku! 🖨️</h3>
                                         <p className="text-slate-500 text-sm mb-6 max-w-md mx-auto">Wciśnij Drukuj i upewnij się, że w oknie drukarki zaznaczona jest opcja <strong>"Drukuj grafiki tła" (Background graphics)</strong>.</p>
                                         
                                         <div className="flex flex-col sm:flex-row gap-4">
@@ -587,7 +604,7 @@ WYMÓG JSON:
                                                 <i className="ph-bold ph-printer text-xl"></i> Otwórz Drukarkę
                                             </button>
                                             <button onClick={publishToMarket} disabled={isPublishing} className="bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200 font-bold py-3 px-8 rounded-xl transition-all flex items-center justify-center gap-2 disabled:opacity-50">
-                                                {isPublishing ? <i className="ph-bold ph-spinner animate-spin text-xl"></i> : <i className="ph-bold ph-cloud-arrow-up text-xl"></i>} Do Bazy
+                                                {isPublishing ? <i className="ph-bold ph-spinner animate-spin text-xl"></i> : <i className="ph-bold ph-cloud-arrow-up text-xl"></i>} Do Bazy Wzorów
                                             </button>
                                         </div>
                                     </div>
