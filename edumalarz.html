@@ -11,7 +11,8 @@
 
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Caveat:wght@600;700&display=swap" rel="stylesheet">
+    
+    <link href="https://fonts.googleapis.com/css2?family=Amatic+SC:wght@400;700&family=Caveat:wght@600;700&family=Dancing+Script:wght@600;700&family=Inter:wght@300;400;500;600;700;800;900&family=Pacifico&family=Playfair+Display:ital,wght@0,600;1,600&display=swap" rel="stylesheet">
 
     <script type="module">
         import { EduBoxCore } from './global-core.js';
@@ -20,8 +21,6 @@
 
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #1e1b4b; color: #f8fafc; overflow: hidden; }
-        .font-hand { font-family: 'Caveat', cursive; }
-        
         .custom-scrollbar::-webkit-scrollbar { width: 8px; height: 8px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #4c1d95; border-radius: 10px; }
@@ -68,6 +67,8 @@
                 background: white !important;
             }
             
+            .grid-1 { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr); height: 270mm; } /* Dyplom */
+            .grid-2 { grid-template-columns: 1fr; grid-template-rows: repeat(2, minmax(0, 1fr)); height: 270mm; } /* Połowa A4 */
             .grid-4 { grid-template-columns: 1fr 1fr; grid-template-rows: repeat(2, minmax(0, 1fr)); height: 270mm; } /* Zaproszenia */
             .grid-6 { grid-template-columns: 1fr 1fr; grid-template-rows: repeat(3, minmax(0, 1fr)); height: 270mm; } /* Medale */
             .grid-8 { grid-template-columns: 1fr 1fr; grid-template-rows: repeat(4, minmax(0, 1fr)); height: 270mm; } /* Zawieszki */
@@ -122,6 +123,42 @@
             } catch(e) { throw new Error("Brak połączenia z Tłumaczem. " + e.message); }
         };
 
+        // --- KOMPONENT RENDERUJĄCY GRAFIKĘ Z TEKSTEM ---
+        const PrintItem = ({ url, format, title, content, posY, fontFam, tSize, cSize }) => {
+            const aspectClass = (format === 'medal' || format === 'naklejka') ? 'aspect-square' : 'aspect-[3/4]';
+            const roundedClass = format === 'medal' ? 'rounded-full' : 'rounded-lg';
+            
+            return (
+                <div className={`relative w-full h-full flex flex-col items-center justify-center overflow-hidden bg-white border border-gray-100 ${aspectClass} ${roundedClass}`}
+                     style={{ containerType: 'inline-size' }}>
+                    <img src={url} className={`absolute inset-0 w-full h-full z-0 ${format === 'medal' ? 'object-contain' : 'object-cover'}`} alt="Tło" />
+                    
+                    <div className="absolute w-full px-4 sm:px-8 text-center flex flex-col items-center z-10"
+                         style={{ top: `${posY}%`, transform: 'translateY(-50%)' }}>
+                        {title && (
+                            <h2 className="font-extrabold text-slate-900 leading-none break-words w-full" 
+                                style={{
+                                    fontFamily: fontFam,
+                                    fontSize: `${tSize * 0.15}cqi`, 
+                                    textShadow: '0 0 12px rgba(255,255,255,1), 0 0 5px rgba(255,255,255,0.9), 0 0 20px rgba(255,255,255,0.8)'
+                                }}>
+                                {title}
+                            </h2>
+                        )}
+                        {format === 'zaproszenie' && content && (
+                            <p className="font-sans font-bold text-slate-800 whitespace-pre-wrap mt-2 leading-snug w-full" 
+                               style={{
+                                   fontSize: `${cSize * 0.05}cqi`, 
+                                   textShadow: '0 0 8px rgba(255,255,255,1), 0 0 4px rgba(255,255,255,0.9)'
+                               }}>
+                                {content}
+                            </p>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
         function App() {
             const [user, setUser] = useState(null);
             const [appMode, setAppMode] = useState('kreator'); 
@@ -133,12 +170,19 @@
             const [isGenerating, setIsGenerating] = useState(false);
             const [genStatus, setGenStatus] = useState('');
             
-            // Image State
+            // Image & Typography State
             const [prompt, setPrompt] = useState('');
             const [customTitle, setCustomTitle] = useState('');
             const [customContent, setCustomContent] = useState('');
             const [imageStyle, setImageStyle] = useState('akwarela');
             const [format, setFormat] = useState('medal');
+            
+            // New Typography Controls
+            const [textPosY, setTextPosY] = useState(50);
+            const [titleFont, setTitleFont] = useState("'Caveat', cursive");
+            const [titleSize, setTitleSize] = useState(100);
+            const [contentSize, setContentSize] = useState(100);
+
             const [resultImageUrl, setResultImageUrl] = useState(null);
             
             // Print State
@@ -168,6 +212,7 @@
                 else if (format === 'naklejka') setPrintLayout(9);
                 else if (format === 'zaproszenie') setPrintLayout(4);
                 else if (format === 'zawieszka') setPrintLayout(8);
+                else if (format === 'dyplom') setPrintLayout(1);
             }, [format]);
 
             const showMessage = (text, type = 'success') => {
@@ -192,10 +237,9 @@
                 setResultImageUrl(null);
 
                 try {
-                    // ETAP 1: TŁUMACZ (OpenAI)
                     setGenStatus('Tłumaczenie na język AI...');
                     const transSys = `Jesteś ekspertem od promptów graficznych. Przetłumacz poniższy opis polskiego użytkownika na perfekcyjny, bogaty w detale język angielski (tylko część wizualna).
-ZASADA ABSOLUTNA: Niezależnie od opisu, dodaj do angielskiego promptu wyraźny nakaz pozostawienia pustej przestrzeni (negative space / blank area) w centrum grafiki na tekst.
+ZASADA ABSOLUTNA: Niezależnie od opisu, dodaj do angielskiego promptu wyraźny nakaz pozostawienia pustej przestrzeni (negative space / blank area) wokół lub w centrum grafiki, gdzie zostanie później nałożony tekst.
 ZABRONIONE: Model nie może generować ŻADNEGO tekstu, liter ani słów na obrazku.
 WYMÓG JSON: { "english_prompt": "english translation here" }`;
                     
@@ -203,8 +247,6 @@ WYMÓG JSON: { "english_prompt": "english translation here" }`;
                     const parsedTrans = parseAIResponse(aiText);
                     const englishPrompt = parsedTrans.english_prompt || prompt;
 
-                    // ETAP 2: MALARZ (Fal.ai Flux)
-                    // Zauważ: Celowo NIE wysyłamy customText do backendu api/malarz. Zostawiamy pisanie po stronie HTML!
                     setGenStatus('Malowanie tła i grafiki...');
                     const res = await fetch('/api/malarz', {
                         method: 'POST',
@@ -238,7 +280,10 @@ WYMÓG JSON: { "english_prompt": "english translation here" }`;
                 if (!resultImageUrl || !user) { showMessage('Błąd autoryzacji bazy.', 'error'); return; }
                 setIsPublishing(true);
                 try {
-                    const payload = { url: resultImageUrl, params: { prompt, imageStyle, format, customTitle, customContent } };
+                    const payload = { 
+                        url: resultImageUrl, 
+                        params: { prompt, imageStyle, format, customTitle, customContent, textPosY, titleFont, titleSize, contentSize } 
+                    };
                     await window.EduBoxCore.saveToGielda('edumalarz_market', 'edumalarz', customTitle || prompt.substring(0, 30), payload);
                     showMessage('Opublikowano w Galerii!', 'success');
                     setAppMode('gielda');
@@ -263,43 +308,15 @@ WYMÓG JSON: { "english_prompt": "english translation here" }`;
                 return () => { if (unsubscribe) unsubscribe(); }
             }, [appMode]);
 
-            // Komponent renderujący pojedynczy kafelek z nałożonym tekstem
-            const PrintItem = ({ url, format, title, content }) => {
-                const aspectClass = (format === 'medal' || format === 'naklejka') ? 'aspect-square' : 'aspect-[3/4]';
-                const roundedClass = format === 'medal' ? 'rounded-full' : 'rounded-lg';
-                
-                return (
-                    <div className={`relative w-full h-full flex flex-col items-center justify-center overflow-hidden bg-white border border-gray-100 ${aspectClass} ${roundedClass}`}>
-                        {/* Zmiana na object-contain aby kółko medalu było całe widoczne na kwadratowym obrazku */}
-                        <img src={url} className={`absolute inset-0 w-full h-full z-0 ${format === 'medal' ? 'object-contain' : 'object-cover'}`} alt="Tło" />
-                        
-                        <div className="relative z-10 flex flex-col items-center justify-center h-full p-6 text-center w-full">
-                            {title && (
-                                <h2 className="font-hand font-extrabold text-slate-900 leading-none break-words w-full" 
-                                    style={{fontSize: 'clamp(1.5rem, 5vw, 3rem)', textShadow: '0 0 12px rgba(255,255,255,1), 0 0 5px rgba(255,255,255,0.9), 0 0 20px rgba(255,255,255,0.8)'}}>
-                                    {title}
-                                </h2>
-                            )}
-                            {format === 'zaproszenie' && content && (
-                                <p className="font-sans font-bold text-slate-800 whitespace-pre-wrap mt-4 leading-snug w-full" 
-                                   style={{fontSize: 'clamp(0.7rem, 2vw, 1.2rem)', textShadow: '0 0 8px rgba(255,255,255,1), 0 0 4px rgba(255,255,255,0.9)'}}>
-                                    {content}
-                                </p>
-                            )}
-                        </div>
-                    </div>
-                );
-            };
-
             return (
                 <div className="flex h-screen w-full bg-slate-950 text-slate-200 overflow-hidden relative selection:bg-pink-500/30">
                     
-                    {/* Elementy drukowane pojawiające się tylko podczas CTRL+P (Wymuszone czyste tło) */}
+                    {/* Elementy drukowane pojawiające się tylko podczas CTRL+P */}
                     {resultImageUrl && (
                         <div className="print-only bg-white">
                             <div className={`a4-grid grid-${printLayout} bg-white`}>
                                 {Array.from({ length: printLayout }).map((_, i) => (
-                                    <PrintItem key={i} url={resultImageUrl} format={format} title={customTitle} content={customContent} />
+                                    <PrintItem key={i} url={resultImageUrl} format={format} title={customTitle} content={customContent} posY={textPosY} fontFam={titleFont} tSize={titleSize} cSize={contentSize} />
                                 ))}
                             </div>
                         </div>
@@ -337,6 +354,7 @@ WYMÓG JSON: { "english_prompt": "english translation here" }`;
                             {appMode === 'kreator' && (
                                 <>
                                     <div className="space-y-4 bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-inner">
+                                        
                                         <div className="space-y-1">
                                             <label className="text-[10px] font-bold text-slate-400 uppercase">Format Grafiki</label>
                                             <select value={format} onChange={e => setFormat(e.target.value)} className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:border-pink-500 outline-none">
@@ -358,12 +376,24 @@ WYMÓG JSON: { "english_prompt": "english translation here" }`;
                                         </div>
 
                                         <div className="space-y-1">
-                                            <label className="text-[10px] font-bold text-slate-400 uppercase">Tytuł / Główny napis</label>
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase">Co ma wyrysować sztuczna inteligencja?</label>
+                                            <textarea 
+                                                value={prompt} 
+                                                onChange={e => setPrompt(e.target.value)} 
+                                                className="w-full h-20 bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:border-pink-500 transition-colors resize-none" 
+                                                placeholder="Wpisz po polsku samo tło/motyw, np. Uśmiechnięta pszczółka z kwiatkiem..." 
+                                            />
+                                        </div>
+
+                                        <div className="pt-2 border-t border-slate-800"></div>
+
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-bold text-pink-400 uppercase">Tytuł / Główny napis</label>
                                             <input 
                                                 type="text" 
                                                 value={customTitle} 
                                                 onChange={e => setCustomTitle(e.target.value)} 
-                                                className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:border-pink-500 transition-colors" 
+                                                className="w-full bg-slate-950 border border-pink-700/50 rounded-lg p-2.5 text-sm text-white focus:border-pink-500 transition-colors" 
                                                 placeholder="np. Super Pszczółka, Dzień Ojca..." 
                                             />
                                         </div>
@@ -380,15 +410,47 @@ WYMÓG JSON: { "english_prompt": "english translation here" }`;
                                             </div>
                                         )}
 
-                                        <div className="space-y-1">
-                                            <label className="text-[10px] font-bold text-slate-400 uppercase">Co ma wyrysować sztuczna inteligencja?</label>
-                                            <textarea 
-                                                value={prompt} 
-                                                onChange={e => setPrompt(e.target.value)} 
-                                                className="w-full h-20 bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:border-pink-500 transition-colors resize-none" 
-                                                placeholder="Wpisz po polsku samo tło/motyw, np. Uśmiechnięta pszczółka z kwiatkiem..." 
-                                            />
+                                        {/* ZAAWANSOWANE USTAWIENIA TEKSTU */}
+                                        <div className="bg-slate-950 border border-slate-700 rounded-lg p-3 space-y-3 mt-4">
+                                            <div className="flex justify-between items-center text-[10px] font-bold text-slate-300 uppercase">
+                                                <span><i className="ph-bold ph-text-aa"></i> Typografia</span>
+                                            </div>
+                                            
+                                            <div className="space-y-1 mt-2">
+                                                <select value={titleFont} onChange={e => setTitleFont(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded p-2 text-xs text-white focus:border-pink-500 outline-none">
+                                                    <option value="'Caveat', cursive">Ręczna (Caveat)</option>
+                                                    <option value="'Dancing Script', cursive">Elegancka Pisanka (Dancing Script)</option>
+                                                    <option value="'Pacifico', cursive">Gruba Pisanka (Pacifico)</option>
+                                                    <option value="'Amatic SC', cursive">Dziecięca (Amatic SC)</option>
+                                                    <option value="'Playfair Display', serif">Klasyczna Szeryfowa (Playfair)</option>
+                                                    <option value="'Inter', sans-serif">Prosta Nowoczesna (Inter)</option>
+                                                </select>
+                                            </div>
+
+                                            <div className="space-y-1 pt-2">
+                                                <div className="flex justify-between text-[10px] text-slate-400">
+                                                    <span>Rozmiar Tytułu: {titleSize}%</span>
+                                                </div>
+                                                <input type="range" min="30" max="250" value={titleSize} onChange={e => setTitleSize(e.target.value)} className="w-full accent-pink-500" />
+                                            </div>
+
+                                            {format === 'zaproszenie' && (
+                                                <div className="space-y-1">
+                                                    <div className="flex justify-between text-[10px] text-slate-400">
+                                                        <span>Rozmiar Treści: {contentSize}%</span>
+                                                    </div>
+                                                    <input type="range" min="30" max="250" value={contentSize} onChange={e => setContentSize(e.target.value)} className="w-full accent-pink-500" />
+                                                </div>
+                                            )}
+
+                                            <div className="space-y-1 pt-2">
+                                                <div className="flex justify-between text-[10px] text-slate-400">
+                                                    <span>Pozycja Pionowa (Góra - Dół): {textPosY}%</span>
+                                                </div>
+                                                <input type="range" min="0" max="100" value={textPosY} onChange={e => setTextPosY(e.target.value)} className="w-full accent-pink-500" />
+                                            </div>
                                         </div>
+
                                     </div>
 
                                     <div className="space-y-3 pt-2">
@@ -420,6 +482,10 @@ WYMÓG JSON: { "english_prompt": "english translation here" }`;
                                                         setFormat(item.config.params.format || 'medal'); 
                                                         setCustomTitle(item.config.params.customTitle || '');
                                                         setCustomContent(item.config.params.customContent || '');
+                                                        setTextPosY(item.config.params.textPosY || 50);
+                                                        setTitleFont(item.config.params.titleFont || "'Caveat', cursive");
+                                                        setTitleSize(item.config.params.titleSize || 100);
+                                                        setContentSize(item.config.params.contentSize || 100);
                                                         setAppMode('kreator'); 
                                                      }}>
                                                     <div className="aspect-square bg-slate-900 w-full relative">
@@ -470,7 +536,7 @@ WYMÓG JSON: { "english_prompt": "english translation here" }`;
                                     
                                     {/* PODGLĄD NA ŻYWO */}
                                     <div className="inline-block mx-auto shadow-2xl rounded-2xl overflow-hidden border-4 border-white bg-white w-full max-w-sm">
-                                        <PrintItem url={resultImageUrl} format={format} title={customTitle} content={customContent} />
+                                        <PrintItem url={resultImageUrl} format={format} title={customTitle} content={customContent} posY={textPosY} fontFam={titleFont} tSize={titleSize} cSize={contentSize} />
                                     </div>
 
                                     {/* STUDIO WYDRUKU */}
@@ -479,6 +545,8 @@ WYMÓG JSON: { "english_prompt": "english translation here" }`;
                                         <p className="text-slate-400 text-xs mb-6 max-w-md mx-auto">Wybierz, ile kopii grafiki chcesz zmieścić na białej stronie A4. Aplikacja ułoży z tego idealną siatkę do wycięcia, oszczędzając toner.</p>
                                         
                                         <div className="flex flex-wrap justify-center gap-3 mb-8">
+                                            <button onClick={() => setPrintLayout(1)} className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${printLayout === 1 ? 'bg-pink-600 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}>1 (Wielki Dyplom)</button>
+                                            <button onClick={() => setPrintLayout(2)} className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${printLayout === 2 ? 'bg-pink-600 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}>2 (Połowa A4)</button>
                                             <button onClick={() => setPrintLayout(4)} className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${printLayout === 4 ? 'bg-pink-600 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}>4 (Zaproszenia A6)</button>
                                             <button onClick={() => setPrintLayout(6)} className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${printLayout === 6 ? 'bg-pink-600 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}>6 (Duże Medale)</button>
                                             <button onClick={() => setPrintLayout(8)} className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${printLayout === 8 ? 'bg-pink-600 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}>8 (Zawieszki)</button>
