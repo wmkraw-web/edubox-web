@@ -26,7 +26,6 @@
     <style>
         body { font-family: 'Nunito', sans-serif; background-color: #f0fdf4; color: #0f172a; overflow: hidden; }
         
-        /* Zaktualizowane klasy dla nowych czcionek z polskimi znakami */
         .font-kids { font-family: 'Baloo 2', sans-serif; }
         .font-hand { font-family: 'Kalam', cursive; }
         
@@ -45,15 +44,15 @@
             100% { transform: translate(30px, -50px) scale(1.05); }
         }
 
-        /* --- PREMIUM BORDERS & STYLES --- */
+        /* --- PREMIUM BORDERS --- */
         .premium-border {
-            border: 6px solid white;
-            outline: 4px dashed rgba(0,0,0,0.1);
-            outline-offset: -8px;
+            border: 0.375rem solid white; /* skalowalne zamiast 6px */
+            outline: 0.25rem dashed rgba(0,0,0,0.1);
+            outline-offset: -0.5rem;
             box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
         }
 
-        /* --- STUDIO WYDRUKU: PANCERNA WIELOSTRONICOWOŚĆ I INTELIGENTNE SKALOWANIE --- */
+        /* --- STUDIO WYDRUKU: BAZOWE USTAWIENIA --- */
         @media screen {
             .print-only { display: none !important; }
         }
@@ -74,34 +73,14 @@
 
             aside, .aura-container, .no-print, nav, header { display: none !important; }
             main { display: block !important; width: 100% !important; height: auto !important; background: white !important; }
-            
             .print-only { display: block !important; width: 100% !important; height: auto !important; background: white !important; }
             * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-            .print-break-inside-avoid { break-inside: avoid !important; page-break-inside: avoid !important; display: block !important; }
             
-            /* DYNAMICZNE SIATKI NA PODSTAWIE WYBORU UŻYTKOWNIKA */
-            
-            /* 1. Opcja "Wielkie" (1 kolumna, ok. 2 duże tablice na A4) */
-            .print-grid-large { grid-template-columns: 1fr !important; display: grid !important; gap: 20px !important; }
-            .print-grid-large > div { min-height: 125mm !important; padding: 2rem !important; }
-            .print-grid-large > div h2 { font-size: 3rem !important; line-height: 1.1 !important; }
-            .print-grid-large > div p { font-size: 1.8rem !important; line-height: 1.3 !important; }
-            .print-grid-large img { transform: scale(1.2); } 
-            .print-grid-large .w-32, .print-grid-large .w-40 { width: 12rem !important; height: 12rem !important; }
-            .print-grid-large .text-3xl { font-size: 4rem !important; }
-
-            /* 2. Opcja "Średnie" (2 kolumny, 4-6 tablic na A4) */
-            .print-grid-medium { grid-template-columns: repeat(2, 1fr) !important; display: grid !important; gap: 15px !important; }
-            .print-grid-medium > div { min-height: 75mm !important; }
-            
-            /* 3. Opcja "Małe" (3 kolumny, 9+ tabliczek na A4) */
-            .print-grid-small { grid-template-columns: repeat(3, 1fr) !important; display: grid !important; gap: 10px !important; }
-            .print-grid-small > div { min-height: 45mm !important; padding: 0.5rem !important; }
-            .print-grid-small > div h2 { font-size: 1.1rem !important; line-height: 1.1 !important; }
-            .print-grid-small > div p { font-size: 0.8rem !important; line-height: 1.2 !important; }
-            .print-grid-small .w-32, .print-grid-small .w-40 { width: 4rem !important; height: 4rem !important; }
-            .print-grid-small .p-6 { padding: 0.75rem !important; }
-            .print-grid-small .text-2xl { font-size: 1.2rem !important; }
+            .print-break-inside-avoid { 
+                break-inside: avoid !important; 
+                page-break-inside: avoid !important; 
+                display: block !important; 
+            }
         }
     </style>
 </head>
@@ -183,7 +162,7 @@
             const [groupAge, setGroupAge] = useState('Przedszkolaki');
             
             const [resultData, setResultData] = useState(null);
-            const [printSize, setPrintSize] = useState('medium'); // Nowy stan dla wielkości wydruku!
+            const [printSize, setPrintSize] = useState('medium'); 
             
             const [marketItems, setMarketItems] = useState([]);
             const [isFetchingMarket, setIsFetchingMarket] = useState(false);
@@ -313,7 +292,6 @@ WYMÓG JSON:
 
                     setResultData({ type: layoutType, data: parsedJson, params: { theme, groupAge } });
                     
-                    // Reset wielkości wydruku dla różnych opcji
                     if(layoutType === 'etykiety') setPrintSize('medium');
                     else setPrintSize('large');
                     
@@ -355,7 +333,7 @@ WYMÓG JSON:
                 return () => { if (unsubscribe) unsubscribe(); }
             }, [appMode]);
 
-            // --- RENDEROWANIE PIĘKNYCH UKŁADÓW (Z DYNAMICZNYMI KLASAMI CSS DO WYDRUKU) ---
+            // --- INTELIGENTNE RENDEROWANIE SKALOWALNE ---
             const renderLayout = () => {
                 if (!resultData || !resultData.data) return null;
                 const { type, data } = resultData;
@@ -368,19 +346,19 @@ WYMÓG JSON:
                                 <span>Kliknij w pola z napisem <strong>"Imię Dziecka"</strong> poniżej, aby wpisać imiona przedszkolaków! Dopiero potem wciśnij Drukuj.</span>
                             </div>
 
-                            <div className={`grid grid-cols-2 gap-6 print-grid-${printSize}`}>
+                            <div className="grid gap-6 print-grid-dynamic">
                                 {data.items.map((item, i) => (
-                                    <div key={i} className={`bg-white border-[6px] ${item.borderColor || 'border-yellow-400'} rounded-[32px] p-2 flex items-stretch shadow-md print-break-inside-avoid h-[130px] md:h-[150px] relative overflow-hidden group`}>
-                                        <div className="w-24 md:w-32 h-full shrink-0 bg-white rounded-[20px] overflow-hidden border-[3px] border-slate-100 shadow-sm mr-3 flex items-center justify-center">
+                                    <div key={i} className={`bg-white border-[0.375rem] ${item.borderColor || 'border-yellow-400'} rounded-[2rem] p-2 flex items-stretch shadow-md print-break-inside-avoid h-[8rem] md:h-[10rem] relative overflow-hidden group`}>
+                                        <div className="w-[6rem] md:w-[8rem] h-full shrink-0 bg-white rounded-[1.25rem] overflow-hidden border-[3px] border-slate-100 shadow-sm mr-3 flex items-center justify-center">
                                             <img src={item.imgUrl} className="max-w-full max-h-full object-contain p-1" />
                                         </div>
-                                        <div className="flex-1 bg-slate-50/80 rounded-[20px] border-2 border-dashed border-slate-300 relative flex items-center justify-center overflow-hidden transition-colors hover:bg-slate-100/80 focus-within:border-emerald-400">
+                                        <div className="flex-1 bg-slate-50/80 rounded-[1.25rem] border-2 border-dashed border-slate-300 relative flex items-center justify-center overflow-hidden transition-colors hover:bg-slate-100/80 focus-within:border-emerald-400">
                                             <div className="absolute top-2 right-3 text-xl opacity-30">⭐</div>
                                             <div className="absolute bottom-2 left-3 text-xl opacity-30">❤️</div>
                                             <input 
                                                 type="text" 
                                                 placeholder="Imię Dziecka"
-                                                className="w-full h-full bg-transparent text-center outline-none font-kids text-2xl md:text-3xl font-bold text-slate-800 placeholder-slate-300 px-4 z-10"
+                                                className="w-full h-full bg-transparent text-center outline-none font-kids text-2xl md:text-3xl font-bold text-slate-800 placeholder-slate-300 px-4 z-10 print-input"
                                             />
                                         </div>
                                     </div>
@@ -393,9 +371,9 @@ WYMÓG JSON:
                 if (type === 'drzwi') {
                     return (
                         <div className="flex flex-col items-center gap-6 bg-white p-10 w-full max-w-3xl mx-auto rounded-xl">
-                            <div className="bg-sky-50 premium-border rounded-[60px] p-8 text-center relative w-full print-break-inside-avoid">
+                            <div className="bg-sky-50 premium-border rounded-[3.75rem] p-8 text-center relative w-full print-break-inside-avoid">
                                 {data.headerImgUrl && (
-                                    <div className="w-48 h-32 mx-auto mb-4 overflow-hidden rounded-full border-4 border-white shadow-inner">
+                                    <div className="w-[12rem] h-[8rem] mx-auto mb-4 overflow-hidden rounded-full border-4 border-white shadow-inner">
                                         <img src={data.headerImgUrl} className="w-full h-full object-cover" />
                                     </div>
                                 )}
@@ -404,11 +382,10 @@ WYMÓG JSON:
                                 </h1>
                             </div>
                             
-                            {/* Zapakowane w grida by można było sterować wielkością na wydruku */}
-                            <div className={`w-full grid grid-cols-1 gap-6 print-grid-${printSize}`}>
+                            <div className="w-full grid gap-6 print-grid-dynamic">
                                 {data.items.map((item, i) => (
                                     <div key={i} className={`w-[90%] mx-auto ${item.bgColor} premium-border rounded-full p-2 pr-10 flex items-center shadow-md print-break-inside-avoid`}>
-                                        <div className="w-24 h-24 rounded-full border-4 border-white shadow-sm overflow-hidden shrink-0 bg-white flex items-center justify-center">
+                                        <div className="w-[6rem] h-[6rem] md:w-[8rem] md:h-[8rem] rounded-full border-4 border-white shadow-sm overflow-hidden shrink-0 bg-white flex items-center justify-center">
                                             <img src={item.imgUrl} className="max-w-full max-h-full object-contain p-1" />
                                         </div>
                                         <div className={`font-kids font-black text-3xl md:text-4xl ${item.textColor} tracking-wide text-center flex-1`}>
@@ -425,17 +402,19 @@ WYMÓG JSON:
                     return (
                         <div className="bg-[#e7d5b8] p-10 w-full max-w-5xl mx-auto rounded-xl shadow-inner relative" style={{backgroundImage: 'url("https://www.transparenttextures.com/patterns/cork-board.png")'}}>
                             <div className="text-center mb-12 print-break-inside-avoid">
-                                <div className="inline-block bg-white/95 premium-border rounded-[40px] px-16 py-6 shadow-xl rotate-1 relative">
+                                <div className="inline-block bg-white/95 premium-border rounded-[2.5rem] px-16 py-6 shadow-xl rotate-1 relative">
                                     <div className="absolute -top-6 -left-6 text-5xl transform -rotate-12 drop-shadow-md">📌</div>
                                     <h1 className="text-5xl md:text-7xl font-kids font-black text-amber-600 drop-shadow-sm">{data.title}</h1>
                                 </div>
                             </div>
                             
-                            <div className={`grid grid-cols-2 md:grid-cols-3 gap-8 print-grid-${printSize}`}>
+                            {/* Klasa "print-grid-dynamic" zarządza liczbą kolumn przez wstrzyknięte style */}
+                            <div className="grid gap-8 print-grid-dynamic">
                                 {data.items.map((item, i) => (
                                     <div key={i} className={`${item.bgColor} premium-border rounded-3xl p-4 flex flex-col items-center text-center shadow-lg relative print-break-inside-avoid transform ${i%2 === 0 ? '-rotate-1' : 'rotate-2'}`}>
                                         <div className="absolute -top-4 left-1/2 -translate-x-1/2 text-3xl drop-shadow-md">📍</div>
-                                        <div className="w-full aspect-square rounded-2xl bg-white border-2 border-white/50 shadow-inner overflow-hidden mb-4 p-2 flex items-center justify-center">
+                                        {/* UWAGA: Stała wysokość obrazka zapobiega ucinaniu i rozciąganiu w dół */}
+                                        <div className="w-full h-40 md:h-56 rounded-2xl bg-white border-2 border-white/50 shadow-inner overflow-hidden mb-4 p-2 flex items-center justify-center shrink-0">
                                             <img src={item.imgUrl} className="max-w-full max-h-full object-contain" />
                                         </div>
                                         <div className={`font-kids font-bold text-xl md:text-2xl leading-snug px-2 pb-2 ${item.textColor}`}>
@@ -450,10 +429,10 @@ WYMÓG JSON:
 
                 if (type === 'kaciki') {
                     return (
-                        <div className={`grid grid-cols-1 md:grid-cols-2 gap-8 bg-white p-8 w-full max-w-5xl mx-auto rounded-xl print-grid-${printSize}`}>
+                        <div className="grid gap-8 bg-white p-8 w-full max-w-5xl mx-auto rounded-xl print-grid-dynamic">
                             {data.items.map((item, i) => (
-                                <div key={i} className={`${item.bgColor} premium-border rounded-[40px] p-4 relative flex items-center shadow-lg print-break-inside-avoid`}>
-                                    <div className="w-40 h-40 rounded-3xl bg-white shadow-inner overflow-hidden shrink-0 border-4 border-white/60 z-10 relative left-2 p-2 flex items-center justify-center">
+                                <div key={i} className={`${item.bgColor} premium-border rounded-[2.5rem] p-4 relative flex items-center shadow-lg print-break-inside-avoid`}>
+                                    <div className="w-[8rem] h-[8rem] md:w-[12rem] md:h-[12rem] rounded-3xl bg-white shadow-inner overflow-hidden shrink-0 border-4 border-white/60 z-10 relative left-2 p-2 flex items-center justify-center">
                                         <img src={item.imgUrl} className="max-w-full max-h-full object-contain" />
                                     </div>
                                     <div className="flex-1 text-center pr-6 pl-4 relative z-10">
@@ -470,20 +449,20 @@ WYMÓG JSON:
                 if (type === 'plakat_choroba') {
                     return (
                         <div className="bg-white p-8 md:p-12 w-full max-w-5xl mx-auto rounded-xl shadow-2xl print-break-inside-avoid border-8 border-sky-100">
-                            <div className="text-center mb-10 bg-sky-50 rounded-[50px] premium-border p-8 relative">
+                            <div className="text-center mb-10 bg-sky-50 rounded-[3rem] premium-border p-8 relative">
                                 <h1 className="text-5xl md:text-6xl font-kids font-black text-red-600 uppercase tracking-tight mb-4 drop-shadow-md leading-none">{data.title}</h1>
                                 <p className="text-2xl font-kids font-bold text-sky-800">{data.subtitle}</p>
                             </div>
-                            <div className={`grid grid-cols-1 md:grid-cols-2 gap-8 print-grid-${printSize}`}>
+                            <div className="grid gap-8 print-grid-dynamic">
                                 {data.items.map((item, i) => (
-                                    <div key={i} className={`${item.bgColor} premium-border rounded-[40px] overflow-hidden shadow-lg flex flex-col h-full print-break-inside-avoid`}>
+                                    <div key={i} className={`${item.bgColor} premium-border rounded-[2.5rem] overflow-hidden shadow-lg flex flex-col h-full print-break-inside-avoid`}>
                                         <div className={`${item.headerColor} text-white p-5 flex items-center gap-4 border-b-4 border-white/20`}>
-                                            <div className="w-14 h-14 bg-white rounded-full flex items-center justify-center text-3xl font-black text-slate-800 shadow-inner shrink-0">{i+1}</div>
+                                            <div className="w-[3.5rem] h-[3.5rem] bg-white rounded-full flex items-center justify-center text-3xl font-black text-slate-800 shadow-inner shrink-0">{i+1}</div>
                                             <h2 className="font-kids font-black text-2xl md:text-3xl leading-tight drop-shadow-sm">{item.title}</h2>
                                         </div>
                                         <div className="p-6 flex items-center gap-6 grow">
                                             <p className="font-sans font-semibold text-slate-800 leading-relaxed text-lg flex-1">{item.desc}</p>
-                                            <div className="w-32 h-32 shrink-0 rounded-full border-4 border-white shadow-md overflow-hidden bg-white p-1 flex items-center justify-center">
+                                            <div className="w-[6rem] h-[6rem] md:w-[10rem] md:h-[10rem] shrink-0 rounded-full border-4 border-white shadow-md overflow-hidden bg-white p-1 flex items-center justify-center">
                                                 <img src={item.imgUrl} className="max-w-full max-h-full object-contain" />
                                             </div>
                                         </div>
@@ -502,6 +481,42 @@ WYMÓG JSON:
 
             return (
                 <div className="flex h-screen w-full bg-emerald-950 text-slate-800 overflow-hidden relative selection:bg-emerald-500/30">
+                    
+                    {/* WSTRZYKNIĘTE STYLE DYNAMICZNE DLA DRUKARKI (Decydują o skalowaniu czcionki i kolumnach) */}
+                    <style>
+                    {`
+                        @media print {
+                            html, body {
+                                font-size: ${printSize === 'large' ? '22px' : printSize === 'small' ? '12px' : '16px'} !important;
+                            }
+                            .print-grid-dynamic {
+                                display: grid !important;
+                                grid-template-columns: repeat(${
+                                    printSize === 'large' ? 1 : 
+                                    printSize === 'medium' ? 2 : 3
+                                }, 1fr) !important;
+                                gap: 1.5rem !important;
+                            }
+                            input::placeholder { color: transparent !important; }
+                            .print-input { border: none !important; background: transparent !important; box-shadow: none !important; }
+                        }
+                        
+                        @media screen {
+                            /* Fallback kolumn na ekranie komputera */
+                            .print-grid-dynamic {
+                                display: grid;
+                                grid-template-columns: repeat(${
+                                    layoutType === 'drzwi' ? 1 :
+                                    layoutType === 'kodeks' ? 3 : 2
+                                }, minmax(0, 1fr));
+                            }
+                            @media (max-width: 768px) {
+                                .print-grid-dynamic { grid-template-columns: 1fr; }
+                            }
+                        }
+                    `}
+                    </style>
+
                     <div className="aura-container no-print"><div className="aura-blob aura-1"></div><div className="aura-blob aura-2"></div><div className="aura-blob aura-3"></div></div>
 
                     {message && (
@@ -510,7 +525,7 @@ WYMÓG JSON:
                         </div>
                     )}
 
-                    {/* Widok Drukowania */}
+                    {/* Widok Drukowania - Uwolniony od ograniczeń */}
                     <div className="print-only">
                         {renderLayout()}
                     </div>
@@ -674,7 +689,7 @@ WYMÓG JSON:
                                                 <button onClick={() => setPrintSize('small')} className={`px-5 py-3 rounded-xl text-sm font-bold transition-all ${printSize === 'small' ? 'bg-emerald-600 text-white shadow-md' : 'bg-white border border-slate-300 text-slate-600 hover:bg-slate-50'}`}>Małe (9+ na stronę)</button>
                                             </div>
                                             <p className="text-[10px] text-emerald-600 mt-4 font-semibold">
-                                                Rozmiar zmieni się automatycznie na papierze w oknie podglądu druku (w aplikacji podgląd zawsze wygląda tak samo).
+                                                Rozmiar zmieni się automatycznie w oknie podglądu druku (CTRL+P).
                                             </p>
                                         </div>
 
