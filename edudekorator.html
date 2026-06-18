@@ -51,28 +51,46 @@
             box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
         }
 
-        /* --- STUDIO WYDRUKU: JAKOŚĆ PREMIUM (Jak z PDF z Facebooka) --- */
+        /* --- STUDIO WYDRUKU: PANCERNA NAPRAWA WIELU STRON --- */
         @media screen {
             .print-only { display: none !important; }
         }
 
         @media print {
-            @page { margin: 5mm; }
-            body, html, #root { 
+            @page { margin: 10mm; size: auto; }
+            
+            /* Zabijamy wszystkie ograniczenia wysokości, żeby drukarka widziała wszystkie strony! */
+            html, body, #root { 
                 background: white !important; 
-                margin: 0 !important; padding: 0 !important; 
-                overflow: visible !important; height: auto !important;
+                margin: 0 !important; 
+                padding: 0 !important; 
+                height: auto !important; 
+                min-height: auto !important;
+                overflow: visible !important; 
             }
-            .no-print { display: none !important; }
+
+            .h-screen { height: auto !important; }
+            .overflow-hidden { overflow: visible !important; }
+            .overflow-y-auto { overflow: visible !important; }
+            .flex-1 { display: block !important; height: auto !important; }
+            
+            /* Ukrywamy UI aplikacji */
+            aside, .aura-container, .no-print { display: none !important; }
+            
+            /* Uwalniamy blok z wynikami */
+            main { display: block !important; height: auto !important; overflow: visible !important; background: white !important; }
+            
             .print-only { 
                 display: block !important; 
-                width: 100%; height: 100%; 
+                width: 100% !important; 
+                height: auto !important; 
                 background: white !important; 
             }
+            
             * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
             
+            /* Zabezpieczenie przed ucinaniem elementów wpół na nowej stronie */
             .print-break-inside-avoid { break-inside: avoid; page-break-inside: avoid; }
-            .page-break-after { break-after: page; page-break-after: always; }
         }
     </style>
 </head>
@@ -82,7 +100,6 @@
     <script type="text/babel">
         const { useState, useEffect } = React;
 
-        // Obejście problemów z parsowaniem JSON-a
         const parseAIResponse = (aiOutput) => {
             let text = String(aiOutput?.text || aiOutput?.response || aiOutput?.content || aiOutput || "").trim();
             text = text.replace(/```json/gi, '').replace(/```/g, '').trim();
@@ -99,7 +116,6 @@
             }
         };
 
-        // Krok 1: Wymyślanie tekstów i promptów (OpenAI)
         const fetchTextAI = async (prompt, systemInstruction) => {
             const finalPrompt = `INSTRUKCJA: Zwróć DOKŁADNIE i WYŁĄCZNIE czysty kod JSON. Nie używaj znaczników markdown.\n\n${systemInstruction}\n\nZADANIE:\n${prompt}`;
             try {
@@ -117,17 +133,17 @@
             } catch(e) { throw new Error("Brak połączenia z AI. " + e.message); }
         };
 
-        // Krok 2: Generowanie ilustracji w locie (Fal.ai - Malarz)
         const fetchImageAI = async (imagePrompt) => {
             try {
+                // ULEPSZONY PROMPT GRAFICZNY - Styl wektorowy premium, urocze dziecięce
                 const res = await fetch('/api/malarz', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ 
-                        prompt: `${imagePrompt}. Cute children's book illustration style, flat vector, highly detailed, joyful, pure white background, perfectly centered.`, 
+                        prompt: `${imagePrompt}. High quality vibrant children education illustration, 2D vector style, bright pastel colors, no text, pure white background, cute and friendly, perfectly centered.`, 
                         style: 'wektor', 
                         format: 'naklejka', 
-                        customText: '' // Puste pole, bo tekst nakładamy w HTML-u!
+                        customText: '' 
                     })
                 });
                 if (res.ok) {
@@ -150,11 +166,10 @@
             const [message, setMessage] = useState(null);
             
             const [isGenerating, setIsGenerating] = useState(false);
-            const [genStatus, setGenStatus] = useState(''); // Status dla wielu kroków
+            const [genStatus, setGenStatus] = useState(''); 
             
-            // Konfigurator Wystroju
             const [layoutType, setLayoutType] = useState('drzwi');
-            const [theme, setTheme] = useState('Pszczółki / Wiosna');
+            const [theme, setTheme] = useState('Pszczółki');
             const [groupAge, setGroupAge] = useState('Przedszkolaki');
             
             const [resultData, setResultData] = useState(null);
@@ -196,84 +211,92 @@
 
             const generateContent = async () => {
                 if (!isPremium && aiGenerations >= 3) { showMessage('Limit wyczerpany.', 'error'); return; }
+                if (!theme.trim()) { showMessage('Wpisz motyw!', 'error'); return; }
+                
                 setIsGenerating(true);
                 setResultData(null);
 
                 let sysPrompt = "";
-                // Redukujemy ilość elementów, żeby serwer Fal.ai i Vercel nie dostały zadyszki przy generowaniu zdjęć.
-                // 5 reguł dla Drzwi, 6 dla Kodeksu, 4 dla Kącików, 4 dla Plakatu
+                
                 if (layoutType === 'drzwi') {
-                    sysPrompt = `Jesteś projektantem premium dekoracji przedszkolnych. Użytkownik chce stworzyć ekskluzywny zestaw na drzwi z głównym hasłem i 5 cechami dzieci na osobnych kafelkach.
-Dla każdego elementu wymyśl angielski 'image_prompt' opisujący piękną, wektorową ilustrację przedstawiającą radosne dziecko wykonujące daną czynność (np. malujące, dzielące się zabawką). Dobierz pastelowe kolory Tailwind.
+                    sysPrompt = `Projektujesz premium dekoracje przedszkolne. Wygeneruj zestaw na drzwi z głównym hasłem i 5 cechami dzieci.
+Wymyśl angielski 'image_prompt' dla pięknej, uroczej 2D wektorowej ilustracji radośnie bawiących się dzieci pasujących do cechy.
 WYMÓG JSON:
 {
   "title": "W naszej sali dzieci są:",
-  "header_img_prompt": "Cute vector illustration of three happy kindergarten kids waving hands, full body, white background",
+  "header_img_prompt": "Cute vector illustration of happy kids waving hands, full body, white background",
   "items": [
-    { "text": "Kreatywne", "image_prompt": "Cute vector illustration of a happy little girl painting a rainbow on an easel, white background", "bgColor": "bg-green-100", "textColor": "text-green-700" }
-    // wygeneruj dokładnie 5 takich kafelków
+    { "text": "Kreatywne", "image_prompt": "Cute vector illustration of a happy little child painting, white background", "bgColor": "bg-green-100", "textColor": "text-green-700" }
+    // dokładnie 5 takich kafelków
   ]
 }`;
                 } else if (layoutType === 'kodeks') {
-                    sysPrompt = `Projektujesz "Kodeks Przedszkolaka". Wymyśl 6 krótkich, pozytywnych zasad.
-Dla każdej zasady podaj angielski 'image_prompt' opisujący wektorową, uroczą ilustrację dzieci demonstrujących tę zasadę.
+                    sysPrompt = `Projektujesz "Kodeks Przedszkolaka". Wymyśl 6 krótkich zasad (w 1. os. l. mnogiej).
+Dla każdej zasady podaj angielski 'image_prompt' z uroczymi wektorowymi dziećmi ilustrującymi zasadę.
 WYMÓG JSON:
 {
   "title": "Nasz Kodeks",
-  "header_img_prompt": "Cute vector illustration of a group of kindergarten kids hugging and smiling, white background",
+  "header_img_prompt": "Cute vector illustration of kids holding hands smiling, white background",
   "items": [
-    { "text": "Pomagamy sobie nawzajem", "image_prompt": "Cute vector illustration of two kids sharing a teddy bear toy, white background", "bgColor": "bg-blue-50", "textColor": "text-blue-800" }
-    // dokładnie 6 zasad
-  ]
+    { "text": "Sprzątamy zabawki", "image_prompt": "Cute vector illustration of two kids putting toys in a box, white background", "bgColor": "bg-blue-50", "textColor": "text-blue-800" }
+  ] // 6 zasad
 }`;
                 } else if (layoutType === 'kaciki') {
-                    sysPrompt = `Projektujesz luksusowe szyldy do kącików tematycznych (np. Kącik Plastyczny, Kącik Lalek). Wygeneruj 4 różne kąciki.
-Dla każdego podaj angielski 'image_prompt' opisujący duże, piękne ilustracje zabawek i dzieci w danym kąciku.
+                    sysPrompt = `Projektujesz szyldy do kącików tematycznych (np. Kącik Lalek). Wygeneruj 4 kąciki pasujące do wieku i tematu.
+Dla każdego podaj angielski 'image_prompt' z dużymi, pięknymi ilustracjami zabawek/dzieci.
 WYMÓG JSON:
 {
   "title": "Nasze Kąciki",
   "items": [
-    { "text": "Kącik Majsterkowicza", "image_prompt": "Cute vector illustration of a little boy wearing safety goggles building a birdhouse with a toy hammer, white background", "bgColor": "bg-amber-100", "textColor": "text-amber-800" }
-    // dokładnie 4 kąciki
-  ]
+    { "text": "Kącik Czytelniczy", "image_prompt": "Cute vector illustration of kids reading a big storybook, white background", "bgColor": "bg-amber-100", "textColor": "text-amber-800" }
+  ] // 4 kąciki
 }`;
                 } else if (layoutType === 'plakat_choroba') {
-                    sysPrompt = `Projektujesz plakat "Zostaw dziecko w domu, gdy:". Plakat ma 4 kafelki objawów.
-Dla każdego objawu podaj 'image_prompt' ilustrujący urocze dziecko z danym objawem (z termometrem, kichające itp.).
+                    sysPrompt = `Projektujesz plakat edukacyjny na drzwi o objawach chorób (4 kafelki).
+Dla każdego objawu podaj uroczy 'image_prompt' obrazujący chore dziecko (np. z termometrem).
 WYMÓG JSON:
 {
   "title": "Zostaw dziecko w domu, gdy:",
-  "subtitle": "Dbajmy wspólnie o zdrowie wszystkich dzieci",
+  "subtitle": "Dbajmy wspólnie o zdrowie!",
   "footer": "DZIĘKUJEMY ZA WSPÓŁPRACĘ!",
   "items": [
-    { "title": "Ma Gorączkę", "desc": "Podwyższona temperatura to sygnał...", "image_prompt": "Cute vector illustration of a sad little boy with a thermometer in his mouth in bed, white background", "bgColor": "bg-red-50", "headerColor": "bg-red-500" }
-    // dokładnie 4 objawy
+    { "title": "Ma Gorączkę", "desc": "Zawsze zostań w domu...", "image_prompt": "Cute vector illustration of a sad kid in bed with thermometer, white background", "bgColor": "bg-red-50", "headerColor": "bg-red-500" }
+  ] // 4 objawy
+}`;
+                } else if (layoutType === 'etykiety') {
+                    // NOWY MODUŁ - ETYKIETY NA SZAFKI
+                    sysPrompt = `Projektujesz urocze etykiety/wizytówki na szafki w szatni przedszkolnej.
+Na podstawie podanego motywu (np. zwierzątka, owoce, pojazdy, kosmos) wygeneruj 10 różnych symboli.
+Dla każdego z nich podaj angielski 'image_prompt' dla wektorowej ilustracji.
+WYMÓG JSON:
+{
+  "title": "Etykiety na szafki",
+  "items": [
+    { "image_prompt": "Cute vector illustration of a happy little yellow bee, white background", "bgColor": "bg-yellow-50", "borderColor": "border-yellow-400" },
+    { "image_prompt": "Cute vector illustration of a happy little green frog, white background", "bgColor": "bg-green-50", "borderColor": "border-green-400" }
+    // dokładnie 10 etykiet, różne symbole pasujące do motywu. Pola "text" nie potrzebujemy, dziecko samo wpisze imię.
   ]
 }`;
                 }
 
-                const prompt = `Motyw przewodni / Nazwa Grupy: ${theme}. Wiek dzieci: ${groupAge}. Stwórz profesjonalny i szczegółowy pakiet.`;
+                const prompt = `Motyw przewodni / Temat wizualny: ${theme}. Wiek: ${groupAge}. Stwórz profesjonalny pakiet.`;
 
                 try {
-                    // 1. ZBUDUJ KONCEPCJĘ (OpenAI)
-                    setGenStatus('Krok 1: Wymyślanie tekstów i scen scenografii...');
+                    setGenStatus('Krok 1: Planowanie koncepcji (OpenAI)...');
                     const aiText = await fetchTextAI(prompt, sysPrompt);
                     const parsedJson = parseAIResponse(aiText);
                     
-                    // 2. MALUJ ILUSTRACJE (Fal.ai Flux)
-                    setGenStatus('Krok 2: Malowanie głównych grafik. Proszę czekać...');
+                    setGenStatus('Krok 2: Malowanie głównych grafik...');
                     
-                    // Pobieramy nagłówek (jeśli istnieje)
                     if (parsedJson.header_img_prompt) {
                         parsedJson.headerImgUrl = await fetchImageAI(parsedJson.header_img_prompt);
                     }
 
-                    // Pobieramy obrazki dla elementów w równoległych żądaniach (Dzięki Fal.ai jest to bardzo szybkie!)
                     setGenStatus(`Krok 3: Rysowanie ${parsedJson.items.length} unikalnych ilustracji do zestawu...`);
                     const itemsWithImages = await Promise.all(
                         parsedJson.items.map(async (item) => {
                             const imgUrl = await fetchImageAI(item.image_prompt);
-                            return { ...item, imgUrl: imgUrl || 'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?q=80&w=400&auto=format&fit=crop' }; // Fallback w razie błędu
+                            return { ...item, imgUrl: imgUrl || 'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?q=80&w=400&auto=format&fit=crop' }; 
                         })
                     );
                     
@@ -286,7 +309,7 @@ WYMÓG JSON:
                         setAiGenerations(newCount);
                         try { window.localStorage.setItem('edubox_eduwystroj_ai', newCount.toString()); } catch(e) {}
                     }
-                    showMessage('Pakiet Dekoracyjny gotowy do druku!', 'success');
+                    showMessage('Gotowe do druku!', 'success');
                 } catch (error) { 
                     showMessage(error.message, 'error'); 
                 } finally { 
@@ -319,15 +342,39 @@ WYMÓG JSON:
                 return () => { if (unsubscribe) unsubscribe(); }
             }, [appMode]);
 
-            // --- RENDEROWANIE PIĘKNYCH UKŁADÓW (Z PRAWDZIWYMI GRAFIKAMI) ---
+            // --- RENDEROWANIE PIĘKNYCH UKŁADÓW ---
             const renderLayout = () => {
                 if (!resultData || !resultData.data) return null;
                 const { type, data } = resultData;
 
+                // 1. ETYKIETY NA SZAFKI (Nowość!)
+                if (type === 'etykiety') {
+                    return (
+                        <div className="bg-white p-6 w-full max-w-5xl mx-auto rounded-xl">
+                            <div className="grid grid-cols-2 gap-4 md:gap-6">
+                                {data.items.map((item, i) => (
+                                    <div key={i} className={`${item.bgColor} border-[4px] ${item.borderColor || 'border-slate-300'} rounded-[24px] p-3 flex items-stretch shadow-sm print-break-inside-avoid h-[120px] md:h-[140px]`}>
+                                        {/* Obrazek z lewej */}
+                                        <div className="w-24 h-full shrink-0 bg-white rounded-[16px] overflow-hidden border-2 border-white/60 shadow-inner mr-4">
+                                            <img src={item.imgUrl} className="w-full h-full object-cover" />
+                                        </div>
+                                        {/* Puste pole na imię z prawej */}
+                                        <div className="flex-1 bg-white rounded-[16px] border-2 border-dashed border-slate-300 relative flex items-center justify-center overflow-hidden">
+                                            <div className="absolute top-2 right-2 text-xl opacity-40">⭐</div>
+                                            <div className="absolute bottom-2 left-2 text-xl opacity-40">❤️</div>
+                                            <span className="text-slate-300 font-kids text-sm tracking-widest opacity-50">Imię Dziecka</span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    );
+                }
+
+                // 2. DRZWI
                 if (type === 'drzwi') {
                     return (
                         <div className="flex flex-col items-center gap-6 bg-white p-10 w-full max-w-3xl mx-auto rounded-xl">
-                            {/* Nagłówek Dekoracyjny (Chmurka z ilustracją) */}
                             <div className="bg-sky-50 premium-border rounded-[60px] p-8 text-center relative w-full print-break-inside-avoid">
                                 {data.headerImgUrl && (
                                     <div className="w-48 h-32 mx-auto mb-4 overflow-hidden rounded-full border-4 border-white shadow-inner">
@@ -338,8 +385,6 @@ WYMÓG JSON:
                                     {data.title}
                                 </h1>
                             </div>
-
-                            {/* Banery Cech z obrazkami */}
                             {data.items.map((item, i) => (
                                 <div key={i} className={`w-[90%] ${item.bgColor} premium-border rounded-full p-2 pr-10 flex items-center shadow-md print-break-inside-avoid`}>
                                     <div className="w-24 h-24 rounded-full border-4 border-white shadow-sm overflow-hidden shrink-0 bg-white">
@@ -354,6 +399,7 @@ WYMÓG JSON:
                     );
                 }
 
+                // 3. KODEKS
                 if (type === 'kodeks') {
                     return (
                         <div className="bg-[#e7d5b8] p-10 w-full max-w-5xl mx-auto rounded-xl shadow-inner relative" style={{backgroundImage: 'url("https://www.transparenttextures.com/patterns/cork-board.png")'}}>
@@ -381,6 +427,7 @@ WYMÓG JSON:
                     );
                 }
 
+                // 4. KĄCIKI
                 if (type === 'kaciki') {
                     return (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-white p-8 w-full max-w-5xl mx-auto rounded-xl">
@@ -389,7 +436,6 @@ WYMÓG JSON:
                                     <div className="w-40 h-40 rounded-3xl bg-white shadow-inner overflow-hidden shrink-0 border-4 border-white/60 z-10 relative left-2">
                                         <img src={item.imgUrl} className="w-full h-full object-cover" />
                                     </div>
-                                    
                                     <div className="flex-1 text-center pr-6 pl-4 relative z-10">
                                         <h2 className={`font-kids font-black text-3xl md:text-4xl ${item.textColor} uppercase leading-tight drop-shadow-sm`}>
                                             {item.text}
@@ -401,6 +447,7 @@ WYMÓG JSON:
                     );
                 }
 
+                // 5. PLAKAT ZDROWIA
                 if (type === 'plakat_choroba') {
                     return (
                         <div className="bg-white p-8 md:p-12 w-full max-w-5xl mx-auto rounded-xl shadow-2xl print-break-inside-avoid border-8 border-sky-100">
@@ -408,7 +455,6 @@ WYMÓG JSON:
                                 <h1 className="text-5xl md:text-6xl font-kids font-black text-red-600 uppercase tracking-tight mb-4 drop-shadow-md leading-none">{data.title}</h1>
                                 <p className="text-2xl font-kids font-bold text-sky-800">{data.subtitle}</p>
                             </div>
-
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                 {data.items.map((item, i) => (
                                     <div key={i} className={`${item.bgColor} premium-border rounded-[40px] overflow-hidden shadow-lg flex flex-col h-full print-break-inside-avoid`}>
@@ -425,7 +471,6 @@ WYMÓG JSON:
                                     </div>
                                 ))}
                             </div>
-
                             <div className="mt-10 text-center bg-pink-50 rounded-full py-6 px-10 premium-border">
                                 <p className="font-kids font-black text-3xl text-pink-600 drop-shadow-sm">💖 {data.footer} 💖</p>
                             </div>
@@ -446,7 +491,7 @@ WYMÓG JSON:
                         </div>
                     )}
 
-                    {/* Widok Drukowania */}
+                    {/* Widok Drukowania - Uwolniony od ograniczeń */}
                     <div className="print-only">
                         {renderLayout()}
                     </div>
@@ -478,6 +523,7 @@ WYMÓG JSON:
                                         <div className="space-y-1">
                                             <label className="text-[10px] font-bold text-slate-500 uppercase">Co projektujemy?</label>
                                             <select value={layoutType} onChange={e => setLayoutType(e.target.value)} className="w-full bg-white border border-slate-300 rounded-lg p-2.5 text-sm font-semibold text-slate-800 focus:border-emerald-500 outline-none shadow-sm">
+                                                <option value="etykiety">🏷️ Etykiety na Szafki (Z miejscem na imię)</option>
                                                 <option value="drzwi">🚪 Zestaw na Drzwi (W naszej sali...)</option>
                                                 <option value="kodeks">📌 Kodeks Przedszkolaka (Tablica)</option>
                                                 <option value="kaciki">🧩 Duże Szyldy do Kącików</option>
@@ -486,13 +532,13 @@ WYMÓG JSON:
                                         </div>
 
                                         <div className="space-y-1">
-                                            <label className="text-[10px] font-bold text-slate-500 uppercase">Motyw / Nazwa</label>
+                                            <label className="text-[10px] font-bold text-slate-500 uppercase">Motyw / Nazwa / Symbole</label>
                                             <input 
                                                 type="text" 
                                                 value={theme} 
                                                 onChange={e => setTheme(e.target.value)} 
                                                 className="w-full bg-white border border-slate-300 rounded-lg p-2.5 text-sm text-slate-800 focus:border-emerald-500 transition-colors shadow-sm" 
-                                                placeholder="np. Biedronki, Kosmos..." 
+                                                placeholder="np. Zwierzątka, Kosmos, Pszczółki..." 
                                             />
                                         </div>
 
@@ -509,8 +555,8 @@ WYMÓG JSON:
                                     </div>
 
                                     <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-[10px] font-bold text-amber-700 flex flex-col gap-2 shadow-inner">
-                                        <div className="flex gap-2 items-center"><i className="ph-fill ph-magic-wand text-xl shrink-0"></i> <span>Aplikacja połączy kreatywność GPT z generatorem obrazków Fal.ai (Flux).</span></div>
-                                        <span className="text-amber-600">Proces potrwa ok. 15 sekund – malujemy dla Ciebie od 5 do 7 oryginalnych ilustracji!</span>
+                                        <div className="flex gap-2 items-center"><i className="ph-fill ph-magic-wand text-xl shrink-0"></i> <span>Aplikacja połączy kreatywność GPT z generatorem obrazków Fal.ai.</span></div>
+                                        <span className="text-amber-600">Proces potrwa od 10 do 20 sekund – malujemy dla Ciebie kilka oryginalnych ilustracji!</span>
                                     </div>
 
                                     <div className="space-y-3 pt-2">
@@ -518,7 +564,7 @@ WYMÓG JSON:
                                             {isGenerating ? (
                                                 <><i className="ph-bold ph-spinner animate-spin text-xl"></i><span className="text-xs font-semibold">{genStatus}</span></>
                                             ) : (
-                                                <span className="flex items-center gap-2"><i className="ph-bold ph-magic-wand text-xl"></i> Wygeneruj Ilustrowany Zestaw</span>
+                                                <span className="flex items-center gap-2"><i className="ph-bold ph-magic-wand text-xl"></i> Wygeneruj Zestaw</span>
                                             )}
                                         </button>
                                     </div>
@@ -583,7 +629,7 @@ WYMÓG JSON:
                             ) : (
                                 <div className="space-y-8 animate-[reveal_0.4s_ease-out] w-full max-w-5xl">
                                     
-                                    {/* PODGLĄD NA ŻYWO (Zupełnie jak wydruk) */}
+                                    {/* PODGLĄD NA ŻYWO */}
                                     <div className="shadow-2xl rounded-2xl overflow-hidden border border-slate-300 bg-slate-100/80 backdrop-blur-md pb-10">
                                         <div className="bg-slate-800 text-slate-300 text-xs font-bold px-4 py-2 flex items-center justify-between">
                                             <span className="flex items-center gap-2"><i className="ph-bold ph-eye"></i> Podgląd Układu (Jak w PDF)</span>
@@ -597,7 +643,7 @@ WYMÓG JSON:
                                     {/* AKCJE */}
                                     <div className="mt-10 bg-white border border-slate-200 rounded-3xl p-8 text-center shadow-xl flex flex-col items-center">
                                         <h3 className="text-xl font-bold text-slate-800 mb-2">Plik gotowy do druku! 🖨️</h3>
-                                        <p className="text-slate-500 text-sm mb-6 max-w-md mx-auto">Wciśnij Drukuj i upewnij się, że w oknie drukarki zaznaczona jest opcja <strong>"Drukuj grafiki tła" (Background graphics)</strong>.</p>
+                                        <p className="text-slate-500 text-sm mb-6 max-w-md mx-auto">Wciśnij Drukuj i upewnij się, że w oknie drukarki zaznaczona jest opcja <strong>"Drukuj grafiki tła" (Background graphics)</strong>. Możesz przewijać okno wydruku, aby zobaczyć kolejne strony.</p>
                                         
                                         <div className="flex flex-col sm:flex-row gap-4">
                                             <button onClick={() => window.print()} className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 px-8 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/30">
