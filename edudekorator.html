@@ -53,7 +53,7 @@
             box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
         }
 
-        /* --- STUDIO WYDRUKU: ABSOLUTNIE PANCERNA WIELOSTRONICOWOŚĆ --- */
+        /* --- STUDIO WYDRUKU: PANCERNA WIELOSTRONICOWOŚĆ I INTELIGENTNE SKALOWANIE --- */
         @media screen {
             .print-only { display: none !important; }
         }
@@ -73,29 +73,35 @@
             }
 
             aside, .aura-container, .no-print, nav, header { display: none !important; }
-            
             main { display: block !important; width: 100% !important; height: auto !important; background: white !important; }
             
-            .print-only { 
-                display: block !important; 
-                width: 100% !important; 
-                height: auto !important; 
-                background: white !important; 
-            }
-            
+            .print-only { display: block !important; width: 100% !important; height: auto !important; background: white !important; }
             * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+            .print-break-inside-avoid { break-inside: avoid !important; page-break-inside: avoid !important; display: block !important; }
             
-            .print-break-inside-avoid { 
-                break-inside: avoid !important; 
-                page-break-inside: avoid !important; 
-                display: block !important; 
-            }
+            /* DYNAMICZNE SIATKI NA PODSTAWIE WYBORU UŻYTKOWNIKA */
             
-            .grid {
-                display: grid !important;
-                grid-template-columns: 1fr 1fr !important;
-                gap: 15px !important;
-            }
+            /* 1. Opcja "Wielkie" (1 kolumna, ok. 2 duże tablice na A4) */
+            .print-grid-large { grid-template-columns: 1fr !important; display: grid !important; gap: 20px !important; }
+            .print-grid-large > div { min-height: 125mm !important; padding: 2rem !important; }
+            .print-grid-large > div h2 { font-size: 3rem !important; line-height: 1.1 !important; }
+            .print-grid-large > div p { font-size: 1.8rem !important; line-height: 1.3 !important; }
+            .print-grid-large img { transform: scale(1.2); } 
+            .print-grid-large .w-32, .print-grid-large .w-40 { width: 12rem !important; height: 12rem !important; }
+            .print-grid-large .text-3xl { font-size: 4rem !important; }
+
+            /* 2. Opcja "Średnie" (2 kolumny, 4-6 tablic na A4) */
+            .print-grid-medium { grid-template-columns: repeat(2, 1fr) !important; display: grid !important; gap: 15px !important; }
+            .print-grid-medium > div { min-height: 75mm !important; }
+            
+            /* 3. Opcja "Małe" (3 kolumny, 9+ tabliczek na A4) */
+            .print-grid-small { grid-template-columns: repeat(3, 1fr) !important; display: grid !important; gap: 10px !important; }
+            .print-grid-small > div { min-height: 45mm !important; padding: 0.5rem !important; }
+            .print-grid-small > div h2 { font-size: 1.1rem !important; line-height: 1.1 !important; }
+            .print-grid-small > div p { font-size: 0.8rem !important; line-height: 1.2 !important; }
+            .print-grid-small .w-32, .print-grid-small .w-40 { width: 4rem !important; height: 4rem !important; }
+            .print-grid-small .p-6 { padding: 0.75rem !important; }
+            .print-grid-small .text-2xl { font-size: 1.2rem !important; }
         }
     </style>
 </head>
@@ -172,11 +178,13 @@
             const [isGenerating, setIsGenerating] = useState(false);
             const [genStatus, setGenStatus] = useState(''); 
             
-            const [layoutType, setLayoutType] = useState('etykiety'); 
+            const [layoutType, setLayoutType] = useState('kodeks'); 
             const [theme, setTheme] = useState('Pszczółki');
             const [groupAge, setGroupAge] = useState('Przedszkolaki');
             
             const [resultData, setResultData] = useState(null);
+            const [printSize, setPrintSize] = useState('medium'); // Nowy stan dla wielkości wydruku!
+            
             const [marketItems, setMarketItems] = useState([]);
             const [isFetchingMarket, setIsFetchingMarket] = useState(false);
             const [isPublishing, setIsPublishing] = useState(false);
@@ -305,6 +313,10 @@ WYMÓG JSON:
 
                     setResultData({ type: layoutType, data: parsedJson, params: { theme, groupAge } });
                     
+                    // Reset wielkości wydruku dla różnych opcji
+                    if(layoutType === 'etykiety') setPrintSize('medium');
+                    else setPrintSize('large');
+                    
                     if (!isPremium) {
                         const newCount = aiGenerations + 1;
                         setAiGenerations(newCount);
@@ -343,7 +355,7 @@ WYMÓG JSON:
                 return () => { if (unsubscribe) unsubscribe(); }
             }, [appMode]);
 
-            // --- RENDEROWANIE PIĘKNYCH UKŁADÓW ---
+            // --- RENDEROWANIE PIĘKNYCH UKŁADÓW (Z DYNAMICZNYMI KLASAMI CSS DO WYDRUKU) ---
             const renderLayout = () => {
                 if (!resultData || !resultData.data) return null;
                 const { type, data } = resultData;
@@ -356,7 +368,7 @@ WYMÓG JSON:
                                 <span>Kliknij w pola z napisem <strong>"Imię Dziecka"</strong> poniżej, aby wpisać imiona przedszkolaków! Dopiero potem wciśnij Drukuj.</span>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-6">
+                            <div className={`grid grid-cols-2 gap-6 print-grid-${printSize}`}>
                                 {data.items.map((item, i) => (
                                     <div key={i} className={`bg-white border-[6px] ${item.borderColor || 'border-yellow-400'} rounded-[32px] p-2 flex items-stretch shadow-md print-break-inside-avoid h-[130px] md:h-[150px] relative overflow-hidden group`}>
                                         <div className="w-24 md:w-32 h-full shrink-0 bg-white rounded-[20px] overflow-hidden border-[3px] border-slate-100 shadow-sm mr-3 flex items-center justify-center">
@@ -391,16 +403,20 @@ WYMÓG JSON:
                                     {data.title}
                                 </h1>
                             </div>
-                            {data.items.map((item, i) => (
-                                <div key={i} className={`w-[90%] ${item.bgColor} premium-border rounded-full p-2 pr-10 flex items-center shadow-md print-break-inside-avoid`}>
-                                    <div className="w-24 h-24 rounded-full border-4 border-white shadow-sm overflow-hidden shrink-0 bg-white flex items-center justify-center">
-                                        <img src={item.imgUrl} className="max-w-full max-h-full object-contain p-1" />
+                            
+                            {/* Zapakowane w grida by można było sterować wielkością na wydruku */}
+                            <div className={`w-full grid grid-cols-1 gap-6 print-grid-${printSize}`}>
+                                {data.items.map((item, i) => (
+                                    <div key={i} className={`w-[90%] mx-auto ${item.bgColor} premium-border rounded-full p-2 pr-10 flex items-center shadow-md print-break-inside-avoid`}>
+                                        <div className="w-24 h-24 rounded-full border-4 border-white shadow-sm overflow-hidden shrink-0 bg-white flex items-center justify-center">
+                                            <img src={item.imgUrl} className="max-w-full max-h-full object-contain p-1" />
+                                        </div>
+                                        <div className={`font-kids font-black text-3xl md:text-4xl ${item.textColor} tracking-wide text-center flex-1`}>
+                                            {item.text}
+                                        </div>
                                     </div>
-                                    <div className={`font-kids font-black text-3xl md:text-4xl ${item.textColor} tracking-wide text-center flex-1`}>
-                                        {item.text}
-                                    </div>
-                                </div>
-                            ))}
+                                ))}
+                            </div>
                         </div>
                     );
                 }
@@ -415,7 +431,7 @@ WYMÓG JSON:
                                 </div>
                             </div>
                             
-                            <div className="grid grid-cols-2 md:grid-cols-3 gap-8">
+                            <div className={`grid grid-cols-2 md:grid-cols-3 gap-8 print-grid-${printSize}`}>
                                 {data.items.map((item, i) => (
                                     <div key={i} className={`${item.bgColor} premium-border rounded-3xl p-4 flex flex-col items-center text-center shadow-lg relative print-break-inside-avoid transform ${i%2 === 0 ? '-rotate-1' : 'rotate-2'}`}>
                                         <div className="absolute -top-4 left-1/2 -translate-x-1/2 text-3xl drop-shadow-md">📍</div>
@@ -434,7 +450,7 @@ WYMÓG JSON:
 
                 if (type === 'kaciki') {
                     return (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-white p-8 w-full max-w-5xl mx-auto rounded-xl">
+                        <div className={`grid grid-cols-1 md:grid-cols-2 gap-8 bg-white p-8 w-full max-w-5xl mx-auto rounded-xl print-grid-${printSize}`}>
                             {data.items.map((item, i) => (
                                 <div key={i} className={`${item.bgColor} premium-border rounded-[40px] p-4 relative flex items-center shadow-lg print-break-inside-avoid`}>
                                     <div className="w-40 h-40 rounded-3xl bg-white shadow-inner overflow-hidden shrink-0 border-4 border-white/60 z-10 relative left-2 p-2 flex items-center justify-center">
@@ -458,7 +474,7 @@ WYMÓG JSON:
                                 <h1 className="text-5xl md:text-6xl font-kids font-black text-red-600 uppercase tracking-tight mb-4 drop-shadow-md leading-none">{data.title}</h1>
                                 <p className="text-2xl font-kids font-bold text-sky-800">{data.subtitle}</p>
                             </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <div className={`grid grid-cols-1 md:grid-cols-2 gap-8 print-grid-${printSize}`}>
                                 {data.items.map((item, i) => (
                                     <div key={i} className={`${item.bgColor} premium-border rounded-[40px] overflow-hidden shadow-lg flex flex-col h-full print-break-inside-avoid`}>
                                         <div className={`${item.headerColor} text-white p-5 flex items-center gap-4 border-b-4 border-white/20`}>
@@ -643,10 +659,26 @@ WYMÓG JSON:
                                         </div>
                                     </div>
 
-                                    {/* AKCJE */}
+                                    {/* AKCJE I ROZMIAR */}
                                     <div className="mt-10 bg-white border border-slate-200 rounded-3xl p-8 text-center shadow-xl flex flex-col items-center">
-                                        <h3 className="text-xl font-bold text-slate-800 mb-2">Plik gotowy do druku! 🖨️</h3>
-                                        <p className="text-slate-500 text-sm mb-6 max-w-md mx-auto">Wciśnij Drukuj i upewnij się, że w oknie drukarki zaznaczona jest opcja <strong>"Drukuj grafiki tła" (Background graphics)</strong>. Możesz przewijać okno wydruku, aby zobaczyć wszystkie strony.</p>
+                                        <h3 className="text-2xl font-kids font-black text-slate-800 mb-6">Gotowe do druku! 🖨️</h3>
+                                        
+                                        {/* PANEL WYBORU ROZMIARU WYDRUKU */}
+                                        <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-6 w-full max-w-2xl mb-8 shadow-sm">
+                                            <h4 className="text-sm font-bold text-emerald-800 mb-4 uppercase tracking-wider flex items-center justify-center gap-2">
+                                                <i className="ph-bold ph-frame-corners text-xl"></i> Wybierz rozmiar na wydruku A4
+                                            </h4>
+                                            <div className="flex flex-wrap justify-center gap-3">
+                                                <button onClick={() => setPrintSize('large')} className={`px-5 py-3 rounded-xl text-sm font-bold transition-all ${printSize === 'large' ? 'bg-emerald-600 text-white shadow-md' : 'bg-white border border-slate-300 text-slate-600 hover:bg-slate-50'}`}>Wielkie (1-2 na stronę)</button>
+                                                <button onClick={() => setPrintSize('medium')} className={`px-5 py-3 rounded-xl text-sm font-bold transition-all ${printSize === 'medium' ? 'bg-emerald-600 text-white shadow-md' : 'bg-white border border-slate-300 text-slate-600 hover:bg-slate-50'}`}>Średnie (4-6 na stronę)</button>
+                                                <button onClick={() => setPrintSize('small')} className={`px-5 py-3 rounded-xl text-sm font-bold transition-all ${printSize === 'small' ? 'bg-emerald-600 text-white shadow-md' : 'bg-white border border-slate-300 text-slate-600 hover:bg-slate-50'}`}>Małe (9+ na stronę)</button>
+                                            </div>
+                                            <p className="text-[10px] text-emerald-600 mt-4 font-semibold">
+                                                Rozmiar zmieni się automatycznie na papierze w oknie podglądu druku (w aplikacji podgląd zawsze wygląda tak samo).
+                                            </p>
+                                        </div>
+
+                                        <p className="text-slate-500 text-sm mb-6 max-w-md mx-auto">Wciśnij Drukuj i upewnij się, że w oknie drukarki zaznaczona jest opcja <strong>"Drukuj grafiki tła" (Background graphics)</strong>.</p>
                                         
                                         <div className="flex flex-col sm:flex-row gap-4">
                                             <button onClick={() => window.print()} className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 px-8 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/30">
