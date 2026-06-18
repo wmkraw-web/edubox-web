@@ -17,10 +17,61 @@
     <!-- Piękne, dziecięce czcionki -->
     <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@400;600;700;800;900&family=Caveat:wght@700&display=swap" rel="stylesheet">
 
-    <!-- Globalny Core Bazy Danych -->
+    <!-- WBUDOWANA BAZA DANYCH (Omija błędy z ładowaniem modułów z dysku) -->
     <script type="module">
-        import { EduBoxCore } from './global-core.js';
-        window.EduBoxCore = EduBoxCore;
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, serverTimestamp, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        const FIREBASE_CONFIG = {
+            apiKey: "AIzaSyDL_mvepNJjMmZYQzifN2cXzoKwCE8jNd0",
+            authDomain: "edubox-pro.firebaseapp.com",
+            projectId: "edubox-pro",
+            storageBucket: "edubox-pro.firebasestorage.app",
+            messagingSenderId: "570263845714",
+            appId: "1:570263845714:web:0b029211f7af071b66988b"
+        };
+        const APP_ID = "eduboxpro";
+
+        let app, auth, db;
+        try {
+            app = initializeApp(FIREBASE_CONFIG);
+            auth = getAuth(app);
+            db = getFirestore(app);
+        } catch (e) { console.warn("Firebase init failed", e); }
+
+        window.EduBoxCore = {
+            user: null,
+            init: (callback) => {
+                if (!auth) return;
+                signInAnonymously(auth).catch(e => console.error(e));
+                onAuthStateChanged(auth, (user) => {
+                    window.EduBoxCore.user = user;
+                    if(callback) callback(user);
+                });
+            },
+            saveToGielda: async (collectionName, appType, itemName, config) => {
+                if (!db || !window.EduBoxCore.user) throw new Error("Brak połączenia z chmurą.");
+                const publicRef = collection(db, 'artifacts', APP_ID, 'public', 'data', collectionName);
+                await addDoc(publicRef, {
+                    userId: window.EduBoxCore.user.uid,
+                    createdAt: serverTimestamp(),
+                    type: appType,
+                    name: itemName,
+                    config: config
+                });
+            },
+            subscribeToGielda: (collectionName, onDataLoaded, onError) => {
+                if (!db) return () => {};
+                const publicRef = collection(db, 'artifacts', APP_ID, 'public', 'data', collectionName);
+                return onSnapshot(publicRef, (snapshot) => {
+                    const loaded = [];
+                    snapshot.forEach(doc => loaded.push({ id: doc.id, ...doc.data() }));
+                    loaded.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
+                    onDataLoaded(loaded);
+                }, onError);
+            }
+        };
     </script>
 
     <style>
@@ -133,8 +184,9 @@
 
             useEffect(() => {
                 const initDb = () => {
-                    if (typeof window !== 'undefined' && window.EduBoxCore) window.EduBoxCore.init((u) => setUser(u));
-                    else setTimeout(initDb, 100);
+                    if (typeof window !== 'undefined' && window.EduBoxCore && window.EduBoxCore.init) {
+                        window.EduBoxCore.init((u) => setUser(u));
+                    } else { setTimeout(initDb, 100); }
                 };
                 initDb();
                 
@@ -149,6 +201,18 @@
             const showMessage = (text, type = 'success') => {
                 setMessage({ text, type });
                 setTimeout(() => setMessage(null), 3500);
+            };
+
+            // DODANA FUNKCJA OBSŁUGUJĄCA KOD PREMIUM!
+            const handlePremiumCheck = () => {
+                if (premiumCode.toUpperCase() === 'KAWA2024') {
+                    setIsPremium(true); 
+                    try { window.localStorage.setItem('edubox_premium', 'KAWA2024'); } catch(e) {}
+                    setPremiumCode('');
+                    showMessage('Kod Premium zaakceptowany!', 'success');
+                } else { 
+                    showMessage('Nieprawidłowy kod', 'error'); 
+                }
             };
 
             const generateContent = async () => {
