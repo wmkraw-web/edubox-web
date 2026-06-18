@@ -19,10 +19,61 @@
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-    <!-- Globalny Core Bazy Danych -->
+    <!-- WBUDOWANA BAZA DANYCH (Omija błędy CORS i importów przy odpalaniu z dysku) -->
     <script type="module">
-        import { EduBoxCore } from './global-core.js';
-        window.EduBoxCore = EduBoxCore;
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, serverTimestamp, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        const FIREBASE_CONFIG = {
+            apiKey: "AIzaSyDL_mvepNJjMmZYQzifN2cXzoKwCE8jNd0",
+            authDomain: "edubox-pro.firebaseapp.com",
+            projectId: "edubox-pro",
+            storageBucket: "edubox-pro.firebasestorage.app",
+            messagingSenderId: "570263845714",
+            appId: "1:570263845714:web:0b029211f7af071b66988b"
+        };
+        const APP_ID = "eduboxpro";
+
+        let app, auth, db;
+        try {
+            app = initializeApp(FIREBASE_CONFIG);
+            auth = getAuth(app);
+            db = getFirestore(app);
+        } catch (e) { console.warn("Firebase init failed", e); }
+
+        window.EduBoxCore = {
+            user: null,
+            init: (callback) => {
+                if (!auth) return;
+                signInAnonymously(auth).catch(e => console.error(e));
+                onAuthStateChanged(auth, (user) => {
+                    window.EduBoxCore.user = user;
+                    if(callback) callback(user);
+                });
+            },
+            saveToGielda: async (collectionName, appType, itemName, config) => {
+                if (!db || !window.EduBoxCore.user) throw new Error("Brak połączenia z chmurą.");
+                const publicRef = collection(db, 'artifacts', APP_ID, 'public', 'data', collectionName);
+                await addDoc(publicRef, {
+                    userId: window.EduBoxCore.user.uid,
+                    createdAt: serverTimestamp(),
+                    type: appType,
+                    name: itemName,
+                    config: config
+                });
+            },
+            subscribeToGielda: (collectionName, onDataLoaded, onError) => {
+                if (!db) return () => {};
+                const publicRef = collection(db, 'artifacts', APP_ID, 'public', 'data', collectionName);
+                return onSnapshot(publicRef, (snapshot) => {
+                    const loaded = [];
+                    snapshot.forEach(doc => loaded.push({ id: doc.id, ...doc.data() }));
+                    loaded.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
+                    onDataLoaded(loaded);
+                }, onError);
+            }
+        };
     </script>
 
     <style>
@@ -36,12 +87,8 @@
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #475569; }
 
         /* Auras - Summer V3 PRO MAX */
-        .aura-container {
-            position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 0;
-        }
-        .aura-blob {
-            position: absolute; filter: blur(120px); border-radius: 50%; opacity: 0.35; animation: float 15s ease-in-out infinite alternate;
-        }
+        .aura-container { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; }
+        .aura-blob { position: absolute; filter: blur(120px); border-radius: 50%; opacity: 0.35; animation: float 15s ease-in-out infinite alternate; }
         .aura-1 { top: -10%; left: -10%; width: 500px; height: 500px; background: radial-gradient(circle, rgba(234, 179, 8, 0.6) 0%, rgba(0,0,0,0) 70%); animation-delay: 0s; }
         .aura-2 { bottom: -10%; right: -10%; width: 600px; height: 600px; background: radial-gradient(circle, rgba(6, 182, 212, 0.5) 0%, rgba(0,0,0,0) 70%); animation-delay: -5s; }
         .aura-3 { top: 40%; left: 30%; width: 400px; height: 400px; background: radial-gradient(circle, rgba(249, 115, 22, 0.4) 0%, rgba(0,0,0,0) 70%); animation-delay: -10s; }
@@ -51,37 +98,39 @@
             100% { transform: translate(30px, 50px) scale(1.1); }
         }
 
-        /* Ulepszone Style Drukowania (Brak obcinania, brak ciemnego tła) */
+        /* --- NAPRAWIONE STYLE DRUKOWANIA WIELU STRON --- */
         @media print {
-            body, html, #root { 
+            @page { size: auto; margin: 15mm; }
+            
+            /* Zdejmujemy wszelkie limity wysokości z całej aplikacji */
+            body, html, #root, .h-screen, .flex, .flex-1, .overflow-hidden, .overflow-y-auto { 
                 background: white !important; 
                 color: black !important; 
-                margin: 0; padding: 0;
+                margin: 0 !important; 
+                padding: 0 !important;
+                height: auto !important; 
+                min-height: auto !important;
+                width: 100% !important;
                 overflow: visible !important;
-                height: auto !important;
-            }
-            main, .flex-1, .overflow-y-auto {
-                overflow: visible !important;
-                height: auto !important;
                 display: block !important;
             }
-            .no-print { display: none !important; }
-            .print-container { 
-                background: white !important; 
-                color: black !important; 
-                padding: 0 !important; 
-                width: 100% !important; 
-                overflow: visible !important; 
-                height: auto !important;
-            }
+
+            /* Ukrywamy zbędne elementy */
+            .no-print, aside, .aura-container { display: none !important; }
+            
+            main { padding: 0 !important; margin: 0 !important; display: block !important; width: 100% !important; }
+            .print-container { padding: 0 !important; margin: 0 !important; overflow: visible !important; display: block !important; }
+            
+            /* Karta pojedynczego dnia - nie pozwalamy uciąć wpół */
             .print-card { 
-                break-inside: avoid; 
-                page-break-inside: avoid;
+                break-inside: avoid !important; 
+                page-break-inside: avoid !important;
                 border: 2px solid #e2e8f0 !important; 
                 box-shadow: none !important; 
                 color: black !important; 
                 background: white !important; 
-                margin-bottom: 20px; 
+                margin-bottom: 20px !important; 
+                padding: 15px !important;
             }
             .print-text { color: black !important; }
             * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
@@ -95,7 +144,6 @@
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
 
-        // --- KONFIGURACJA MODUŁÓW ---
         const MODULES = [
             { id: 'plan', icon: 'ph-calendar-check', title: 'Plan Półkolonii', desc: '5-dniowy harmonogram', color: 'from-amber-500 to-orange-500' },
             { id: 'sos', icon: 'ph-cloud-rain', title: 'Przycisk S.O.S', desc: 'Gry ratunkowe', color: 'from-cyan-500 to-blue-500' },
@@ -103,7 +151,6 @@
             { id: 'druzyny', icon: 'ph-users-three', title: 'Baza Drużyn', desc: 'Okrzyki dla grup', color: 'from-purple-500 to-pink-500' }
         ];
 
-        // Pancerny Parser JSON 
         const parseAIResponse = (aiOutput) => {
             if (aiOutput && typeof aiOutput === 'object') {
                 if (aiOutput.items || Array.isArray(aiOutput)) return aiOutput;
@@ -123,20 +170,12 @@
                 if (startObj !== -1 && endObj !== -1 && startObj < endObj) {
                     let jsonStr = text.substring(startObj, endObj + 1);
                     jsonStr = jsonStr.replace(/,\s*([\]}])/g, '$1');
-                    try {
-                        return JSON.parse(jsonStr);
-                    } catch (e1) {
-                        jsonStr = jsonStr.replace(/[\n\r\t]+/g, ' ');
-                        return JSON.parse(jsonStr);
-                    }
+                    try { return JSON.parse(jsonStr); } catch (e1) { return JSON.parse(jsonStr.replace(/[\n\r\t]+/g, ' ')); }
                 }
-
                 throw new Error("Brak nawiasów JSON.");
             } catch (e) {
                 console.error("Błąd parsowania:", text, e);
-                const preview = text.length > 100 ? text.substring(0, 100) + "..." : text;
-                if (preview.length === 0) throw new Error("Serwer na Vercelu zwrócił całkowicie PUSTĄ odpowiedź!");
-                throw new Error("BŁĄD Z SERWERA: " + preview);
+                throw new Error("BŁĄD Z SERWERA: Odpowiedź jest wadliwa.");
             }
         };
 
@@ -145,11 +184,7 @@
                 const res = await fetch('/api/chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        prompt: prompt,
-                        system: systemInstruction,
-                        format: "json"
-                    })
+                    body: JSON.stringify({ prompt: prompt, system: systemInstruction, format: "json" })
                 });
                 
                 if (res.ok) {
@@ -159,10 +194,7 @@
                     const errData = await res.text();
                     throw new Error(`Błąd Vercel HTTP ${res.status}: ${errData}`);
                 }
-            } catch(e) { 
-                console.error("Vercel API (/api/chat) zawiodło:", e);
-                throw new Error("Brak połączenia z Twoim serwerem OpenAI na Vercelu. Szczegóły: " + e.message);
-            }
+            } catch(e) { throw new Error("Brak połączenia z serwerem API na Vercelu. Szczegóły: " + e.message); }
         };
 
         function App() {
@@ -183,15 +215,15 @@
             const [props, setProps] = useState('Brak rekwizytów');
             const [specialNeeds, setSpecialNeeds] = useState('Brak (Grupa ogólnodostępna)');
 
-            // Market State
             const [marketItems, setMarketItems] = useState([]);
             const [isFetchingMarket, setIsFetchingMarket] = useState(false);
             const [isPublishing, setIsPublishing] = useState(false);
 
             useEffect(() => {
                 const initDb = () => {
-                    if (typeof window !== 'undefined' && window.EduBoxCore) window.EduBoxCore.init((u) => setUser(u));
-                    else setTimeout(initDb, 100);
+                    if (typeof window !== 'undefined' && window.EduBoxCore && window.EduBoxCore.init) {
+                        window.EduBoxCore.init((u) => setUser(u));
+                    } else { setTimeout(initDb, 100); }
                 };
                 initDb();
                 
@@ -205,7 +237,7 @@
 
             const showMessage = (text, type = 'success') => {
                 setMessage({ text, type });
-                setTimeout(() => setMessage(null), 3000);
+                setTimeout(() => setMessage(null), 3500);
             };
 
             const handlePremiumCheck = () => {
@@ -242,45 +274,21 @@ WYMÓG: Zwróć DOKŁADNIE TEN SZABLON JSON z pięcioma dniami, uzupełniając t
     { "title": "Piątek", "subtitle": "Tytuł dnia", "text1": "Zajęcia poranne...", "text2": "Zajęcia popołudniowe..." }
   ]
 }`;
-                    prompt = `Temat: ${theme}. Wiek dzieci: ${age}. Specyficzne potrzeby (wymaga dostosowania): ${specialNeeds}.`;
+                    prompt = `Temat: ${theme}. Wiek dzieci: ${age}. Specyficzne potrzeby: ${specialNeeds}.`;
                 } else if (activeModule === 'sos') {
                     sysPrompt = `Jesteś animatorem zabaw. Wymyśl błyskawiczne, genialne gry ratunkowe.
-WYMÓG: Zwróć DOKŁADNIE TEN SZABLON JSON z trzema grami, uzupełniając teksty wewnątrz kluczy:
-
-{
-  "items": [
-    { "title": "Nazwa pierwszej gry", "subtitle": "Czas np. 15 min", "text1": "Opisz zasady gry w 3 zdaniach...", "text2": "" },
-    { "title": "Nazwa drugiej gry", "subtitle": "Czas np. 20 min", "text1": "Opisz zasady gry w 3 zdaniach...", "text2": "" },
-    { "title": "Nazwa trzeciej gry", "subtitle": "Czas np. 10 min", "text1": "Opisz zasady gry w 3 zdaniach...", "text2": "" }
-  ]
-}`;
+WYMÓG: Zwróć DOKŁADNIE TEN SZABLON JSON z trzema grami:
+{ "items": [ { "title": "Nazwa pierwszej gry", "subtitle": "Czas np. 15 min", "text1": "Zasady w 3 zdaniach...", "text2": "" }, ... ] }`;
                     prompt = `Gdzie utknęliśmy: ${location}. Dostępne rekwizyty: ${props}. Wiek: ${age}. SPE: ${specialNeeds}.`;
                 } else if (activeModule === 'teren') {
                     sysPrompt = `Jesteś mistrzem gier terenowych. Ułóż rymowane zagadki.
-WYMÓG: Zwróć DOKŁADNIE TEN SZABLON JSON z pięcioma krokami, uzupełniając teksty wewnątrz kluczy:
-
-{
-  "items": [
-    { "title": "Krok 1", "subtitle": "Kryjówka np. pod ławką", "text1": "Rymowanka-zagadka (4 linijki)...", "text2": "" },
-    { "title": "Krok 2", "subtitle": "Kryjówka (gdzie to schować)", "text1": "Rymowanka-zagadka...", "text2": "" },
-    { "title": "Krok 3", "subtitle": "Kryjówka (gdzie to schować)", "text1": "Rymowanka-zagadka...", "text2": "" },
-    { "title": "Krok 4", "subtitle": "Kryjówka (gdzie to schować)", "text1": "Rymowanka-zagadka...", "text2": "" },
-    { "title": "Krok 5", "subtitle": "MIEJSCE SKARBU", "text1": "Ostatnia rymowanka...", "text2": "" }
-  ]
-}`;
+WYMÓG: Zwróć DOKŁADNIE TEN SZABLON JSON z pięcioma krokami:
+{ "items": [ { "title": "Krok 1", "subtitle": "Kryjówka", "text1": "Rymowanka (4 linijki)...", "text2": "" }, ... ] }`;
                     prompt = `Teren gry: ${theme}. Wiek: ${age}. SPE: ${specialNeeds}.`;
                 } else if (activeModule === 'druzyny') {
                     sysPrompt = `Jesteś kierownikiem kolonii. Wymyśl nazwy i okrzyki drużyn.
-WYMÓG: Zwróć DOKŁADNIE TEN SZABLON JSON z czterema drużynami, uzupełniając teksty wewnątrz kluczy:
-
-{
-  "items": [
-    { "title": "Nazwa 1 drużyny", "subtitle": "", "text1": "Rymowany okrzyk drużyny...", "text2": "" },
-    { "title": "Nazwa 2 drużyny", "subtitle": "", "text1": "Rymowany okrzyk drużyny...", "text2": "" },
-    { "title": "Nazwa 3 drużyny", "subtitle": "", "text1": "Rymowany okrzyk drużyny...", "text2": "" },
-    { "title": "Nazwa 4 drużyny", "subtitle": "", "text1": "Rymowany okrzyk drużyny...", "text2": "" }
-  ]
-}`;
+WYMÓG: Zwróć DOKŁADNIE TEN SZABLON JSON z 4 drużynami:
+{ "items": [ { "title": "Nazwa drużyny", "subtitle": "", "text1": "Okrzyk...", "text2": "" }, ... ] }`;
                     prompt = `Tematyka kolonii/obozu: ${theme}. Wiek: ${age}. SPE: ${specialNeeds}.`;
                 }
 
@@ -304,10 +312,9 @@ WYMÓG: Zwróć DOKŁADNIE TEN SZABLON JSON z czterema drużynami, uzupełniają
             };
 
             const publishToMarket = async () => {
-                if (!resultData || !user) { showMessage('Błąd autoryzacji bazy. Zaloguj się lub odśwież stronę.', 'error'); return; }
+                if (!resultData || !user) { showMessage('Zaloguj się lub odśwież stronę, aby udostępnić.', 'error'); return; }
                 setIsPublishing(true);
                 try {
-                    // Integracja z EduBoxCore
                     await window.EduBoxCore.saveToGielda('eduwakacje_market', 'eduwakacje', resultData.params.theme || resultData.params.location || 'Plan', resultData);
                     showMessage('Opublikowano na Giełdzie!', 'success');
                     setAppMode('gielda');
@@ -335,7 +342,6 @@ WYMÓG: Zwróć DOKŁADNIE TEN SZABLON JSON z czterema drużynami, uzupełniają
                 return () => { if (unsubscribe) unsubscribe(); }
             }, [appMode]);
 
-            // --- KOMPONENTY RENDERUJĄCE WYNIKI ---
             const renderResult = () => {
                 if (!resultData) return (
                     <div className="h-full flex flex-col items-center justify-center text-slate-500 opacity-50 no-print">
@@ -366,7 +372,6 @@ WYMÓG: Zwróć DOKŁADNIE TEN SZABLON JSON z czterema drużynami, uzupełniają
                         <div className="bg-red-500/10 border border-red-500/20 p-6 rounded-2xl text-red-400 text-center">
                             <i className="ph-fill ph-warning-circle text-4xl mb-2"></i>
                             <p className="font-bold">Brak wyników do wyrysowania.</p>
-                            <button onClick={generateContent} className="mt-4 bg-red-500 text-white px-4 py-2 rounded font-bold">Spróbuj ponownie</button>
                         </div>
                     );
                 }
@@ -381,7 +386,7 @@ WYMÓG: Zwróć DOKŁADNIE TEN SZABLON JSON z czterema drużynami, uzupełniają
                                 <p className="text-sm text-slate-400 print-text font-bold"><i className="ph-bold ph-users"></i> Grupa wiekowa: {params.age}</p>
                                 {params.specialNeeds && params.specialNeeds !== 'Brak (Grupa ogólnodostępna)' && <p className="text-sm text-emerald-400 print:text-emerald-700 print-text font-bold mt-1"><i className="ph-bold ph-wheelchair"></i> SPE: {params.specialNeeds}</p>}
                             </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 {itemsList.map((item, i) => {
                                     const day = item.title || item.day || item.Day || `Dzień ${i+1}`;
                                     const themeOfDay = item.subtitle || item.title || "Zajęcia";
@@ -415,23 +420,16 @@ WYMÓG: Zwróć DOKŁADNIE TEN SZABLON JSON z czterema drużynami, uzupełniają
                             <div className="text-center mb-8 pb-6 border-b border-slate-800 print:border-slate-300">
                                 <h2 className="text-3xl font-summer text-cyan-400 print-text font-black uppercase mb-2">Ratunkowe Gry S.O.S</h2>
                                 <p className="text-sm text-slate-400 print-text font-bold"><i className="ph-bold ph-map-pin"></i> {params.location} | <i className="ph-bold ph-backpack"></i> {params.props}</p>
-                                {params.specialNeeds && params.specialNeeds !== 'Brak (Grupa ogólnodostępna)' && <p className="text-sm text-emerald-400 print:text-emerald-700 print-text font-bold mt-1"><i className="ph-bold ph-wheelchair"></i> SPE: {params.specialNeeds}</p>}
                             </div>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                {itemsList.map((item, i) => {
-                                    const name = item.title || item.name || `Gra nr ${i+1}`;
-                                    const duration = item.subtitle || item.duration || "15 min";
-                                    const rules = item.text1 || item.rules || "Zasady gry";
-                                    
-                                    return (
-                                        <div key={i} className="bg-slate-900 border border-slate-800 rounded-3xl p-6 print-card relative">
-                                            <div className="w-12 h-12 bg-cyan-500/20 text-cyan-400 rounded-2xl flex items-center justify-center mb-4 text-2xl print:bg-cyan-100 print:text-cyan-800"><i className="ph-bold ph-lightning"></i></div>
-                                            <h3 className="text-lg font-black text-white print-text mb-2">{name}</h3>
-                                            <p className="text-[10px] bg-slate-800 print:bg-slate-200 text-slate-300 print-text px-2 py-1 rounded inline-block font-bold mb-4"><i className="ph-bold ph-timer"></i> Czas: {duration}</p>
-                                            <p className="text-sm text-slate-300 print-text leading-relaxed">{rules}</p>
-                                        </div>
-                                    )
-                                })}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                {itemsList.map((item, i) => (
+                                    <div key={i} className="bg-slate-900 border border-slate-800 rounded-3xl p-6 print-card relative">
+                                        <div className="w-12 h-12 bg-cyan-500/20 text-cyan-400 rounded-2xl flex items-center justify-center mb-4 text-2xl print:bg-cyan-100 print:text-cyan-800"><i className="ph-bold ph-lightning"></i></div>
+                                        <h3 className="text-lg font-black text-white print-text mb-2">{item.title || `Gra nr ${i+1}`}</h3>
+                                        <p className="text-[10px] bg-slate-800 print:bg-slate-200 text-slate-300 print-text px-2 py-1 rounded inline-block font-bold mb-4"><i className="ph-bold ph-timer"></i> Czas: {item.subtitle}</p>
+                                        <p className="text-sm text-slate-300 print-text leading-relaxed">{item.text1}</p>
+                                    </div>
+                                ))}
                             </div>
                         </div>
                     );
@@ -441,26 +439,19 @@ WYMÓG: Zwróć DOKŁADNIE TEN SZABLON JSON z czterema drużynami, uzupełniają
                             <div className="text-center mb-8 pb-6 border-b border-slate-800 print:border-slate-300">
                                 <h2 className="text-3xl font-summer text-emerald-400 print-text font-black uppercase mb-2">Terenowe Podchody</h2>
                                 <p className="text-sm text-slate-400 print-text font-bold"><i className="ph-bold ph-compass"></i> Teren: {params.theme}</p>
-                                {params.specialNeeds && params.specialNeeds !== 'Brak (Grupa ogólnodostępna)' && <p className="text-sm text-emerald-400 print:text-emerald-700 print-text font-bold mt-1"><i className="ph-bold ph-wheelchair"></i> SPE: {params.specialNeeds}</p>}
                             </div>
                             <div className="space-y-4 max-w-2xl mx-auto">
-                                {itemsList.map((item, i) => {
-                                    const step = item.title || item.step || `Krok ${i+1}`;
-                                    const hideout = item.subtitle || item.hideout || "Kryjówka";
-                                    const rhyme = item.text1 || item.rhyme || "Zagadka...";
-                                    
-                                    return (
-                                        <div key={i} className="bg-slate-900 border border-slate-800 rounded-3xl p-6 print-card flex gap-6 items-center">
-                                            <div className="text-5xl font-black text-slate-800 print:text-slate-200">{i+1}</div>
-                                            <div className="flex-1">
-                                                <p className="text-lg font-summer text-emerald-300 print-text leading-relaxed italic mb-3">"{rhyme}"</p>
-                                                <div className="bg-slate-950 print:bg-slate-100 p-3 rounded-xl border border-dashed border-slate-700 print:border-slate-300 text-xs text-slate-400 print-text font-bold flex items-center gap-2">
-                                                    <i className="ph-fill ph-eye"></i> Kryjówka: <span className="text-white print-text">{hideout}</span>
-                                                </div>
+                                {itemsList.map((item, i) => (
+                                    <div key={i} className="bg-slate-900 border border-slate-800 rounded-3xl p-6 print-card flex gap-6 items-center">
+                                        <div className="text-5xl font-black text-slate-800 print:text-slate-200">{i+1}</div>
+                                        <div className="flex-1">
+                                            <p className="text-lg font-summer text-emerald-300 print-text leading-relaxed italic mb-3">"{item.text1}"</p>
+                                            <div className="bg-slate-950 print:bg-slate-100 p-3 rounded-xl border border-dashed border-slate-700 print:border-slate-300 text-xs text-slate-400 print-text font-bold flex items-center gap-2">
+                                                <i className="ph-fill ph-eye"></i> Kryjówka: <span className="text-white print-text">{item.subtitle}</span>
                                             </div>
                                         </div>
-                                    )
-                                })}
+                                    </div>
+                                ))}
                             </div>
                         </div>
                     );
@@ -470,24 +461,18 @@ WYMÓG: Zwróć DOKŁADNIE TEN SZABLON JSON z czterema drużynami, uzupełniają
                             <div className="text-center mb-8 pb-6 border-b border-slate-800 print:border-slate-300">
                                 <h2 className="text-3xl font-summer text-purple-400 print-text font-black uppercase mb-2">Baza Drużyn i Okrzyków</h2>
                                 <p className="text-sm text-slate-400 print-text font-bold"><i className="ph-bold ph-palette"></i> Motyw: {params.theme}</p>
-                                {params.specialNeeds && params.specialNeeds !== 'Brak (Grupa ogólnodostępna)' && <p className="text-sm text-emerald-400 print:text-emerald-700 print-text font-bold mt-1"><i className="ph-bold ph-wheelchair"></i> SPE: {params.specialNeeds}</p>}
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                {itemsList.map((item, i) => {
-                                    const name = item.title || item.name || `Drużyna ${i+1}`;
-                                    const cheer = item.text1 || item.cheer || "Okrzyk";
-                                    
-                                    return (
-                                        <div key={i} className="bg-slate-900 border border-slate-800 rounded-3xl p-6 print-card text-center">
-                                            <div className="w-16 h-16 bg-purple-500/20 text-purple-400 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl print:bg-purple-100 print:text-purple-800"><i className="ph-bold ph-flag-banner"></i></div>
-                                            <h3 className="text-2xl font-black text-white print-text mb-4 uppercase">{name}</h3>
-                                            <div className="bg-slate-950 print:bg-slate-100 p-4 rounded-2xl">
-                                                <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Okrzyk:</div>
-                                                <p className="text-base text-purple-300 print-text font-bold italic leading-relaxed whitespace-pre-line">{cheer}</p>
-                                            </div>
+                                {itemsList.map((item, i) => (
+                                    <div key={i} className="bg-slate-900 border border-slate-800 rounded-3xl p-6 print-card text-center">
+                                        <div className="w-16 h-16 bg-purple-500/20 text-purple-400 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl print:bg-purple-100 print:text-purple-800"><i className="ph-bold ph-flag-banner"></i></div>
+                                        <h3 className="text-2xl font-black text-white print-text mb-4 uppercase">{item.title}</h3>
+                                        <div className="bg-slate-950 print:bg-slate-100 p-4 rounded-2xl">
+                                            <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Okrzyk:</div>
+                                            <p className="text-base text-purple-300 print-text font-bold italic leading-relaxed whitespace-pre-line">{item.text1}</p>
                                         </div>
-                                    )
-                                })}
+                                    </div>
+                                ))}
                             </div>
                         </div>
                     );
@@ -495,62 +480,39 @@ WYMÓG: Zwróć DOKŁADNIE TEN SZABLON JSON z czterema drużynami, uzupełniają
 
                 return (
                     <div className="space-y-8 animate-[reveal_0.4s_ease-out]">
-                        
                         {resultContent}
-
-                        {/* Duży panel udostępniania i druku u dołu */}
+                        
                         <div className="mt-10 bg-slate-900 border border-blue-500/30 rounded-3xl p-8 text-center relative overflow-hidden group no-print shadow-xl">
                             <div className="absolute inset-0 bg-gradient-to-r from-blue-600/10 to-amber-500/10 z-0"></div>
                             <div className="relative z-10">
                                 <h3 className="text-xl font-bold text-white mb-2">Gotowe! Co dalej?</h3>
                                 <p className="text-slate-400 text-sm mb-6 max-w-lg mx-auto">Wydrukuj ten plan, aby mieć go przy sobie podczas zajęć, lub udostępnij na Giełdzie, aby ułatwić pracę innym wychowawcom i animatorom.</p>
-                                
                                 <div className="flex flex-col sm:flex-row justify-center gap-4">
-                                    <button 
-                                        onClick={() => window.print()} 
-                                        className="bg-slate-800 hover:bg-slate-700 text-white font-bold py-4 px-8 rounded-xl shadow-lg transition-all flex items-center justify-center gap-3"
-                                    >
-                                        <i className="ph-bold ph-printer text-2xl"></i> 
-                                        Wydrukuj do PDF
+                                    <button onClick={() => window.print()} className="bg-slate-800 hover:bg-slate-700 text-white font-bold py-4 px-8 rounded-xl shadow-lg transition-all flex items-center justify-center gap-3">
+                                        <i className="ph-bold ph-printer text-2xl"></i> Wydrukuj Dokument
                                     </button>
-
-                                    <button 
-                                        onClick={publishToMarket} 
-                                        disabled={isPublishing}
-                                        className="bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 px-8 rounded-xl shadow-[0_0_20px_rgba(37,99,235,0.4)] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
-                                    >
+                                    <button onClick={publishToMarket} disabled={isPublishing} className="bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 px-8 rounded-xl shadow-[0_0_20px_rgba(37,99,235,0.4)] transition-all flex items-center justify-center gap-3 disabled:opacity-50">
                                         {isPublishing ? <i className="ph-bold ph-spinner animate-spin text-2xl"></i> : <i className="ph-bold ph-cloud-arrow-up text-2xl"></i>} 
-                                        Zapisz do Bazy Giełdy
+                                        Zapisz w Bazie Giełdy
                                     </button>
                                 </div>
                             </div>
                         </div>
-
                     </div>
                 );
             };
 
             return (
                 <div className="flex h-screen w-full bg-slate-950 text-slate-200 overflow-hidden relative selection:bg-amber-500/30">
-                    
-                    {/* Auras rendering in background */}
-                    <div className="aura-container no-print">
-                        <div className="aura-blob aura-1"></div>
-                        <div className="aura-blob aura-2"></div>
-                        <div className="aura-blob aura-3"></div>
-                    </div>
+                    <div className="aura-container no-print"><div className="aura-blob aura-1"></div><div className="aura-blob aura-2"></div><div className="aura-blob aura-3"></div></div>
 
-                    {/* Global Notifications */}
                     {message && (
                         <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 px-6 py-3 rounded-full text-sm font-bold shadow-2xl flex items-center gap-2 animate-bounce ${message.type === 'error' ? 'bg-red-500 text-white' : 'bg-green-500 text-white'} no-print`}>
-                            <i className={`ph-bold ${message.type === 'error' ? 'ph-warning-circle' : 'ph-check-circle'} text-lg`}></i>
-                            {message.text}
+                            <i className={`ph-bold ${message.type === 'error' ? 'ph-warning-circle' : 'ph-check-circle'} text-lg`}></i> {message.text}
                         </div>
                     )}
 
-                    {/* Left Sidebar (No Print) */}
                     <aside className="w-80 flex-shrink-0 bg-slate-900/80 backdrop-blur-xl border-r border-slate-800 flex flex-col h-full z-10 no-print transition-all duration-300">
-                        {/* Header */}
                         <div className="p-6 border-b border-slate-800 flex items-center gap-3">
                             <div className="w-10 h-10 bg-gradient-to-br from-amber-400 to-orange-500 rounded-xl flex items-center justify-center shadow-lg shadow-amber-500/20">
                                 <i className="ph-bold ph-sun text-white text-xl"></i>
@@ -561,35 +523,21 @@ WYMÓG: Zwróć DOKŁADNIE TEN SZABLON JSON z czterema drużynami, uzupełniają
                             </div>
                         </div>
 
-                        {/* Navigation */}
                         <div className="px-4 py-3 flex gap-2 border-b border-slate-800">
-                            <button 
-                                onClick={() => setAppMode('kreator')} 
-                                className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${appMode === 'kreator' ? 'bg-amber-500 text-slate-900 shadow-lg shadow-amber-500/30' : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white'}`}
-                            >
+                            <button onClick={() => setAppMode('kreator')} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${appMode === 'kreator' ? 'bg-amber-500 text-slate-900 shadow-lg shadow-amber-500/30' : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white'}`}>
                                 <i className="ph-bold ph-paint-brush"></i> Asystent
                             </button>
-                            <button 
-                                onClick={() => setAppMode('gielda')} 
-                                className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${appMode === 'gielda' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30' : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white'}`}
-                            >
+                            <button onClick={() => setAppMode('gielda')} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${appMode === 'gielda' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30' : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white'}`}>
                                 <i className="ph-bold ph-globe"></i> Giełda
                             </button>
                         </div>
 
-                        {/* Sidebar Content Scrollable */}
                         <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-6">
-                            
-                            {/* KREATOR MODE */}
                             {appMode === 'kreator' && (
                                 <>
-                                    {/* Module Selector */}
                                     <div className="grid grid-cols-2 gap-2">
                                         {MODULES.map(m => (
-                                            <button 
-                                                key={m.id} onClick={() => setActiveModule(m.id)}
-                                                className={`p-3 rounded-xl flex flex-col items-center text-center gap-2 transition-all border ${activeModule === m.id ? 'bg-slate-800 border-slate-600 shadow-lg' : 'bg-slate-900/50 border-transparent text-slate-500 hover:bg-slate-800 hover:text-slate-300'}`}
-                                            >
+                                            <button key={m.id} onClick={() => setActiveModule(m.id)} className={`p-3 rounded-xl flex flex-col items-center text-center gap-2 transition-all border ${activeModule === m.id ? 'bg-slate-800 border-slate-600 shadow-lg' : 'bg-slate-900/50 border-transparent text-slate-500 hover:bg-slate-800 hover:text-slate-300'}`}>
                                                 <div className={`w-10 h-10 rounded-full flex items-center justify-center bg-gradient-to-br ${m.color} ${activeModule === m.id ? 'opacity-100' : 'opacity-50 grayscale'}`}>
                                                     <i className={`text-xl text-white ${activeModule === m.id ? 'ph-fill' : 'ph-bold'} ${m.icon}`}></i>
                                                 </div>
@@ -598,7 +546,6 @@ WYMÓG: Zwróć DOKŁADNIE TEN SZABLON JSON z czterema drużynami, uzupełniają
                                         ))}
                                     </div>
 
-                                    {/* Dynamic Forms based on Module */}
                                     <div className="space-y-4 bg-slate-900 border border-slate-800 rounded-2xl p-4">
                                         <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest border-b border-slate-800 pb-2 mb-2 flex items-center gap-2">
                                             <i className="ph-bold ph-sliders"></i> Ustawienia Parametrów
@@ -635,35 +582,29 @@ WYMÓG: Zwróć DOKŁADNIE TEN SZABLON JSON z czterema drużynami, uzupełniają
                                             </>
                                         )}
 
-                                        {(activeModule !== 'druzyny' || true) && (
-                                            <div className="space-y-4">
-                                                <div className="space-y-1">
-                                                    <label className="text-[10px] font-bold text-slate-400 uppercase">Wiek Dzieci</label>
-                                                    <select value={age} onChange={e => setAge(e.target.value)} className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:border-amber-500">
-                                                        <option>Przedszkolaki (4-6 lat)</option><option>7-10 lat</option><option>11-14 lat</option><option>Młodzież (15+)</option>
-                                                    </select>
-                                                </div>
-                                                <div className="space-y-1">
-                                                    <label className="text-[10px] font-bold text-slate-400 uppercase text-emerald-400 flex items-center gap-1"><i className="ph-bold ph-wheelchair"></i> Potrzeby Specjalne (SPE)</label>
-                                                    <select value={specialNeeds} onChange={e => setSpecialNeeds(e.target.value)} className="w-full bg-slate-950 border border-emerald-700/50 rounded-lg p-2.5 text-sm text-white focus:border-emerald-500">
-                                                        <option>Brak (Grupa ogólnodostępna)</option>
-                                                        <option>Przedszkolaki z niepełnosprawnością (Ogólne)</option>
-                                                        <option>Spektrum Autyzmu i Asperger</option>
-                                                        <option>Zaburzenia sensoryczne (SI) / Wyciszenie</option>
-                                                        <option>Niepełnosprawność intelektualna</option>
-                                                        <option>Dzieci ze spektrum ADHD</option>
-                                                    </select>
-                                                </div>
+                                        <div className="space-y-4">
+                                            <div className="space-y-1">
+                                                <label className="text-[10px] font-bold text-slate-400 uppercase">Wiek Dzieci</label>
+                                                <select value={age} onChange={e => setAge(e.target.value)} className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:border-amber-500">
+                                                    <option>Przedszkolaki (4-6 lat)</option><option>7-10 lat</option><option>11-14 lat</option><option>Młodzież (15+)</option>
+                                                </select>
                                             </div>
-                                        )}
+                                            <div className="space-y-1">
+                                                <label className="text-[10px] font-bold text-slate-400 uppercase text-emerald-400 flex items-center gap-1"><i className="ph-bold ph-wheelchair"></i> Potrzeby Specjalne (SPE)</label>
+                                                <select value={specialNeeds} onChange={e => setSpecialNeeds(e.target.value)} className="w-full bg-slate-950 border border-emerald-700/50 rounded-lg p-2.5 text-sm text-white focus:border-emerald-500">
+                                                    <option>Brak (Grupa ogólnodostępna)</option>
+                                                    <option>Przedszkolaki z niepełnosprawnością (Ogólne)</option>
+                                                    <option>Spektrum Autyzmu i Asperger</option>
+                                                    <option>Zaburzenia sensoryczne (SI) / Wyciszenie</option>
+                                                    <option>Niepełnosprawność intelektualna</option>
+                                                    <option>Dzieci ze spektrum ADHD</option>
+                                                </select>
+                                            </div>
+                                        </div>
                                     </div>
 
-                                    {/* Akcje */}
                                     <div className="space-y-3 pt-2">
-                                        <button 
-                                            onClick={generateContent} disabled={isGenerating}
-                                            className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-900 font-black py-4 rounded-2xl shadow-lg transition-all flex items-center justify-center gap-2"
-                                        >
+                                        <button onClick={generateContent} disabled={isGenerating} className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-900 font-black py-4 rounded-2xl shadow-lg transition-all flex items-center justify-center gap-2">
                                             {isGenerating ? <i className="ph-bold ph-spinner animate-spin text-xl"></i> : <i className="ph-bold ph-magic-wand text-xl"></i>} 
                                             Generuj Rozwiązanie
                                         </button>
@@ -671,7 +612,6 @@ WYMÓG: Zwróć DOKŁADNIE TEN SZABLON JSON z czterema drużynami, uzupełniają
                                 </>
                             )}
 
-                            {/* GIEŁDA MODE */}
                             {appMode === 'gielda' && (
                                 <div className="space-y-4 pb-6">
                                     <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4 text-center">
@@ -707,10 +647,8 @@ WYMÓG: Zwróć DOKŁADNIE TEN SZABLON JSON z czterema drużynami, uzupełniają
                                     )}
                                 </div>
                             )}
-
                         </div>
 
-                        {/* Premium Footer - czysty design */}
                         <div className="p-4 border-t border-slate-800 bg-slate-950/50">
                             {!isPremium ? (
                                 <div className="space-y-2 mb-2">
@@ -719,21 +657,14 @@ WYMÓG: Zwróć DOKŁADNIE TEN SZABLON JSON z czterema drużynami, uzupełniają
                                         <span className="text-[10px] font-bold text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded-full">{3 - aiGenerations} darmowe</span>
                                     </div>
                                     <div className="flex gap-2">
-                                        <input 
-                                            type="text" value={premiumCode} onChange={(e) => setPremiumCode(e.target.value)}
-                                            placeholder="Kod Premium" 
-                                            className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:border-amber-500 uppercase"
-                                        />
+                                        <input type="text" value={premiumCode} onChange={(e) => setPremiumCode(e.target.value)} placeholder="Kod Premium" className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:border-amber-500 uppercase" />
                                         <button onClick={handlePremiumCheck} className="bg-slate-800 hover:bg-slate-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold border border-slate-700 transition-all">OK</button>
                                     </div>
                                 </div>
                             ) : (
                                 <div className="flex items-center gap-3 bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/30 p-3 rounded-xl mb-2">
                                     <i className="ph-fill ph-crown text-2xl text-amber-400"></i>
-                                    <div>
-                                        <p className="text-xs font-bold text-white">Wersja PRO MAX</p>
-                                        <p className="text-[9px] text-amber-300">Wszystkie limity odblokowane</p>
-                                    </div>
+                                    <div><p className="text-xs font-bold text-white">Wersja PRO MAX</p><p className="text-[9px] text-amber-300">Wszystkie limity odblokowane</p></div>
                                 </div>
                             )}
                         </div>
