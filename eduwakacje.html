@@ -42,11 +42,8 @@
         .aura-blob {
             position: absolute; filter: blur(120px); border-radius: 50%; opacity: 0.35; animation: float 15s ease-in-out infinite alternate;
         }
-        /* Słoneczny żółty */
         .aura-1 { top: -10%; left: -10%; width: 500px; height: 500px; background: radial-gradient(circle, rgba(234, 179, 8, 0.6) 0%, rgba(0,0,0,0) 70%); animation-delay: 0s; }
-        /* Morski błękit */
         .aura-2 { bottom: -10%; right: -10%; width: 600px; height: 600px; background: radial-gradient(circle, rgba(6, 182, 212, 0.5) 0%, rgba(0,0,0,0) 70%); animation-delay: -5s; }
-        /* Tropikalny pomarańcz */
         .aura-3 { top: 40%; left: 30%; width: 400px; height: 400px; background: radial-gradient(circle, rgba(249, 115, 22, 0.4) 0%, rgba(0,0,0,0) 70%); animation-delay: -10s; }
 
         @keyframes float {
@@ -54,14 +51,40 @@
             100% { transform: translate(30px, 50px) scale(1.1); }
         }
 
-        /* Print Styles */
+        /* Ulepszone Style Drukowania (Brak obcinania, brak ciemnego tła) */
         @media print {
-            body { background: white !important; color: black !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; overflow: visible !important; }
+            body, html, #root { 
+                background: white !important; 
+                color: black !important; 
+                margin: 0; padding: 0;
+                overflow: visible !important;
+                height: auto !important;
+            }
+            main, .flex-1, .overflow-y-auto {
+                overflow: visible !important;
+                height: auto !important;
+                display: block !important;
+            }
             .no-print { display: none !important; }
-            .print-container { background: white !important; color: black !important; padding: 0 !important; width: 100% !important; overflow: visible !important; }
-            .print-card { break-inside: avoid; border: 2px solid #e2e8f0 !important; box-shadow: none !important; color: black !important; background: white !important; margin-bottom: 20px; }
+            .print-container { 
+                background: white !important; 
+                color: black !important; 
+                padding: 0 !important; 
+                width: 100% !important; 
+                overflow: visible !important; 
+                height: auto !important;
+            }
+            .print-card { 
+                break-inside: avoid; 
+                page-break-inside: avoid;
+                border: 2px solid #e2e8f0 !important; 
+                box-shadow: none !important; 
+                color: black !important; 
+                background: white !important; 
+                margin-bottom: 20px; 
+            }
             .print-text { color: black !important; }
-            #root, main { height: auto !important; overflow: visible !important; }
+            * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
         }
     </style>
 </head>
@@ -142,7 +165,6 @@
             }
         };
 
-        // --- GŁÓWNA APLIKACJA ---
         function App() {
             const [user, setUser] = useState(null);
             const [appMode, setAppMode] = useState('kreator'); 
@@ -349,8 +371,10 @@ WYMÓG: Zwróć DOKŁADNIE TEN SZABLON JSON z czterema drużynami, uzupełniają
                     );
                 }
 
+                let resultContent = null;
+
                 if (type === 'plan') {
-                    return (
+                    resultContent = (
                         <div className="space-y-6">
                             <div className="text-center mb-8 pb-6 border-b border-slate-800 print:border-slate-300">
                                 <h2 className="text-3xl font-summer text-amber-400 print-text font-black uppercase mb-2">Tydzień: {params.theme}</h2>
@@ -385,10 +409,8 @@ WYMÓG: Zwróć DOKŁADNIE TEN SZABLON JSON z czterema drużynami, uzupełniają
                             </div>
                         </div>
                     );
-                }
-
-                if (type === 'sos') {
-                    return (
+                } else if (type === 'sos') {
+                    resultContent = (
                         <div className="space-y-6">
                             <div className="text-center mb-8 pb-6 border-b border-slate-800 print:border-slate-300">
                                 <h2 className="text-3xl font-summer text-cyan-400 print-text font-black uppercase mb-2">Ratunkowe Gry S.O.S</h2>
@@ -413,10 +435,8 @@ WYMÓG: Zwróć DOKŁADNIE TEN SZABLON JSON z czterema drużynami, uzupełniają
                             </div>
                         </div>
                     );
-                }
-
-                if (type === 'teren') {
-                    return (
+                } else if (type === 'teren') {
+                    resultContent = (
                         <div className="space-y-6">
                             <div className="text-center mb-8 pb-6 border-b border-slate-800 print:border-slate-300">
                                 <h2 className="text-3xl font-summer text-emerald-400 print-text font-black uppercase mb-2">Terenowe Podchody</h2>
@@ -444,10 +464,8 @@ WYMÓG: Zwróć DOKŁADNIE TEN SZABLON JSON z czterema drużynami, uzupełniają
                             </div>
                         </div>
                     );
-                }
-
-                if (type === 'druzyny') {
-                    return (
+                } else if (type === 'druzyny') {
+                    resultContent = (
                         <div className="space-y-6">
                             <div className="text-center mb-8 pb-6 border-b border-slate-800 print:border-slate-300">
                                 <h2 className="text-3xl font-summer text-purple-400 print-text font-black uppercase mb-2">Baza Drużyn i Okrzyków</h2>
@@ -474,8 +492,42 @@ WYMÓG: Zwróć DOKŁADNIE TEN SZABLON JSON z czterema drużynami, uzupełniają
                         </div>
                     );
                 }
-                
-                return <div className="text-red-500">Nierozpoznany moduł wyników.</div>;
+
+                return (
+                    <div className="space-y-8 animate-[reveal_0.4s_ease-out]">
+                        
+                        {resultContent}
+
+                        {/* Duży panel udostępniania i druku u dołu */}
+                        <div className="mt-10 bg-slate-900 border border-blue-500/30 rounded-3xl p-8 text-center relative overflow-hidden group no-print shadow-xl">
+                            <div className="absolute inset-0 bg-gradient-to-r from-blue-600/10 to-amber-500/10 z-0"></div>
+                            <div className="relative z-10">
+                                <h3 className="text-xl font-bold text-white mb-2">Gotowe! Co dalej?</h3>
+                                <p className="text-slate-400 text-sm mb-6 max-w-lg mx-auto">Wydrukuj ten plan, aby mieć go przy sobie podczas zajęć, lub udostępnij na Giełdzie, aby ułatwić pracę innym wychowawcom i animatorom.</p>
+                                
+                                <div className="flex flex-col sm:flex-row justify-center gap-4">
+                                    <button 
+                                        onClick={() => window.print()} 
+                                        className="bg-slate-800 hover:bg-slate-700 text-white font-bold py-4 px-8 rounded-xl shadow-lg transition-all flex items-center justify-center gap-3"
+                                    >
+                                        <i className="ph-bold ph-printer text-2xl"></i> 
+                                        Wydrukuj do PDF
+                                    </button>
+
+                                    <button 
+                                        onClick={publishToMarket} 
+                                        disabled={isPublishing}
+                                        className="bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 px-8 rounded-xl shadow-[0_0_20px_rgba(37,99,235,0.4)] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+                                    >
+                                        {isPublishing ? <i className="ph-bold ph-spinner animate-spin text-2xl"></i> : <i className="ph-bold ph-cloud-arrow-up text-2xl"></i>} 
+                                        Zapisz do Bazy Giełdy
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                );
             };
 
             return (
@@ -490,7 +542,7 @@ WYMÓG: Zwróć DOKŁADNIE TEN SZABLON JSON z czterema drużynami, uzupełniają
 
                     {/* Global Notifications */}
                     {message && (
-                        <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 px-6 py-3 rounded-full text-sm font-bold shadow-2xl flex items-center gap-2 animate-bounce ${message.type === 'error' ? 'bg-red-500 text-white' : 'bg-green-500 text-white'}`}>
+                        <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 px-6 py-3 rounded-full text-sm font-bold shadow-2xl flex items-center gap-2 animate-bounce ${message.type === 'error' ? 'bg-red-500 text-white' : 'bg-green-500 text-white'} no-print`}>
                             <i className={`ph-bold ${message.type === 'error' ? 'ph-warning-circle' : 'ph-check-circle'} text-lg`}></i>
                             {message.text}
                         </div>
@@ -615,17 +667,6 @@ WYMÓG: Zwróć DOKŁADNIE TEN SZABLON JSON z czterema drużynami, uzupełniają
                                             {isGenerating ? <i className="ph-bold ph-spinner animate-spin text-xl"></i> : <i className="ph-bold ph-magic-wand text-xl"></i>} 
                                             Generuj Rozwiązanie
                                         </button>
-                                        
-                                        {resultData && (
-                                            <div className="grid grid-cols-2 gap-2">
-                                                <button onClick={() => window.print()} className="bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 rounded-xl transition-all flex justify-center items-center gap-2 text-xs">
-                                                    <i className="ph-bold ph-printer text-lg"></i> Drukuj
-                                                </button>
-                                                <button onClick={publishToMarket} disabled={isPublishing} className="bg-blue-600/20 border border-blue-500 hover:bg-blue-600 text-blue-400 hover:text-white font-bold py-3 rounded-xl transition-all flex justify-center items-center gap-2 text-xs">
-                                                    {isPublishing ? <i className="ph-bold ph-spinner animate-spin"></i> : <i className="ph-bold ph-share-network"></i>} Na Giełdę
-                                                </button>
-                                            </div>
-                                        )}
                                     </div>
                                 </>
                             )}
