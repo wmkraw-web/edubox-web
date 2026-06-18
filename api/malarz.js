@@ -1,23 +1,23 @@
-// Plik: api/malarz.js
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { prompt, style, format } = req.body;
+  const { prompt, style, format, customText } = req.body;
   const falKey = process.env.FAL_KEY;
 
   if (!falKey) {
     return res.status(500).json({ error: 'Brak klucza FAL_KEY w zmiennych środowiskowych Vercela.' });
   }
 
-  // Zaawansowany Prompt Engineering dla najwyższej jakości
+  // Modyfikatory stylu
   let styleModifier = "";
-  if (style === 'akwarela') styleModifier = "beautiful watercolor illustration, soft pastel colors, artistic, painted by a master illustrator, highly detailed";
-  if (style === 'wektor') styleModifier = "flat vector illustration, clean lines, vibrant colors, 2D game asset style, no gradients, clear and sharp";
-  if (style === 'disney') styleModifier = "3D Pixar Disney style render, cute, magical, highly detailed, vivid colors, 8k resolution, volumetric lighting";
+  if (style === 'akwarela') styleModifier = "beautiful watercolor illustration, soft pastel colors, artistic, highly detailed";
+  if (style === 'wektor') styleModifier = "flat vector illustration, clean lines, vibrant colors, 2D game asset style, no gradients";
+  if (style === 'disney') styleModifier = "3D Pixar Disney style render, cute, magical, highly detailed, vivid colors, volumetric lighting";
   if (style === 'kolorowanka') styleModifier = "black and white line art, coloring book page, clear outlines, no shading, pure white background";
 
+  // Modyfikatory formatu
   let formatModifier = "";
   let imageSize = "square_hd";
   if (format === 'medal') {
@@ -29,12 +29,22 @@ export default async function handler(req, res) {
   } else if (format === 'dyplom') {
       formatModifier = "horizontal composition, decorative border framing, leaving empty negative space in the center for writing text";
       imageSize = "landscape_4_3";
+  } else if (format === 'naklejka') {
+      formatModifier = "sticker design, isolated on pure white background, centered";
+      imageSize = "square_hd";
   }
 
-  const finalPrompt = `${styleModifier}. Subject: ${prompt}. ${formatModifier}. High quality, professional educational material for kindergarten.`;
+  // Zabezpieczenie przed "wymyślaniem" dziwnego języka przez AI
+  let textModifier = "";
+  if (customText && customText.trim() !== "") {
+      textModifier = `The image MUST prominently feature the exact text: "${customText.trim()}". The typography must be beautiful, legible, and well-integrated into the design.`;
+  } else {
+      textModifier = `DO NOT include any text, letters, or words in the image.`;
+  }
+
+  const finalPrompt = `Subject: ${prompt}. ${textModifier} ${styleModifier}. ${formatModifier}. High quality, professional educational material for kindergarten.`;
 
   try {
-    // Używamy modelu Flux Schnell przez Fal.ai dla niesamowitej jakości i szybkości
     const response = await fetch("https://fal.run/fal-ai/flux/schnell", {
       method: "POST",
       headers: {
