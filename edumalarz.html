@@ -60,6 +60,7 @@
             
             // Image State
             const [prompt, setPrompt] = useState('');
+            const [customText, setCustomText] = useState(''); // NOWE POLE NA TEKST
             const [imageStyle, setImageStyle] = useState('akwarela');
             const [format, setFormat] = useState('medal');
             const [resultImageUrl, setResultImageUrl] = useState(null);
@@ -108,7 +109,8 @@
                     const res = await fetch('/api/malarz', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ prompt, style: imageStyle, format })
+                        // DODANO customText DO WYSYŁKI
+                        body: JSON.stringify({ prompt, style: imageStyle, format, customText })
                     });
                     
                     if (!res.ok) {
@@ -136,9 +138,8 @@
                 if (!resultImageUrl || !user) { showMessage('Błąd autoryzacji bazy.', 'error'); return; }
                 setIsPublishing(true);
                 try {
-                    // Na giełdę zapisujemy tylko adres URL do chmury Fal.ai i parametry (jest to ekstremalnie lekkie)
-                    const payload = { url: resultImageUrl, params: { prompt, imageStyle, format } };
-                    await window.EduBoxCore.saveToGielda('edumalarz_market', 'edumalarz', prompt.substring(0, 30), payload);
+                    const payload = { url: resultImageUrl, params: { prompt, imageStyle, format, customText } };
+                    await window.EduBoxCore.saveToGielda('edumalarz_market', 'edumalarz', customText || prompt.substring(0, 30), payload);
                     showMessage('Opublikowano w Galerii!', 'success');
                     setAppMode('gielda');
                 } catch (error) { showMessage(error.message || 'Błąd publikacji.', 'error'); } 
@@ -217,12 +218,23 @@
                                         </div>
 
                                         <div className="space-y-1">
-                                            <label className="text-[10px] font-bold text-slate-400 uppercase">Opisz motyw przewodni</label>
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase">Własny napis (Opcjonalnie)</label>
+                                            <input 
+                                                type="text" 
+                                                value={customText} 
+                                                onChange={e => setCustomText(e.target.value)} 
+                                                className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:border-pink-500 transition-colors" 
+                                                placeholder="np. Super Pszczółka, Dzień Ojca..." 
+                                            />
+                                        </div>
+
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase">Co ma być na obrazku?</label>
                                             <textarea 
                                                 value={prompt} 
                                                 onChange={e => setPrompt(e.target.value)} 
-                                                className="w-full h-32 bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:border-pink-500 transition-colors resize-none" 
-                                                placeholder="np. Uśmiechnięta pszczółka z kwiatkiem, pasowanie na przedszkolaka..." 
+                                                className="w-full h-24 bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:border-pink-500 transition-colors resize-none" 
+                                                placeholder="np. Uśmiechnięta, żółto-czarna pszczółka z kwiatkiem w łapce..." 
                                             />
                                         </div>
                                     </div>
@@ -303,7 +315,7 @@
                             {!resultImageUrl ? (
                                 <div className="text-center text-pink-500/30 no-print max-w-md mx-auto">
                                     <i className="ph-fill ph-image-square text-7xl mb-6 animate-pulse"></i>
-                                    <p className="font-bold text-lg text-pink-100/50">Wybierz kształt, opisz motyw po lewej stronie, a stworzymy dla Ciebie wektorowe arcydzieło do druku.</p>
+                                    <p className="font-bold text-lg text-pink-100/50">Wybierz kształt, wpisz napis i opisz motyw, a stworzymy dla Ciebie wektorowe arcydzieło do druku.</p>
                                 </div>
                             ) : (
                                 <div className="space-y-8 animate-[reveal_0.4s_ease-out] w-full max-w-2xl text-center">
