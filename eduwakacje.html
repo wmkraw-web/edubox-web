@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EduBox V3 PRO MAX - EduWakacje PRO</title>
 
-    <!-- React & Babel -->
-    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- React & Babel (ZAMROŻONE WERSJE - GWARANCJA STABILNOŚCI) -->
+    <script src="https://unpkg.com/react@18.2.0/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone@7.23.6/babel.min.js"></script>
 
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -18,6 +18,12 @@
 
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Globalny Core Bazy Danych -->
+    <script type="module">
+        import { EduBoxCore } from './global-core.js';
+        window.EduBoxCore = EduBoxCore;
+    </script>
 
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #020617; color: #f8fafc; overflow: hidden; }
@@ -60,61 +66,11 @@
     </style>
 </head>
 <body>
-    <!-- Firebase & Core Logic -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, getDocs, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'edubox-eduwakacje-v3';
-        
-        let app, auth, db;
-        try {
-            app = initializeApp(firebaseConfig);
-            auth = getAuth(app);
-            db = getFirestore(app);
-        } catch (e) { console.warn("Firebase init ignored in dev environment."); }
-
-        window.EduBoxCore = {
-            db, auth, appId,
-            user: null,
-            initAuth: async () => {
-                if (!auth) return null;
-                try {
-                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                        await signInWithCustomToken(auth, __initial_auth_token);
-                    } else {
-                        await signInAnonymously(auth);
-                    }
-                } catch (e) { console.error("Auth error:", e); }
-            },
-            onUserChange: (callback) => {
-                if (!auth) return;
-                onAuthStateChanged(auth, (user) => { window.EduBoxCore.user = user; callback(user); });
-            },
-            publishToMarket: async (data) => {
-                if (!db || !window.EduBoxCore.user) throw new Error("Brak autoryzacji");
-                const marketRef = collection(db, 'artifacts', appId, 'public', 'data', 'market');
-                await addDoc(marketRef, { ...data, authorId: window.EduBoxCore.user.uid, createdAt: serverTimestamp() });
-            },
-            fetchMarket: async () => {
-                if (!db || !window.EduBoxCore.user) return [];
-                const marketRef = collection(db, 'artifacts', appId, 'public', 'data', 'market');
-                const snapshot = await getDocs(marketRef);
-                const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                return items.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
-            }
-        };
-        window.EduBoxCore.initAuth();
-    </script>
-
     <div id="root" class="h-screen flex flex-col"></div>
 
     <!-- React App -->
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
-        const apiKey = ""; 
 
         // --- KONFIGURACJA MODUŁÓW ---
         const MODULES = [
@@ -161,16 +117,15 @@
             }
         };
 
-        // ZAKTUALIZOWANY FETCHER: Dopasowany w 100% do Twojego pliku chat.js
         const fetchTextAI = async (prompt, systemInstruction) => {
             try {
                 const res = await fetch('/api/chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ 
-                        prompt: prompt,                // Przekazanie promptu dla uzytkownika
-                        system: systemInstruction,     // Przekazanie instrukcji systemowych (Tego brakowalo!)
-                        format: "json"                 // Magiczna flaga do Twojego chat.js włączająca response_format="json_object"
+                        prompt: prompt,
+                        system: systemInstruction,
+                        format: "json"
                     })
                 });
                 
@@ -212,12 +167,18 @@
             const [isPublishing, setIsPublishing] = useState(false);
 
             useEffect(() => {
-                if (window.EduBoxCore) window.EduBoxCore.onUserChange((u) => setUser(u));
-                const savedGens = localStorage.getItem('edubox_eduwakacje_ai');
-                if (savedGens) setAiGenerations(parseInt(savedGens));
+                const initDb = () => {
+                    if (typeof window !== 'undefined' && window.EduBoxCore) window.EduBoxCore.init((u) => setUser(u));
+                    else setTimeout(initDb, 100);
+                };
+                initDb();
                 
-                const savedPremium = localStorage.getItem('edubox_premium');
-                if (savedPremium === 'KAWA2024') setIsPremium(true);
+                try {
+                    const savedGens = window.localStorage.getItem('edubox_eduwakacje_ai');
+                    if (savedGens) setAiGenerations(parseInt(savedGens));
+                    const savedPremium = window.localStorage.getItem('edubox_premium');
+                    if (savedPremium === 'KAWA2024') setIsPremium(true);
+                } catch (e) {}
             }, []);
 
             const showMessage = (text, type = 'success') => {
@@ -227,7 +188,9 @@
 
             const handlePremiumCheck = () => {
                 if (premiumCode.toUpperCase() === 'KAWA2024') {
-                    setIsPremium(true); localStorage.setItem('edubox_premium', 'KAWA2024'); setPremiumCode('');
+                    setIsPremium(true); 
+                    try { window.localStorage.setItem('edubox_premium', 'KAWA2024'); } catch(e){}
+                    setPremiumCode('');
                     showMessage('Kod Premium zaakceptowany!', 'success');
                 } else { showMessage('Nieprawidłowy kod', 'error'); }
             };
@@ -244,7 +207,6 @@
                 let prompt = "";
                 let sysPrompt = "";
 
-                // ŻELAZNE SZABLONY: Idealne pod JSON_OBJECT w API OpenAI
                 if (activeModule === 'plan') {
                     sysPrompt = `Jesteś doskonałym pedagogiem. Stwórz 5-dniowy plan tematycznych półkolonii.
 WYMÓG: Zwróć DOKŁADNIE TEN SZABLON JSON z pięcioma dniami, uzupełniając teksty wewnątrz kluczy:
@@ -309,7 +271,7 @@ WYMÓG: Zwróć DOKŁADNIE TEN SZABLON JSON z czterema drużynami, uzupełniają
                     if (!isPremium) {
                         const newCount = aiGenerations + 1;
                         setAiGenerations(newCount);
-                        localStorage.setItem('edubox_eduwakacje_ai', newCount.toString());
+                        try { window.localStorage.setItem('edubox_eduwakacje_ai', newCount.toString()); } catch(e){}
                     }
                     showMessage('Gotowe!', 'success');
                 } catch (error) {
@@ -320,30 +282,36 @@ WYMÓG: Zwróć DOKŁADNIE TEN SZABLON JSON z czterema drużynami, uzupełniają
             };
 
             const publishToMarket = async () => {
-                if (!resultData || !user) { showMessage('Musisz najpierw wygenerować wynik i poczekać na połączenie.', 'error'); return; }
+                if (!resultData || !user) { showMessage('Błąd autoryzacji bazy. Zaloguj się lub odśwież stronę.', 'error'); return; }
                 setIsPublishing(true);
                 try {
-                    await window.EduBoxCore.publishToMarket(resultData);
+                    // Integracja z EduBoxCore
+                    await window.EduBoxCore.saveToGielda('eduwakacje_market', 'eduwakacje', resultData.params.theme || resultData.params.location || 'Plan', resultData);
                     showMessage('Opublikowano na Giełdzie!', 'success');
                     setAppMode('gielda');
-                    loadMarket();
                 } catch (error) {
-                    showMessage('Błąd publikacji.', 'error');
+                    showMessage(error.message || 'Błąd publikacji.', 'error');
                 } finally {
                     setIsPublishing(false);
                 }
             };
 
-            const loadMarket = async () => {
-                setIsFetchingMarket(true);
-                try {
-                    const items = await window.EduBoxCore.fetchMarket();
-                    setMarketItems(items);
-                } catch (error) { showMessage('Błąd ładowania.', 'error'); } 
-                finally { setIsFetchingMarket(false); }
-            };
-
-            useEffect(() => { if (appMode === 'gielda') loadMarket(); }, [appMode]);
+            useEffect(() => {
+                let unsubscribe = null;
+                if (appMode === 'gielda') {
+                    setIsFetchingMarket(true);
+                    const checkAndSub = () => {
+                        if(window.EduBoxCore && window.EduBoxCore.subscribeToGielda) {
+                            unsubscribe = window.EduBoxCore.subscribeToGielda('eduwakacje_market', (items) => {
+                                setMarketItems(items);
+                                setIsFetchingMarket(false);
+                            }, (err) => { setIsFetchingMarket(false); });
+                        } else { setTimeout(checkAndSub, 100); }
+                    };
+                    checkAndSub();
+                }
+                return () => { if (unsubscribe) unsubscribe(); }
+            }, [appMode]);
 
             // --- KOMPONENTY RENDERUJĄCE WYNIKI ---
             const renderResult = () => {
@@ -678,15 +646,15 @@ WYMÓG: Zwróć DOKŁADNIE TEN SZABLON JSON z czterema drużynami, uzupełniają
                                     ) : (
                                         <div className="space-y-3">
                                             {marketItems.map(item => {
-                                                const mod = MODULES.find(m => m.id === item.type);
+                                                const mod = MODULES.find(m => m.id === item.config?.type);
                                                 return (
-                                                    <div key={item.id} className="bg-slate-800 rounded-xl p-3 border border-slate-700 hover:border-blue-500 transition-colors group cursor-pointer" onClick={() => { setResultData(item); setAppMode('kreator'); showMessage('Wczytano z Giełdy!', 'success'); }}>
+                                                    <div key={item.id} className="bg-slate-800 rounded-xl p-3 border border-slate-700 hover:border-blue-500 transition-colors group cursor-pointer" onClick={() => { setResultData(item.config); setAppMode('kreator'); showMessage('Wczytano z Giełdy!', 'success'); }}>
                                                         <div className="flex justify-between items-start mb-2">
                                                             <div className="flex items-center gap-2 overflow-hidden">
-                                                                <i className={`ph-fill ${mod?.icon} text-amber-500`}></i>
-                                                                <span className="text-xs font-black text-white truncate">{item.params?.theme || item.params?.location || 'Gra Terenowa'}</span>
+                                                                <i className={`ph-fill ${mod?.icon || 'ph-sun'} text-amber-500`}></i>
+                                                                <span className="text-xs font-black text-white truncate">{item.name}</span>
                                                             </div>
-                                                            <span className="text-[9px] bg-slate-900 text-slate-400 px-2 py-0.5 rounded-full whitespace-nowrap shrink-0">{item.params?.age || 'Wszystkie'}</span>
+                                                            <span className="text-[9px] bg-slate-900 text-slate-400 px-2 py-0.5 rounded-full whitespace-nowrap shrink-0">{item.config?.params?.age || 'Wszystkie'}</span>
                                                         </div>
                                                         <p className="text-[10px] text-slate-400 line-clamp-2 leading-relaxed">
                                                             Pobierz gotowe materiały jednym kliknięciem.
