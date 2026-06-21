@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduBox V3 PRO MAX - EduBajka (Bajkoterapia)</title>
+
+    <!-- React & Babel -->
+    <script src="https://unpkg.com/react@18.2.0/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone@7.23.6/babel.min.js"></script>
+
+    <!-- Tailwind CSS & Phosphor Icons -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    
+    <!-- Magiczne czcionki -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&family=Pacifico&display=swap" rel="stylesheet">
+
+    <!-- WBUDOWANA BAZA DANYCH -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, serverTimestamp, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        const FIREBASE_CONFIG = {
+            apiKey: "AIzaSyDL_mvepNJjMmZYQzifN2cXzoKwCE8jNd0",
+            authDomain: "edubox-pro.firebaseapp.com",
+            projectId: "edubox-pro",
+            storageBucket: "edubox-pro.firebasestorage.app",
+            messagingSenderId: "570263845714",
+            appId: "1:570263845714:web:0b029211f7af071b66988b"
+        };
+        const APP_ID = "eduboxpro";
+
+        let app, auth, db;
+        try {
+            app = initializeApp(FIREBASE_CONFIG);
+            auth = getAuth(app);
+            db = getFirestore(app);
+        } catch (e) { console.warn("Firebase init failed", e); }
+
+        window.EduBoxCore = {
+            user: null,
+            init: (callback) => {
+                if (!auth) return;
+                signInAnonymously(auth).catch(e => console.error(e));
+                onAuthStateChanged(auth, (user) => {
+                    window.EduBoxCore.user = user;
+                    if(callback) callback(user);
+                });
+            },
+            saveToGielda: async (collectionName, appType, itemName, config) => {
+                if (!db || !window.EduBoxCore.user) throw new Error("Brak połączenia z chmurą.");
+                const publicRef = collection(db, 'artifacts', APP_ID, 'public', 'data', collectionName);
+                await addDoc(publicRef, {
+                    userId: window.EduBoxCore.user.uid,
+                    createdAt: serverTimestamp(),
+                    type: appType,
+                    name: itemName,
+                    config: config
+                });
+            }
+        };
+    </script>
+
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #0f172a; color: #f8fafc; overflow: hidden; }
+        .font-story { font-family: 'Lora', serif; }
+        .font-magic { font-family: 'Pacifico', cursive; }
+        
+        .custom-scrollbar::-webkit-scrollbar { width: 8px; height: 8px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #475569; border-radius: 10px; }
+        
+        /* Gwiezdne tło aplikacji */
+        .stars-bg {
+            background-color: #0f172a;
+            background-image: 
+                radial-gradient(1px 1px at 20px 30px, #ffffff, rgba(0,0,0,0)),
+                radial-gradient(1px 1px at 40px 70px, #ffffff, rgba(0,0,0,0)),
+                radial-gradient(1px 1px at 50px 160px, #ffffff, rgba(0,0,0,0)),
+                radial-gradient(2px 2px at 90px 40px, #ffffff, rgba(0,0,0,0)),
+                radial-gradient(2px 2px at 130px 80px, #ffffff, rgba(0,0,0,0)),
+                radial-gradient(1.5px 1.5px at 160px 120px, #ffffff, rgba(0,0,0,0));
+            background-repeat: repeat;
+            background-size: 200px 200px;
+            animation: twinkle 10s infinite alternate;
+        }
+
+        @keyframes twinkle {
+            0% { opacity: 0.8; }
+            100% { opacity: 1; }
+        }
+
+        /* --- STYLE DLA KSIĄŻKI W PDF --- */
+        @media screen {
+            .print-only { display: none !important; }
+        }
+
+        @media print {
+            @page { margin: 0; size: A4 portrait; }
+            
+            html, body, #root, .h-screen, .flex, .overflow-hidden, .overflow-y-auto { 
+                background: white !important; color: black !important;
+                margin: 0 !important; padding: 0 !important; 
+                height: auto !important; width: 100% !important;
+                overflow: visible !important; display: block !important; position: static !important;
+            }
+
+            .no-print, aside, nav, header { display: none !important; }
+            main { display: block !important; width: 100% !important; padding: 0 !important; margin: 0 !important; }
+            
+            .story-page { 
+                width: 100% !important; 
+                min-height: 297mm !important; /* Wymusza dokładną stronę A4 */
+                margin: 0 !important; 
+                padding: 20mm !important; 
+                box-shadow: none !important;
+                border: none !important;
+                background: white !important;
+                page-break-after: always !important; 
+                break-after: page !important;
+                position: relative;
+                display: flex !important;
+                flex-direction: column !important;
+                align-items: center !important;
+                justify-content: center !important;
+            }
+
+            .story-page:last-child { page-break-after: auto !important; break-after: auto !important; }
+            * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+        }
+    </style>
+</head>
+<body>
+    <div id="root" class="h-screen flex flex-col"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        const parseAIResponse = (aiOutput) => {
+            let text = String(aiOutput?.text || aiOutput?.response || aiOutput?.content || aiOutput || "").trim();
+            text = text.replace(/```json/gi, '').replace(/```/g, '').trim();
+            try {
+                const startObj = text.indexOf('{');
+                const endObj = text.lastIndexOf('}');
+                if (startObj !== -1 && endObj !== -1 && startObj < endObj) {
+                    let jsonStr = text.substring(startObj, endObj + 1);
+                    return JSON.parse(jsonStr.replace(/,\s*([\]}])/g, '$1'));
+                }
+                throw new Error("Brak nawiasów JSON.");
+            } catch (e) {
+                throw new Error("BŁĄD Z SERWERA: Niepoprawny format dokumentu.");
+            }
+        };
+
+        const fetchTextAI = async (prompt, systemInstruction) => {
+            const finalPrompt = `INSTRUKCJA: Zwróć DOKŁADNIE i WYŁĄCZNIE czysty kod JSON.\n\n${systemInstruction}\n\nZADANIE:\n${prompt}`;
+            try {
+                const res = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt: finalPrompt, system: systemInstruction, format: "json" })
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    return data.text || data.response || data.content || data;
+                } else {
+                    throw new Error(`Błąd API Text`);
+                }
+            } catch(e) { throw new Error("Brak połączenia z AI. " + e.message); }
+        };
+
+        const fetchImageAI = async (imagePrompt) => {
+            try {
+                const res = await fetch('/api/malarz', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        prompt: `${imagePrompt}. Beautiful cute 3D Pixar Disney style illustration for a children's fairy tale book, 8k resolution, highly detailed, vivid colors, emotional, masterpiece, magical lighting.`, 
+                        style: 'disney', 
+                        format: 'kwadrat', 
+                        customText: '' 
+                    })
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    return data.url;
+                }
+                return null;
+            } catch (e) { return null; }
+        };
+
+        function App() {
+            const [user, setUser] = useState(null);
+            const [isPremium, setIsPremium] = useState(false);
+            const [premiumCode, setPremiumCode] = useState('');
+            const [aiGenerations, setAiGenerations] = useState(0);
+            const [message, setMessage] = useState(null);
+            
+            const [isGenerating, setIsGenerating] = useState(false);
+            const [genStatus, setGenStatus] = useState(''); 
+            const [resultData, setResultData] = useState(null);
+
+            // Formularz
+            const [childName, setChildName] = useState('');
+            const [problem, setProblem] = useState('Boi się ciemności i potworów w pokoju');
+            const [theme, setTheme] = useState('Kosmos i ufoludki');
+            const [gender, setGender] = useState('Chłopiec');
+
+            useEffect(() => {
+                const initDb = () => {
+                    if (typeof window !== 'undefined' && window.EduBoxCore && window.EduBoxCore.init) {
+                        window.EduBoxCore.init((u) => setUser(u));
+                    } else { setTimeout(initDb, 100); }
+                };
+                initDb();
+                
+                try {
+                    const savedGens = window.localStorage.getItem('edubox_edubajka_ai');
+                    if (savedGens) setAiGenerations(parseInt(savedGens));
+                    const savedPremium = window.localStorage.getItem('edubox_premium');
+                    if (savedPremium === 'KAWA2024') setIsPremium(true);
+                } catch (e) {}
+            }, []);
+
+            const showMessage = (text, type = 'success') => {
+                setMessage({ text, type });
+                setTimeout(() => setMessage(null), 4000);
+            };
+
+            const handlePremiumCheck = () => {
+                if (premiumCode.toUpperCase() === 'KAWA2024') {
+                    setIsPremium(true); 
+                    try { window.localStorage.setItem('edubox_premium', 'KAWA2024'); } catch(e) {}
+                    setPremiumCode('');
+                    showMessage('Kod Premium zaakceptowany!', 'success');
+                } else { showMessage('Nieprawidłowy kod', 'error'); }
+            };
+
+            const generateStory = async () => {
+                if (!isPremium && aiGenerations >= 2) { showMessage('Limit wyczerpany.', 'error'); return; }
+                if (!problem.trim() || !theme.trim()) { showMessage('Uzupełnij formularz!', 'error'); return; }
+                
+                setIsGenerating(true);
+                setResultData(null);
+
+                const sysPrompt = `Jesteś wybitnym bajkoterapeutą i autorem bajek dla dzieci.
+Twoim zadaniem jest napisanie 3-stronicowej bajki terapeutycznej pomagającej dziecku poradzić sobie ze zgłoszonym problemem.
+Główny bohater nosi imię podane przez użytkownika (lub jest to anonimowe dziecko). Bajka ma mieć piękny, poetycki, ale zrozumiały język, zawierać metaforę problemu i pokazać jak bohater go pokonuje.
+
+Dla okładki oraz dla KAŻDEJ Z 3 STRON musisz wygenerować angielski 'image_prompt', opisujący to, co dzieje się w danej scenie. Opis obrazka ma być szczegółowy (dla generatora AI).
+
+ZWRÓĆ DOKŁADNIE TEN JSON:
+{
+  "title": "Magiczny tytuł bajki",
+  "cover_prompt": "English prompt for the book cover illustration, cute 3d pixar style",
+  "pages": [
+    { "text": "Tekst pierwszej strony (wprowadzenie do świata i bohatera)...", "image_prompt": "English prompt for scene 1..." },
+    { "text": "Tekst drugiej strony (moment zwrotny i problem)...", "image_prompt": "English prompt for scene 2..." },
+    { "text": "Tekst trzeciej strony (rozwiązanie i morał)...", "image_prompt": "English prompt for scene 3..." }
+  ]
+}`;
+                const prompt = `Imię bohatera: ${childName || (gender === 'Chłopiec' ? 'Chłopiec' : 'Dziewczynka')}. 
+Płeć: ${gender}. 
+Ulubiony motyw/świat: ${theme}. 
+Problem dziecka do rozwiązania (terapeutyczny): ${problem}. 
+Napisz piękną historię.`;
+
+                try {
+                    setGenStatus('Krok 1: Pisanie terapeutycznej historii (Psycholog AI)...');
+                    const aiText = await fetchTextAI(prompt, sysPrompt);
+                    const parsedJson = parseAIResponse(aiText);
+                    
+                    setGenStatus('Krok 2: Malowanie okładki książki (Pixar 3D Studio)...');
+                    parsedJson.coverUrl = await fetchImageAI(parsedJson.cover_prompt);
+
+                    setGenStatus('Krok 3: Rysowanie ilustracji do poszczególnych stron (Ok. 30-40 sekund)...');
+                    const pagesWithImages = await Promise.all(
+                        parsedJson.pages.map(async (page, index) => {
+                            setGenStatus(`Krok 3: Rysowanie ilustracji do strony ${index + 1}/3...`);
+                            const imgUrl = await fetchImageAI(page.image_prompt);
+                            return { ...page, imgUrl: imgUrl || 'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?q=80&w=400&auto=format&fit=crop' }; 
+                        })
+                    );
+                    
+                    parsedJson.pages = pagesWithImages;
+
+                    setResultData(parsedJson);
+                    
+                    if (!isPremium) {
+                        const newCount = aiGenerations + 1;
+                        setAiGenerations(newCount);
+                        try { window.localStorage.setItem('edubajka_ai', newCount.toString()); } catch(e) {}
+                    }
+                    showMessage('Gotowe do druku!', 'success');
+                } catch (error) { 
+                    showMessage(error.message, 'error'); 
+                } finally { 
+                    setIsGenerating(false); 
+                    setGenStatus('');
+                }
+            };
+
+            return (
+                <div className="flex h-screen w-full stars-bg text-slate-200 overflow-hidden relative selection:bg-purple-500/30">
+
+                    {message && (
+                        <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 px-6 py-3 rounded-full text-sm font-bold shadow-2xl flex items-center gap-2 animate-bounce ${message.type === 'error' ? 'bg-red-500 text-white' : 'bg-emerald-500 text-white'} no-print`}>
+                            <i className={`ph-bold ${message.type === 'error' ? 'ph-warning-circle' : 'ph-check-circle'} text-lg`}></i> {message.text}
+                        </div>
+                    )}
+
+                    <aside className="w-[360px] flex-shrink-0 bg-slate-900/90 backdrop-blur-xl border-r border-slate-800 flex flex-col h-full z-10 no-print transition-all duration-300 shadow-2xl">
+                        <div className="p-6 border-b border-slate-800 flex items-center gap-3">
+                            <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-purple-500/20">
+                                <i className="ph-bold ph-book-bookmark text-white text-2xl"></i>
+                            </div>
+                            <div>
+                                <h1 className="text-xl font-magic font-normal tracking-wide text-white leading-none">EduBajka PRO</h1>
+                                <p className="text-[10px] text-purple-400 font-bold tracking-wider uppercase mt-1">Biblioteczka Terapeutyczna</p>
+                            </div>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto custom-scrollbar p-5 space-y-6">
+                            
+                            <div className="bg-purple-500/10 border border-purple-500/20 p-4 rounded-2xl">
+                                <p className="text-xs text-purple-300 leading-relaxed font-medium">
+                                    <i className="ph-fill ph-magic-wand text-purple-400 mr-1 text-lg align-middle"></i>
+                                    Zaprojektuj dedykowaną, ilustrowaną bajkę, która pomoże dziecku uporać się z jego konkretnym lękiem lub problemem.
+                                </p>
+                            </div>
+
+                            <div className="space-y-4 bg-slate-800/50 border border-slate-700 rounded-2xl p-5 shadow-inner">
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase">Imię bohatera (Opcjonalnie)</label>
+                                    <input 
+                                        type="text" 
+                                        value={childName} 
+                                        onChange={e => setChildName(e.target.value)} 
+                                        className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-sm text-white focus:border-purple-500 outline-none transition-colors" 
+                                        placeholder="np. Antoś, Zosia..." 
+                                    />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase">Płeć bohatera</label>
+                                    <select value={gender} onChange={e => setGender(e.target.value)} className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-sm text-white focus:border-purple-500 outline-none">
+                                        <option>Chłopiec</option>
+                                        <option>Dziewczynka</option>
+                                    </select>
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase">Ulubiony Motyw (Świat)</label>
+                                    <input 
+                                        type="text" 
+                                        value={theme} 
+                                        onChange={e => setTheme(e.target.value)} 
+                                        className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-sm text-white focus:border-purple-500 outline-none transition-colors" 
+                                        placeholder="np. Dinozaury, Jednorożce, Pociągi..." 
+                                    />
+                                </div>
+
+                                <div className="space-y-1.5 pt-2">
+                                    <label className="text-[10px] font-bold text-rose-400 uppercase flex items-center gap-1"><i className="ph-bold ph-heart-break"></i> Problem do przepracowania</label>
+                                    <textarea 
+                                        value={problem} 
+                                        onChange={e => setProblem(e.target.value)} 
+                                        className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-sm text-white focus:border-purple-500 outline-none transition-colors h-24 resize-none" 
+                                        placeholder="np. Boi się burzy, nie potrafi przegrywać w gry, uderzył kolegę w złości..." 
+                                    />
+                                </div>
+                            </div>
+
+                            <button onClick={generateStory} disabled={isGenerating} className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-black py-4 rounded-2xl shadow-[0_0_20px_rgba(168,85,247,0.3)] transition-all flex flex-col items-center justify-center gap-1 disabled:opacity-50 min-h-[70px]">
+                                {isGenerating ? (
+                                    <><i className="ph-bold ph-spinner animate-spin text-xl mb-1"></i><span className="text-[10px] text-purple-200 uppercase tracking-widest">{genStatus}</span></>
+                                ) : (
+                                    <span className="flex items-center gap-2"><i className="ph-bold ph-book-open text-xl"></i> Pisz i Ilustruj Książkę</span>
+                                )}
+                            </button>
+                        </div>
+
+                        <div className="p-4 border-t border-slate-800 bg-slate-950/80">
+                            {!isPremium ? (
+                                <div className="space-y-2 mb-2">
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-[10px] font-bold text-slate-500 uppercase">Status PRO</span>
+                                        <span className="text-[10px] font-bold text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded-full">{2 - aiGenerations} darmowe</span>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <input type="text" value={premiumCode} onChange={(e) => setPremiumCode(e.target.value)} placeholder="Kod Premium" className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:border-purple-500 uppercase" />
+                                        <button onClick={handlePremiumCheck} className="bg-slate-700 hover:bg-slate-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-all">OK</button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="flex items-center gap-3 bg-gradient-to-r from-purple-500/10 to-indigo-500/10 border border-purple-500/30 p-3 rounded-xl mb-2">
+                                    <i className="ph-fill ph-crown text-2xl text-purple-400"></i>
+                                    <div><p className="text-xs font-bold text-white">Wersja PRO MAX</p><p className="text-[9px] text-purple-300">Wszystkie limity odblokowane</p></div>
+                                </div>
+                            )}
+                        </div>
+                    </aside>
+
+                    <main className="flex-1 flex flex-col relative z-10 overflow-hidden no-print">
+                        <div className="flex-1 overflow-y-auto custom-scrollbar p-6 lg:p-12 relative flex justify-center">
+                            
+                            {!resultData && !isGenerating && (
+                                <div className="text-center text-slate-500 max-w-md mx-auto my-auto">
+                                    <i className="ph-fill ph-magic-wand text-7xl mb-6 text-purple-900/50 animate-pulse"></i>
+                                    <h2 className="text-2xl font-magic text-purple-300 mb-4">Warsztat Bajkopisarza</h2>
+                                    <p className="text-sm font-medium leading-relaxed">Stwórz własną, bogato ilustrowaną książeczkę w 45 sekund. Idealne narzędzie do biblioteczki przedszkolnej i gabinetu psychologa.</p>
+                                </div>
+                            )}
+
+                            {isGenerating && (
+                                <div className="text-center text-purple-300 max-w-md mx-auto my-auto flex flex-col items-center">
+                                    <div className="relative w-32 h-32 mb-6">
+                                        <div className="absolute inset-0 border-4 border-purple-500/20 rounded-full"></div>
+                                        <div className="absolute inset-0 border-4 border-purple-500 rounded-full border-t-transparent animate-spin"></div>
+                                        <i className="ph-fill ph-palette absolute inset-0 flex items-center justify-center text-4xl text-purple-400 animate-pulse"></i>
+                                    </div>
+                                    <h2 className="text-xl font-bold mb-2 font-story">Drukowanie magicznych stron...</h2>
+                                    <p className="text-sm opacity-80">{genStatus}</p>
+                                    <p className="text-xs text-purple-400/50 mt-4">(Ten proces wymaga wygenerowania 4 grafik wysokiej rozdzielczości. Proszę o cierpliwość)</p>
+                                </div>
+                            )}
+
+                            {resultData && !isGenerating && (
+                                <div className="space-y-12 w-full max-w-3xl pb-24 animate-[reveal_0.4s_ease-out]">
+                                    
+                                    <div className="bg-slate-800/50 border border-purple-500/30 rounded-2xl p-6 flex items-center justify-between shadow-xl backdrop-blur-sm">
+                                        <div>
+                                            <h3 className="text-lg font-bold text-white">Twój plik PDF jest gotowy!</h3>
+                                            <p className="text-xs text-slate-400">Książeczka jest sformatowana do wydruku jako dwustronne A4 (każda strona bajki zajmie jedną kartkę).</p>
+                                        </div>
+                                        <button onClick={() => window.print()} className="bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 px-6 rounded-xl shadow-[0_0_15px_rgba(147,51,234,0.4)] transition-all flex items-center gap-2">
+                                            <i className="ph-bold ph-printer text-xl"></i> Wydrukuj Bajkę
+                                        </button>
+                                    </div>
+
+                                    {/* STRONA 1: OKŁADKA */}
+                                    <div className="story-page bg-white text-center shadow-2xl relative overflow-hidden group">
+                                        <div className="absolute inset-0 border-[15px] border-double border-purple-100/50 pointer-events-none z-10"></div>
+                                        <div className="w-full h-[60%] bg-slate-100 rounded-b-[4rem] overflow-hidden mb-8 shadow-inner relative">
+                                            <img src={resultData.coverUrl} className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-1000" alt="Okładka" />
+                                            <div className="absolute inset-0 bg-gradient-to-t from-slate-900/50 to-transparent"></div>
+                                        </div>
+                                        <div className="px-12 flex-1 flex flex-col items-center justify-center">
+                                            <p className="text-sm font-bold text-purple-600 uppercase tracking-[0.3em] mb-4">Biblioteczka Terapeutyczna</p>
+                                            <h1 className="text-4xl md:text-5xl font-magic font-normal text-slate-800 leading-tight mb-8">{resultData.title}</h1>
+                                            <div className="w-16 h-1 bg-purple-200 rounded-full"></div>
+                                        </div>
+                                    </div>
+
+                                    {/* STRONY BAJKI */}
+                                    {resultData.pages.map((page, index) => (
+                                        <div key={index} className="story-page bg-white shadow-2xl relative overflow-hidden">
+                                            <div className="w-full h-[50%] bg-slate-100 rounded-[2rem] overflow-hidden mb-10 shadow-md relative">
+                                                <img src={page.imgUrl} className="w-full h-full object-cover" alt={`Scena ${index+1}`} />
+                                            </div>
+                                            <div className="px-8 md:px-16 flex-1 flex flex-col justify-start w-full">
+                                                <div className="flex items-center gap-4 mb-6">
+                                                    <span className="w-10 h-10 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center font-bold text-lg shrink-0">{index+1}</span>
+                                                    <div className="h-px bg-slate-200 flex-1"></div>
+                                                </div>
+                                                <p className="font-story text-xl md:text-2xl text-slate-700 leading-[1.8] text-justify drop-shadow-sm">
+                                                    {page.text}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    ))}
+
+                                    <div className="story-page bg-white flex flex-col items-center justify-center text-center shadow-2xl relative">
+                                        <i className="ph-fill ph-heart text-6xl text-rose-500 mb-6"></i>
+                                        <h2 className="text-3xl font-magic text-slate-800 mb-4">Koniec</h2>
+                                        <p className="font-story text-slate-500">Bajka stworzona specjalnie dla Ciebie.</p>
+                                    </div>
+
+                                </div>
+                            )}
+
+                        </div>
+                    </main>
+
+                    {/* Dedykowany widok druku */}
+                    <div className="print-only w-full">
+                        {resultData && (
+                            <div className="w-full bg-white">
+                                {/* OKŁADKA */}
+                                <div className="story-page text-center">
+                                    <div className="absolute inset-0 border-[15px] border-double border-purple-100/50 pointer-events-none z-10"></div>
+                                    <div className="w-full h-[60%] bg-slate-100 rounded-b-[4rem] overflow-hidden mb-8 shadow-inner">
+                                        <img src={resultData.coverUrl} className="w-full h-full object-cover" />
+                                    </div>
+                                    <div className="px-12 flex-1 flex flex-col items-center justify-center">
+                                        <p className="text-sm font-bold text-purple-600 uppercase tracking-[0.3em] mb-4">Biblioteczka Terapeutyczna</p>
+                                        <h1 className="text-5xl font-magic font-normal text-slate-800 leading-tight mb-8">{resultData.title}</h1>
+                                        <div className="w-16 h-1 bg-purple-200 rounded-full"></div>
+                                    </div>
+                                </div>
+
+                                {/* STRONY */}
+                                {resultData.pages.map((page, index) => (
+                                    <div key={index} className="story-page">
+                                        <div className="w-full h-[55%] bg-slate-100 rounded-[2rem] overflow-hidden mb-10 shadow-md">
+                                            <img src={page.imgUrl} className="w-full h-full object-cover" />
+                                        </div>
+                                        <div className="px-12 flex-1 flex flex-col justify-start w-full">
+                                            <div className="flex items-center gap-4 mb-6">
+                                                <span className="w-10 h-10 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center font-bold text-lg shrink-0">{index+1}</span>
+                                                <div className="h-px bg-slate-200 flex-1"></div>
+                                            </div>
+                                            <p className="font-story text-2xl text-slate-700 leading-[1.8] text-justify">
+                                                {page.text}
+                                            </p>
+                                        </div>
+                                    </div>
+                                ))}
+
+                                {/* ZAKOŃCZENIE */}
+                                <div className="story-page flex flex-col items-center justify-center text-center">
+                                    <div className="w-24 h-24 mb-6 rounded-full bg-rose-50 flex items-center justify-center"><i className="ph-fill ph-heart text-5xl text-rose-500"></i></div>
+                                    <h2 className="text-4xl font-magic text-slate-800 mb-4">Koniec</h2>
+                                    <p className="font-story text-xl text-slate-500">Bajka stworzona specjalnie dla Ciebie.</p>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
