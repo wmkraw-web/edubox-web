@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduBox V3 PRO MAX - EduKalendarz</title>
+
+    <!-- React & Babel -->
+    <script src="https://unpkg.com/react@18.2.0/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone@7.23.6/babel.min.js"></script>
+
+    <!-- Tailwind CSS & Phosphor Icons -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Outfit:wght@700;800;900&display=swap" rel="stylesheet">
+
+    <!-- WBUDOWANA BAZA DANYCH -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, serverTimestamp, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        const FIREBASE_CONFIG = {
+            apiKey: "AIzaSyDL_mvepNJjMmZYQzifN2cXzoKwCE8jNd0",
+            authDomain: "edubox-pro.firebaseapp.com",
+            projectId: "edubox-pro",
+            storageBucket: "edubox-pro.firebasestorage.app",
+            messagingSenderId: "570263845714",
+            appId: "1:570263845714:web:0b029211f7af071b66988b"
+        };
+        const APP_ID = "eduboxpro";
+
+        let app, auth, db;
+        try {
+            app = initializeApp(FIREBASE_CONFIG);
+            auth = getAuth(app);
+            db = getFirestore(app);
+        } catch (e) { console.warn("Firebase init failed", e); }
+
+        window.EduBoxCore = {
+            user: null,
+            init: (callback) => {
+                if (!auth) return;
+                signInAnonymously(auth).catch(e => console.error(e));
+                onAuthStateChanged(auth, (user) => {
+                    window.EduBoxCore.user = user;
+                    if(callback) callback(user);
+                });
+            }
+        };
+    </script>
+
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; color: #0f172a; overflow: hidden; }
+        .font-display { font-family: 'Outfit', sans-serif; }
+        
+        .custom-scrollbar::-webkit-scrollbar { width: 8px; height: 8px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        
+        .app-bg {
+            background-color: #f1f5f9;
+            background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+
+        .month-tab { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        .month-tab:hover { transform: translateY(-2px); }
+        .month-tab.active { background: white; border-color: #8b5cf6; color: #4f46e5; box-shadow: 0 10px 15px -3px rgba(139, 92, 246, 0.2); z-index: 10; }
+
+        @media print {
+            @page { margin: 15mm; size: A4 portrait; }
+            body, html, #root, .h-screen, .flex, .overflow-hidden, .overflow-y-auto { 
+                display: block !important; height: auto !important; overflow: visible !important; background: white !important;
+            }
+            .no-print, aside, nav, header { display: none !important; }
+            main { display: block !important; width: 100% !important; height: auto !important; background: white !important; padding: 0 !important; }
+            .print-break-inside-avoid { break-inside: avoid !important; page-break-inside: avoid !important; }
+            * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+        }
+    </style>
+</head>
+<body>
+    <div id="root" class="h-screen flex flex-col"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // OGROMNA BAZA ŚWIĄT NIETYPOWYCH (Polskie Standardy Szkolne)
+        const HOLIDAYS = {
+            9: [ { day: 15, name: "Międzynarodowy Dzień Kropki", desc: "Święto kreatywności i odkrywania talentów", icon: "ph-circle" }, { day: 20, name: "Ogólnopolski Dzień Przedszkolaka", desc: "Zabawy i integracja grupy", icon: "ph-baby" }, { day: 28, name: "Światowy Dzień Jabłka", desc: "Zdrowe odżywianie i dary jesieni", icon: "ph-apple-logo" }, { day: 30, name: "Dzień Chłopaka", desc: "Święto chłopaków w klasie", icon: "ph-baseball" } ],
+            10: [ { day: 4, name: "Światowy Dzień Zwierząt", desc: "Edukacja o empatii i szacunku do zwierząt", icon: "ph-paw-print" }, { day: 9, name: "Dzień Znaczka Pocztowego", desc: "Poczta, listy i projektowanie znaczków", icon: "ph-envelope" }, { day: 10, name: "Święto Drzewa", desc: "Edukacja ekologiczna i dary lasu", icon: "ph-tree" }, { day: 15, name: "Dzień Czystych Rąk", desc: "Higiena i dbanie o zdrowie", icon: "ph-drop" } ],
+            11: [ { day: 5, name: "Dzień Postaci z Bajek", desc: "Królewny, smoki i superbohaterowie", icon: "ph-crown" }, { day: 10, name: "Dzień Jeża", desc: "Zimowy sen zwierząt i jesienne liście", icon: "ph-bug" }, { day: 20, name: "Ogólnopolski Dzień Praw Dziecka", desc: "Edukacja obywatelska od najmłodszych lat", icon: "ph-scales" }, { day: 25, name: "Światowy Dzień Pluszowego Misia", desc: "Przynosimy misie do szkoły/przedszkola", icon: "ph-heart" } ],
+            12: [ { day: 4, name: "Dzień Górnika (Barbórka)", desc: "Węgiel, kopalnie i Śląsk", icon: "ph-pickaxe" }, { day: 15, name: "Międzynarodowy Dzień Herbaty", desc: "Zimowa rozgrzewka i zapachy", icon: "ph-coffee" }, { day: 20, name: "Dzień Ryby", desc: "Morskie głębiny i wodne zwierzęta", icon: "ph-fish" } ],
+            1: [ { day: 18, name: "Dzień Kubusia Puchatka", desc: "Przyjaźń, miodek i Stumilowy Las", icon: "ph-book-open-text" }, { day: 20, name: "Dzień Pingwina", desc: "Zwierzęta egzotyczne i zabawy zimowe", icon: "ph-thermometer-cold" }, { day: 28, name: "Międzynarodowy Dzień Klocków Lego", desc: "Budowanie, architektura i mała motoryka", icon: "ph-squares-four" }, { day: 31, name: "Dzień Zebry", desc: "Czarno-białe kontrasty i sawanna", icon: "ph-barcode" } ],
+            2: [ { day: 9, name: "Międzynarodowy Dzień Pizzy", desc: "Włoska kuchnia, sensoryka i kształty", icon: "ph-pizza" }, { day: 17, name: "Światowy Dzień Kota", desc: "Puszyste mruczki, kocie ruchy", icon: "ph-cat" }, { day: 26, name: "Dzień Dinozaura", desc: "Paleontologia, wykopaliska i giganty", icon: "ph-bone" } ],
+            3: [ { day: 14, name: "Dzień Motyla", desc: "Cykl życia, symetria i kolory", icon: "ph-butterfly" }, { day: 21, name: "Dzień Kolorowej Skarpetki", desc: "Światowy Dzień Zespołu Downa (Akceptacja)", icon: "ph-sneaker" }, { day: 22, name: "Światowy Dzień Wody", desc: "Eksperymenty i ekologia", icon: "ph-drop" } ],
+            4: [ { day: 2, name: "Światowy Dzień Świadomości Autyzmu", desc: "Na niebiesko dla autyzmu - Integracja", icon: "ph-puzzle-piece" }, { day: 4, name: "Dzień Marchewki", desc: "Zdrowie, witaminy i warzywa", icon: "ph-carrot" }, { day: 12, name: "Dzień Czekolady", desc: "Sensoryka, smaki i kuchnia", icon: "ph-cookie" }, { day: 22, name: "Międzynarodowy Dzień Ziemi", desc: "Recykling, planeta i ekologia", icon: "ph-globe-hemisphere-green" } ],
+            5: [ { day: 4, name: "Dzień Strażaka", desc: "Zawody ratunkowe i numery alarmowe", icon: "ph-fire" }, { day: 15, name: "Dzień Niezapominajki", desc: "Polska przyroda i pamięć o środowisku", icon: "ph-flower" }, { day: 20, name: "Światowy Dzień Pszczół", desc: "Zapylacze, łąka i plaster miodu", icon: "ph-hexagon" }, { day: 24, name: "Dzień Ślimaka", desc: "Spowolnienie, uważność i przyroda", icon: "ph-spiral" } ],
+            6: [ { day: 1, name: "Międzynarodowy Dzień Dziecka", desc: "Zabawa, prawa dzieci i uśmiech", icon: "ph-balloons" }, { day: 8, name: "Światowy Dzień Oceanów", desc: "Woda, żegluga i zwierzęta morskie", icon: "ph-waves" }, { day: 21, name: "Światowy Dzień Żyrafy", desc: "Najwyższe zwierzęta i Afryka", icon: "ph-arrows-out-line-vertical" } ]
+        };
+
+        const MONTHS = [
+            { id: 9, name: "Wrzesień" }, { id: 10, name: "Październik" }, { id: 11, name: "Listopad" }, { id: 12, name: "Grudzień" },
+            { id: 1, name: "Styczeń" }, { id: 2, name: "Luty" }, { id: 3, name: "Marzec" }, { id: 4, name: "Kwiecień" },
+            { id: 5, name: "Maj" }, { id: 6, name: "Czerwiec" }
+        ];
+
+        const parseAIResponse = (aiOutput) => {
+            let text = String(aiOutput?.text || aiOutput?.response || aiOutput?.content || aiOutput || "").trim();
+            text = text.replace(/```json/gi, '').replace(/```/g, '').trim();
+            try {
+                const startObj = text.indexOf('{');
+                const endObj = text.lastIndexOf('}');
+                if (startObj !== -1 && endObj !== -1 && startObj < endObj) {
+                    let jsonStr = text.substring(startObj, endObj + 1);
+                    return JSON.parse(jsonStr.replace(/,\s*([\]}])/g, '$1'));
+                }
+                throw new Error("Brak nawiasów JSON.");
+            } catch (e) {
+                throw new Error("BŁĄD Z SERWERA: Niepoprawny format dokumentu. Spróbuj ponownie.");
+            }
+        };
+
+        const fetchTextAI = async (prompt, systemInstruction) => {
+            const finalPrompt = `INSTRUKCJA: Zwróć DOKŁADNIE i WYŁĄCZNIE czysty kod JSON. Nie używaj znaczników markdown.\n\n${systemInstruction}\n\nZADANIE:\n${prompt}`;
+            try {
+                const res = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt: finalPrompt, system: systemInstruction, format: "json" })
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    return data.text || data.response || data.content || data;
+                } else {
+                    throw new Error(`Błąd API Text`);
+                }
+            } catch(e) { throw new Error("Brak połączenia z AI. " + e.message); }
+        };
+
+        function App() {
+            const [user, setUser] = useState(null);
+            const [isPremium, setIsPremium] = useState(false);
+            const [premiumCode, setPremiumCode] = useState('');
+            const [aiGenerations, setAiGenerations] = useState(0);
+            const [message, setMessage] = useState(null);
+            
+            const [activeMonth, setActiveMonth] = useState(9); // Start na wrześniu
+            const [selectedHoliday, setSelectedHoliday] = useState(null); // Gdy wybrano święto - odpalamy kreator
+            const [isGenerating, setIsGenerating] = useState(false);
+            const [resultData, setResultData] = useState(null);
+
+            // Formularz parametrów
+            const [ageGroup, setAgeGroup] = useState('Przedszkole (Starszaki)');
+            const [speNeeds, setSpeNeeds] = useState('Brak specjalnych dostosowań');
+            const [timeLimit, setTimeLimit] = useState('Pełne zajęcia (ok. 45 min)');
+
+            useEffect(() => {
+                const initDb = () => {
+                    if (typeof window !== 'undefined' && window.EduBoxCore && window.EduBoxCore.init) {
+                        window.EduBoxCore.init((u) => setUser(u));
+                    } else { setTimeout(initDb, 100); }
+                };
+                initDb();
+                
+                try {
+                    const savedGens = window.localStorage.getItem('edubox_edukalendarz_ai');
+                    if (savedGens) setAiGenerations(parseInt(savedGens));
+                    const savedPremium = window.localStorage.getItem('edubox_premium');
+                    if (savedPremium === 'KAWA2024') setIsPremium(true);
+                } catch (e) {}
+            }, []);
+
+            const showMessage = (text, type = 'success') => {
+                setMessage({ text, type });
+                setTimeout(() => setMessage(null), 4000);
+            };
+
+            const handlePremiumCheck = () => {
+                if (premiumCode.toUpperCase() === 'KAWA2024') {
+                    setIsPremium(true); 
+                    try { window.localStorage.setItem('edubox_premium', 'KAWA2024'); } catch(e){}
+                    setPremiumCode('');
+                    showMessage('Kod Premium zaakceptowany!', 'success');
+                } else { showMessage('Nieprawidłowy kod', 'error'); }
+            };
+
+            const handleHolidaySelect = (holiday) => {
+                setSelectedHoliday(holiday);
+                setResultData(null);
+            };
+
+            const generateLessonPlan = async () => {
+                if (!selectedHoliday) return;
+                if (!isPremium && aiGenerations >= 3) { showMessage('Limit darmowych generacji wyczerpany. Wpisz kod KAWA2024.', 'error'); return; }
+                
+                setIsGenerating(true);
+                setResultData(null);
+                
+                const sysPrompt = `Jesteś kreatywnym pedagogiem i mistrzem edukacji "Zero-Prep".
+                Twoim zadaniem jest stworzenie błyskawicznego, angażującego scenariusza zajęć na święto nietypowe, bez konieczności drukowania kart czy długich przygotowań materiałów.
+                
+                Zwróć wynik w formacie JSON z następującą strukturą:
+                {
+                  "intro": "Wstęp i zaciekawienie (krótka opowieść lub zagadka)",
+                  "activities": [
+                    { "name": "Nazwa zabawy 1 (Ruchowa)", "desc": "Opis jak grać w 2-3 zdaniach..." },
+                    { "name": "Nazwa zabawy 2 (Dydaktyczna/Sensoryczna)", "desc": "Opis jak grać..." }
+                  ],
+                  "art": "Szybka praca plastyczna lub techniczna (z materiałów dostępnych w każdej sali, np. papier, nożyczki, bibuła)",
+                  "summary": "Podsumowanie i ewaluacja (Krótkie zadanie na koniec)"
+                }`;
+
+                const prompt = `Święto: ${selectedHoliday.name}. \nGrupa wiekowa: ${ageGroup}. \nDostosowania SPE: ${speNeeds}. \nCzas trwania: ${timeLimit}. Zbuduj niesamowite zajęcia.`;
+
+                try {
+                    const aiText = await fetchTextAI(prompt, sysPrompt);
+                    const parsedJson = parseAIResponse(aiText);
+                    
+                    setResultData(parsedJson);
+                    
+                    if (!isPremium) {
+                        const newCount = aiGenerations + 1;
+                        setAiGenerations(newCount);
+                        try { window.localStorage.setItem('edubox_edukalendarz_ai', newCount.toString()); } catch(e){}
+                    }
+                } catch (error) {
+                    showMessage(error.message, 'error');
+                } finally {
+                    setIsGenerating(false);
+                }
+            };
+
+            return (
+                <div className="flex h-screen w-full bg-slate-100 text-slate-800 overflow-hidden relative selection:bg-purple-500/30">
+
+                    {message && (
+                        <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 px-6 py-3 rounded-full text-sm font-bold shadow-2xl flex items-center gap-2 animate-bounce ${message.type === 'error' ? 'bg-red-500 text-white' : 'bg-emerald-500 text-white'} no-print`}>
+                            <i className={`ph-bold ${message.type === 'error' ? 'ph-warning-circle' : 'ph-check-circle'} text-lg`}></i> {message.text}
+                        </div>
+                    )}
+
+                    <aside className="w-[380px] flex-shrink-0 bg-white border-r border-slate-200 flex flex-col h-full z-10 shadow-2xl no-print">
+                        <div className="p-6 border-b border-slate-100 flex items-center gap-4 bg-slate-50">
+                            <div className="w-12 h-12 bg-gradient-to-br from-violet-500 to-fuchsia-600 rounded-xl flex items-center justify-center shadow-lg shadow-violet-500/20 shrink-0">
+                                <i className="ph-bold ph-calendar-star text-white text-2xl"></i>
+                            </div>
+                            <div>
+                                <h1 className="text-xl font-display font-black tracking-tight text-slate-800 leading-none">EduKalendarz</h1>
+                                <p className="text-[10px] text-violet-600 font-bold tracking-wider uppercase mt-1">Święta Nietypowe</p>
+                            </div>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto custom-scrollbar p-5 space-y-6">
+                            
+                            {!selectedHoliday ? (
+                                <div className="space-y-4">
+                                    <div className="bg-violet-50/50 border border-violet-100 p-4 rounded-2xl">
+                                        <p className="text-xs text-violet-800 leading-relaxed font-medium">
+                                            <i className="ph-fill ph-info text-violet-500 mr-1 text-lg align-middle"></i>
+                                            Wybierz miesiąc i kliknij w wybrane Święto Nietypowe, aby wygenerować błyskawiczny scenariusz zajęć!
+                                        </p>
+                                    </div>
+                                    
+                                    <div className="grid grid-cols-2 gap-2">
+                                        {MONTHS.map(m => (
+                                            <button 
+                                                key={m.id} 
+                                                onClick={() => setActiveMonth(m.id)}
+                                                className={`month-tab py-3 px-2 rounded-xl text-xs font-bold border transition-colors ${activeMonth === m.id ? 'active' : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100'}`}
+                                            >
+                                                {m.name}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="space-y-6 animate-[reveal_0.2s_ease-out]">
+                                    <button onClick={() => setSelectedHoliday(null)} className="text-xs font-bold text-slate-500 hover:text-violet-600 flex items-center gap-1 transition-colors">
+                                        <i className="ph-bold ph-arrow-left"></i> Powrót do Kalendarza
+                                    </button>
+
+                                    <div className="bg-gradient-to-br from-violet-600 to-fuchsia-600 rounded-2xl p-6 text-white text-center shadow-lg relative overflow-hidden">
+                                        <i className={`ph-fill ${selectedHoliday.icon} text-6xl opacity-20 absolute -right-4 -bottom-4`}></i>
+                                        <p className="text-[10px] font-bold uppercase tracking-widest text-violet-200 mb-1">{selectedHoliday.day} {MONTHS.find(m=>m.id === activeMonth)?.name}</p>
+                                        <h2 className="text-2xl font-display font-black leading-tight mb-2 relative z-10">{selectedHoliday.name}</h2>
+                                    </div>
+
+                                    <div className="space-y-4">
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1"><i className="ph-bold ph-users text-violet-400"></i> Grupa docelowa</label>
+                                            <select value={ageGroup} onChange={e => setAgeGroup(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm font-semibold text-slate-700 focus:border-violet-500 outline-none shadow-sm cursor-pointer">
+                                                <option>Przedszkole (Młodsze)</option>
+                                                <option>Przedszkole (Starszaki / Zerówka)</option>
+                                                <option>Edukacja Wczesnoszkolna (1-3)</option>
+                                                <option>Świetlica Szkolna</option>
+                                            </select>
+                                        </div>
+
+                                        <div className="space-y-1.5 bg-rose-50 p-3 rounded-xl border border-rose-100">
+                                            <label className="text-[10px] font-bold text-rose-600 uppercase tracking-widest flex items-center gap-1"><i className="ph-bold ph-wheelchair"></i> Potrzeby SPE</label>
+                                            <select value={speNeeds} onChange={e => setSpeNeeds(e.target.value)} className="w-full bg-white border border-rose-200 rounded-lg p-2.5 text-xs font-semibold text-rose-800 focus:border-rose-400 outline-none cursor-pointer">
+                                                <option>Brak (Grupa standardowa)</option>
+                                                <option>Wyciszenie (Grupa przebodźcowana / SI)</option>
+                                                <option>Spektrum Autyzmu (Więcej przewidywalności)</option>
+                                                <option>ADHD (Dużo ruchu i zmian)</option>
+                                            </select>
+                                        </div>
+
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Czas trwania</label>
+                                            <select value={timeLimit} onChange={e => setTimeLimit(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs font-semibold text-slate-700 focus:border-violet-500 outline-none shadow-sm cursor-pointer">
+                                                <option>Szybki przerywnik (15 min)</option>
+                                                <option>Pełne zajęcia (ok. 45 min)</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <button onClick={generateLessonPlan} disabled={isGenerating} className="w-full bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-700 hover:to-fuchsia-700 text-white font-black py-4 rounded-xl shadow-[0_10px_20px_-10px_rgba(139,92,246,0.5)] transition-all flex flex-col items-center justify-center gap-1 disabled:opacity-50 min-h-[70px]">
+                                        {isGenerating ? (
+                                            <><i className="ph-bold ph-spinner animate-spin text-2xl"></i><span className="text-xs">Komponowanie zajęć...</span></>
+                                        ) : (
+                                            <span className="flex items-center gap-2"><i className="ph-bold ph-magic-wand text-2xl"></i> Twórz Zajęcia (Zero-Prep)</span>
+                                        )}
+                                    </button>
+                                </div>
+                            )}
+
+                        </div>
+
+                        <div className="p-4 border-t border-slate-200 bg-slate-50">
+                            {!isPremium ? (
+                                <div className="space-y-2 mb-2">
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-[10px] font-bold text-slate-500 uppercase">Status PRO</span>
+                                        <span className="text-[10px] font-bold text-violet-600 bg-violet-100 px-2 py-0.5 rounded-full">{3 - aiGenerations} darmowe</span>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <input type="text" value={premiumCode} onChange={(e) => setPremiumCode(e.target.value)} placeholder="Kod Premium" className="flex-1 bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs text-slate-800 focus:border-violet-500 uppercase" />
+                                        <button onClick={handlePremiumCheck} className="bg-slate-800 hover:bg-slate-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-all">OK</button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="flex items-center gap-3 bg-gradient-to-r from-violet-50 to-fuchsia-50 border border-violet-200 p-3 rounded-xl mb-2">
+                                    <i className="ph-fill ph-crown text-2xl text-violet-500"></i>
+                                    <div><p className="text-xs font-bold text-violet-900">Wersja PRO MAX</p><p className="text-[9px] text-violet-700">Wszystkie limity odblokowane</p></div>
+                                </div>
+                            )}
+                        </div>
+                    </aside>
+
+                    <main className="flex-1 flex flex-col relative z-0 overflow-hidden app-bg">
+                        <div className="flex-1 overflow-y-auto custom-scrollbar p-6 lg:p-12 relative">
+                            
+                            {/* WIDOK: LISTA ŚWIĄT W MIESIĄCU */}
+                            {!selectedHoliday && (
+                                <div className="max-w-4xl mx-auto animate-[reveal_0.3s_ease-out]">
+                                    <div className="flex items-center justify-between mb-8 pb-4 border-b border-slate-300">
+                                        <div>
+                                            <h2 className="text-3xl font-display font-black text-slate-800">{MONTHS.find(m=>m.id === activeMonth)?.name}</h2>
+                                            <p className="text-sm font-medium text-slate-500 mt-1">Najciekawsze święta nietypowe w tym miesiącu</p>
+                                        </div>
+                                        <i className="ph-fill ph-calendar text-4xl text-slate-300"></i>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                        {HOLIDAYS[activeMonth]?.map((h, i) => (
+                                            <div key={i} onClick={() => handleHolidaySelect(h)} className="bg-white border border-slate-200 hover:border-violet-400 rounded-2xl p-5 shadow-sm hover:shadow-lg transition-all cursor-pointer group flex items-center gap-5">
+                                                <div className="w-16 h-16 rounded-2xl bg-violet-50 text-violet-600 flex flex-col items-center justify-center shrink-0 border border-violet-100 group-hover:scale-105 transition-transform">
+                                                    <span className="text-[10px] font-black uppercase mb-[-4px]">Dzień</span>
+                                                    <span className="text-2xl font-display font-black">{h.day}</span>
+                                                </div>
+                                                <div className="flex-1">
+                                                    <h3 className="text-lg font-black text-slate-800 group-hover:text-violet-600 transition-colors leading-tight mb-1">{h.name}</h3>
+                                                    <p className="text-xs text-slate-500 leading-snug">{h.desc}</p>
+                                                </div>
+                                                <i className="ph-bold ph-caret-right text-slate-300 group-hover:text-violet-500 text-xl"></i>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    {(!HOLIDAYS[activeMonth] || HOLIDAYS[activeMonth].length === 0) && (
+                                        <div className="text-center py-20 text-slate-400">
+                                            <i className="ph-fill ph-coffee text-5xl mb-4"></i>
+                                            <p>W tym miesiącu EduKalendarz proponuje przerwę!</p>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* WIDOK: ŁADOWANIE */}
+                            {isGenerating && (
+                                <div className="h-full flex flex-col items-center justify-center max-w-md mx-auto text-center">
+                                    <div className="w-24 h-24 bg-white rounded-3xl shadow-xl flex items-center justify-center mb-6 animate-pulse">
+                                        <i className="ph-fill ph-sparkle text-5xl text-violet-500"></i>
+                                    </div>
+                                    <h2 className="text-xl font-bold text-slate-800 mb-2 font-display">Magia w toku...</h2>
+                                    <p className="text-violet-600 font-medium text-sm animate-pulse">Projektujemy wciągające zabawy na {selectedHoliday.name} bez kserowania i wycinania!</p>
+                                </div>
+                            )}
+
+                            {/* WIDOK: WYNIK (SCENARIUSZ + EKOSYSTEM) */}
+                            {resultData && !isGenerating && (
+                                <div className="max-w-3xl mx-auto pb-20 animate-[reveal_0.4s_ease-out]">
+                                    
+                                    {/* Górny panel scenariusza */}
+                                    <div className="bg-white rounded-[2rem] shadow-xl border border-slate-200 overflow-hidden mb-8 print-break-inside-avoid">
+                                        <div className="bg-slate-900 text-white p-8 relative overflow-hidden">
+                                            <div className="absolute top-[-50px] right-[-50px] w-48 h-48 bg-violet-500 rounded-full mix-blend-multiply filter blur-3xl opacity-50"></div>
+                                            <div className="relative z-10">
+                                                <div className="inline-block px-3 py-1 bg-white/20 backdrop-blur-md rounded-full text-[10px] font-black tracking-widest uppercase mb-3">Scenariusz EduBox Zero-Prep</div>
+                                                <h1 className="text-4xl font-display font-black leading-tight mb-2">{selectedHoliday.name}</h1>
+                                                <div className="flex gap-4 text-sm font-medium text-slate-300">
+                                                    <span><i className="ph-fill ph-users"></i> {ageGroup}</span>
+                                                    <span><i className="ph-fill ph-clock"></i> {timeLimit}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="p-8 space-y-8">
+                                            {/* Wstęp */}
+                                            <div>
+                                                <h3 className="text-xs font-black text-violet-600 uppercase tracking-widest mb-3 flex items-center gap-2"><i className="ph-fill ph-microphone-stage text-lg"></i> Wstęp i Zaciekawienie</h3>
+                                                <p className="text-slate-700 leading-relaxed font-medium bg-slate-50 p-5 rounded-2xl border border-slate-100">{resultData.intro}</p>
+                                            </div>
+
+                                            {/* Zabawy */}
+                                            <div>
+                                                <h3 className="text-xs font-black text-emerald-600 uppercase tracking-widest mb-4 flex items-center gap-2"><i className="ph-fill ph-game-controller text-lg"></i> Zabawy i Aktywności</h3>
+                                                <div className="space-y-4">
+                                                    {resultData.activities.map((act, i) => (
+                                                        <div key={i} className="flex gap-4 items-start">
+                                                            <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center font-black shrink-0 mt-1">{i+1}</div>
+                                                            <div>
+                                                                <h4 className="font-bold text-slate-800 mb-1">{act.name}</h4>
+                                                                <p className="text-sm text-slate-600 leading-relaxed">{act.desc}</p>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            {/* Plastyka */}
+                                            <div>
+                                                <h3 className="text-xs font-black text-amber-500 uppercase tracking-widest mb-3 flex items-center gap-2"><i className="ph-fill ph-palette text-lg"></i> Praca Plastyczna (Z tego co jest)</h3>
+                                                <p className="text-slate-700 leading-relaxed text-sm bg-amber-50 p-4 rounded-xl border border-amber-100">{resultData.art}</p>
+                                            </div>
+
+                                            {/* Podsumowanie */}
+                                            <div>
+                                                <h3 className="text-xs font-black text-blue-500 uppercase tracking-widest mb-3 flex items-center gap-2"><i className="ph-fill ph-flag-checkered text-lg"></i> Ewaluacja</h3>
+                                                <p className="text-slate-700 leading-relaxed text-sm border-l-4 border-blue-400 pl-4">{resultData.summary}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* MAGIA INTEGRACJI EDUBOX: Panel Rekomendacji! */}
+                                    <div className="no-print">
+                                        <div className="text-center mb-6 mt-12">
+                                            <h3 className="text-xl font-display font-black text-slate-800">Uzupełnij zajęcia z ekosystemem EduBox!</h3>
+                                            <p className="text-sm text-slate-500">Użyj innych aplikacji, aby w 2 minuty stworzyć dodatkowe materiały na <strong>{selectedHoliday.name}</strong>.</p>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            {/* Rekomendacja 1: Dyplomy */}
+                                            <a href="edudyplomy.html" target="_blank" className="bg-white border border-slate-200 rounded-2xl p-5 flex items-center gap-4 hover:border-rose-400 hover:shadow-md transition-all group">
+                                                <div className="w-12 h-12 bg-rose-50 text-rose-500 rounded-xl flex items-center justify-center text-2xl group-hover:bg-rose-500 group-hover:text-white transition-colors"><i className="ph-fill ph-medal"></i></div>
+                                                <div className="flex-1">
+                                                    <h4 className="font-bold text-slate-800 text-sm mb-0.5">EduDyplomy AI</h4>
+                                                    <p className="text-xs text-slate-500">Wygeneruj śmieszne, rymowane dyplomy dla klasy za udział w {selectedHoliday.name}.</p>
+                                                </div>
+                                            </a>
+
+                                            {/* Rekomendacja 2: MagicLetters */}
+                                            <a href="magicletters.html" target="_blank" className="bg-white border border-slate-200 rounded-2xl p-5 flex items-center gap-4 hover:border-purple-400 hover:shadow-md transition-all group">
+                                                <div className="w-12 h-12 bg-purple-50 text-purple-500 rounded-xl flex items-center justify-center text-2xl group-hover:bg-purple-500 group-hover:text-white transition-colors"><i className="ph-fill ph-text-aa"></i></div>
+                                                <div className="flex-1">
+                                                    <h4 className="font-bold text-slate-800 text-sm mb-0.5">MagicLetters PRO</h4>
+                                                    <p className="text-xs text-slate-500">Stwórz piękną, kolorową girlandę z napisem na tablicę korkową.</p>
+                                                </div>
+                                            </a>
+
+                                            {/* Rekomendacja 3: Prezentacje */}
+                                            <a href="eduprezentacja.html" target="_blank" className="bg-white border border-slate-200 rounded-2xl p-5 flex items-center gap-4 hover:border-blue-400 hover:shadow-md transition-all group">
+                                                <div className="w-12 h-12 bg-blue-50 text-blue-500 rounded-xl flex items-center justify-center text-2xl group-hover:bg-blue-500 group-hover:text-white transition-colors"><i className="ph-fill ph-projector-screen-chart"></i></div>
+                                                <div className="flex-1">
+                                                    <h4 className="font-bold text-slate-800 text-sm mb-0.5">EduPrezentacja</h4>
+                                                    <p className="text-xs text-slate-500">Wygeneruj gotowy pokaz slajdów na ekran interaktywny o dzisiejszym święcie.</p>
+                                                </div>
+                                            </a>
+
+                                            {/* Rekomendacja 4: Fiszki / Dobble */}
+                                            <a href="edubystrzak.html" target="_blank" className="bg-white border border-slate-200 rounded-2xl p-5 flex items-center gap-4 hover:border-amber-400 hover:shadow-md transition-all group">
+                                                <div className="w-12 h-12 bg-amber-50 text-amber-500 rounded-xl flex items-center justify-center text-2xl group-hover:bg-amber-500 group-hover:text-white transition-colors"><i className="ph-fill ph-lightning"></i></div>
+                                                <div className="flex-1">
+                                                    <h4 className="font-bold text-slate-800 text-sm mb-0.5">EduBystrzak (Dobble)</h4>
+                                                    <p className="text-xs text-slate-500">Stwórz z AI tematyczne karty do gry na spostrzegawczość.</p>
+                                                </div>
+                                            </a>
+                                        </div>
+
+                                        <div className="mt-8 text-center">
+                                            <button onClick={() => window.print()} className="bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 px-8 rounded-xl shadow-lg transition-all inline-flex items-center gap-2">
+                                                <i className="ph-bold ph-printer text-xl"></i> Wydrukuj ten scenariusz
+                                            </button>
+                                        </div>
+                                    </div>
+                                    
+                                </div>
+                            )}
+
+                        </div>
+                    </main>
+
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
