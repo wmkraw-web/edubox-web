@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduBox V3 PRO MAX - EduPDF Edytor</title>
+
+    <!-- React & Babel -->
+    <script src="https://unpkg.com/react@18.2.0/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone@7.23.6/babel.min.js"></script>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    
+    <!-- Biblioteki PDF (Kluczowe dla tej aplikacji) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+    <!-- Piękne, urzędowe i odręczne czcionki -->
+    <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,600;1,600&family=Roboto+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+
+    <!-- WBUDOWANA BAZA DANYCH (Zabezpieczenie przed błędami plików lokalnych) -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        const FIREBASE_CONFIG = {
+            apiKey: "AIzaSyDL_mvepNJjMmZYQzifN2cXzoKwCE8jNd0",
+            authDomain: "edubox-pro.firebaseapp.com",
+            projectId: "edubox-pro",
+            storageBucket: "edubox-pro.firebasestorage.app",
+            messagingSenderId: "570263845714",
+            appId: "1:570263845714:web:0b029211f7af071b66988b"
+        };
+        const APP_ID = "eduboxpro";
+
+        let app, auth, db;
+        try {
+            app = initializeApp(FIREBASE_CONFIG);
+            auth = getAuth(app);
+            db = getFirestore(app);
+        } catch (e) { console.warn("Firebase init failed", e); }
+
+        window.EduBoxCore = {
+            user: null,
+            init: (callback) => {
+                if (!auth) return;
+                signInAnonymously(auth).catch(e => console.error(e));
+                onAuthStateChanged(auth, (user) => {
+                    window.EduBoxCore.user = user;
+                    if(callback) callback(user);
+                });
+            }
+        };
+    </script>
+
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; color: #0f172a; overflow: hidden; }
+        
+        .custom-scrollbar::-webkit-scrollbar { width: 8px; height: 8px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        
+        /* Tło aplikacji */
+        .app-bg {
+            background-color: #f8fafc;
+            background-image: radial-gradient(#e2e8f0 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+
+        /* Klasy edytora */
+        .pdf-element { position: absolute; pointer-events: auto; }
+        .pdf-element:hover { outline: 2px dashed rgba(59, 130, 246, 0.5); }
+        .pdf-element.selected { outline: 2px dashed #3b82f6; z-index: 50; }
+        
+        /* Ukrywanie elementu drag na tekście wewnątrz aby przesunąć kontener */
+        .no-select { user-select: none; -webkit-user-select: none; }
+        
+        /* Zapobieganie znikaniu textarea */
+        textarea.element-textarea {
+            background: transparent; border: none; outline: none; resize: none; overflow: hidden;
+            width: 100%; height: 100%; display: block;
+        }
+    </style>
+</head>
+<body>
+    <div id="root" class="h-screen flex flex-col"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // Inicjalizacja workera PDF.js
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+        // Konfiguracja stałej szerokości kanwy dla wygody skalowania
+        const RENDER_WIDTH = 800;
+
+        function App() {
+            const [user, setUser] = useState(null);
+            const [pages, setPages] = useState([]); // { id, type, imgData, width, height, elements: [] }
+            const [activePageIdx, setActivePageIdx] = useState(0);
+            
+            const [isLoading, setIsLoading] = useState(false);
+            const [loadingMsg, setLoadingMsg] = useState('');
+            const [message, setMessage] = useState(null);
+            
+            const [selectedElementId, setSelectedElementId] = useState(null);
+            const [zoom, setZoom] = useState(1);
+            
+            // Drag & Drop State
+            const [dragState, setDragState] = useState(null);
+            
+            const containerRef = useRef(null);
+            const fileInputRef = useRef(null);
+
+            useEffect(() => {
+                if (window.EduBoxCore && window.EduBoxCore.init) {
+                    window.EduBoxCore.init((u) => setUser(u));
+                }
+            }, []);
+
+            const showMessage = (text, type = 'success') => {
+                setMessage({ text, type });
+                setTimeout(() => setMessage(null), 4000);
+            };
+
+            // --- OBSŁUGA PLIKU PDF ---
+            const handleFileUpload = async (e) => {
+                const file = e.target.files[0];
+                if (!file || file.type !== 'application/pdf') {
+                    showMessage('Proszę wgrać plik PDF.', 'error');
+                    return;
+                }
+
+                setIsLoading(true);
+                setLoadingMsg('Konwertowanie PDF na płótno edytora...');
+
+                try {
+                    const arrayBuffer = await file.arrayBuffer();
+                    const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+                    
+                    const newPages = [];
+                    for (let i = 1; i <= pdf.numPages; i++) {
+                        const page = await pdf.getPage(i);
+                        // Pobieramy viewport, obliczamy scale by szerokość wynosiła RENDER_WIDTH
+                        const unscaledViewport = page.getViewport({ scale: 1.0 });
+                        const scale = RENDER_WIDTH / unscaledViewport.width;
+                        const viewport = page.getViewport({ scale: scale * 2 }); // x2 dla ostrości (Retina)
+
+                        const canvas = document.createElement('canvas');
+                        const ctx = canvas.getContext('2d');
+                        canvas.width = viewport.width;
+                        canvas.height = viewport.height;
+
+                        await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+                        
+                        newPages.push({
+                            id: `page_${Date.now()}_${i}`,
+                            type: 'pdf',
+                            imgData: canvas.toDataURL('image/jpeg', 0.9), // Wysoka jakość JPEG
+                            width: RENDER_WIDTH,
+                            height: unscaledViewport.height * scale, // Proporcjonalna wysokość
+                            elements: []
+                        });
+                    }
+
+                    setPages(newPages);
+                    setActivePageIdx(0);
+                    setSelectedElementId(null);
+                    showMessage('Dokument wczytany pomyślnie!');
+                } catch (error) {
+                    console.error(error);
+                    showMessage('Błąd odczytu pliku PDF. Spróbuj inny plik.', 'error');
+                } finally {
+                    setIsLoading(false);
+                    e.target.value = null; // Reset inputa
+                }
+            };
+
+            const addBlankPage = () => {
+                const heightA4 = RENDER_WIDTH * 1.4142; // Proporcja A4
+                const newPage = {
+                    id: `page_${Date.now()}_blank`,
+                    type: 'blank',
+                    imgData: null,
+                    width: RENDER_WIDTH,
+                    height: heightA4,
+                    elements: []
+                };
+                setPages([...pages, newPage]);
+                setActivePageIdx(pages.length); // Przejdź do nowej strony
+                setSelectedElementId(null);
+                showMessage('Dodano pustą stronę!');
+            };
+
+            const deleteCurrentPage = () => {
+                if (pages.length <= 1) {
+                    setPages([]);
+                    setActivePageIdx(0);
+                    return;
+                }
+                const newPages = pages.filter((_, i) => i !== activePageIdx);
+                setPages(newPages);
+                setActivePageIdx(Math.max(0, activePageIdx - 1));
+                setSelectedElementId(null);
+            };
+
+            // --- ZARZĄDZANIE ELEMENTAMI (TEKST / KOREKTOR) ---
+            const addElement = (type) => {
+                if (pages.length === 0) return;
+                
+                const newElement = {
+                    id: `el_${Date.now()}`,
+                    type: type,
+                    x: 100, // Początkowa pozycja
+                    y: 100,
+                    // Parametry tekstu
+                    content: type === 'text' ? 'Twój nowy tekst...' : '',
+                    fontSize: 24,
+                    color: '#000000',
+                    fontFamily: "'Inter', sans-serif",
+                    fontWeight: '400',
+                    // Parametry korektora
+                    width: type === 'whiteout' ? 200 : null,
+                    height: type === 'whiteout' ? 50 : null
+                };
+
+                const updatedPages = [...pages];
+                updatedPages[activePageIdx].elements.push(newElement);
+                setPages(updatedPages);
+                setSelectedElementId(newElement.id);
+            };
+
+            const updateSelectedElement = (updates) => {
+                if (!selectedElementId || pages.length === 0) return;
+                const updatedPages = [...pages];
+                const elements = updatedPages[activePageIdx].elements;
+                const elIndex = elements.findIndex(el => el.id === selectedElementId);
+                
+                if (elIndex !== -1) {
+                    elements[elIndex] = { ...elements[elIndex], ...updates };
+                    setPages(updatedPages);
+                }
+            };
+
+            const deleteSelectedElement = () => {
+                if (!selectedElementId || pages.length === 0) return;
+                const updatedPages = [...pages];
+                updatedPages[activePageIdx].elements = updatedPages[activePageIdx].elements.filter(el => el.id !== selectedElementId);
+                setPages(updatedPages);
+                setSelectedElementId(null);
+            };
+
+            // --- DRAG & DROP LOGIC ---
+            const handlePointerDown = (e, id) => {
+                e.stopPropagation();
+                setSelectedElementId(id);
+                
+                // Zabezpieczenie przed przesuwaniem, gdy użytkownik wpisuje tekst na urządzeniu mobilnym
+                if (e.target.tagName.toLowerCase() === 'textarea') return;
+
+                const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+                const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+                
+                const element = pages[activePageIdx].elements.find(el => el.id === id);
+                if (!element) return;
+
+                setDragState({
+                    id,
+                    startX: clientX,
+                    startY: clientY,
+                    initX: element.x,
+                    initY: element.y
+                });
+            };
+
+            useEffect(() => {
+                if (!dragState) return;
+
+                const handlePointerMove = (e) => {
+                    const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+                    const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+                    
+                    // Obliczamy różnicę uwzględniając ZOOM kontenera
+                    const dx = (clientX - dragState.startX) / zoom;
+                    const dy = (clientY - dragState.startY) / zoom;
+
+                    const updatedPages = [...pages];
+                    const elements = updatedPages[activePageIdx].elements;
+                    const elIndex = elements.findIndex(el => el.id === dragState.id);
+                    
+                    if (elIndex !== -1) {
+                        elements[elIndex].x = dragState.initX + dx;
+                        elements[elIndex].y = dragState.initY + dy;
+                        setPages(updatedPages);
+                    }
+                };
+
+                const handlePointerUp = () => {
+                    setDragState(null);
+                };
+
+                window.addEventListener('mousemove', handlePointerMove);
+                window.addEventListener('mouseup', handlePointerUp);
+                window.addEventListener('touchmove', handlePointerMove, { passive: false });
+                window.addEventListener('touchend', handlePointerUp);
+
+                return () => {
+                    window.removeEventListener('mousemove', handlePointerMove);
+                    window.removeEventListener('mouseup', handlePointerUp);
+                    window.removeEventListener('touchmove', handlePointerMove);
+                    window.removeEventListener('touchend', handlePointerUp);
+                };
+            }, [dragState, pages, activePageIdx, zoom]);
+
+            // Odkliknięcie zdejmuje selekcję
+            const handleBackgroundClick = () => {
+                setSelectedElementId(null);
+            };
+
+            // --- EKSPORT DO PDF ---
+            const exportToPDF = async () => {
+                if (pages.length === 0) return;
+                
+                setIsLoading(true);
+                setLoadingMsg('Składanie dokumentu PDF. To zajmie tylko chwilkę...');
+                
+                try {
+                    const { jsPDF } = window.jspdf;
+                    const pdf = new jsPDF({ unit: 'px', format: 'a4', orientation: 'portrait' });
+                    
+                    // Szerokość A4 w jsPDF (domyślnie ~446px)
+                    const pdfWidth = pdf.internal.pageSize.getWidth();
+
+                    for (let i = 0; i < pages.length; i++) {
+                        const page = pages[i];
+                        
+                        // Obliczamy proporcjonalną wysokość strony do zapisu
+                        const ratio = page.height / page.width;
+                        const pdfHeight = pdfWidth * ratio;
+
+                        // Tworzymy tymczasowy kontener poza ekranem by idealnie sczytać go przez html2canvas
+                        const tempDiv = document.createElement('div');
+                        tempDiv.style.position = 'absolute';
+                        tempDiv.style.left = '-9999px';
+                        tempDiv.style.top = '-9999px';
+                        tempDiv.style.width = `${page.width}px`;
+                        tempDiv.style.height = `${page.height}px`;
+                        tempDiv.style.backgroundColor = 'white';
+                        
+                        if (page.type === 'pdf') {
+                            const img = document.createElement('img');
+                            img.src = page.imgData;
+                            img.style.position = 'absolute';
+                            img.style.width = '100%';
+                            img.style.height = '100%';
+                            tempDiv.appendChild(img);
+                        }
+
+                        // Renderujemy elementy
+                        page.elements.forEach(el => {
+                            const elDiv = document.createElement('div');
+                            elDiv.style.position = 'absolute';
+                            elDiv.style.left = `${el.x}px`;
+                            elDiv.style.top = `${el.y}px`;
+                            
+                            if (el.type === 'whiteout') {
+                                elDiv.style.width = `${el.width}px`;
+                                elDiv.style.height = `${el.height}px`;
+                                elDiv.style.backgroundColor = 'white';
+                            } else if (el.type === 'text') {
+                                elDiv.innerText = el.content;
+                                elDiv.style.fontSize = `${el.fontSize}px`;
+                                elDiv.style.color = el.color;
+                                elDiv.style.fontFamily = el.fontFamily;
+                                elDiv.style.fontWeight = el.fontWeight;
+                                elDiv.style.whiteSpace = 'pre-wrap';
+                                elDiv.style.lineHeight = '1.2';
+                            }
+                            tempDiv.appendChild(elDiv);
+                        });
+
+                        document.body.appendChild(tempDiv);
+
+                        // Capture do obrazu
+                        const canvas = await html2canvas(tempDiv, { scale: 2, useCORS: true, logging: false });
+                        const imgData = canvas.toDataURL('image/jpeg', 0.95);
+                        
+                        if (i > 0) pdf.addPage(); // Nowa strona (pierwsza jest domyślnie dodana)
+                        
+                        // Ustawiamy rozmiar strony PDF do rozmiaru oryginalnej kartki (aby pasowały układy pionowe/poziome)
+                        pdf.setPage(i + 1);
+                        // UWAGA: jsPDF używa pierwszych argumentów z init do wszystkich stron. 
+                        // W tej uproszczonej wersji eksportujemy jako plik portretowy A4, a obrazy dopasowują się szerokością.
+                        
+                        pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+                        
+                        document.body.removeChild(tempDiv);
+                    }
+
+                    pdf.save('EduBox_Dokument.pdf');
+                    showMessage('Zapisano pomyślnie!', 'success');
+                } catch (error) {
+                    console.error("Błąd zapisu:", error);
+                    showMessage('Wystąpił problem podczas eksportu. Spróbuj ponownie.', 'error');
+                } finally {
+                    setIsLoading(false);
+                }
+            };
+
+            const activePage = pages[activePageIdx] || null;
+            const selectedElement = activePage?.elements.find(el => el.id === selectedElementId) || null;
+
+            return (
+                <div className="flex h-screen w-full bg-slate-900 text-slate-800 overflow-hidden relative selection:bg-blue-500/30">
+                    
+                    {/* Ładowanie Overlay */}
+                    {isLoading && (
+                        <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center text-white">
+                            <i className="ph-bold ph-spinner animate-spin text-6xl mb-4 text-blue-500"></i>
+                            <h2 className="text-xl font-bold">{loadingMsg}</h2>
+                        </div>
+                    )}
+
+                    {/* Powiadomienia */}
+                    {message && (
+                        <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 px-6 py-3 rounded-full text-sm font-bold shadow-2xl flex items-center gap-2 animate-bounce ${message.type === 'error' ? 'bg-red-500 text-white' : 'bg-blue-500 text-white'}`}>
+                            <i className={`ph-bold ${message.type === 'error' ? 'ph-warning-circle' : 'ph-check-circle'} text-lg`}></i> {message.text}
+                        </div>
+                    )}
+
+                    {/* Pasek Boczny (Narzędzia) */}
+                    <aside className="w-80 flex-shrink-0 bg-white border-r border-slate-200 flex flex-col h-full z-10 shadow-xl">
+                        <div className="p-6 border-b border-slate-100 flex items-center gap-3 bg-slate-50">
+                            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20 text-white text-xl">
+                                <i className="ph-bold ph-file-pdf"></i>
+                            </div>
+                            <div>
+                                <h1 className="text-xl font-black tracking-tight text-slate-800 leading-none">EduPDF Edytor</h1>
+                                <p className="text-[10px] text-blue-600 font-bold tracking-wider uppercase mt-1">Korektor i Wypełniacz</p>
+                            </div>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto custom-scrollbar p-4 flex flex-col gap-6">
+                            
+                            {/* KROK 1: Plik */}
+                            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+                                <h3 className="text-xs font-bold text-slate-500 uppercase mb-3 flex items-center gap-2">
+                                    <span className="w-5 h-5 rounded-full bg-slate-200 flex items-center justify-center text-[10px] text-slate-600">1</span> Wgraj Dokument
+                                </h3>
+                                <button onClick={() => fileInputRef.current?.click()} className="w-full bg-white border-2 border-dashed border-blue-300 hover:border-blue-500 hover:bg-blue-50 text-blue-600 font-bold py-3 rounded-xl transition-colors flex items-center justify-center gap-2 text-sm">
+                                    <i className="ph-bold ph-upload-simple text-lg"></i> Otwórz plik PDF
+                                </button>
+                                <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept="application/pdf" className="hidden" />
+                                {pages.length > 0 && (
+                                    <div className="mt-3 flex items-center justify-between bg-white p-2 rounded-lg border border-slate-200 text-xs">
+                                        <button onClick={() => setActivePageIdx(Math.max(0, activePageIdx - 1))} disabled={activePageIdx === 0} className="p-1 hover:bg-slate-100 rounded disabled:opacity-30"><i className="ph-bold ph-caret-left"></i></button>
+                                        <span className="font-bold text-slate-600">Strona {activePageIdx + 1} z {pages.length}</span>
+                                        <button onClick={() => setActivePageIdx(Math.min(pages.length - 1, activePageIdx + 1))} disabled={activePageIdx === pages.length - 1} className="p-1 hover:bg-slate-100 rounded disabled:opacity-30"><i className="ph-bold ph-caret-right"></i></button>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* KROK 2: Narzędzia */}
+                            <div className={`bg-slate-50 border border-slate-200 rounded-2xl p-4 transition-opacity ${pages.length === 0 ? 'opacity-50 pointer-events-none' : ''}`}>
+                                <h3 className="text-xs font-bold text-slate-500 uppercase mb-3 flex items-center gap-2">
+                                    <span className="w-5 h-5 rounded-full bg-slate-200 flex items-center justify-center text-[10px] text-slate-600">2</span> Dodaj Elementy
+                                </h3>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <button onClick={() => addElement('whiteout')} className="bg-white border border-slate-200 hover:border-slate-400 text-slate-700 py-3 rounded-xl flex flex-col items-center gap-1 shadow-sm transition-all text-xs font-bold">
+                                        <div className="w-6 h-6 border-2 border-slate-300 rounded bg-white flex items-center justify-center"><i className="ph-bold ph-eraser text-slate-400"></i></div>
+                                        Zamaluj
+                                    </button>
+                                    <button onClick={() => addElement('text')} className="bg-white border border-slate-200 hover:border-blue-400 text-slate-700 hover:text-blue-600 py-3 rounded-xl flex flex-col items-center gap-1 shadow-sm transition-all text-xs font-bold">
+                                        <i className="ph-bold ph-text-t text-2xl"></i>
+                                        Napisz
+                                    </button>
+                                </div>
+                                <button onClick={addBlankPage} className="mt-2 w-full bg-white border border-slate-200 hover:border-emerald-400 text-slate-600 hover:text-emerald-600 py-2 rounded-xl transition-all flex items-center justify-center gap-2 text-xs font-bold shadow-sm">
+                                    <i className="ph-bold ph-plus-circle text-lg"></i> Dodaj pustą stronę na końcu
+                                </button>
+                                <button onClick={deleteCurrentPage} className="mt-2 w-full bg-red-50 hover:bg-red-100 text-red-600 py-2 rounded-xl transition-all flex items-center justify-center gap-2 text-[10px] font-bold">
+                                    <i className="ph-bold ph-trash"></i> Usuń wyświetlaną stronę
+                                </button>
+                            </div>
+
+                            {/* WŁAŚCIWOŚCI ZAZNACZONEGO ELEMENTU */}
+                            {selectedElement && (
+                                <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 animate-[reveal_0.2s_ease-out]">
+                                    <div className="flex justify-between items-center mb-3">
+                                        <h3 className="text-xs font-bold text-blue-800 uppercase flex items-center gap-2">
+                                            {selectedElement.type === 'text' ? <><i className="ph-bold ph-text-aa"></i> Edycja Tekstu</> : <><i className="ph-bold ph-eraser"></i> Edycja Korektora</>}
+                                        </h3>
+                                        <button onClick={deleteSelectedElement} className="text-red-500 hover:bg-red-100 p-1.5 rounded text-lg"><i className="ph-bold ph-trash"></i></button>
+                                    </div>
+
+                                    {selectedElement.type === 'text' && (
+                                        <div className="space-y-3">
+                                            <textarea 
+                                                value={selectedElement.content} 
+                                                onChange={e => updateSelectedElement({ content: e.target.value })}
+                                                className="w-full bg-white border border-blue-200 rounded-lg p-2 text-sm focus:outline-none focus:border-blue-400 resize-none h-20"
+                                                placeholder="Wpisz treść tutaj..."
+                                            />
+                                            <div className="flex items-center gap-2">
+                                                <i className="ph-bold ph-text-t text-slate-400 text-lg"></i>
+                                                <input type="range" min="10" max="120" value={selectedElement.fontSize} onChange={e => updateSelectedElement({ fontSize: parseInt(e.target.value) })} className="flex-1 accent-blue-500" />
+                                                <span className="text-xs font-bold text-slate-600 w-8">{selectedElement.fontSize}px</span>
+                                            </div>
+                                            <div className="flex gap-2">
+                                                <input type="color" value={selectedElement.color} onChange={e => updateSelectedElement({ color: e.target.value })} className="w-10 h-10 p-0 border-0 rounded cursor-pointer" />
+                                                <select value={selectedElement.fontFamily} onChange={e => updateSelectedElement({ fontFamily: e.target.value })} className="flex-1 bg-white border border-blue-200 rounded-lg px-2 text-xs font-bold text-slate-700 outline-none">
+                                                    <option value="'Inter', sans-serif">Standardowa (Inter)</option>
+                                                    <option value="'Roboto Mono', monospace">Maszynowa (Roboto)</option>
+                                                    <option value="'Playfair Display', serif">Elegancka (Playfair)</option>
+                                                    <option value="'Caveat', cursive">Odręczna (Caveat)</option>
+                                                </select>
+                                                <button onClick={() => updateSelectedElement({ fontWeight: selectedElement.fontWeight === '700' ? '400' : '700' })} className={`w-10 h-10 rounded-lg font-bold border ${selectedElement.fontWeight === '700' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-blue-200'}`}>B</button>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {selectedElement.type === 'whiteout' && (
+                                        <div className="space-y-3">
+                                            <p className="text-xs text-blue-700 leading-tight">Użyj suwaków, aby precyzyjnie dopasować wielkość białej łaty, zasłaniając błędy w dokumencie.</p>
+                                            <div className="flex items-center gap-2">
+                                                <i className="ph-bold ph-arrows-out-line-horizontal text-slate-400 text-lg"></i>
+                                                <input type="range" min="10" max="800" value={selectedElement.width} onChange={e => updateSelectedElement({ width: parseInt(e.target.value) })} className="flex-1 accent-blue-500" />
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <i className="ph-bold ph-arrows-out-line-vertical text-slate-400 text-lg"></i>
+                                                <input type="range" min="10" max="800" value={selectedElement.height} onChange={e => updateSelectedElement({ height: parseInt(e.target.value) })} className="flex-1 accent-blue-500" />
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                        </div>
+
+                        {/* KROK 3: Zapis */}
+                        <div className="p-4 border-t border-slate-200 bg-white">
+                            <button 
+                                onClick={exportToPDF} 
+                                disabled={pages.length === 0 || isLoading}
+                                className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-black py-4 rounded-xl shadow-lg shadow-blue-500/30 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:grayscale"
+                            >
+                                <i className="ph-bold ph-download-simple text-xl"></i> Pobierz Gotowy PDF
+                            </button>
+                        </div>
+                    </aside>
+
+                    {/* Główny obszar roboczy (Płótno) */}
+                    <main className="flex-1 relative flex flex-col items-center overflow-hidden app-bg" onClick={handleBackgroundClick}>
+                        
+                        {/* Zoom Controls */}
+                        {pages.length > 0 && (
+                            <div className="absolute top-6 right-6 z-40 bg-white rounded-full shadow-lg border border-slate-200 flex items-center p-1">
+                                <button onClick={() => setZoom(Math.max(0.4, zoom - 0.1))} className="w-8 h-8 flex items-center justify-center text-slate-600 hover:bg-slate-100 rounded-full"><i className="ph-bold ph-minus"></i></button>
+                                <span className="text-xs font-bold w-12 text-center text-slate-700">{Math.round(zoom * 100)}%</span>
+                                <button onClick={() => setZoom(Math.min(2.0, zoom + 0.1))} className="w-8 h-8 flex items-center justify-center text-slate-600 hover:bg-slate-100 rounded-full"><i className="ph-bold ph-plus"></i></button>
+                            </div>
+                        )}
+
+                        <div className="flex-1 w-full overflow-auto custom-scrollbar flex justify-center py-12 px-4" ref={containerRef}>
+                            
+                            {pages.length === 0 ? (
+                                <div className="max-w-md my-auto text-center">
+                                    <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center mx-auto mb-6 shadow-xl border-4 border-slate-50">
+                                        <i className="ph-fill ph-file-pdf text-5xl text-blue-500"></i>
+                                    </div>
+                                    <h2 className="text-2xl font-black text-slate-800 mb-2">Rozpocznij Edycję PDF</h2>
+                                    <p className="text-slate-500 text-sm leading-relaxed mb-8">Wgraj z menu po lewej plik PDF, ofertę, dyplom lub kartę pracy. Układ zostanie zachowany, a Ty będziesz mógł zamazać błędy i nałożyć nowy, czysty tekst.</p>
+                                    <button onClick={() => fileInputRef.current?.click()} className="bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-8 rounded-full shadow-lg shadow-blue-500/30 transition-all flex items-center justify-center gap-2 mx-auto">
+                                        <i className="ph-bold ph-upload-simple text-lg"></i> Przeglądaj Pliki
+                                    </button>
+                                </div>
+                            ) : (
+                                <div 
+                                    className="bg-white shadow-2xl relative transition-transform duration-200 origin-top"
+                                    style={{ 
+                                        width: activePage.width, 
+                                        height: activePage.height,
+                                        transform: `scale(${zoom})`,
+                                        marginBottom: `${(zoom - 1) * activePage.height}px` // Kompensacja skali dla scrolla
+                                    }}
+                                >
+                                    {/* Obraz PDF lub Pusta Kartka */}
+                                    {activePage.type === 'pdf' && activePage.imgData && (
+                                        <img src={activePage.imgData} alt="PDF Page" className="absolute inset-0 w-full h-full pointer-events-none no-select" />
+                                    )}
+
+                                    {/* Renderowanie nakładanych elementów */}
+                                    {activePage.elements.map(el => {
+                                        const isSelected = selectedElementId === el.id;
+                                        
+                                        if (el.type === 'whiteout') {
+                                            return (
+                                                <div 
+                                                    key={el.id}
+                                                    onMouseDown={(e) => handlePointerDown(e, el.id)}
+                                                    onTouchStart={(e) => handlePointerDown(e, el.id)}
+                                                    className={`pdf-element bg-white cursor-move ${isSelected ? 'selected' : ''}`}
+                                                    style={{ left: el.x, top: el.y, width: el.width, height: el.height }}
+                                                >
+                                                    {/* Mały znacznik żeby widzieć pusty korektor gdy jest niezaznaczony */}
+                                                    {!isSelected && <div className="absolute inset-0 border border-slate-100/50"></div>}
+                                                </div>
+                                            );
+                                        }
+
+                                        if (el.type === 'text') {
+                                            return (
+                                                <div 
+                                                    key={el.id}
+                                                    onMouseDown={(e) => handlePointerDown(e, el.id)}
+                                                    onTouchStart={(e) => handlePointerDown(e, el.id)}
+                                                    className={`pdf-element cursor-move p-1 ${isSelected ? 'selected' : ''}`}
+                                                    style={{ 
+                                                        left: el.x, top: el.y, 
+                                                        minWidth: '100px', minHeight: '30px'
+                                                    }}
+                                                >
+                                                    <div 
+                                                        className="whitespace-pre-wrap leading-[1.2]"
+                                                        style={{
+                                                            fontSize: `${el.fontSize}px`,
+                                                            color: el.color,
+                                                            fontFamily: el.fontFamily,
+                                                            fontWeight: el.fontWeight
+                                                        }}
+                                                    >
+                                                        {el.content || '...'}
+                                                    </div>
+                                                </div>
+                                            );
+                                        }
+
+                                        return null;
+                                    })}
+                                </div>
+                            )}
+
+                        </div>
+                    </main>
+
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
