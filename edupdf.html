@@ -19,7 +19,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
-    <!-- Czcionki ozdobne (Klasyczne jak Arial/Times są wbudowane w system) -->
+    <!-- Czcionki ozdobne i systemowe -->
     <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
     <!-- WBUDOWANA BAZA DANYCH -->
@@ -72,14 +72,13 @@
             background-size: 20px 20px;
         }
 
-        /* Klasy edytora - ulepszone dla swobodnej edycji */
+        /* Klasy edytora - Naprawiony Korektor i znikający Drag Handle */
         .pdf-element { position: absolute; pointer-events: auto; }
-        .pdf-element:hover { outline: 2px dashed rgba(59, 130, 246, 0.4); }
+        .pdf-element:not(.selected):hover { outline: 1px dashed rgba(59, 130, 246, 0.3); } 
         .pdf-element.selected { outline: 2px dashed #3b82f6; z-index: 50; }
         
         .no-select { user-select: none; -webkit-user-select: none; }
         
-        /* Aktywny edytor tekstu (Zdejmujemy kontury, by wyglądał jak na papierze) */
         .content-editable-box {
             outline: none;
             min-width: 50px;
@@ -95,6 +94,11 @@
             pointer-events: none;
             display: block;
         }
+
+        /* Automatyczne ukrywanie przycisku Przesuń podczas pisania */
+        .pdf-element:focus-within .drag-handle {
+            display: none !important;
+        }
     </style>
 </head>
 <body>
@@ -106,7 +110,6 @@
         // Inicjalizacja workera PDF.js
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-        // Konfiguracja stałej szerokości kanwy dla wygody skalowania
         const RENDER_WIDTH = 800;
 
         function App() {
@@ -121,7 +124,6 @@
             const [selectedElementId, setSelectedElementId] = useState(null);
             const [zoom, setZoom] = useState(1);
             
-            // Drag & Drop State
             const [dragState, setDragState] = useState(null);
             
             const containerRef = useRef(null);
@@ -227,10 +229,10 @@
                     type: type,
                     x: type === 'whiteout' ? 300 : 150, 
                     y: type === 'whiteout' ? 300 : 150,
-                    content: type === 'text' ? 'Kliknij tu i wpisz tekst...' : '',
+                    content: type === 'text' ? '' : '',
                     fontSize: 16,
                     color: '#000000',
-                    fontFamily: 'Arial, sans-serif', // Zmienione na standardowy urzędowy
+                    fontFamily: 'Arial, sans-serif', 
                     fontWeight: '400',
                     width: type === 'whiteout' ? 150 : null,
                     height: type === 'whiteout' ? 30 : null
@@ -254,12 +256,33 @@
                 }
             };
 
-            const deleteSelectedElement = () => {
-                if (!selectedElementId || pages.length === 0) return;
+            const deleteElement = (id) => {
+                if (pages.length === 0) return;
                 const updatedPages = [...pages];
-                updatedPages[activePageIdx].elements = updatedPages[activePageIdx].elements.filter(el => el.id !== selectedElementId);
+                updatedPages[activePageIdx].elements = updatedPages[activePageIdx].elements.filter(el => el.id !== id);
                 setPages(updatedPages);
-                setSelectedElementId(null);
+                if (selectedElementId === id) setSelectedElementId(null);
+            };
+
+            // Funkcja DUPLIKOWANIA (Kopiuj / Wklej)
+            const duplicateSelectedElement = () => {
+                if (!selectedElementId || pages.length === 0) return;
+                const elements = pages[activePageIdx].elements;
+                const elToCopy = elements.find(el => el.id === selectedElementId);
+                
+                if (elToCopy) {
+                    const newElement = {
+                        ...elToCopy,
+                        id: `el_${Date.now()}`,
+                        x: elToCopy.x + 20, // Lekkie przesunięcie, żeby było widać kopię
+                        y: elToCopy.y + 20
+                    };
+                    const updatedPages = [...pages];
+                    updatedPages[activePageIdx].elements.push(newElement);
+                    setPages(updatedPages);
+                    setSelectedElementId(newElement.id);
+                    showMessage('Skopiowano element!');
+                }
             };
 
             // --- DRAG & DROP LOGIC ---
@@ -267,7 +290,6 @@
                 e.stopPropagation();
                 setSelectedElementId(id);
                 
-                // Nie blokuj przeciągania jeśli kliknęliśmy na element, ale zablokuj, gdy klikamy w sam środek tekstu (pozwala to na edycję tekstu)
                 if (e.target.classList.contains('content-editable-box')) return;
 
                 const clientX = e.clientX || (e.touches && e.touches[0].clientX);
@@ -335,7 +357,7 @@
                 
                 setIsLoading(true);
                 setLoadingMsg('Składanie dokumentu PDF. To zajmie tylko chwilkę...');
-                setSelectedElementId(null); // Odznacz by usunąć obramowania
+                setSelectedElementId(null); // Odznacz by ukryć wszystkie ramki na wydruku
                 
                 try {
                     const { jsPDF } = window.jspdf;
@@ -364,7 +386,6 @@
                             tempDiv.appendChild(img);
                         }
 
-                        // Renderowanie elementów do eksportu
                         page.elements.forEach(el => {
                             const elDiv = document.createElement('div');
                             elDiv.style.position = 'absolute';
@@ -375,6 +396,8 @@
                                 elDiv.style.width = `${el.width}px`;
                                 elDiv.style.height = `${el.height}px`;
                                 elDiv.style.backgroundColor = 'white';
+                                // Upewniamy się, że nie ma ramki na wydruku
+                                elDiv.style.border = 'none'; 
                             } else if (el.type === 'text') {
                                 elDiv.innerText = el.content;
                                 elDiv.style.fontSize = `${el.fontSize}px`;
@@ -431,7 +454,7 @@
                     )}
 
                     {/* Pasek Boczny (Narzędzia) */}
-                    <aside className="w-80 flex-shrink-0 bg-white border-r border-slate-200 flex flex-col h-full z-10 shadow-xl">
+                    <aside className="w-80 flex-shrink-0 bg-white border-r border-slate-200 flex flex-col h-full z-10 shadow-xl relative z-50">
                         <div className="p-6 border-b border-slate-100 flex items-center gap-3 bg-slate-50">
                             <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20 text-white text-xl">
                                 <i className="ph-bold ph-file-pdf"></i>
@@ -465,14 +488,14 @@
                             {/* KROK 2: Narzędzia */}
                             <div className={`bg-slate-50 border border-slate-200 rounded-2xl p-4 shadow-sm transition-opacity ${pages.length === 0 ? 'opacity-50 pointer-events-none' : ''}`}>
                                 <h3 className="text-xs font-bold text-slate-500 uppercase mb-3 flex items-center gap-2">
-                                    <span className="w-5 h-5 rounded-full bg-slate-200 flex items-center justify-center text-[10px] text-slate-600">2</span> Dodaj Elementy
+                                    <span className="w-5 h-5 rounded-full bg-slate-200 flex items-center justify-center text-[10px] text-slate-600">2</span> Narzędzia
                                 </h3>
                                 <div className="grid grid-cols-2 gap-2">
                                     <button onClick={() => addElement('whiteout')} className="bg-white border border-slate-200 hover:border-slate-400 text-slate-700 py-3 rounded-xl flex flex-col items-center gap-1 shadow-sm transition-all text-xs font-bold">
                                         <div className="w-6 h-6 border-2 border-slate-300 rounded bg-white flex items-center justify-center"><i className="ph-bold ph-eraser text-slate-400"></i></div>
                                         Zamaluj
                                     </button>
-                                    <button onClick={() => addElement('text')} className="bg-white border border-slate-200 hover:border-blue-400 text-slate-700 hover:text-blue-600 py-3 rounded-xl flex flex-col items-center gap-1 shadow-sm transition-all text-xs font-bold">
+                                    <button onClick={() => { addElement('text'); setTimeout(() => { const boxes = document.querySelectorAll('.content-editable-box'); if(boxes.length > 0) boxes[boxes.length-1].focus(); }, 100); }} className="bg-white border border-slate-200 hover:border-blue-400 text-slate-700 hover:text-blue-600 py-3 rounded-xl flex flex-col items-center gap-1 shadow-sm transition-all text-xs font-bold">
                                         <i className="ph-bold ph-text-t text-2xl"></i>
                                         Napisz
                                     </button>
@@ -492,14 +515,16 @@
                                         <h3 className="text-xs font-bold text-blue-800 uppercase flex items-center gap-2">
                                             <i className="ph-bold ph-text-aa"></i> Wygląd Tekstu
                                         </h3>
-                                        <button onClick={deleteSelectedElement} className="text-red-500 hover:bg-red-100 p-1.5 rounded text-lg"><i className="ph-bold ph-trash"></i></button>
+                                        <div className="flex gap-1">
+                                            <button onClick={duplicateSelectedElement} className="text-blue-600 hover:bg-blue-200 p-1.5 rounded text-lg transition-colors" title="Zduplikuj ten napis"><i className="ph-bold ph-copy"></i></button>
+                                            <button onClick={() => deleteElement(selectedElementId)} className="text-red-500 hover:bg-red-100 p-1.5 rounded text-lg transition-colors"><i className="ph-bold ph-trash"></i></button>
+                                        </div>
                                     </div>
                                     <div className="space-y-3">
-                                        <p className="text-[10px] text-blue-600 font-bold mb-2">Sam tekst wpisuj bezpośrednio klikając w niego na dokumencie!</p>
                                         <div className="flex items-center gap-2">
                                             <i className="ph-bold ph-text-t text-slate-400 text-lg"></i>
                                             <input type="range" min="10" max="120" value={selectedElement.fontSize} onChange={e => updateSelectedElement({ fontSize: parseInt(e.target.value) })} className="flex-1 accent-blue-500" />
-                                            <span className="text-xs font-bold text-slate-600 w-8">{selectedElement.fontSize}px</span>
+                                            <span className="text-xs font-bold text-slate-600 w-8 text-right">{selectedElement.fontSize}px</span>
                                         </div>
                                         <div className="flex gap-2">
                                             <input type="color" value={selectedElement.color} onChange={e => updateSelectedElement({ color: e.target.value })} className="w-10 h-10 p-0 border-0 rounded cursor-pointer shrink-0" />
@@ -507,13 +532,12 @@
                                             {/* ZAAWANSOWANE KLASYCZNE CZCIONKI URZĘDOWE */}
                                             <select value={selectedElement.fontFamily} onChange={e => updateSelectedElement({ fontFamily: e.target.value })} className="flex-1 bg-white border border-blue-200 rounded-lg px-2 text-[10px] font-bold text-slate-700 outline-none">
                                                 <option value="Arial, Helvetica, sans-serif">Arial (Klasyczna)</option>
+                                                <option value="'Calibri', sans-serif">Calibri (Nowoczesna Word)</option>
                                                 <option value="'Times New Roman', Times, serif">Times New Roman (Urzędowa)</option>
-                                                <option value="Helvetica, sans-serif">Helvetica (Nowoczesna)</option>
+                                                <option value="Helvetica, sans-serif">Helvetica</option>
+                                                <option value="Tahoma, sans-serif">Tahoma</option>
+                                                <option value="Georgia, serif">Georgia</option>
                                                 <option value="'Courier New', Courier, monospace">Courier New (Maszynowa)</option>
-                                                <option value="Georgia, serif">Georgia (Książkowa)</option>
-                                                <option value="Tahoma, sans-serif">Tahoma (Zwięzła)</option>
-                                                <option value="Verdana, sans-serif">Verdana (Czytelna)</option>
-                                                <option value="'Inter', sans-serif">Inter (Standard App)</option>
                                                 <option value="'Caveat', cursive">Caveat (Odręczna Pismo)</option>
                                             </select>
                                             <button onClick={() => updateSelectedElement({ fontWeight: selectedElement.fontWeight === '700' ? '400' : '700' })} className={`w-10 h-10 shrink-0 rounded-lg font-bold border ${selectedElement.fontWeight === '700' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-blue-200'}`}>B</button>
@@ -522,14 +546,17 @@
                                 </div>
                             )}
 
-                            {/* WŁAŚCIWOŚCI KOREKTORA (SUWAKI + USUWANIE) */}
+                            {/* WŁAŚCIWOŚCI KOREKTORA (SUWAKI + DUPLIKOWANIE) */}
                             {selectedElement && selectedElement.type === 'whiteout' && (
                                 <div className="bg-slate-100 border border-slate-300 rounded-2xl p-4 shadow-sm animate-[reveal_0.2s_ease-out]">
                                     <div className="flex justify-between items-center mb-2">
                                         <h3 className="text-xs font-bold text-slate-600 uppercase flex items-center gap-2">
                                             <i className="ph-bold ph-eraser"></i> Opcje Korektora
                                         </h3>
-                                        <button onClick={deleteSelectedElement} className="text-red-500 hover:bg-red-100 p-1.5 rounded text-lg"><i className="ph-bold ph-trash"></i></button>
+                                        <div className="flex gap-1">
+                                            <button onClick={duplicateSelectedElement} className="text-blue-500 hover:bg-blue-200 p-1.5 rounded text-lg transition-colors" title="Skopiuj tę łatę"><i className="ph-bold ph-copy"></i></button>
+                                            <button onClick={() => deleteElement(selectedElementId)} className="text-red-500 hover:bg-red-100 p-1.5 rounded text-lg transition-colors"><i className="ph-bold ph-trash"></i></button>
+                                        </div>
                                     </div>
                                     <p className="text-[10px] text-slate-500 leading-tight mb-2">Złap prawy dolny róg białej łaty na dokumencie, aby ją rozciągnąć, lub użyj suwaków poniżej.</p>
                                     <div className="space-y-2">
@@ -548,7 +575,7 @@
                         </div>
 
                         {/* KROK 3: Zapis */}
-                        <div className="p-4 border-t border-slate-200 bg-white shadow-[0_-10px_20px_rgba(0,0,0,0.02)]">
+                        <div className="p-4 border-t border-slate-200 bg-white shadow-[0_-10px_20px_rgba(0,0,0,0.02)] z-50">
                             <button 
                                 onClick={exportToPDF} 
                                 disabled={pages.length === 0 || isLoading}
@@ -571,7 +598,7 @@
                             </div>
                         )}
 
-                        <div className="flex-1 w-full overflow-auto custom-scrollbar flex justify-center py-12 px-4">
+                        <div className="flex-1 w-full overflow-auto custom-scrollbar flex justify-center py-12 px-4 relative z-0">
                             
                             {pages.length === 0 ? (
                                 <div className="max-w-md my-auto text-center">
@@ -608,28 +635,26 @@
                                                 <div 
                                                     key={el.id}
                                                     onMouseDown={(e) => {
-                                                        // Zapobiega drag&drop jeśli użytkownik rozciąga róg (resize handle)
                                                         const rect = e.target.getBoundingClientRect();
                                                         const isResizing = (e.clientX - rect.left > rect.width - 15) && (e.clientY - rect.top > rect.height - 15);
                                                         if (!isResizing) handlePointerDown(e, el.id);
                                                     }}
                                                     onTouchStart={(e) => handlePointerDown(e, el.id)}
                                                     onMouseUp={(e) => {
-                                                        // Aktualizacja stanu po rozciągnięciu CSS resize
                                                         const target = e.currentTarget;
                                                         if (target.offsetWidth !== el.width || target.offsetHeight !== el.height) {
                                                             updateSelectedElement({ width: target.offsetWidth, height: target.offsetHeight });
                                                         }
                                                     }}
-                                                    className={`pdf-element bg-white cursor-move ${isSelected ? 'selected' : ''}`}
+                                                    className={`pdf-element bg-white cursor-move ${isSelected ? 'selected z-50' : 'z-10'}`}
                                                     style={{ 
                                                         left: el.x, top: el.y, 
                                                         width: el.width, height: el.height,
-                                                        resize: isSelected ? 'both' : 'none', // Aktywacja rozciągania na krawędzi
+                                                        resize: isSelected ? 'both' : 'none', 
                                                         overflow: 'hidden'
                                                     }}
                                                 >
-                                                    {!isSelected && <div className="absolute inset-0 border border-slate-100/50"></div>}
+                                                    {/* Usunięto całkowicie szarą ramkę! Czysta biel */}
                                                 </div>
                                             );
                                         }
@@ -638,17 +663,17 @@
                                             return (
                                                 <div 
                                                     key={el.id}
-                                                    className={`pdf-element p-1 ${isSelected ? 'selected' : ''}`}
+                                                    className={`pdf-element p-1 ${isSelected ? 'selected z-50' : 'z-20'}`}
                                                     style={{ left: el.x, top: el.y, minWidth: '100px' }}
                                                     onClick={(e) => {
                                                         e.stopPropagation();
                                                         setSelectedElementId(el.id);
                                                     }}
                                                 >
-                                                    {/* Niebieska rączka do przesuwania (pojawia się tylko po kliknięciu elementu) */}
+                                                    {/* Niebieska rączka do przesuwania znika gdy zaczynasz pisać! */}
                                                     {isSelected && (
                                                         <div 
-                                                            className="absolute -top-7 left-0 bg-blue-500 text-white px-3 py-1 rounded-t-lg text-[10px] font-bold cursor-move flex items-center gap-1 shadow-md hover:bg-blue-600"
+                                                            className="drag-handle absolute -top-8 left-0 bg-blue-500 text-white px-3 py-1 rounded-t-lg text-[10px] font-bold cursor-move flex items-center gap-1 shadow-md hover:bg-blue-600 z-50"
                                                             onMouseDown={(e) => handlePointerDown(e, el.id)}
                                                             onTouchStart={(e) => handlePointerDown(e, el.id)}
                                                         >
@@ -660,9 +685,17 @@
                                                     <div
                                                         contentEditable={true}
                                                         suppressContentEditableWarning={true}
-                                                        onBlur={(e) => updateSelectedElement({ content: e.currentTarget.innerText })}
-                                                        data-placeholder="Wpisz tekst..."
-                                                        className="content-editable-box"
+                                                        onBlur={(e) => {
+                                                            const text = e.currentTarget.innerText;
+                                                            // Auto-usuwanie pustego pola, by nie robiło bałaganu na ekranie
+                                                            if (!text.trim()) {
+                                                                deleteElement(el.id);
+                                                            } else {
+                                                                updateSelectedElement({ content: text });
+                                                            }
+                                                        }}
+                                                        data-placeholder="Napisz coś..."
+                                                        className="content-editable-box relative z-10"
                                                         style={{
                                                             fontSize: `${el.fontSize}px`,
                                                             color: el.color,
