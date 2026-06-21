@@ -19,8 +19,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
-    <!-- Czcionki ozdobne i systemowe -->
-    <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Klasyczne czcionki (często używane w dokumentach) -->
+    <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Inter:wght@300;400;500;600;700&family=Lora:ital,wght@0,400;0,700;1,400&family=Montserrat:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
 
     <!-- WBUDOWANA BAZA DANYCH -->
     <script type="module">
@@ -67,38 +67,64 @@
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
         
         .app-bg {
-            background-color: #f8fafc;
-            background-image: radial-gradient(#e2e8f0 1px, transparent 1px);
+            background-color: #e2e8f0;
+            background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
             background-size: 20px 20px;
         }
 
-        /* Klasy edytora - Naprawiony Korektor i znikający Drag Handle */
+        /* --- STYLIZACJA ELEMENTÓW NA PŁÓTNIE --- */
         .pdf-element { position: absolute; pointer-events: auto; }
-        .pdf-element:not(.selected):hover { outline: 1px dashed rgba(59, 130, 246, 0.3); } 
-        .pdf-element.selected { outline: 2px dashed #3b82f6; z-index: 50; }
+        
+        /* Aktywny kontur TYLKO gdy element jest zaznaczony (Dla korektora brak śladu bez zaznaczenia) */
+        .pdf-element.selected { outline: 2px solid #3b82f6; z-index: 50; }
         
         .no-select { user-select: none; -webkit-user-select: none; }
         
+        /* Obszar wpisywania tekstu */
         .content-editable-box {
             outline: none;
-            min-width: 50px;
+            min-width: 20px;
             min-height: 1.2em;
             cursor: text;
             white-space: pre-wrap;
             word-break: break-word;
+            padding: 2px;
+            margin: -2px; /* kompensacja paddingu */
         }
         
         .content-editable-box:empty:before {
             content: attr(data-placeholder);
-            color: #94a3b8;
+            color: #cbd5e1;
             pointer-events: none;
             display: block;
         }
 
-        /* Automatyczne ukrywanie przycisku Przesuń podczas pisania */
-        .pdf-element:focus-within .drag-handle {
-            display: none !important;
+        /* Floating Toolbar (Lewitujący pasek narzędzi) */
+        .floating-toolbar {
+            position: absolute;
+            top: -45px;
+            left: 0;
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            display: flex;
+            align-items: center;
+            padding: 4px;
+            gap: 4px;
+            z-index: 100;
+            white-space: nowrap;
         }
+        
+        .floating-btn {
+            display: flex; align-items: center; justify-content: center;
+            width: 28px; height: 28px; border-radius: 6px;
+            color: #475569; transition: all 0.2s;
+            cursor: pointer; background: transparent; border: none;
+        }
+        .floating-btn:hover { background: #f1f5f9; color: #0f172a; }
+        .floating-divider { width: 1px; height: 20px; background: #e2e8f0; margin: 0 2px; }
+
     </style>
 </head>
 <body>
@@ -125,9 +151,12 @@
             const [zoom, setZoom] = useState(1);
             
             const [dragState, setDragState] = useState(null);
+            const [sidebarTab, setSidebarTab] = useState('narzedzia'); // 'narzedzia' lub 'tekst'
             
             const containerRef = useRef(null);
             const fileInputRef = useRef(null);
+            // Ref do pilnowania, czy aktualnie piszemy
+            const editModeRef = useRef(false);
 
             useEffect(() => {
                 if (window.EduBoxCore && window.EduBoxCore.init) {
@@ -140,7 +169,7 @@
                 setTimeout(() => setMessage(null), 4000);
             };
 
-            // --- OBSŁUGA PLIKU PDF ---
+            // --- OBSŁUGA PLIKU PDF Z EKSTRAKCJĄ TEKSTU ---
             const handleFileUpload = async (e) => {
                 const file = e.target.files[0];
                 if (!file || file.type !== 'application/pdf') {
@@ -149,7 +178,7 @@
                 }
 
                 setIsLoading(true);
-                setLoadingMsg('Konwertowanie PDF na płótno edytora...');
+                setLoadingMsg('Analizowanie dokumentu i wyciąganie tekstów...');
 
                 try {
                     const arrayBuffer = await file.arrayBuffer();
@@ -162,19 +191,33 @@
                         const scale = RENDER_WIDTH / unscaledViewport.width;
                         const viewport = page.getViewport({ scale: scale * 2 }); 
 
+                        // Renderowanie do obrazu
                         const canvas = document.createElement('canvas');
                         const ctx = canvas.getContext('2d');
                         canvas.width = viewport.width;
                         canvas.height = viewport.height;
-
                         await page.render({ canvasContext: ctx, viewport: viewport }).promise;
                         
+                        // Ekstrakcja tekstu (NOWOŚĆ!)
+                        const textContent = await page.getTextContent();
+                        // Łączymy teksty, dodając nowe linie na podstawie pozycji Y, aby w miarę zachować strukturę
+                        let extractedText = '';
+                        let lastY = -1;
+                        textContent.items.forEach(item => {
+                            if (lastY !== -1 && Math.abs(lastY - item.transform[5]) > 5) {
+                                extractedText += '\n'; // Nowa linia jeśli zmieniła się wysokość
+                            }
+                            extractedText += item.str + ' ';
+                            lastY = item.transform[5];
+                        });
+
                         newPages.push({
                             id: `page_${Date.now()}_${i}`,
                             type: 'pdf',
-                            imgData: canvas.toDataURL('image/jpeg', 0.9), 
+                            imgData: canvas.toDataURL('image/jpeg', 0.95), 
                             width: RENDER_WIDTH,
                             height: unscaledViewport.height * scale, 
+                            extractedText: extractedText.trim(),
                             elements: []
                         });
                     }
@@ -182,10 +225,11 @@
                     setPages(newPages);
                     setActivePageIdx(0);
                     setSelectedElementId(null);
-                    showMessage('Dokument wczytany pomyślnie!');
+                    setSidebarTab('tekst'); // Automatycznie przełącz na zakładkę z tekstem, żeby pokazać nową funkcję!
+                    showMessage('Dokument załadowany!');
                 } catch (error) {
                     console.error(error);
-                    showMessage('Błąd odczytu pliku PDF. Spróbuj inny plik.', 'error');
+                    showMessage('Błąd odczytu pliku PDF. Dokument może być zaszyfrowany.', 'error');
                 } finally {
                     setIsLoading(false);
                     e.target.value = null; 
@@ -200,6 +244,7 @@
                     imgData: null,
                     width: RENDER_WIDTH,
                     height: heightA4,
+                    extractedText: 'To jest pusta strona dodana przez Ciebie.',
                     elements: []
                 };
                 setPages([...pages, newPage]);
@@ -208,34 +253,30 @@
                 showMessage('Dodano pustą stronę!');
             };
 
-            const deleteCurrentPage = () => {
-                if (pages.length <= 1) {
-                    setPages([]);
-                    setActivePageIdx(0);
-                    return;
-                }
-                const newPages = pages.filter((_, i) => i !== activePageIdx);
-                setPages(newPages);
-                setActivePageIdx(Math.max(0, activePageIdx - 1));
-                setSelectedElementId(null);
-            };
-
             // --- ZARZĄDZANIE ELEMENTAMI ---
             const addElement = (type) => {
                 if (pages.length === 0) return;
                 
+                // Oblicz środek aktualnego widoku (uproszczone pozycjonowanie)
+                const container = containerRef.current;
+                let startY = 150;
+                if (container) {
+                    const scrollY = container.scrollTop;
+                    startY = (scrollY / zoom) + 150;
+                }
+
                 const newElement = {
                     id: `el_${Date.now()}`,
                     type: type,
-                    x: type === 'whiteout' ? 300 : 150, 
-                    y: type === 'whiteout' ? 300 : 150,
+                    x: RENDER_WIDTH / 2 - (type === 'whiteout' ? 75 : 50), 
+                    y: startY,
                     content: type === 'text' ? '' : '',
                     fontSize: 16,
                     color: '#000000',
                     fontFamily: 'Arial, sans-serif', 
                     fontWeight: '400',
                     width: type === 'whiteout' ? 150 : null,
-                    height: type === 'whiteout' ? 30 : null
+                    height: type === 'whiteout' ? 25 : null
                 };
 
                 const updatedPages = [...pages];
@@ -264,34 +305,34 @@
                 if (selectedElementId === id) setSelectedElementId(null);
             };
 
-            // Funkcja DUPLIKOWANIA (Kopiuj / Wklej)
-            const duplicateSelectedElement = () => {
-                if (!selectedElementId || pages.length === 0) return;
+            // Funkcja DUPLIKOWANIA (Kopiuj / Wklej) z przesunięciem
+            const duplicateElement = (id) => {
+                if (pages.length === 0) return;
                 const elements = pages[activePageIdx].elements;
-                const elToCopy = elements.find(el => el.id === selectedElementId);
+                const elToCopy = elements.find(el => el.id === id);
                 
                 if (elToCopy) {
                     const newElement = {
                         ...elToCopy,
                         id: `el_${Date.now()}`,
-                        x: elToCopy.x + 20, // Lekkie przesunięcie, żeby było widać kopię
+                        x: elToCopy.x + 20, 
                         y: elToCopy.y + 20
                     };
                     const updatedPages = [...pages];
                     updatedPages[activePageIdx].elements.push(newElement);
                     setPages(updatedPages);
                     setSelectedElementId(newElement.id);
-                    showMessage('Skopiowano element!');
                 }
             };
 
             // --- DRAG & DROP LOGIC ---
             const handlePointerDown = (e, id) => {
+                // Jeśli klikamy w aktywny edytor tekstu, by pisać, nie blokujmy tego dragiem!
+                if (editModeRef.current) return;
+                
                 e.stopPropagation();
                 setSelectedElementId(id);
                 
-                if (e.target.classList.contains('content-editable-box')) return;
-
                 const clientX = e.clientX || (e.touches && e.touches[0].clientX);
                 const clientY = e.clientY || (e.touches && e.touches[0].clientY);
                 
@@ -345,10 +386,13 @@
                 };
             }, [dragState, pages, activePageIdx, zoom]);
 
+            // --- ZDEJMOWANIE ZAZNACZENIA ---
             const handleBackgroundClick = (e) => {
-                if (e.target === containerRef.current || e.target.classList.contains('app-bg')) {
-                    setSelectedElementId(null);
-                }
+                // Zapobiegamy odznaczeniu, jeśli klikamy w narzędzia lub menu
+                if (e.target.closest('.floating-toolbar') || e.target.closest('aside')) return;
+                
+                setSelectedElementId(null);
+                editModeRef.current = false;
             };
 
             // --- EKSPORT DO PDF ---
@@ -356,8 +400,9 @@
                 if (pages.length === 0) return;
                 
                 setIsLoading(true);
-                setLoadingMsg('Składanie dokumentu PDF. To zajmie tylko chwilkę...');
-                setSelectedElementId(null); // Odznacz by ukryć wszystkie ramki na wydruku
+                setLoadingMsg('Pieczenie plików PDF (Zachowujemy super jakość)...');
+                setSelectedElementId(null); 
+                editModeRef.current = false;
                 
                 try {
                     const { jsPDF } = window.jspdf;
@@ -396,8 +441,6 @@
                                 elDiv.style.width = `${el.width}px`;
                                 elDiv.style.height = `${el.height}px`;
                                 elDiv.style.backgroundColor = 'white';
-                                // Upewniamy się, że nie ma ramki na wydruku
-                                elDiv.style.border = 'none'; 
                             } else if (el.type === 'text') {
                                 elDiv.innerText = el.content;
                                 elDiv.style.fontSize = `${el.fontSize}px`;
@@ -424,7 +467,7 @@
                         document.body.removeChild(tempDiv);
                     }
 
-                    pdf.save('EduBox_Dokument.pdf');
+                    pdf.save('EduBox_Edytowany_Dokument.pdf');
                     showMessage('Zapisano pomyślnie!', 'success');
                 } catch (error) {
                     console.error("Błąd zapisu:", error);
@@ -435,15 +478,15 @@
             };
 
             const activePage = pages[activePageIdx] || null;
-            const selectedElement = activePage?.elements.find(el => el.id === selectedElementId) || null;
-
+            
             return (
                 <div className="flex h-screen w-full bg-slate-900 text-slate-800 overflow-hidden relative selection:bg-blue-500/30">
                     
                     {isLoading && (
-                        <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center text-white">
+                        <div className="absolute inset-0 bg-slate-900/90 backdrop-blur-md z-50 flex flex-col items-center justify-center text-white">
                             <i className="ph-bold ph-spinner animate-spin text-6xl mb-4 text-blue-500"></i>
-                            <h2 className="text-xl font-bold">{loadingMsg}</h2>
+                            <h2 className="text-xl font-bold mb-2">{loadingMsg}</h2>
+                            <p className="text-sm text-slate-400">Proszę nie zamykać okna...</p>
                         </div>
                     )}
 
@@ -454,121 +497,89 @@
                     )}
 
                     {/* Pasek Boczny (Narzędzia) */}
-                    <aside className="w-80 flex-shrink-0 bg-white border-r border-slate-200 flex flex-col h-full z-10 shadow-xl relative z-50">
+                    <aside className="w-[340px] flex-shrink-0 bg-white border-r border-slate-200 flex flex-col h-full z-10 shadow-2xl relative z-50">
                         <div className="p-6 border-b border-slate-100 flex items-center gap-3 bg-slate-50">
-                            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20 text-white text-xl">
+                            <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20 text-white text-2xl shrink-0">
                                 <i className="ph-bold ph-file-pdf"></i>
                             </div>
                             <div>
-                                <h1 className="text-xl font-black tracking-tight text-slate-800 leading-none">EduPDF Edytor</h1>
-                                <p className="text-[10px] text-blue-600 font-bold tracking-wider uppercase mt-1">Korektor i Wypełniacz</p>
+                                <h1 className="text-xl font-black tracking-tight text-slate-800 leading-none">EduPDF Wypełniacz</h1>
+                                <p className="text-[10px] text-blue-600 font-bold tracking-wider uppercase mt-1">Wersja V4 ULTRA</p>
                             </div>
+                        </div>
+
+                        {/* Zakładki */}
+                        <div className="flex bg-slate-100 p-1 mx-4 mt-4 rounded-lg">
+                            <button onClick={() => setSidebarTab('narzedzia')} className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${sidebarTab === 'narzedzia' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Narzędzia</button>
+                            <button onClick={() => setSidebarTab('tekst')} className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${sidebarTab === 'tekst' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Oryginalny Tekst <span className="bg-red-500 text-white text-[8px] px-1 rounded ml-1">NEW</span></button>
                         </div>
 
                         <div className="flex-1 overflow-y-auto custom-scrollbar p-4 flex flex-col gap-6">
                             
-                            {/* KROK 1: Plik */}
-                            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 shadow-sm">
-                                <h3 className="text-xs font-bold text-slate-500 uppercase mb-3 flex items-center gap-2">
-                                    <span className="w-5 h-5 rounded-full bg-slate-200 flex items-center justify-center text-[10px] text-slate-600">1</span> Wgraj Dokument
-                                </h3>
-                                <button onClick={() => fileInputRef.current?.click()} className="w-full bg-white border-2 border-dashed border-blue-300 hover:border-blue-500 hover:bg-blue-50 text-blue-600 font-bold py-3 rounded-xl transition-colors flex items-center justify-center gap-2 text-sm">
-                                    <i className="ph-bold ph-upload-simple text-lg"></i> Otwórz plik PDF
-                                </button>
-                                <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept="application/pdf" className="hidden" />
-                                {pages.length > 0 && (
-                                    <div className="mt-3 flex items-center justify-between bg-white p-2 rounded-lg border border-slate-200 text-xs">
-                                        <button onClick={() => setActivePageIdx(Math.max(0, activePageIdx - 1))} disabled={activePageIdx === 0} className="p-1 hover:bg-slate-100 rounded disabled:opacity-30"><i className="ph-bold ph-caret-left"></i></button>
-                                        <span className="font-bold text-slate-600">Strona {activePageIdx + 1} z {pages.length}</span>
-                                        <button onClick={() => setActivePageIdx(Math.min(pages.length - 1, activePageIdx + 1))} disabled={activePageIdx === pages.length - 1} className="p-1 hover:bg-slate-100 rounded disabled:opacity-30"><i className="ph-bold ph-caret-right"></i></button>
+                            {sidebarTab === 'narzedzia' ? (
+                                <>
+                                    {/* KROK 1: Plik */}
+                                    <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+                                        <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">1. Dokument</h3>
+                                        <button onClick={() => fileInputRef.current?.click()} className="w-full bg-slate-50 border border-slate-300 hover:border-blue-400 hover:text-blue-600 text-slate-700 font-bold py-3 rounded-lg transition-colors flex items-center justify-center gap-2 text-sm">
+                                            <i className="ph-bold ph-upload-simple text-lg"></i> Wgraj nowy plik PDF
+                                        </button>
+                                        <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept="application/pdf" className="hidden" />
+                                        
+                                        {pages.length > 0 && (
+                                            <div className="mt-3 flex items-center justify-between bg-blue-50/50 p-2 rounded-lg border border-blue-100 text-xs">
+                                                <button onClick={() => setActivePageIdx(Math.max(0, activePageIdx - 1))} disabled={activePageIdx === 0} className="p-1 hover:bg-white rounded border border-transparent hover:border-blue-200 disabled:opacity-30 transition-all"><i className="ph-bold ph-caret-left text-blue-600"></i></button>
+                                                <span className="font-bold text-blue-800">Strona {activePageIdx + 1} z {pages.length}</span>
+                                                <button onClick={() => setActivePageIdx(Math.min(pages.length - 1, activePageIdx + 1))} disabled={activePageIdx === pages.length - 1} className="p-1 hover:bg-white rounded border border-transparent hover:border-blue-200 disabled:opacity-30 transition-all"><i className="ph-bold ph-caret-right text-blue-600"></i></button>
+                                            </div>
+                                        )}
                                     </div>
-                                )}
-                            </div>
 
-                            {/* KROK 2: Narzędzia */}
-                            <div className={`bg-slate-50 border border-slate-200 rounded-2xl p-4 shadow-sm transition-opacity ${pages.length === 0 ? 'opacity-50 pointer-events-none' : ''}`}>
-                                <h3 className="text-xs font-bold text-slate-500 uppercase mb-3 flex items-center gap-2">
-                                    <span className="w-5 h-5 rounded-full bg-slate-200 flex items-center justify-center text-[10px] text-slate-600">2</span> Narzędzia
-                                </h3>
-                                <div className="grid grid-cols-2 gap-2">
-                                    <button onClick={() => addElement('whiteout')} className="bg-white border border-slate-200 hover:border-slate-400 text-slate-700 py-3 rounded-xl flex flex-col items-center gap-1 shadow-sm transition-all text-xs font-bold">
-                                        <div className="w-6 h-6 border-2 border-slate-300 rounded bg-white flex items-center justify-center"><i className="ph-bold ph-eraser text-slate-400"></i></div>
-                                        Zamaluj
-                                    </button>
-                                    <button onClick={() => { addElement('text'); setTimeout(() => { const boxes = document.querySelectorAll('.content-editable-box'); if(boxes.length > 0) boxes[boxes.length-1].focus(); }, 100); }} className="bg-white border border-slate-200 hover:border-blue-400 text-slate-700 hover:text-blue-600 py-3 rounded-xl flex flex-col items-center gap-1 shadow-sm transition-all text-xs font-bold">
-                                        <i className="ph-bold ph-text-t text-2xl"></i>
-                                        Napisz
-                                    </button>
-                                </div>
-                                <button onClick={addBlankPage} className="mt-2 w-full bg-white border border-slate-200 hover:border-emerald-400 text-slate-600 hover:text-emerald-600 py-2 rounded-xl transition-all flex items-center justify-center gap-2 text-[10px] font-bold shadow-sm">
-                                    <i className="ph-bold ph-plus-circle text-lg"></i> Dodaj pustą stronę na końcu
-                                </button>
-                                <button onClick={deleteCurrentPage} className="mt-2 w-full bg-red-50 hover:bg-red-100 text-red-600 py-2 rounded-xl transition-all flex items-center justify-center gap-2 text-[10px] font-bold">
-                                    <i className="ph-bold ph-trash"></i> Usuń wyświetlaną stronę
-                                </button>
-                            </div>
+                                    {/* KROK 2: Narzędzia */}
+                                    <div className={`bg-white border border-slate-200 rounded-xl p-4 shadow-sm transition-opacity ${pages.length === 0 ? 'opacity-50 pointer-events-none' : ''}`}>
+                                        <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">2. Elementy</h3>
+                                        <div className="grid grid-cols-2 gap-2 mb-3">
+                                            <button onClick={() => addElement('whiteout')} className="bg-slate-50 border border-slate-200 hover:border-slate-400 text-slate-700 py-3 rounded-lg flex flex-col items-center gap-2 shadow-sm transition-all text-xs font-bold">
+                                                <div className="w-8 h-8 border-2 border-slate-300 rounded bg-white flex items-center justify-center"><i className="ph-fill ph-eraser text-slate-400 text-lg"></i></div>
+                                                Korektor
+                                            </button>
+                                            <button onClick={() => { addElement('text'); setTimeout(() => { const boxes = document.querySelectorAll('.content-editable-box'); if(boxes.length > 0) boxes[boxes.length-1].focus(); }, 100); }} className="bg-blue-50 border border-blue-200 hover:border-blue-500 text-blue-700 py-3 rounded-lg flex flex-col items-center gap-2 shadow-sm transition-all text-xs font-bold">
+                                                <i className="ph-bold ph-text-t text-3xl"></i>
+                                                Tekst
+                                            </button>
+                                        </div>
+                                        
+                                        <div className="text-[10px] text-slate-500 bg-slate-50 p-2 rounded border border-slate-100 flex items-start gap-2 mb-3">
+                                            <i className="ph-fill ph-info text-blue-400 text-sm shrink-0 mt-0.5"></i>
+                                            <p>Kliknij wygenerowany element na dokumencie, by otworzyć <b>pływający pasek opcji (czcionki, kopiuj, usuń)</b>.</p>
+                                        </div>
 
-                            {/* WŁAŚCIWOŚCI ZAZNACZONEGO ELEMENTU (TYLKO DLA TEKSTU I TYLKO USTAWIENIA CZCIONKI) */}
-                            {selectedElement && selectedElement.type === 'text' && (
-                                <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 shadow-sm animate-[reveal_0.2s_ease-out]">
-                                    <div className="flex justify-between items-center mb-3">
-                                        <h3 className="text-xs font-bold text-blue-800 uppercase flex items-center gap-2">
-                                            <i className="ph-bold ph-text-aa"></i> Wygląd Tekstu
+                                        <button onClick={addBlankPage} className="w-full bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 text-emerald-700 py-2 rounded-lg transition-all flex items-center justify-center gap-2 text-xs font-bold shadow-sm">
+                                            <i className="ph-bold ph-file-plus text-lg"></i> Dodaj czystą stronę
+                                        </button>
+                                    </div>
+                                </>
+                            ) : (
+                                /* ZAKŁADKA: ORYGINALNY TEKST */
+                                <div className="bg-white border border-blue-200 rounded-xl p-4 shadow-sm flex flex-col h-full animate-[reveal_0.2s_ease-out]">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <h3 className="text-xs font-bold text-blue-800 flex items-center gap-2">
+                                            <i className="ph-bold ph-scan"></i> Skaner Tekstu (OCR)
                                         </h3>
-                                        <div className="flex gap-1">
-                                            <button onClick={duplicateSelectedElement} className="text-blue-600 hover:bg-blue-200 p-1.5 rounded text-lg transition-colors" title="Zduplikuj ten napis"><i className="ph-bold ph-copy"></i></button>
-                                            <button onClick={() => deleteElement(selectedElementId)} className="text-red-500 hover:bg-red-100 p-1.5 rounded text-lg transition-colors"><i className="ph-bold ph-trash"></i></button>
-                                        </div>
                                     </div>
-                                    <div className="space-y-3">
-                                        <div className="flex items-center gap-2">
-                                            <i className="ph-bold ph-text-t text-slate-400 text-lg"></i>
-                                            <input type="range" min="10" max="120" value={selectedElement.fontSize} onChange={e => updateSelectedElement({ fontSize: parseInt(e.target.value) })} className="flex-1 accent-blue-500" />
-                                            <span className="text-xs font-bold text-slate-600 w-8 text-right">{selectedElement.fontSize}px</span>
+                                    <p className="text-[10px] text-slate-500 mb-3 leading-tight">
+                                        Edycja oryginału jest zablokowana, aby PDF się nie "rozpadł". Ale oto tekst odzyskany z tej strony! Zaznacz słowo, skopiuj je i wklej do swojego narzędzia "Tekst".
+                                    </p>
+                                    
+                                    {pages.length > 0 && activePage ? (
+                                        <div className="flex-1 bg-slate-50 border border-slate-200 rounded-lg p-3 overflow-y-auto text-xs text-slate-700 font-mono leading-relaxed whitespace-pre-wrap select-text">
+                                            {activePage.extractedText || <span className="italic text-slate-400">System nie wykrył żadnego tekstu na tej stronie (może to sam obrazek lub skan?).</span>}
                                         </div>
-                                        <div className="flex gap-2">
-                                            <input type="color" value={selectedElement.color} onChange={e => updateSelectedElement({ color: e.target.value })} className="w-10 h-10 p-0 border-0 rounded cursor-pointer shrink-0" />
-                                            
-                                            {/* ZAAWANSOWANE KLASYCZNE CZCIONKI URZĘDOWE */}
-                                            <select value={selectedElement.fontFamily} onChange={e => updateSelectedElement({ fontFamily: e.target.value })} className="flex-1 bg-white border border-blue-200 rounded-lg px-2 text-[10px] font-bold text-slate-700 outline-none">
-                                                <option value="Arial, Helvetica, sans-serif">Arial (Klasyczna)</option>
-                                                <option value="'Calibri', sans-serif">Calibri (Nowoczesna Word)</option>
-                                                <option value="'Times New Roman', Times, serif">Times New Roman (Urzędowa)</option>
-                                                <option value="Helvetica, sans-serif">Helvetica</option>
-                                                <option value="Tahoma, sans-serif">Tahoma</option>
-                                                <option value="Georgia, serif">Georgia</option>
-                                                <option value="'Courier New', Courier, monospace">Courier New (Maszynowa)</option>
-                                                <option value="'Caveat', cursive">Caveat (Odręczna Pismo)</option>
-                                            </select>
-                                            <button onClick={() => updateSelectedElement({ fontWeight: selectedElement.fontWeight === '700' ? '400' : '700' })} className={`w-10 h-10 shrink-0 rounded-lg font-bold border ${selectedElement.fontWeight === '700' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-blue-200'}`}>B</button>
+                                    ) : (
+                                        <div className="flex-1 flex items-center justify-center text-slate-400 text-xs italic">
+                                            Wgraj plik PDF, aby wyciągnąć tekst.
                                         </div>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* WŁAŚCIWOŚCI KOREKTORA (SUWAKI + DUPLIKOWANIE) */}
-                            {selectedElement && selectedElement.type === 'whiteout' && (
-                                <div className="bg-slate-100 border border-slate-300 rounded-2xl p-4 shadow-sm animate-[reveal_0.2s_ease-out]">
-                                    <div className="flex justify-between items-center mb-2">
-                                        <h3 className="text-xs font-bold text-slate-600 uppercase flex items-center gap-2">
-                                            <i className="ph-bold ph-eraser"></i> Opcje Korektora
-                                        </h3>
-                                        <div className="flex gap-1">
-                                            <button onClick={duplicateSelectedElement} className="text-blue-500 hover:bg-blue-200 p-1.5 rounded text-lg transition-colors" title="Skopiuj tę łatę"><i className="ph-bold ph-copy"></i></button>
-                                            <button onClick={() => deleteElement(selectedElementId)} className="text-red-500 hover:bg-red-100 p-1.5 rounded text-lg transition-colors"><i className="ph-bold ph-trash"></i></button>
-                                        </div>
-                                    </div>
-                                    <p className="text-[10px] text-slate-500 leading-tight mb-2">Złap prawy dolny róg białej łaty na dokumencie, aby ją rozciągnąć, lub użyj suwaków poniżej.</p>
-                                    <div className="space-y-2">
-                                        <div className="flex items-center gap-2">
-                                            <i className="ph-bold ph-arrows-out-line-horizontal text-slate-400 text-lg"></i>
-                                            <input type="range" min="10" max="800" value={selectedElement.width} onChange={e => updateSelectedElement({ width: parseInt(e.target.value) })} className="flex-1 accent-slate-500" />
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <i className="ph-bold ph-arrows-out-line-vertical text-slate-400 text-lg"></i>
-                                            <input type="range" min="10" max="800" value={selectedElement.height} onChange={e => updateSelectedElement({ height: parseInt(e.target.value) })} className="flex-1 accent-slate-500" />
-                                        </div>
-                                    </div>
+                                    )}
                                 </div>
                             )}
 
@@ -579,9 +590,9 @@
                             <button 
                                 onClick={exportToPDF} 
                                 disabled={pages.length === 0 || isLoading}
-                                className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-black py-4 rounded-xl shadow-lg shadow-blue-500/30 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:grayscale"
+                                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-4 rounded-xl shadow-lg shadow-blue-600/30 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:grayscale"
                             >
-                                <i className="ph-bold ph-download-simple text-xl"></i> Pobierz Gotowy PDF
+                                <i className="ph-bold ph-printer text-xl"></i> Generuj nowy PDF
                             </button>
                         </div>
                     </aside>
@@ -592,24 +603,19 @@
                         {/* Zoom Controls */}
                         {pages.length > 0 && (
                             <div className="absolute top-6 right-6 z-40 bg-white rounded-full shadow-lg border border-slate-200 flex items-center p-1">
-                                <button onClick={() => setZoom(Math.max(0.4, zoom - 0.1))} className="w-8 h-8 flex items-center justify-center text-slate-600 hover:bg-slate-100 rounded-full"><i className="ph-bold ph-minus"></i></button>
+                                <button onClick={() => setZoom(Math.max(0.4, zoom - 0.1))} className="w-8 h-8 flex items-center justify-center text-slate-600 hover:bg-slate-100 rounded-full"><i className="ph-bold ph-magnifying-glass-minus"></i></button>
                                 <span className="text-xs font-bold w-12 text-center text-slate-700">{Math.round(zoom * 100)}%</span>
-                                <button onClick={() => setZoom(Math.min(2.0, zoom + 0.1))} className="w-8 h-8 flex items-center justify-center text-slate-600 hover:bg-slate-100 rounded-full"><i className="ph-bold ph-plus"></i></button>
+                                <button onClick={() => setZoom(Math.min(2.0, zoom + 0.1))} className="w-8 h-8 flex items-center justify-center text-slate-600 hover:bg-slate-100 rounded-full"><i className="ph-bold ph-magnifying-glass-plus"></i></button>
                             </div>
                         )}
 
-                        <div className="flex-1 w-full overflow-auto custom-scrollbar flex justify-center py-12 px-4 relative z-0">
+                        <div className="flex-1 w-full overflow-auto custom-scrollbar flex justify-center py-16 px-8 relative z-0">
                             
                             {pages.length === 0 ? (
-                                <div className="max-w-md my-auto text-center">
-                                    <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center mx-auto mb-6 shadow-xl border-4 border-slate-50">
-                                        <i className="ph-fill ph-file-pdf text-5xl text-blue-500"></i>
-                                    </div>
-                                    <h2 className="text-2xl font-black text-slate-800 mb-2">Rozpocznij Edycję PDF</h2>
-                                    <p className="text-slate-500 text-sm leading-relaxed mb-8">Wgraj z menu po lewej plik PDF, ofertę, dyplom lub kartę pracy. Układ zostanie zachowany, a Ty będziesz mógł z łatwością zmazać błędy i dopisać nowy, profesjonalny tekst z czcionkami urzędowymi.</p>
-                                    <button onClick={() => fileInputRef.current?.click()} className="bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-8 rounded-full shadow-lg shadow-blue-500/30 transition-all flex items-center justify-center gap-2 mx-auto">
-                                        <i className="ph-bold ph-upload-simple text-lg"></i> Przeglądaj Pliki
-                                    </button>
+                                <div className="max-w-md my-auto text-center opacity-70">
+                                    <i className="ph-fill ph-files text-8xl text-slate-300 mb-4"></i>
+                                    <h2 className="text-2xl font-black text-slate-500 mb-2">Puste biurko</h2>
+                                    <p className="text-slate-400 text-sm">Wgraj plik PDF z menu po lewej stronie, aby rozpocząć pracę.</p>
                                 </div>
                             ) : (
                                 <div 
@@ -621,90 +627,153 @@
                                         marginBottom: `${(zoom - 1) * activePage.height}px` 
                                     }}
                                 >
-                                    {/* Obraz PDF lub Pusta Kartka */}
+                                    {/* Tło PDF */}
                                     {activePage.type === 'pdf' && activePage.imgData && (
                                         <img src={activePage.imgData} alt="PDF Page" className="absolute inset-0 w-full h-full pointer-events-none no-select" />
                                     )}
 
-                                    {/* Renderowanie nakładanych elementów */}
+                                    {/* ELEMENTY NAKŁADANE */}
                                     {activePage.elements.map(el => {
                                         const isSelected = selectedElementId === el.id;
                                         
                                         if (el.type === 'whiteout') {
                                             return (
-                                                <div 
-                                                    key={el.id}
-                                                    onMouseDown={(e) => {
-                                                        const rect = e.target.getBoundingClientRect();
-                                                        const isResizing = (e.clientX - rect.left > rect.width - 15) && (e.clientY - rect.top > rect.height - 15);
-                                                        if (!isResizing) handlePointerDown(e, el.id);
-                                                    }}
-                                                    onTouchStart={(e) => handlePointerDown(e, el.id)}
-                                                    onMouseUp={(e) => {
-                                                        const target = e.currentTarget;
-                                                        if (target.offsetWidth !== el.width || target.offsetHeight !== el.height) {
-                                                            updateSelectedElement({ width: target.offsetWidth, height: target.offsetHeight });
-                                                        }
-                                                    }}
-                                                    className={`pdf-element bg-white cursor-move ${isSelected ? 'selected z-50' : 'z-10'}`}
-                                                    style={{ 
-                                                        left: el.x, top: el.y, 
-                                                        width: el.width, height: el.height,
-                                                        resize: isSelected ? 'both' : 'none', 
-                                                        overflow: 'hidden'
-                                                    }}
-                                                >
-                                                    {/* Usunięto całkowicie szarą ramkę! Czysta biel */}
+                                                <div key={el.id}>
+                                                    {/* Pływający pasek dla korektora */}
+                                                    {isSelected && (
+                                                        <div className="floating-toolbar" style={{ left: el.x, top: el.y - 45 }} onMouseDown={e => e.stopPropagation()}>
+                                                            <div className="text-[10px] font-bold text-slate-400 px-2 flex items-center gap-1"><i className="ph-fill ph-eraser"></i> Korektor</div>
+                                                            <div className="floating-divider"></div>
+                                                            <button onClick={() => duplicateElement(el.id)} className="floating-btn" title="Duplikuj"><i className="ph-bold ph-copy"></i></button>
+                                                            <button onClick={() => deleteElement(el.id)} className="floating-btn text-red-500 hover:text-red-600 hover:bg-red-50" title="Usuń"><i className="ph-bold ph-trash"></i></button>
+                                                        </div>
+                                                    )}
+                                                    
+                                                    {/* Obiekt Korektora */}
+                                                    <div 
+                                                        onMouseDown={(e) => {
+                                                            const rect = e.target.getBoundingClientRect();
+                                                            const isResizing = (e.clientX - rect.left > rect.width - 15) && (e.clientY - rect.top > rect.height - 15);
+                                                            if (!isResizing) handlePointerDown(e, el.id);
+                                                        }}
+                                                        onTouchStart={(e) => handlePointerDown(e, el.id)}
+                                                        onMouseUp={(e) => {
+                                                            const target = e.currentTarget;
+                                                            if (target.offsetWidth !== el.width || target.offsetHeight !== el.height) {
+                                                                updateSelectedElement({ width: target.offsetWidth, height: target.offsetHeight });
+                                                            }
+                                                        }}
+                                                        className={`pdf-element bg-white cursor-move ${isSelected ? 'selected' : ''}`}
+                                                        style={{ 
+                                                            left: el.x, top: el.y, 
+                                                            width: el.width, height: el.height,
+                                                            resize: isSelected ? 'both' : 'none', 
+                                                            overflow: 'hidden'
+                                                        }}
+                                                    >
+                                                        {/* Wskazówka widoczna tylko na hover, by całkowicie zniknęła poza selekcją */}
+                                                        {!isSelected && <div className="absolute inset-0 hover:border-2 hover:border-blue-400/50 transition-colors pointer-events-none"></div>}
+                                                    </div>
                                                 </div>
                                             );
                                         }
 
                                         if (el.type === 'text') {
                                             return (
-                                                <div 
-                                                    key={el.id}
-                                                    className={`pdf-element p-1 ${isSelected ? 'selected z-50' : 'z-20'}`}
-                                                    style={{ left: el.x, top: el.y, minWidth: '100px' }}
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        setSelectedElementId(el.id);
-                                                    }}
-                                                >
-                                                    {/* Niebieska rączka do przesuwania znika gdy zaczynasz pisać! */}
+                                                <div key={el.id}>
+                                                    {/* Pływający pasek opcji dla Tekstu! */}
                                                     {isSelected && (
-                                                        <div 
-                                                            className="drag-handle absolute -top-8 left-0 bg-blue-500 text-white px-3 py-1 rounded-t-lg text-[10px] font-bold cursor-move flex items-center gap-1 shadow-md hover:bg-blue-600 z-50"
-                                                            onMouseDown={(e) => handlePointerDown(e, el.id)}
-                                                            onTouchStart={(e) => handlePointerDown(e, el.id)}
-                                                        >
-                                                            <i className="ph-bold ph-arrows-out-cardinal text-sm"></i> Przesuń
+                                                        <div className="floating-toolbar" style={{ left: el.x, top: el.y - 45 }} onMouseDown={e => e.stopPropagation()}>
+                                                            {/* Wybór czcionki */}
+                                                            <select 
+                                                                value={el.fontFamily} 
+                                                                onChange={e => updateSelectedElement({ fontFamily: e.target.value })} 
+                                                                className="bg-transparent text-xs font-bold text-slate-700 outline-none w-24 cursor-pointer"
+                                                            >
+                                                                <option value="Arial, Helvetica, sans-serif">Arial</option>
+                                                                <option value="'Calibri', sans-serif">Calibri</option>
+                                                                <option value="'Times New Roman', Times, serif">Times</option>
+                                                                <option value="Helvetica, sans-serif">Helvetica</option>
+                                                                <option value="Tahoma, sans-serif">Tahoma</option>
+                                                                <option value="Georgia, serif">Georgia</option>
+                                                                <option value="'Courier New', Courier, monospace">Courier</option>
+                                                                <option value="'Inter', sans-serif">Inter</option>
+                                                                <option value="'Lora', serif">Lora</option>
+                                                                <option value="'Montserrat', sans-serif">Montserrat</option>
+                                                                <option value="'Caveat', cursive">Ręczna</option>
+                                                            </select>
+                                                            <div className="floating-divider"></div>
+                                                            
+                                                            {/* Rozmiar */}
+                                                            <button onClick={() => updateSelectedElement({ fontSize: Math.max(8, el.fontSize - 2) })} className="floating-btn"><i className="ph-bold ph-minus"></i></button>
+                                                            <span className="text-xs font-bold text-slate-600 w-6 text-center">{el.fontSize}</span>
+                                                            <button onClick={() => updateSelectedElement({ fontSize: el.fontSize + 2 })} className="floating-btn"><i className="ph-bold ph-plus"></i></button>
+                                                            <div className="floating-divider"></div>
+                                                            
+                                                            {/* Pogrubienie */}
+                                                            <button 
+                                                                onClick={() => updateSelectedElement({ fontWeight: el.fontWeight === '700' ? '400' : '700' })} 
+                                                                className={`floating-btn font-black font-serif ${el.fontWeight === '700' ? 'bg-slate-200 text-blue-600' : ''}`}
+                                                            >B</button>
+                                                            
+                                                            {/* Kolor */}
+                                                            <input type="color" value={el.color} onChange={e => updateSelectedElement({ color: e.target.value })} className="w-6 h-6 p-0 border-0 rounded cursor-pointer ml-1" />
+                                                            <div className="floating-divider"></div>
+
+                                                            {/* Akcje */}
+                                                            <button onClick={() => duplicateElement(el.id)} className="floating-btn" title="Duplikuj"><i className="ph-bold ph-copy"></i></button>
+                                                            <button onClick={() => deleteElement(el.id)} className="floating-btn text-red-500 hover:text-red-600 hover:bg-red-50" title="Usuń"><i className="ph-bold ph-trash"></i></button>
                                                         </div>
                                                     )}
-                                                    
-                                                    {/* Pole do pisania NA ŻYWO (ContentEditable) */}
-                                                    <div
-                                                        contentEditable={true}
-                                                        suppressContentEditableWarning={true}
-                                                        onBlur={(e) => {
-                                                            const text = e.currentTarget.innerText;
-                                                            // Auto-usuwanie pustego pola, by nie robiło bałaganu na ekranie
-                                                            if (!text.trim()) {
-                                                                deleteElement(el.id);
-                                                            } else {
-                                                                updateSelectedElement({ content: text });
-                                                            }
-                                                        }}
-                                                        data-placeholder="Napisz coś..."
-                                                        className="content-editable-box relative z-10"
-                                                        style={{
-                                                            fontSize: `${el.fontSize}px`,
-                                                            color: el.color,
-                                                            fontFamily: el.fontFamily,
-                                                            fontWeight: el.fontWeight,
-                                                            lineHeight: '1.2'
+
+                                                    {/* Obiekt Tekstu */}
+                                                    <div 
+                                                        className={`pdf-element ${isSelected ? 'selected' : ''}`}
+                                                        style={{ left: el.x, top: el.y }}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setSelectedElementId(el.id);
                                                         }}
                                                     >
-                                                        {el.content}
+                                                        {/* Rączka do przesuwania (ukrywana przez CSS gdy fokusujemy pole tekstu) */}
+                                                        {isSelected && (
+                                                            <div 
+                                                                className="drag-handle absolute -left-6 top-1/2 -translate-y-1/2 bg-blue-500 text-white w-5 h-8 rounded flex items-center justify-center cursor-move shadow-md hover:bg-blue-600"
+                                                                onMouseDown={(e) => handlePointerDown(e, el.id)}
+                                                                onTouchStart={(e) => handlePointerDown(e, el.id)}
+                                                                title="Przesuń element"
+                                                            >
+                                                                <i className="ph-bold ph-arrows-out-cardinal text-xs"></i>
+                                                            </div>
+                                                        )}
+                                                        
+                                                        {/* Aktywne Pole Tekstowe */}
+                                                        <div
+                                                            contentEditable={true}
+                                                            suppressContentEditableWarning={true}
+                                                            onFocus={() => { editModeRef.current = true; }}
+                                                            onBlur={(e) => {
+                                                                editModeRef.current = false;
+                                                                const text = e.currentTarget.innerText;
+                                                                // Sprzątanie po pustych polach
+                                                                if (!text.trim()) {
+                                                                    deleteElement(el.id);
+                                                                } else {
+                                                                    updateSelectedElement({ content: text });
+                                                                }
+                                                            }}
+                                                            data-placeholder="Napisz coś..."
+                                                            className="content-editable-box"
+                                                            style={{
+                                                                fontSize: `${el.fontSize}px`,
+                                                                color: el.color,
+                                                                fontFamily: el.fontFamily,
+                                                                fontWeight: el.fontWeight,
+                                                                lineHeight: '1.2'
+                                                            }}
+                                                        >
+                                                            {el.content}
+                                                        </div>
                                                     </div>
                                                 </div>
                                             );
