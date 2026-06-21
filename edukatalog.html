@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduBox PRO - EduKatalog (Generator Ofert)</title>
+
+    <!-- React & Babel -->
+    <script src="https://unpkg.com/react@18.2.0/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone@7.23.6/babel.min.js"></script>
+
+    <!-- Tailwind CSS & Phosphor Icons -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    
+    <!-- Eleganckie czcionki do katalogu -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+
+    <!-- MAGIA: Ładujemy Twój plik apps.js jako źródło danych! -->
+    <script src="./apps.js" onerror="window.appsJsError = true;"></script>
+
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; color: #0f172a; overflow-x: hidden; }
+        .font-serif-title { font-family: 'Playfair Display', serif; }
+        
+        .custom-scrollbar::-webkit-scrollbar { width: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; border: 2px solid #f1f5f9; }
+
+        /* --- STYLE DLA PERFEKCYJNEGO PDF (A4) --- */
+        @media screen {
+            .print-only { display: none !important; }
+            .catalog-page { box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); margin: 2rem auto; }
+        }
+
+        @media print {
+            @page { margin: 0; size: A4 portrait; }
+            
+            body, html, #root { 
+                background: white !important; 
+                margin: 0 !important; padding: 0 !important; 
+                width: 100% !important; height: auto !important;
+                overflow: visible !important; display: block !important;
+            }
+
+            .no-print, aside { display: none !important; }
+            main { padding: 0 !important; margin: 0 !important; width: 100% !important; display: block !important; }
+            
+            .catalog-page { 
+                width: 100% !important; 
+                min-height: 297mm !important; /* Wysokość A4 */
+                margin: 0 !important; 
+                padding: 15mm !important; /* Eleganckie marginesy wewnątrz kartki */
+                box-shadow: none !important;
+                page-break-after: always !important; /* Każda "Strona" zaczyna się od nowej kartki */
+                break-after: page !important;
+                position: relative;
+            }
+
+            /* Ukryj pustą stronę na samym końcu jeśli się wygeneruje */
+            .catalog-page:last-child { page-break-after: auto !important; break-after: auto !important; }
+
+            .app-card {
+                break-inside: avoid !important; /* Nie tnij kart aplikacji wpół! */
+                page-break-inside: avoid !important;
+                border: 1px solid #e2e8f0 !important;
+                box-shadow: none !important;
+                margin-bottom: 1rem !important;
+            }
+
+            * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+        }
+    </style>
+</head>
+<body>
+    <div id="root" class="flex flex-col h-screen"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        const CAT_CONFIG = {
+            'terapia': { title: 'Terapia i SPE', icon: 'ph-heart', color: 'bg-rose-500', text: 'text-rose-500', border: 'border-rose-200' },
+            'biurokracja': { title: 'Biurokracja i Dokumenty', icon: 'ph-file-text', color: 'bg-blue-500', text: 'text-blue-500', border: 'border-blue-200' },
+            'zajecia': { title: 'Zajęcia i Gry', icon: 'ph-game-controller', color: 'bg-emerald-500', text: 'text-emerald-500', border: 'border-emerald-200' },
+            'grafika': { title: 'Grafika i Kreatywne', icon: 'ph-palette', color: 'bg-purple-500', text: 'text-purple-500', border: 'border-purple-200' },
+            'inne': { title: 'Pozostałe Aplikacje', icon: 'ph-squares-four', color: 'bg-slate-500', text: 'text-slate-500', border: 'border-slate-200' }
+        };
+
+        function App() {
+            const [apps, setApps] = useState([]);
+            const [error, setError] = useState(null);
+
+            useEffect(() => {
+                // Sprawdzamy czy apps.js się załadował poprawnie
+                if (window.appsJsError) {
+                    setError("Nie mogę znaleźć pliku apps.js! Upewnij się, że ten plik (edukatalog.html) jest w tym samym folderze co apps.js.");
+                    return;
+                }
+
+                // Odczytujemy dane z okna (window.EduBoxData dodane przez apps.js)
+                if (window.EduBoxData && window.EduBoxData.APPS) {
+                    setApps(window.EduBoxData.APPS);
+                } else {
+                    // Czekamy chwilę, może skrypt się jeszcze ładuje
+                    setTimeout(() => {
+                        if (window.EduBoxData && window.EduBoxData.APPS) {
+                            setApps(window.EduBoxData.APPS);
+                        } else {
+                            setError("Plik apps.js został wczytany, ale nie zawiera 'window.EduBoxData.APPS'. Sprawdź strukturę pliku.");
+                        }
+                    }, 500);
+                }
+            }, []);
+
+            // Grupowanie aplikacji kategoriami
+            const groupedApps = apps.reduce((acc, app) => {
+                const cat = app.category || 'inne';
+                if (!acc[cat]) acc[cat] = [];
+                acc[cat].push(app);
+                return acc;
+            }, {});
+
+            if (error) {
+                return (
+                    <div className="flex-1 flex flex-col items-center justify-center bg-slate-900 text-white p-8">
+                        <i className="ph-fill ph-warning-circle text-6xl text-red-500 mb-4"></i>
+                        <h1 className="text-2xl font-bold mb-2">Błąd wczytywania bazy aplikacji</h1>
+                        <p className="text-slate-400 text-center max-w-lg">{error}</p>
+                    </div>
+                );
+            }
+
+            if (apps.length === 0) {
+                return (
+                    <div className="flex-1 flex flex-col items-center justify-center bg-slate-100 text-slate-500">
+                        <i className="ph-bold ph-spinner animate-spin text-5xl mb-4"></i>
+                        <p>Zaciągam listę aplikacji z Twojego pliku apps.js...</p>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="flex h-screen w-full bg-slate-200 overflow-hidden">
+                    
+                    {/* PANEL BOCZNY (NIE DRUKUJE SIĘ) */}
+                    <aside className="w-80 flex-shrink-0 bg-white border-r border-slate-200 flex flex-col h-full z-10 shadow-2xl no-print">
+                        <div className="p-8 border-b border-slate-100 bg-slate-50 text-center">
+                            <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-600/30 text-white text-3xl mx-auto mb-4">
+                                <i className="ph-bold ph-book-open-text"></i>
+                            </div>
+                            <h1 className="text-2xl font-black tracking-tight text-slate-800 leading-none">EduKatalog</h1>
+                            <p className="text-xs text-blue-600 font-bold uppercase mt-2 tracking-widest">Generator Ofert</p>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto custom-scrollbar p-6 flex flex-col gap-6">
+                            <div className="bg-emerald-50 border border-emerald-200 p-4 rounded-2xl text-emerald-800">
+                                <h3 className="font-bold text-sm mb-1 flex items-center gap-2"><i className="ph-fill ph-check-circle text-lg"></i> Baza podłączona!</h3>
+                                <p className="text-xs opacity-80 leading-relaxed">System pomyślnie odczytał Twój plik <strong>apps.js</strong>. Znaleziono <strong>{apps.length}</strong> gotowych aplikacji.</p>
+                            </div>
+
+                            <div className="space-y-3">
+                                <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Statystyki Kategorii</h4>
+                                {Object.keys(groupedApps).map(cat => {
+                                    const config = CAT_CONFIG[cat] || CAT_CONFIG['inne'];
+                                    return (
+                                        <div key={cat} className="flex items-center justify-between bg-white border border-slate-200 p-3 rounded-xl shadow-sm">
+                                            <div className="flex items-center gap-2">
+                                                <i className={`ph-fill ${config.icon} ${config.text} text-lg`}></i>
+                                                <span className="text-xs font-bold text-slate-700">{config.title}</span>
+                                            </div>
+                                            <span className="bg-slate-100 text-slate-600 px-2 py-1 rounded text-[10px] font-black">{groupedApps[cat].length}</span>
+                                        </div>
+                                    )
+                                })}
+                            </div>
+
+                            <div className="bg-blue-50 p-4 rounded-2xl border border-blue-100 mt-auto">
+                                <p className="text-xs text-blue-800 leading-relaxed font-medium">
+                                    <i className="ph-fill ph-info mr-1"></i>
+                                    Zawsze gdy dodasz nową aplikację przez Kreator do pliku <strong>apps.js</strong>, ten katalog zaktualizuje się automatycznie.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="p-6 border-t border-slate-200 bg-white">
+                            <button onClick={() => window.print()} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-4 rounded-xl shadow-lg shadow-blue-600/30 transition-all flex items-center justify-center gap-2">
+                                <i className="ph-bold ph-printer text-xl"></i> Drukuj / Zapisz PDF
+                            </button>
+                        </div>
+                    </aside>
+
+                    {/* GŁÓWNY WIDOK - KATALOG (A4) */}
+                    <main className="flex-1 overflow-y-auto custom-scrollbar relative bg-slate-200">
+                        <div className="max-w-[210mm] mx-auto pb-20">
+                            
+                            {/* STRONA 1: TYTUŁOWA */}
+                            <div className="catalog-page bg-white flex flex-col justify-center items-center text-center relative overflow-hidden">
+                                {/* Ozdobne tło */}
+                                <div className="absolute top-0 inset-x-0 h-64 bg-gradient-to-b from-blue-50 to-white"></div>
+                                <div className="absolute top-[-50px] right-[-50px] w-64 h-64 bg-blue-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20"></div>
+                                <div className="absolute bottom-[-50px] left-[-50px] w-64 h-64 bg-emerald-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20"></div>
+                                
+                                <div className="relative z-10 w-full">
+                                    <div className="w-32 h-32 bg-slate-900 rounded-[2rem] flex items-center justify-center shadow-2xl mx-auto mb-10 transform rotate-3">
+                                        <i className="ph-fill ph-rocket text-6xl text-white"></i>
+                                    </div>
+                                    <h2 className="text-blue-600 font-bold tracking-[0.2em] uppercase text-sm mb-4">Twój Ekosystem AI</h2>
+                                    <h1 className="font-serif-title text-6xl md:text-7xl font-black text-slate-900 leading-tight mb-8">Katalog<br/>Narzędzi<br/>EduBox PRO</h1>
+                                    
+                                    <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 max-w-sm mx-auto shadow-sm mt-12">
+                                        <p className="text-4xl font-black text-blue-600 mb-1">{apps.length}</p>
+                                        <p className="text-sm font-bold text-slate-500 uppercase tracking-widest">Dostępnych Aplikacji</p>
+                                    </div>
+                                    
+                                    <p className="text-slate-400 text-xs mt-16 font-mono">Stan na dzień: {new Date().toLocaleDateString('pl-PL')}</p>
+                                </div>
+                            </div>
+
+                            {/* STRONY Z KATEGORIAMI */}
+                            {Object.keys(groupedApps).map((cat, index) => {
+                                const config = CAT_CONFIG[cat] || CAT_CONFIG['inne'];
+                                const catApps = groupedApps[cat];
+                                
+                                return (
+                                    <div key={cat} className="catalog-page bg-white flex flex-col">
+                                        
+                                        {/* Nagłówek Kategorii */}
+                                        <div className={`${config.color} text-white p-8 rounded-3xl mb-8 flex items-center justify-between shadow-lg relative overflow-hidden print-break-inside-avoid`}>
+                                            <div className="absolute right-[-20px] top-[-20px] opacity-10 transform rotate-12 scale-150 pointer-events-none">
+                                                <i className={`ph-fill ${config.icon} text-9xl`}></i>
+                                            </div>
+                                            <div className="relative z-10">
+                                                <p className="text-white/80 font-bold uppercase tracking-widest text-xs mb-1">Sekcja {index + 1}</p>
+                                                <h2 className="text-3xl font-black">{config.title}</h2>
+                                            </div>
+                                            <div className="bg-white/20 px-4 py-2 rounded-xl backdrop-blur-sm relative z-10 text-center">
+                                                <span className="block text-2xl font-black leading-none">{catApps.length}</span>
+                                                <span className="text-[9px] uppercase font-bold tracking-wider">Aplikacji</span>
+                                            </div>
+                                        </div>
+
+                                        {/* Siatka Aplikacji - Używamy CSS Grid, który ładnie łamie się na wydruku */}
+                                        <div className="grid grid-cols-2 gap-6 flex-1 content-start">
+                                            {catApps.map(app => (
+                                                <div key={app.title} className={`app-card bg-slate-50 rounded-2xl p-5 border-2 ${config.border} flex flex-col h-full relative`}>
+                                                    
+                                                    {/* Badge (np. NOWOŚĆ) */}
+                                                    {app.badge && (
+                                                        <div className="absolute -top-3 -right-2 z-10">
+                                                            <span className={`${app.badgeColor || 'bg-red-500'} text-white text-[9px] font-black px-3 py-1 rounded-full uppercase tracking-widest shadow-sm border border-white`}>
+                                                                {app.badge}
+                                                            </span>
+                                                        </div>
+                                                    )}
+
+                                                    <div className="flex items-start gap-4 mb-3">
+                                                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center bg-white shadow-sm border ${config.border} shrink-0 ${app.color || config.text}`}>
+                                                            <i className={`ph-fill ${app.icon || 'ph-app-window'} text-2xl`}></i>
+                                                        </div>
+                                                        <div className="flex-1 pt-1">
+                                                            <h3 className="text-base font-black text-slate-800 leading-tight mb-1">{app.title}</h3>
+                                                            {/* Tagi na małych pastylkach */}
+                                                            {app.tags && app.tags.length > 0 && (
+                                                                <div className="flex flex-wrap gap-1 mt-2">
+                                                                    {app.tags.slice(0,3).map(tag => (
+                                                                        <span key={tag} className="text-[8px] bg-white border border-slate-200 text-slate-500 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">
+                                                                            {tag}
+                                                                        </span>
+                                                                    ))}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <p className="text-xs text-slate-600 leading-relaxed font-medium mt-auto bg-white p-3 rounded-xl border border-slate-100">
+                                                        {app.desc}
+                                                    </p>
+                                                </div>
+                                            ))}
+                                        </div>
+
+                                        {/* Stopka na stronie (Opcjonalnie) */}
+                                        <div className="mt-auto pt-6 text-center border-t border-slate-100">
+                                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Katalog Aplikacji EduBox PRO MAX &bull; Strona {index + 2}</p>
+                                        </div>
+                                    </div>
+                                )
+                            })}
+
+                        </div>
+                    </main>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
