@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduBox V3 PRO MAX - EduWpisy PRO</title>
+
+    <!-- React & Babel -->
+    <script src="https://unpkg.com/react@18.2.0/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone@7.23.6/babel.min.js"></script>
+
+    <!-- Tailwind CSS & Phosphor Icons -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+
+    <!-- WBUDOWANA BAZA DANYCH -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, serverTimestamp, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        const FIREBASE_CONFIG = {
+            apiKey: "AIzaSyDL_mvepNJjMmZYQzifN2cXzoKwCE8jNd0",
+            authDomain: "edubox-pro.firebaseapp.com",
+            projectId: "edubox-pro",
+            storageBucket: "edubox-pro.firebasestorage.app",
+            messagingSenderId: "570263845714",
+            appId: "1:570263845714:web:0b029211f7af071b66988b"
+        };
+        const APP_ID = "eduboxpro";
+
+        let app, auth, db;
+        try {
+            app = initializeApp(FIREBASE_CONFIG);
+            auth = getAuth(app);
+            db = getFirestore(app);
+        } catch (e) { console.warn("Firebase init failed", e); }
+
+        window.EduBoxCore = {
+            user: null,
+            init: (callback) => {
+                if (!auth) return;
+                signInAnonymously(auth).catch(e => console.error(e));
+                onAuthStateChanged(auth, (user) => {
+                    window.EduBoxCore.user = user;
+                    if(callback) callback(user);
+                });
+            },
+            saveToGielda: async (collectionName, appType, itemName, config) => {
+                if (!db || !window.EduBoxCore.user) throw new Error("Brak połączenia z chmurą.");
+                const publicRef = collection(db, 'artifacts', APP_ID, 'public', 'data', collectionName);
+                await addDoc(publicRef, {
+                    userId: window.EduBoxCore.user.uid,
+                    createdAt: serverTimestamp(),
+                    type: appType,
+                    name: itemName,
+                    config: config
+                });
+            }
+        };
+    </script>
+
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; color: #0f172a; overflow: hidden; }
+        .font-serif-title { font-family: 'Playfair Display', serif; }
+        
+        .custom-scrollbar::-webkit-scrollbar { width: 8px; height: 8px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        
+        /* Delikatne tło w kropki jak w zeszycie szkolnym */
+        .app-bg {
+            background-color: #f1f5f9;
+            background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+
+        .shimmer {
+            background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.8) 50%, rgba(255,255,255,0) 100%);
+            background-size: 200% 100%;
+            animation: shimmer 2s infinite;
+        }
+        @keyframes shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+        }
+    </style>
+</head>
+<body>
+    <div id="root" class="h-screen flex flex-col"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        const parseAIResponse = (aiOutput) => {
+            let text = String(aiOutput?.text || aiOutput?.response || aiOutput?.content || aiOutput || "").trim();
+            text = text.replace(/```json/gi, '').replace(/```/g, '').trim();
+            try {
+                const startObj = text.indexOf('{');
+                const endObj = text.lastIndexOf('}');
+                if (startObj !== -1 && endObj !== -1 && startObj < endObj) {
+                    let jsonStr = text.substring(startObj, endObj + 1);
+                    return JSON.parse(jsonStr.replace(/,\s*([\]}])/g, '$1'));
+                }
+                throw new Error("Brak nawiasów JSON.");
+            } catch (e) {
+                throw new Error("BŁĄD Z SERWERA: Niepoprawny format dokumentu. Spróbuj ponownie.");
+            }
+        };
+
+        const fetchTextAI = async (prompt, systemInstruction) => {
+            const finalPrompt = `INSTRUKCJA: Zwróć DOKŁADNIE i WYŁĄCZNIE czysty kod JSON. Nie używaj znaczników markdown.\n\n${systemInstruction}\n\nZADANIE:\n${prompt}`;
+            try {
+                const res = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt: finalPrompt, system: systemInstruction, format: "json" })
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    return data.text || data.response || data.content || data;
+                } else {
+                    throw new Error(`Błąd API Text`);
+                }
+            } catch(e) { throw new Error("Brak połączenia z AI. " + e.message); }
+        };
+
+        function App() {
+            const [user, setUser] = useState(null);
+            const [isPremium, setIsPremium] = useState(false);
+            const [premiumCode, setPremiumCode] = useState('');
+            const [aiGenerations, setAiGenerations] = useState(0);
+            const [message, setMessage] = useState(null);
+            
+            const [isGenerating, setIsGenerating] = useState(false);
+            const [resultData, setResultData] = useState(null);
+            const [copiedId, setCopiedId] = useState(null);
+
+            // Formularz wpisów
+            const [topic, setTopic] = useState('');
+            const [activities, setActivities] = useState('');
+            const [ageGroup, setAgeGroup] = useState('Edukacja Wczesnoszkolna (1-3)');
+            const [speNeeds, setSpeNeeds] = useState('Brak specjalnych dostosowań');
+            const [length, setLength] = useState('Średni (1-2 zdania)');
+
+            useEffect(() => {
+                const initDb = () => {
+                    if (typeof window !== 'undefined' && window.EduBoxCore && window.EduBoxCore.init) {
+                        window.EduBoxCore.init((u) => setUser(u));
+                    } else { setTimeout(initDb, 100); }
+                };
+                initDb();
+                
+                try {
+                    const savedGens = window.localStorage.getItem('edubox_eduwpisy_ai');
+                    if (savedGens) setAiGenerations(parseInt(savedGens));
+                    const savedPremium = window.localStorage.getItem('edubox_premium');
+                    if (savedPremium === 'KAWA2024') setIsPremium(true);
+                } catch (e) {}
+            }, []);
+
+            const showMessage = (text, type = 'success') => {
+                setMessage({ text, type });
+                setTimeout(() => setMessage(null), 4000);
+            };
+
+            const handlePremiumCheck = () => {
+                if (premiumCode.toUpperCase() === 'KAWA2024') {
+                    setIsPremium(true); 
+                    try { window.localStorage.setItem('edubox_premium', 'KAWA2024'); } catch(e){}
+                    setPremiumCode('');
+                    showMessage('Kod Premium zaakceptowany!', 'success');
+                } else { showMessage('Nieprawidłowy kod', 'error'); }
+            };
+
+            const handleCopy = (text, id) => {
+                navigator.clipboard.writeText(text).then(() => {
+                    setCopiedId(id);
+                    showMessage('Skopiowano wpis do schowka! Wklej w Librus/Vulcan.');
+                    setTimeout(() => setCopiedId(null), 3000);
+                });
+            };
+
+            const generateContent = async () => {
+                if (!topic.trim()) { showMessage('Wpisz główny temat zajęć.', 'error'); return; }
+                if (!isPremium && aiGenerations >= 5) { showMessage('Limit darmowych generacji wyczerpany. Wpisz kod KAWA2024.', 'error'); return; }
+                
+                setIsGenerating(true);
+                setResultData(null);
+                
+                const sysPrompt = `Jesteś ekspertem pedagogiki, doświadczonym metodykiem i dyrektorem placówki oświatowej. Twoim zadaniem jest pisanie wpisów do dzienników elektronicznych (Librus, Vulcan).
+                Wpisy muszą być maksymalnie profesjonalne, używać mądrego żargonu pedagogicznego (np. percepcja, motoryka mała/duża, koordynacja wzrokowo-ruchowa, rozwój kompetencji kluczowych, integracja sensoryczna).
+
+                WYMOGI SPE: Jeżeli użytkownik wskazał w parametrach, że w grupie są dzieci ze Specjalnymi Potrzebami Edukacyjnymi (SPE), co najmniej 2 warianty wpisu MUSZĄ zawierać sformułowania o "indywidualizacji pracy", "dostosowaniu wymagań do możliwości psychofizycznych", "wspieraniu integracji", lub "elementach terapii włączającej". Używaj urzędowego języka MEN. Pamiętaj by nie używać imion dzieci!
+
+                Wygeneruj 5 zróżnicowanych wariantów tego samego wpisu.
+                WYMÓG JSON:
+                {
+                  "variants": [
+                    { "title": "Standardowy / Zwięzły", "text": "..." },
+                    { "title": "Opisowy / Skupiony na celach", "text": "..." },
+                    { "title": "Rozwój kompetencji społecznych", "text": "..." },
+                    { "title": "Wariant urzędowy (Akcent na Podstawę Programową)", "text": "..." },
+                    { "title": "Wariant włączający (Akcent na metodykę i SPE)", "text": "..." }
+                  ]
+                }`;
+
+                const prompt = `Temat główny: ${topic}. \nWykonane aktywności: ${activities || 'Rozmowa kierowana, karty pracy'}. \nGrupa wiekowa: ${ageGroup}. \nDostosowania SPE: ${speNeeds}. \nPreferowana długość wpisu: ${length}.`;
+
+                try {
+                    const aiText = await fetchTextAI(prompt, sysPrompt);
+                    const parsedJson = parseAIResponse(aiText);
+                    
+                    setResultData(parsedJson.variants);
+                    
+                    if (!isPremium) {
+                        const newCount = aiGenerations + 1;
+                        setAiGenerations(newCount);
+                        try { window.localStorage.setItem('edubox_eduwpisy_ai', newCount.toString()); } catch(e){}
+                    }
+                } catch (error) {
+                    showMessage(error.message, 'error');
+                } finally {
+                    setIsGenerating(false);
+                }
+            };
+
+            return (
+                <div className="flex h-screen w-full bg-slate-100 text-slate-800 overflow-hidden relative selection:bg-indigo-500/30">
+
+                    {message && (
+                        <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 px-6 py-3 rounded-full text-sm font-bold shadow-2xl flex items-center gap-2 animate-bounce ${message.type === 'error' ? 'bg-red-500 text-white' : 'bg-emerald-500 text-white'} no-print`}>
+                            <i className={`ph-bold ${message.type === 'error' ? 'ph-warning-circle' : 'ph-check-circle'} text-lg`}></i> {message.text}
+                        </div>
+                    )}
+
+                    <aside className="w-[380px] flex-shrink-0 bg-white border-r border-slate-200 flex flex-col h-full z-10 shadow-2xl">
+                        <div className="p-6 border-b border-slate-100 flex items-center gap-4 bg-slate-50">
+                            <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/20 shrink-0">
+                                <i className="ph-bold ph-pencil-line text-white text-2xl"></i>
+                            </div>
+                            <div>
+                                <h1 className="text-xl font-black tracking-tight text-slate-800 leading-none">EduWpisy PRO</h1>
+                                <p className="text-[10px] text-indigo-500 font-bold tracking-wider uppercase mt-1">Asystent Dziennika</p>
+                            </div>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto custom-scrollbar p-5 space-y-6">
+                            
+                            <div className="bg-indigo-50/50 border border-indigo-100 p-4 rounded-2xl">
+                                <p className="text-xs text-indigo-800 leading-relaxed font-medium">
+                                    <i className="ph-fill ph-magic-wand text-indigo-500 mr-1 text-lg align-middle"></i>
+                                    Wpisz proste słowa (np. "jesień, wyklejanie"), a AI zamieni to w 5 mądrych, profesjonalnych i urzędowych sformułowań do skopiowania do <b>Librusa</b> lub <b>Vulcana</b>.
+                                </p>
+                            </div>
+
+                            <div className="space-y-4">
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1"><i className="ph-bold ph-text-t text-indigo-400"></i> Temat zajęć</label>
+                                    <input type="text" value={topic} onChange={e => setTopic(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm text-slate-800 focus:border-indigo-500 outline-none transition-colors font-bold shadow-sm" placeholder="np. Znaki drogowe" />
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1"><i className="ph-bold ph-person-simple-run text-indigo-400"></i> Co dzieci robiły? (Opcjonalnie)</label>
+                                    <textarea value={activities} onChange={e => setActivities(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm text-slate-800 focus:border-indigo-500 outline-none transition-colors resize-none h-20 shadow-sm" placeholder="np. kolorowanie, śpiewanie piosenki, spacer" />
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1"><i className="ph-bold ph-users text-indigo-400"></i> Grupa / Etap</label>
+                                    <select value={ageGroup} onChange={e => setAgeGroup(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm font-semibold text-slate-700 focus:border-indigo-500 outline-none shadow-sm cursor-pointer">
+                                        <option>Żłobek</option>
+                                        <option>Przedszkole (Młodsze)</option>
+                                        <option>Przedszkole (Starszaki / Zerówka)</option>
+                                        <option>Edukacja Wczesnoszkolna (1-3)</option>
+                                        <option>Klasy 4-8</option>
+                                        <option>Świetlica</option>
+                                    </select>
+                                </div>
+
+                                <div className="space-y-1.5 bg-rose-50 p-3 rounded-xl border border-rose-100">
+                                    <label className="text-[10px] font-bold text-rose-600 uppercase tracking-widest flex items-center gap-1"><i className="ph-bold ph-wheelchair"></i> Moduł SPE / Włączenie</label>
+                                    <select value={speNeeds} onChange={e => setSpeNeeds(e.target.value)} className="w-full bg-white border border-rose-200 rounded-lg p-2.5 text-xs font-semibold text-rose-800 focus:border-rose-400 outline-none cursor-pointer">
+                                        <option>Brak specjalnych dostosowań</option>
+                                        <option>Uwzględnienie dzieci w spektrum (ASD / Asperger)</option>
+                                        <option>Indywidualizacja dla ucznia z ADHD</option>
+                                        <option>Dostosowanie (Zaburzenia SI)</option>
+                                        <option>Dostosowanie dla ucznia z niedosłuchem / niedowidzeniem</option>
+                                        <option>Ogólna indywidualizacja wymagań i metod pracy</option>
+                                    </select>
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Długość wpisu</label>
+                                    <select value={length} onChange={e => setLength(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs font-semibold text-slate-700 focus:border-indigo-500 outline-none shadow-sm cursor-pointer">
+                                        <option>Bardzo krótki (1 zdanie)</option>
+                                        <option>Średni (1-2 zdania)</option>
+                                        <option>Długi i wyczerpujący (2-4 zdania)</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <button onClick={generateContent} disabled={isGenerating} className="w-full bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white font-black py-4 rounded-xl shadow-[0_10px_20px_-10px_rgba(79,70,229,0.5)] transition-all flex flex-col items-center justify-center gap-1 disabled:opacity-50 min-h-[70px] mt-6">
+                                {isGenerating ? (
+                                    <><i className="ph-bold ph-spinner animate-spin text-2xl"></i><span className="text-xs">Formułowanie urzędowe...</span></>
+                                ) : (
+                                    <span className="flex items-center gap-2"><i className="ph-bold ph-magic-wand text-2xl"></i> Generuj Urzędowe Wpisy</span>
+                                )}
+                            </button>
+                        </div>
+
+                        <div className="p-4 border-t border-slate-200 bg-slate-50">
+                            {!isPremium ? (
+                                <div className="space-y-2 mb-2">
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-[10px] font-bold text-slate-500 uppercase">Status PRO</span>
+                                        <span className="text-[10px] font-bold text-indigo-600 bg-indigo-100 px-2 py-0.5 rounded-full">{5 - aiGenerations} darmowe</span>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <input type="text" value={premiumCode} onChange={(e) => setPremiumCode(e.target.value)} placeholder="Kod Premium" className="flex-1 bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs text-slate-800 focus:border-indigo-500 uppercase" />
+                                        <button onClick={handlePremiumCheck} className="bg-slate-800 hover:bg-slate-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-all">OK</button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="flex items-center gap-3 bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-200 p-3 rounded-xl mb-2">
+                                    <i className="ph-fill ph-crown text-2xl text-indigo-500"></i>
+                                    <div><p className="text-xs font-bold text-indigo-900">Wersja PRO MAX</p><p className="text-[9px] text-indigo-700">Wszystkie limity odblokowane</p></div>
+                                </div>
+                            )}
+                        </div>
+                    </aside>
+
+                    <main className="flex-1 flex flex-col relative z-0 overflow-hidden app-bg">
+                        <div className="flex-1 overflow-y-auto custom-scrollbar p-6 lg:p-12 relative">
+                            
+                            {!resultData && !isGenerating && (
+                                <div className="h-full flex flex-col items-center justify-center max-w-lg mx-auto text-center opacity-60">
+                                    <i className="ph-fill ph-books text-8xl text-indigo-300 mb-6"></i>
+                                    <h2 className="text-2xl font-black text-slate-800 mb-2 font-serif-title">Elektroniczny Dziennik bez stresu</h2>
+                                    <p className="text-slate-500 text-sm leading-relaxed">Wypełnij formularz z lewej strony, a następnie kliknij Generuj. Otrzymasz 5 wariantów wpisu, w tym sformułowania specjalistyczne uwzględniające indywidualizację (SPE).</p>
+                                </div>
+                            )}
+
+                            {isGenerating && (
+                                <div className="h-full flex flex-col items-center justify-center max-w-md mx-auto text-center">
+                                    <div className="w-full bg-white rounded-2xl p-6 shadow-lg border border-slate-200 relative overflow-hidden mb-6">
+                                        <div className="absolute inset-0 shimmer opacity-20"></div>
+                                        <div className="h-4 bg-slate-200 rounded w-1/3 mb-4"></div>
+                                        <div className="h-3 bg-slate-100 rounded w-full mb-2"></div>
+                                        <div className="h-3 bg-slate-100 rounded w-5/6 mb-2"></div>
+                                        <div className="h-3 bg-slate-100 rounded w-4/6"></div>
+                                    </div>
+                                    <p className="text-indigo-600 font-bold animate-pulse">Trwa dopasowywanie języka pedagogicznego do wymogów Podstawy Programowej...</p>
+                                </div>
+                            )}
+
+                            {resultData && !isGenerating && (
+                                <div className="max-w-4xl mx-auto space-y-6 pb-20 animate-[reveal_0.3s_ease-out]">
+                                    
+                                    <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200 flex items-center justify-between">
+                                        <div>
+                                            <h2 className="text-xl font-black text-slate-800 mb-1">Wyniki dla: "{topic}"</h2>
+                                            <p className="text-xs font-bold text-emerald-600 flex items-center gap-1"><i className="ph-fill ph-check-circle"></i> Gotowe do przeklejenia do Dziennika (Librus / Vulcan)</p>
+                                        </div>
+                                    </div>
+
+                                    {resultData.map((variant, index) => {
+                                        const isCopied = copiedId === index;
+                                        // Wyróżnienie wariantu SPE innym kolorem
+                                        const isSpeVariant = variant.title.toLowerCase().includes('spe') || variant.title.toLowerCase().includes('włączając');
+                                        
+                                        return (
+                                            <div key={index} className={`bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow border-l-4 ${isSpeVariant ? 'border-l-rose-500' : 'border-l-indigo-500'} border-y border-r border-y-slate-200 border-r-slate-200 group`}>
+                                                <div className={`px-5 py-3 ${isSpeVariant ? 'bg-rose-50' : 'bg-slate-50'} border-b border-slate-100 flex items-center justify-between`}>
+                                                    <h3 className={`text-xs font-bold uppercase tracking-widest flex items-center gap-2 ${isSpeVariant ? 'text-rose-700' : 'text-slate-600'}`}>
+                                                        {isSpeVariant ? <i className="ph-fill ph-wheelchair text-rose-500 text-lg"></i> : <i className="ph-fill ph-tag text-indigo-400 text-lg"></i>}
+                                                        {variant.title}
+                                                    </h3>
+                                                    <span className="text-[10px] text-slate-400 font-semibold">Opcja {index + 1} z 5</span>
+                                                </div>
+                                                <div className="p-5 relative">
+                                                    <p className="text-[15px] text-slate-700 leading-relaxed font-medium mb-4 selection:bg-indigo-100">
+                                                        {variant.text}
+                                                    </p>
+                                                    
+                                                    <div className="flex justify-end">
+                                                        <button 
+                                                            onClick={() => handleCopy(variant.text, index)}
+                                                            className={`px-6 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-2 ${isCopied ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30' : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white border border-indigo-100 hover:border-transparent'}`}
+                                                        >
+                                                            {isCopied ? <><i className="ph-bold ph-check"></i> Skopiowano!</> : <><i className="ph-bold ph-copy"></i> Kopiuj do schowka</>}
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )
+                                    })}
+
+                                    <div className="text-center mt-12 bg-indigo-50 p-6 rounded-2xl border border-indigo-100">
+                                        <p className="text-indigo-800 font-bold mb-2">Potrzebujesz czegoś innego?</p>
+                                        <p className="text-xs text-indigo-600/80">Zmień wytyczne po lewej stronie i wygeneruj nową pulę wpisów. Sztuczna Inteligencja za każdym razem stworzy unikalne sformułowania.</p>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </main>
+
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
