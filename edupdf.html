@@ -14,15 +14,15 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     
-    <!-- Biblioteki PDF (Kluczowe dla tej aplikacji) -->
+    <!-- Biblioteki PDF -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
-    <!-- Piękne, urzędowe i odręczne czcionki -->
-    <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,600;1,600&family=Roboto+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <!-- Czcionki ozdobne (Klasyczne jak Arial/Times są wbudowane w system) -->
+    <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
-    <!-- WBUDOWANA BAZA DANYCH (Zabezpieczenie przed błędami plików lokalnych) -->
+    <!-- WBUDOWANA BAZA DANYCH -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
@@ -66,25 +66,34 @@
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
         
-        /* Tło aplikacji */
         .app-bg {
             background-color: #f8fafc;
             background-image: radial-gradient(#e2e8f0 1px, transparent 1px);
             background-size: 20px 20px;
         }
 
-        /* Klasy edytora */
+        /* Klasy edytora - ulepszone dla swobodnej edycji */
         .pdf-element { position: absolute; pointer-events: auto; }
-        .pdf-element:hover { outline: 2px dashed rgba(59, 130, 246, 0.5); }
+        .pdf-element:hover { outline: 2px dashed rgba(59, 130, 246, 0.4); }
         .pdf-element.selected { outline: 2px dashed #3b82f6; z-index: 50; }
         
-        /* Ukrywanie elementu drag na tekście wewnątrz aby przesunąć kontener */
         .no-select { user-select: none; -webkit-user-select: none; }
         
-        /* Zapobieganie znikaniu textarea */
-        textarea.element-textarea {
-            background: transparent; border: none; outline: none; resize: none; overflow: hidden;
-            width: 100%; height: 100%; display: block;
+        /* Aktywny edytor tekstu (Zdejmujemy kontury, by wyglądał jak na papierze) */
+        .content-editable-box {
+            outline: none;
+            min-width: 50px;
+            min-height: 1.2em;
+            cursor: text;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        
+        .content-editable-box:empty:before {
+            content: attr(data-placeholder);
+            color: #94a3b8;
+            pointer-events: none;
+            display: block;
         }
     </style>
 </head>
@@ -102,7 +111,7 @@
 
         function App() {
             const [user, setUser] = useState(null);
-            const [pages, setPages] = useState([]); // { id, type, imgData, width, height, elements: [] }
+            const [pages, setPages] = useState([]); 
             const [activePageIdx, setActivePageIdx] = useState(0);
             
             const [isLoading, setIsLoading] = useState(false);
@@ -147,10 +156,9 @@
                     const newPages = [];
                     for (let i = 1; i <= pdf.numPages; i++) {
                         const page = await pdf.getPage(i);
-                        // Pobieramy viewport, obliczamy scale by szerokość wynosiła RENDER_WIDTH
                         const unscaledViewport = page.getViewport({ scale: 1.0 });
                         const scale = RENDER_WIDTH / unscaledViewport.width;
-                        const viewport = page.getViewport({ scale: scale * 2 }); // x2 dla ostrości (Retina)
+                        const viewport = page.getViewport({ scale: scale * 2 }); 
 
                         const canvas = document.createElement('canvas');
                         const ctx = canvas.getContext('2d');
@@ -162,9 +170,9 @@
                         newPages.push({
                             id: `page_${Date.now()}_${i}`,
                             type: 'pdf',
-                            imgData: canvas.toDataURL('image/jpeg', 0.9), // Wysoka jakość JPEG
+                            imgData: canvas.toDataURL('image/jpeg', 0.9), 
                             width: RENDER_WIDTH,
-                            height: unscaledViewport.height * scale, // Proporcjonalna wysokość
+                            height: unscaledViewport.height * scale, 
                             elements: []
                         });
                     }
@@ -178,12 +186,12 @@
                     showMessage('Błąd odczytu pliku PDF. Spróbuj inny plik.', 'error');
                 } finally {
                     setIsLoading(false);
-                    e.target.value = null; // Reset inputa
+                    e.target.value = null; 
                 }
             };
 
             const addBlankPage = () => {
-                const heightA4 = RENDER_WIDTH * 1.4142; // Proporcja A4
+                const heightA4 = RENDER_WIDTH * 1.4142; 
                 const newPage = {
                     id: `page_${Date.now()}_blank`,
                     type: 'blank',
@@ -193,7 +201,7 @@
                     elements: []
                 };
                 setPages([...pages, newPage]);
-                setActivePageIdx(pages.length); // Przejdź do nowej strony
+                setActivePageIdx(pages.length); 
                 setSelectedElementId(null);
                 showMessage('Dodano pustą stronę!');
             };
@@ -210,24 +218,22 @@
                 setSelectedElementId(null);
             };
 
-            // --- ZARZĄDZANIE ELEMENTAMI (TEKST / KOREKTOR) ---
+            // --- ZARZĄDZANIE ELEMENTAMI ---
             const addElement = (type) => {
                 if (pages.length === 0) return;
                 
                 const newElement = {
                     id: `el_${Date.now()}`,
                     type: type,
-                    x: 100, // Początkowa pozycja
-                    y: 100,
-                    // Parametry tekstu
-                    content: type === 'text' ? 'Twój nowy tekst...' : '',
-                    fontSize: 24,
+                    x: type === 'whiteout' ? 300 : 150, 
+                    y: type === 'whiteout' ? 300 : 150,
+                    content: type === 'text' ? 'Kliknij tu i wpisz tekst...' : '',
+                    fontSize: 16,
                     color: '#000000',
-                    fontFamily: "'Inter', sans-serif",
+                    fontFamily: 'Arial, sans-serif', // Zmienione na standardowy urzędowy
                     fontWeight: '400',
-                    // Parametry korektora
-                    width: type === 'whiteout' ? 200 : null,
-                    height: type === 'whiteout' ? 50 : null
+                    width: type === 'whiteout' ? 150 : null,
+                    height: type === 'whiteout' ? 30 : null
                 };
 
                 const updatedPages = [...pages];
@@ -261,8 +267,8 @@
                 e.stopPropagation();
                 setSelectedElementId(id);
                 
-                // Zabezpieczenie przed przesuwaniem, gdy użytkownik wpisuje tekst na urządzeniu mobilnym
-                if (e.target.tagName.toLowerCase() === 'textarea') return;
+                // Nie blokuj przeciągania jeśli kliknęliśmy na element, ale zablokuj, gdy klikamy w sam środek tekstu (pozwala to na edycję tekstu)
+                if (e.target.classList.contains('content-editable-box')) return;
 
                 const clientX = e.clientX || (e.touches && e.touches[0].clientX);
                 const clientY = e.clientY || (e.touches && e.touches[0].clientY);
@@ -286,7 +292,6 @@
                     const clientX = e.clientX || (e.touches && e.touches[0].clientX);
                     const clientY = e.clientY || (e.touches && e.touches[0].clientY);
                     
-                    // Obliczamy różnicę uwzględniając ZOOM kontenera
                     const dx = (clientX - dragState.startX) / zoom;
                     const dy = (clientY - dragState.startY) / zoom;
 
@@ -318,9 +323,10 @@
                 };
             }, [dragState, pages, activePageIdx, zoom]);
 
-            // Odkliknięcie zdejmuje selekcję
-            const handleBackgroundClick = () => {
-                setSelectedElementId(null);
+            const handleBackgroundClick = (e) => {
+                if (e.target === containerRef.current || e.target.classList.contains('app-bg')) {
+                    setSelectedElementId(null);
+                }
             };
 
             // --- EKSPORT DO PDF ---
@@ -329,22 +335,18 @@
                 
                 setIsLoading(true);
                 setLoadingMsg('Składanie dokumentu PDF. To zajmie tylko chwilkę...');
+                setSelectedElementId(null); // Odznacz by usunąć obramowania
                 
                 try {
                     const { jsPDF } = window.jspdf;
                     const pdf = new jsPDF({ unit: 'px', format: 'a4', orientation: 'portrait' });
-                    
-                    // Szerokość A4 w jsPDF (domyślnie ~446px)
                     const pdfWidth = pdf.internal.pageSize.getWidth();
 
                     for (let i = 0; i < pages.length; i++) {
                         const page = pages[i];
-                        
-                        // Obliczamy proporcjonalną wysokość strony do zapisu
                         const ratio = page.height / page.width;
                         const pdfHeight = pdfWidth * ratio;
 
-                        // Tworzymy tymczasowy kontener poza ekranem by idealnie sczytać go przez html2canvas
                         const tempDiv = document.createElement('div');
                         tempDiv.style.position = 'absolute';
                         tempDiv.style.left = '-9999px';
@@ -362,7 +364,7 @@
                             tempDiv.appendChild(img);
                         }
 
-                        // Renderujemy elementy
+                        // Renderowanie elementów do eksportu
                         page.elements.forEach(el => {
                             const elDiv = document.createElement('div');
                             elDiv.style.position = 'absolute';
@@ -380,6 +382,7 @@
                                 elDiv.style.fontFamily = el.fontFamily;
                                 elDiv.style.fontWeight = el.fontWeight;
                                 elDiv.style.whiteSpace = 'pre-wrap';
+                                elDiv.style.wordBreak = 'break-word';
                                 elDiv.style.lineHeight = '1.2';
                             }
                             tempDiv.appendChild(elDiv);
@@ -387,17 +390,12 @@
 
                         document.body.appendChild(tempDiv);
 
-                        // Capture do obrazu
                         const canvas = await html2canvas(tempDiv, { scale: 2, useCORS: true, logging: false });
                         const imgData = canvas.toDataURL('image/jpeg', 0.95);
                         
-                        if (i > 0) pdf.addPage(); // Nowa strona (pierwsza jest domyślnie dodana)
+                        if (i > 0) pdf.addPage();
                         
-                        // Ustawiamy rozmiar strony PDF do rozmiaru oryginalnej kartki (aby pasowały układy pionowe/poziome)
                         pdf.setPage(i + 1);
-                        // UWAGA: jsPDF używa pierwszych argumentów z init do wszystkich stron. 
-                        // W tej uproszczonej wersji eksportujemy jako plik portretowy A4, a obrazy dopasowują się szerokością.
-                        
                         pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
                         
                         document.body.removeChild(tempDiv);
@@ -419,7 +417,6 @@
             return (
                 <div className="flex h-screen w-full bg-slate-900 text-slate-800 overflow-hidden relative selection:bg-blue-500/30">
                     
-                    {/* Ładowanie Overlay */}
                     {isLoading && (
                         <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center text-white">
                             <i className="ph-bold ph-spinner animate-spin text-6xl mb-4 text-blue-500"></i>
@@ -427,7 +424,6 @@
                         </div>
                     )}
 
-                    {/* Powiadomienia */}
                     {message && (
                         <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 px-6 py-3 rounded-full text-sm font-bold shadow-2xl flex items-center gap-2 animate-bounce ${message.type === 'error' ? 'bg-red-500 text-white' : 'bg-blue-500 text-white'}`}>
                             <i className={`ph-bold ${message.type === 'error' ? 'ph-warning-circle' : 'ph-check-circle'} text-lg`}></i> {message.text}
@@ -449,7 +445,7 @@
                         <div className="flex-1 overflow-y-auto custom-scrollbar p-4 flex flex-col gap-6">
                             
                             {/* KROK 1: Plik */}
-                            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+                            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 shadow-sm">
                                 <h3 className="text-xs font-bold text-slate-500 uppercase mb-3 flex items-center gap-2">
                                     <span className="w-5 h-5 rounded-full bg-slate-200 flex items-center justify-center text-[10px] text-slate-600">1</span> Wgraj Dokument
                                 </h3>
@@ -467,7 +463,7 @@
                             </div>
 
                             {/* KROK 2: Narzędzia */}
-                            <div className={`bg-slate-50 border border-slate-200 rounded-2xl p-4 transition-opacity ${pages.length === 0 ? 'opacity-50 pointer-events-none' : ''}`}>
+                            <div className={`bg-slate-50 border border-slate-200 rounded-2xl p-4 shadow-sm transition-opacity ${pages.length === 0 ? 'opacity-50 pointer-events-none' : ''}`}>
                                 <h3 className="text-xs font-bold text-slate-500 uppercase mb-3 flex items-center gap-2">
                                     <span className="w-5 h-5 rounded-full bg-slate-200 flex items-center justify-center text-[10px] text-slate-600">2</span> Dodaj Elementy
                                 </h3>
@@ -481,7 +477,7 @@
                                         Napisz
                                     </button>
                                 </div>
-                                <button onClick={addBlankPage} className="mt-2 w-full bg-white border border-slate-200 hover:border-emerald-400 text-slate-600 hover:text-emerald-600 py-2 rounded-xl transition-all flex items-center justify-center gap-2 text-xs font-bold shadow-sm">
+                                <button onClick={addBlankPage} className="mt-2 w-full bg-white border border-slate-200 hover:border-emerald-400 text-slate-600 hover:text-emerald-600 py-2 rounded-xl transition-all flex items-center justify-center gap-2 text-[10px] font-bold shadow-sm">
                                     <i className="ph-bold ph-plus-circle text-lg"></i> Dodaj pustą stronę na końcu
                                 </button>
                                 <button onClick={deleteCurrentPage} className="mt-2 w-full bg-red-50 hover:bg-red-100 text-red-600 py-2 rounded-xl transition-all flex items-center justify-center gap-2 text-[10px] font-bold">
@@ -489,62 +485,70 @@
                                 </button>
                             </div>
 
-                            {/* WŁAŚCIWOŚCI ZAZNACZONEGO ELEMENTU */}
-                            {selectedElement && (
-                                <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 animate-[reveal_0.2s_ease-out]">
+                            {/* WŁAŚCIWOŚCI ZAZNACZONEGO ELEMENTU (TYLKO DLA TEKSTU I TYLKO USTAWIENIA CZCIONKI) */}
+                            {selectedElement && selectedElement.type === 'text' && (
+                                <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 shadow-sm animate-[reveal_0.2s_ease-out]">
                                     <div className="flex justify-between items-center mb-3">
                                         <h3 className="text-xs font-bold text-blue-800 uppercase flex items-center gap-2">
-                                            {selectedElement.type === 'text' ? <><i className="ph-bold ph-text-aa"></i> Edycja Tekstu</> : <><i className="ph-bold ph-eraser"></i> Edycja Korektora</>}
+                                            <i className="ph-bold ph-text-aa"></i> Wygląd Tekstu
                                         </h3>
                                         <button onClick={deleteSelectedElement} className="text-red-500 hover:bg-red-100 p-1.5 rounded text-lg"><i className="ph-bold ph-trash"></i></button>
                                     </div>
-
-                                    {selectedElement.type === 'text' && (
-                                        <div className="space-y-3">
-                                            <textarea 
-                                                value={selectedElement.content} 
-                                                onChange={e => updateSelectedElement({ content: e.target.value })}
-                                                className="w-full bg-white border border-blue-200 rounded-lg p-2 text-sm focus:outline-none focus:border-blue-400 resize-none h-20"
-                                                placeholder="Wpisz treść tutaj..."
-                                            />
-                                            <div className="flex items-center gap-2">
-                                                <i className="ph-bold ph-text-t text-slate-400 text-lg"></i>
-                                                <input type="range" min="10" max="120" value={selectedElement.fontSize} onChange={e => updateSelectedElement({ fontSize: parseInt(e.target.value) })} className="flex-1 accent-blue-500" />
-                                                <span className="text-xs font-bold text-slate-600 w-8">{selectedElement.fontSize}px</span>
-                                            </div>
-                                            <div className="flex gap-2">
-                                                <input type="color" value={selectedElement.color} onChange={e => updateSelectedElement({ color: e.target.value })} className="w-10 h-10 p-0 border-0 rounded cursor-pointer" />
-                                                <select value={selectedElement.fontFamily} onChange={e => updateSelectedElement({ fontFamily: e.target.value })} className="flex-1 bg-white border border-blue-200 rounded-lg px-2 text-xs font-bold text-slate-700 outline-none">
-                                                    <option value="'Inter', sans-serif">Standardowa (Inter)</option>
-                                                    <option value="'Roboto Mono', monospace">Maszynowa (Roboto)</option>
-                                                    <option value="'Playfair Display', serif">Elegancka (Playfair)</option>
-                                                    <option value="'Caveat', cursive">Odręczna (Caveat)</option>
-                                                </select>
-                                                <button onClick={() => updateSelectedElement({ fontWeight: selectedElement.fontWeight === '700' ? '400' : '700' })} className={`w-10 h-10 rounded-lg font-bold border ${selectedElement.fontWeight === '700' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-blue-200'}`}>B</button>
-                                            </div>
+                                    <div className="space-y-3">
+                                        <p className="text-[10px] text-blue-600 font-bold mb-2">Sam tekst wpisuj bezpośrednio klikając w niego na dokumencie!</p>
+                                        <div className="flex items-center gap-2">
+                                            <i className="ph-bold ph-text-t text-slate-400 text-lg"></i>
+                                            <input type="range" min="10" max="120" value={selectedElement.fontSize} onChange={e => updateSelectedElement({ fontSize: parseInt(e.target.value) })} className="flex-1 accent-blue-500" />
+                                            <span className="text-xs font-bold text-slate-600 w-8">{selectedElement.fontSize}px</span>
                                         </div>
-                                    )}
-
-                                    {selectedElement.type === 'whiteout' && (
-                                        <div className="space-y-3">
-                                            <p className="text-xs text-blue-700 leading-tight">Użyj suwaków, aby precyzyjnie dopasować wielkość białej łaty, zasłaniając błędy w dokumencie.</p>
-                                            <div className="flex items-center gap-2">
-                                                <i className="ph-bold ph-arrows-out-line-horizontal text-slate-400 text-lg"></i>
-                                                <input type="range" min="10" max="800" value={selectedElement.width} onChange={e => updateSelectedElement({ width: parseInt(e.target.value) })} className="flex-1 accent-blue-500" />
-                                            </div>
-                                            <div className="flex items-center gap-2">
-                                                <i className="ph-bold ph-arrows-out-line-vertical text-slate-400 text-lg"></i>
-                                                <input type="range" min="10" max="800" value={selectedElement.height} onChange={e => updateSelectedElement({ height: parseInt(e.target.value) })} className="flex-1 accent-blue-500" />
-                                            </div>
+                                        <div className="flex gap-2">
+                                            <input type="color" value={selectedElement.color} onChange={e => updateSelectedElement({ color: e.target.value })} className="w-10 h-10 p-0 border-0 rounded cursor-pointer shrink-0" />
+                                            
+                                            {/* ZAAWANSOWANE KLASYCZNE CZCIONKI URZĘDOWE */}
+                                            <select value={selectedElement.fontFamily} onChange={e => updateSelectedElement({ fontFamily: e.target.value })} className="flex-1 bg-white border border-blue-200 rounded-lg px-2 text-[10px] font-bold text-slate-700 outline-none">
+                                                <option value="Arial, Helvetica, sans-serif">Arial (Klasyczna)</option>
+                                                <option value="'Times New Roman', Times, serif">Times New Roman (Urzędowa)</option>
+                                                <option value="Helvetica, sans-serif">Helvetica (Nowoczesna)</option>
+                                                <option value="'Courier New', Courier, monospace">Courier New (Maszynowa)</option>
+                                                <option value="Georgia, serif">Georgia (Książkowa)</option>
+                                                <option value="Tahoma, sans-serif">Tahoma (Zwięzła)</option>
+                                                <option value="Verdana, sans-serif">Verdana (Czytelna)</option>
+                                                <option value="'Inter', sans-serif">Inter (Standard App)</option>
+                                                <option value="'Caveat', cursive">Caveat (Odręczna Pismo)</option>
+                                            </select>
+                                            <button onClick={() => updateSelectedElement({ fontWeight: selectedElement.fontWeight === '700' ? '400' : '700' })} className={`w-10 h-10 shrink-0 rounded-lg font-bold border ${selectedElement.fontWeight === '700' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-blue-200'}`}>B</button>
                                         </div>
-                                    )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* WŁAŚCIWOŚCI KOREKTORA (SUWAKI + USUWANIE) */}
+                            {selectedElement && selectedElement.type === 'whiteout' && (
+                                <div className="bg-slate-100 border border-slate-300 rounded-2xl p-4 shadow-sm animate-[reveal_0.2s_ease-out]">
+                                    <div className="flex justify-between items-center mb-2">
+                                        <h3 className="text-xs font-bold text-slate-600 uppercase flex items-center gap-2">
+                                            <i className="ph-bold ph-eraser"></i> Opcje Korektora
+                                        </h3>
+                                        <button onClick={deleteSelectedElement} className="text-red-500 hover:bg-red-100 p-1.5 rounded text-lg"><i className="ph-bold ph-trash"></i></button>
+                                    </div>
+                                    <p className="text-[10px] text-slate-500 leading-tight mb-2">Złap prawy dolny róg białej łaty na dokumencie, aby ją rozciągnąć, lub użyj suwaków poniżej.</p>
+                                    <div className="space-y-2">
+                                        <div className="flex items-center gap-2">
+                                            <i className="ph-bold ph-arrows-out-line-horizontal text-slate-400 text-lg"></i>
+                                            <input type="range" min="10" max="800" value={selectedElement.width} onChange={e => updateSelectedElement({ width: parseInt(e.target.value) })} className="flex-1 accent-slate-500" />
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <i className="ph-bold ph-arrows-out-line-vertical text-slate-400 text-lg"></i>
+                                            <input type="range" min="10" max="800" value={selectedElement.height} onChange={e => updateSelectedElement({ height: parseInt(e.target.value) })} className="flex-1 accent-slate-500" />
+                                        </div>
+                                    </div>
                                 </div>
                             )}
 
                         </div>
 
                         {/* KROK 3: Zapis */}
-                        <div className="p-4 border-t border-slate-200 bg-white">
+                        <div className="p-4 border-t border-slate-200 bg-white shadow-[0_-10px_20px_rgba(0,0,0,0.02)]">
                             <button 
                                 onClick={exportToPDF} 
                                 disabled={pages.length === 0 || isLoading}
@@ -556,7 +560,7 @@
                     </aside>
 
                     {/* Główny obszar roboczy (Płótno) */}
-                    <main className="flex-1 relative flex flex-col items-center overflow-hidden app-bg" onClick={handleBackgroundClick}>
+                    <main className="flex-1 relative flex flex-col items-center overflow-hidden app-bg" onClick={handleBackgroundClick} ref={containerRef}>
                         
                         {/* Zoom Controls */}
                         {pages.length > 0 && (
@@ -567,7 +571,7 @@
                             </div>
                         )}
 
-                        <div className="flex-1 w-full overflow-auto custom-scrollbar flex justify-center py-12 px-4" ref={containerRef}>
+                        <div className="flex-1 w-full overflow-auto custom-scrollbar flex justify-center py-12 px-4">
                             
                             {pages.length === 0 ? (
                                 <div className="max-w-md my-auto text-center">
@@ -575,7 +579,7 @@
                                         <i className="ph-fill ph-file-pdf text-5xl text-blue-500"></i>
                                     </div>
                                     <h2 className="text-2xl font-black text-slate-800 mb-2">Rozpocznij Edycję PDF</h2>
-                                    <p className="text-slate-500 text-sm leading-relaxed mb-8">Wgraj z menu po lewej plik PDF, ofertę, dyplom lub kartę pracy. Układ zostanie zachowany, a Ty będziesz mógł zamazać błędy i nałożyć nowy, czysty tekst.</p>
+                                    <p className="text-slate-500 text-sm leading-relaxed mb-8">Wgraj z menu po lewej plik PDF, ofertę, dyplom lub kartę pracy. Układ zostanie zachowany, a Ty będziesz mógł z łatwością zmazać błędy i dopisać nowy, profesjonalny tekst z czcionkami urzędowymi.</p>
                                     <button onClick={() => fileInputRef.current?.click()} className="bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-8 rounded-full shadow-lg shadow-blue-500/30 transition-all flex items-center justify-center gap-2 mx-auto">
                                         <i className="ph-bold ph-upload-simple text-lg"></i> Przeglądaj Pliki
                                     </button>
@@ -587,7 +591,7 @@
                                         width: activePage.width, 
                                         height: activePage.height,
                                         transform: `scale(${zoom})`,
-                                        marginBottom: `${(zoom - 1) * activePage.height}px` // Kompensacja skali dla scrolla
+                                        marginBottom: `${(zoom - 1) * activePage.height}px` 
                                     }}
                                 >
                                     {/* Obraz PDF lub Pusta Kartka */}
@@ -603,12 +607,28 @@
                                             return (
                                                 <div 
                                                     key={el.id}
-                                                    onMouseDown={(e) => handlePointerDown(e, el.id)}
+                                                    onMouseDown={(e) => {
+                                                        // Zapobiega drag&drop jeśli użytkownik rozciąga róg (resize handle)
+                                                        const rect = e.target.getBoundingClientRect();
+                                                        const isResizing = (e.clientX - rect.left > rect.width - 15) && (e.clientY - rect.top > rect.height - 15);
+                                                        if (!isResizing) handlePointerDown(e, el.id);
+                                                    }}
                                                     onTouchStart={(e) => handlePointerDown(e, el.id)}
+                                                    onMouseUp={(e) => {
+                                                        // Aktualizacja stanu po rozciągnięciu CSS resize
+                                                        const target = e.currentTarget;
+                                                        if (target.offsetWidth !== el.width || target.offsetHeight !== el.height) {
+                                                            updateSelectedElement({ width: target.offsetWidth, height: target.offsetHeight });
+                                                        }
+                                                    }}
                                                     className={`pdf-element bg-white cursor-move ${isSelected ? 'selected' : ''}`}
-                                                    style={{ left: el.x, top: el.y, width: el.width, height: el.height }}
+                                                    style={{ 
+                                                        left: el.x, top: el.y, 
+                                                        width: el.width, height: el.height,
+                                                        resize: isSelected ? 'both' : 'none', // Aktywacja rozciągania na krawędzi
+                                                        overflow: 'hidden'
+                                                    }}
                                                 >
-                                                    {/* Mały znacznik żeby widzieć pusty korektor gdy jest niezaznaczony */}
                                                     {!isSelected && <div className="absolute inset-0 border border-slate-100/50"></div>}
                                                 </div>
                                             );
@@ -618,24 +638,40 @@
                                             return (
                                                 <div 
                                                     key={el.id}
-                                                    onMouseDown={(e) => handlePointerDown(e, el.id)}
-                                                    onTouchStart={(e) => handlePointerDown(e, el.id)}
-                                                    className={`pdf-element cursor-move p-1 ${isSelected ? 'selected' : ''}`}
-                                                    style={{ 
-                                                        left: el.x, top: el.y, 
-                                                        minWidth: '100px', minHeight: '30px'
+                                                    className={`pdf-element p-1 ${isSelected ? 'selected' : ''}`}
+                                                    style={{ left: el.x, top: el.y, minWidth: '100px' }}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setSelectedElementId(el.id);
                                                     }}
                                                 >
-                                                    <div 
-                                                        className="whitespace-pre-wrap leading-[1.2]"
+                                                    {/* Niebieska rączka do przesuwania (pojawia się tylko po kliknięciu elementu) */}
+                                                    {isSelected && (
+                                                        <div 
+                                                            className="absolute -top-7 left-0 bg-blue-500 text-white px-3 py-1 rounded-t-lg text-[10px] font-bold cursor-move flex items-center gap-1 shadow-md hover:bg-blue-600"
+                                                            onMouseDown={(e) => handlePointerDown(e, el.id)}
+                                                            onTouchStart={(e) => handlePointerDown(e, el.id)}
+                                                        >
+                                                            <i className="ph-bold ph-arrows-out-cardinal text-sm"></i> Przesuń
+                                                        </div>
+                                                    )}
+                                                    
+                                                    {/* Pole do pisania NA ŻYWO (ContentEditable) */}
+                                                    <div
+                                                        contentEditable={true}
+                                                        suppressContentEditableWarning={true}
+                                                        onBlur={(e) => updateSelectedElement({ content: e.currentTarget.innerText })}
+                                                        data-placeholder="Wpisz tekst..."
+                                                        className="content-editable-box"
                                                         style={{
                                                             fontSize: `${el.fontSize}px`,
                                                             color: el.color,
                                                             fontFamily: el.fontFamily,
-                                                            fontWeight: el.fontWeight
+                                                            fontWeight: el.fontWeight,
+                                                            lineHeight: '1.2'
                                                         }}
                                                     >
-                                                        {el.content || '...'}
+                                                        {el.content}
                                                     </div>
                                                 </div>
                                             );
