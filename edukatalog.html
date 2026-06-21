@@ -17,8 +17,13 @@
     <!-- Eleganckie czcionki do katalogu -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
 
-    <!-- MAGIA: Ładujemy Twój plik apps.js jako źródło danych! -->
-    <script src="./apps.js" onerror="window.appsJsError = true;"></script>
+    <!-- MAGIA: Wymuszamy ZAWSZE najnowszą wersję apps.js (Obejście Cache) -->
+    <script>
+        const script = document.createElement('script');
+        script.src = './apps.js?v=' + new Date().getTime();
+        script.onerror = () => { window.appsJsError = true; };
+        document.head.appendChild(script);
+    </script>
 
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; color: #0f172a; overflow-x: hidden; }
@@ -37,15 +42,30 @@
         @media print {
             @page { margin: 0; size: A4 portrait; }
             
-            body, html, #root { 
+            /* Zdejmujemy blokady przewijania i limity wysokości */
+            html, body, #root, .h-screen, .overflow-hidden, .overflow-y-auto { 
                 background: white !important; 
                 margin: 0 !important; padding: 0 !important; 
                 width: 100% !important; height: auto !important;
+                min-height: auto !important;
                 overflow: visible !important; display: block !important;
+                position: static !important;
+            }
+
+            /* Zabijamy głównego flexa! To on ucinał PDF do 1 strony w Chrome */
+            #root > div {
+                display: block !important;
+                height: auto !important;
+                overflow: visible !important;
             }
 
             .no-print, aside { display: none !important; }
-            main { padding: 0 !important; margin: 0 !important; width: 100% !important; display: block !important; }
+            
+            main { 
+                padding: 0 !important; margin: 0 !important; 
+                width: 100% !important; height: auto !important;
+                display: block !important; overflow: visible !important;
+            }
             
             .catalog-page { 
                 width: 100% !important; 
@@ -56,6 +76,7 @@
                 page-break-after: always !important; /* Każda "Strona" zaczyna się od nowej kartki */
                 break-after: page !important;
                 position: relative;
+                display: block !important; /* Musi być block, by się poprawnie łamało */
             }
 
             /* Ukryj pustą stronę na samym końcu jeśli się wygeneruje */
@@ -64,7 +85,7 @@
             .app-card {
                 break-inside: avoid !important; /* Nie tnij kart aplikacji wpół! */
                 page-break-inside: avoid !important;
-                border: 1px solid #e2e8f0 !important;
+                border: 2px solid #e2e8f0 !important;
                 box-shadow: none !important;
                 margin-bottom: 1rem !important;
             }
@@ -92,25 +113,28 @@
             const [error, setError] = useState(null);
 
             useEffect(() => {
-                // Sprawdzamy czy apps.js się załadował poprawnie
-                if (window.appsJsError) {
-                    setError("Nie mogę znaleźć pliku apps.js! Upewnij się, że ten plik (edukatalog.html) jest w tym samym folderze co apps.js.");
-                    return;
-                }
-
-                // Odczytujemy dane z okna (window.EduBoxData dodane przez apps.js)
-                if (window.EduBoxData && window.EduBoxData.APPS) {
-                    setApps(window.EduBoxData.APPS);
-                } else {
-                    // Czekamy chwilę, może skrypt się jeszcze ładuje
-                    setTimeout(() => {
-                        if (window.EduBoxData && window.EduBoxData.APPS) {
-                            setApps(window.EduBoxData.APPS);
-                        } else {
-                            setError("Plik apps.js został wczytany, ale nie zawiera 'window.EduBoxData.APPS'. Sprawdź strukturę pliku.");
+                // Interwał sprawdzający, czy apps.js już się załadował (bo ładujemy go dynamicznie)
+                let attempts = 0;
+                const checkData = setInterval(() => {
+                    if (window.appsJsError) {
+                        clearInterval(checkData);
+                        setError("Nie mogę znaleźć pliku apps.js! Upewnij się, że jest w tym samym folderze.");
+                        return;
+                    }
+                    
+                    if (window.EduBoxData && window.EduBoxData.APPS) {
+                        setApps(window.EduBoxData.APPS);
+                        clearInterval(checkData);
+                    } else {
+                        attempts++;
+                        if (attempts > 15) { // Po 3 sekundach przerywamy
+                            clearInterval(checkData);
+                            setError("Plik apps.js wczytuje się zbyt długo lub ma błąd w kodzie (np. brakujący przecinek).");
                         }
-                    }, 500);
-                }
+                    }
+                }, 200);
+
+                return () => clearInterval(checkData);
             }, []);
 
             // Grupowanie aplikacji kategoriami
