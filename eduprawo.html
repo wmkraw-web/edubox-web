@@ -112,6 +112,12 @@
             
             .print-border-bottom { border-bottom: 2px solid #ccc !important; }
             .print-bg-light { background-color: #f8fafc !important; border: 1px solid #e2e8f0 !important; }
+
+            /* Wymuszamy OTWARTY stan zakładek na wydruku */
+            details { display: block !important; height: auto !important; overflow: visible !important; }
+            details > summary ~ * { display: block !important; }
+            details > summary { border-bottom: 2px solid #e2e8f0 !important; }
+            .ph-caret-down { display: none !important; }
         }
     </style>
 </head>
@@ -372,23 +378,31 @@
                 setAiResponse(null);
                 setBotMessage("Otwieram najnowsze akta i dzienniki ustaw. Biorę pod uwagę najnowsze nowelizacje z lat 2024-2026. Analizuję problem, co potrwa około 30-40 sekund...");
 
-                // POTĘŻNY PROMPT PRAWNICZY V5 BERSERKER (Wymuszający najnowszą wiedzę i przykłady)
+                // POTĘŻNY PROMPT PRAWNICZY V5 BERSERKER (Z Rozwijanymi Zakładkami)
                 const systemPrompt = `Jesteś Głównym Radcą Prawnym MEN i absolutnym ekspertem z zakresu Prawa Oświatowego. 
 ZASADY BEZWZGLĘDNE (KRYTYCZNE DLA TWOJEGO DZIAŁANIA):
-1. AKTUALNOŚĆ (ROK 2026): Obecnie mamy rok 2026. MUSISZ opierać swoją opinię na najnowszym stanie prawnym, ze szczególnym uwzględnieniem gigantycznych zmian i nowelizacji z lat 2024, 2025 i 2026 (m.in. standardy ochrony małoletnich, zmiany w awansie, czasie pracy, emeryturach). Jeśli przepis się zmienił, wyraźnie wskaż tę nowelizację!
-2. ZAKAZ OGÓLNIKÓW I KRÓTKICH LIST: Nie wolno Ci odpowiadać pojedynczymi zdaniami. Twoja opinia musi być wyczerpującym esejem prawniczym.
-3. STRUKTURA PUNKTÓW Z PRZYKŁADAMI: Jeśli wymieniasz jakiekolwiek punkty (np. wymagania, obowiązki), KAŻDY JEDEN PUNKT musi być potężnym blokiem tekstu składającym się z trzech elementów:
-   - "Zasada prawna": Dokładne, dogłębne wyjaśnienie przepisu.
-   - "Interpretacja": Jak MEN i sądy to interpretują.
-   - "Przykład z życia szkoły": Konkretna, wymyślona scenka pokazująca, jak to działa w praktyce szkolnej.
-4. Formatuj tekst w JSON za pomocą "\\n" dla nowych akapitów. Wyróżniaj słowa kluczowe za pomocą **gwiazdek**. ZAWSZE podawaj artykuły i ustępy z ustaw.
+1. AKTUALNOŚĆ (ROK 2026): Obecnie mamy rok 2026. MUSISZ opierać swoją opinię na najnowszym stanie prawnym z lat 2024-2026.
+2. INTERAKTYWNE SEKCJE (AKORDIONY): Każdy osobny przepis lub wątek musi być umieszczony jako osobny obiekt w tablicy "explanation_sections".
+3. STRUKTURA PUNKTÓW Z PRZYKŁADAMI: Dla KAŻDEJ sekcji w "explanation_sections" podaj w polu "content" dogłębną interpretację prawną (wiele zdań), a w polu "example" wymyśloną, bardzo szczegółową scenkę z życia szkoły obrazującą ten przepis.
+4. Formatuj tekst w JSON za pomocą "\\n" dla nowych akapitów. Wyróżniaj słowa kluczowe za pomocą **gwiazdek**.
 
 Odpowiadaj WYŁĄCZNIE w formacie JSON (czysty JSON, bez bloków markdown).
 STRUKTURA JSON:
 {
-  "legal_basis": "Wymień BARDZO szczegółowo akty prawne (wskazując najnowsze Dzienniki Ustaw i nowelizacje z lat 2024-2026) oraz konkretne artykuły/ustępy mające tu zastosowanie.",
-  "explanation": "Niezwykle obszerna, głęboka i wnikliwa analiza. Zastosuj się rygorystycznie do zasady nr 3 - każdy punkt musi mieć dogłębny opis i Przykład z życia szkoły. Rozpisz się maksymalnie, analizując każdy aspekt problemu z perspektywy dyrektora i nauczyciela.",
-  "action_steps": "Praktyczne, bardzo szczegółowe kroki do podjęcia przez nauczyciela/dyrektora w tej sprawie. Żadnych krótkich haseł."
+  "legal_basis": "Wymień BARDZO szczegółowo akty prawne (wskazując najnowsze nowelizacje) oraz artykuły.",
+  "explanation_sections": [
+    {
+      "title": "Tytuł przepisu (np. Warunki z Art. 9b ust. 1 KN)",
+      "content": "Niezwykle obszerna, głęboka i wnikliwa analiza, dlaczego ten punkt jest ważny i jak go stosować...",
+      "example": "Przykład: Nauczycielka Anna złożyła wniosek w terminie... W związku z tym dyrektor musiał..."
+    },
+    {
+      "title": "Kolejny ważny punkt analizy...",
+      "content": "Analiza prawna...",
+      "example": "Przykład z innej szkoły..."
+    }
+  ],
+  "action_steps": "Praktyczne, wieloetapowe kroki do podjęcia przez nauczyciela/dyrektora. Żadnych krótkich haseł."
 }`;
 
                 try {
@@ -398,7 +412,7 @@ STRUKTURA JSON:
                         body: JSON.stringify({ 
                             prompt: query, 
                             system: systemPrompt, 
-                            temperature: 0.6, // Zwiększona temperatura dla bogatszych opisów i przykładów
+                            temperature: 0.5, // Zwiększona temperatura dla bogatszych opisów i przykładów
                             model: "gpt-4o-mini",
                             format: "json" 
                         })
@@ -682,7 +696,33 @@ STRUKTURA JSON:
                                             {/* Wyjaśnienie */}
                                             <div>
                                                 <h3 className="text-xs font-black uppercase text-slate-400 tracking-widest mb-4 border-b border-slate-200 pb-2">Dogłębna Analiza Prawna</h3>
-                                                <div className="text-slate-800 font-medium" dangerouslySetInnerHTML={{ __html: formatAIResponse(aiResponse.explanation) }}></div>
+                                                
+                                                {aiResponse.explanation_sections && aiResponse.explanation_sections.length > 0 ? (
+                                                    <div className="space-y-4">
+                                                        {aiResponse.explanation_sections.map((section, idx) => (
+                                                            <details key={idx} className="bg-white border border-slate-200 rounded-xl shadow-sm group print-bg-light overflow-hidden">
+                                                                <summary className="font-bold text-slate-800 text-base md:text-lg p-5 cursor-pointer outline-none hover:bg-slate-50 transition-colors flex justify-between items-center group-open:bg-slate-50 group-open:border-b border-slate-200">
+                                                                    <span className="flex items-center gap-3"><i className="ph-bold ph-caret-down group-open:rotate-180 transition-transform text-sky-500"></i> {section.title}</span>
+                                                                </summary>
+                                                                <div className="p-6 text-slate-700 leading-relaxed bg-white rounded-b-xl">
+                                                                    <div dangerouslySetInnerHTML={{ __html: formatAIResponse(section.content) }}></div>
+                                                                    
+                                                                    {section.example && (
+                                                                        <div className="mt-6 p-5 bg-sky-50/80 border-l-4 border-sky-400 rounded-r-xl">
+                                                                            <strong className="text-sky-800 flex items-center gap-2 mb-2 text-xs uppercase tracking-widest">
+                                                                                <i className="ph-fill ph-lightbulb text-lg"></i> Przykład z życia szkoły:
+                                                                            </strong>
+                                                                            <div className="text-slate-800 font-medium italic" dangerouslySetInnerHTML={{ __html: formatAIResponse(section.example) }}></div>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            </details>
+                                                        ))}
+                                                    </div>
+                                                ) : (
+                                                    /* Zabezpieczenie dla starszych wpisów z Bazy Prawa, które nie mają jeszcze sekcji interaktywnych */
+                                                    <div className="text-slate-800 font-medium" dangerouslySetInnerHTML={{ __html: formatAIResponse(aiResponse.explanation) }}></div>
+                                                )}
                                             </div>
 
                                             {/* Rekomendowane Kroki */}
