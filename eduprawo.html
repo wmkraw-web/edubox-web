@@ -91,6 +91,8 @@
         .ai-content p { margin-bottom: 1rem; }
         .ai-content ul { list-style-type: disc; margin-left: 1.5rem; margin-bottom: 1rem; }
         .ai-content li { margin-bottom: 0.5rem; }
+        .ai-content a { color: #0284c7; text-decoration: underline; font-weight: 700; transition: color 0.2s; padding: 2px 4px; border-radius: 4px; }
+        .ai-content a:hover { color: #0369a1; background-color: #e0f2fe; }
 
         /* --- STYLE WYDRUKU V3 PRO MAX --- */
         @media print {
@@ -378,31 +380,31 @@
                 setAiResponse(null);
                 setBotMessage("Otwieram najnowsze akta i dzienniki ustaw. Biorę pod uwagę najnowsze nowelizacje z lat 2024-2026. Analizuję problem, co potrwa około 30-40 sekund...");
 
-                // POTĘŻNY PROMPT PRAWNICZY V5 BERSERKER (Z Rozwijanymi Zakładkami)
+                // POTĘŻNY PROMPT PRAWNICZY V6 (Z interaktywnymi linkami)
                 const systemPrompt = `Jesteś Głównym Radcą Prawnym MEN i absolutnym ekspertem z zakresu Prawa Oświatowego. 
 ZASADY BEZWZGLĘDNE (KRYTYCZNE DLA TWOJEGO DZIAŁANIA):
 1. AKTUALNOŚĆ (ROK 2026): Obecnie mamy rok 2026. MUSISZ opierać swoją opinię na najnowszym stanie prawnym z lat 2024-2026.
 2. INTERAKTYWNE SEKCJE (AKORDIONY): Każdy osobny przepis lub wątek musi być umieszczony jako osobny obiekt w tablicy "explanation_sections".
 3. STRUKTURA PUNKTÓW Z PRZYKŁADAMI: Dla KAŻDEJ sekcji w "explanation_sections" podaj w polu "content" dogłębną interpretację prawną (wiele zdań), a w polu "example" wymyśloną, bardzo szczegółową scenkę z życia szkoły obrazującą ten przepis.
-4. Formatuj tekst w JSON za pomocą "\\n" dla nowych akapitów. Wyróżniaj słowa kluczowe za pomocą **gwiazdek**.
+4. AKTYWNE LINKI (ZŁOTA ZASADA): Kiedykolwiek w tekście powołujesz się na konkretny artykuł, ustawę lub rozporządzenie, MUSISZ owinąć to w działający link HTML wyszukujący ten akt w bazie ISAP. Używaj pojedynczych cudzysłowów wewnątrz tagu, aby nie zepsuć struktury JSON! Wzór: <a href='https://www.google.com/search?q=ISAP+Karta+Nauczyciela+art+42' target='_blank'>art. 42 Karty Nauczyciela</a>
+5. Formatuj tekst w JSON za pomocą "\\n" dla nowych akapitów. Wyróżniaj słowa kluczowe za pomocą **gwiazdek**.
 
 Odpowiadaj WYŁĄCZNIE w formacie JSON (czysty JSON, bez bloków markdown).
 STRUKTURA JSON:
 {
+  "legal_sources": [
+    { "name": "Karta Nauczyciela", "search_query": "Ustawa Karta Nauczyciela ISAP" },
+    { "name": "Prawo Oświatowe", "search_query": "Prawo Oświatowe Ustawa ISAP" }
+  ],
   "legal_basis": "Wymień BARDZO szczegółowo akty prawne (wskazując najnowsze nowelizacje) oraz artykuły.",
   "explanation_sections": [
     {
       "title": "Tytuł przepisu (np. Warunki z Art. 9b ust. 1 KN)",
-      "content": "Niezwykle obszerna, głęboka i wnikliwa analiza, dlaczego ten punkt jest ważny i jak go stosować...",
+      "content": "Niezwykle obszerna, głęboka i wnikliwa analiza, zawierająca linki <a> do artykułów...",
       "example": "Przykład: Nauczycielka Anna złożyła wniosek w terminie... W związku z tym dyrektor musiał..."
-    },
-    {
-      "title": "Kolejny ważny punkt analizy...",
-      "content": "Analiza prawna...",
-      "example": "Przykład z innej szkoły..."
     }
   ],
-  "action_steps": "Praktyczne, wieloetapowe kroki do podjęcia przez nauczyciela/dyrektora. Żadnych krótkich haseł."
+  "action_steps": "Praktyczne, wieloetapowe kroki do podjęcia przez nauczyciela/dyrektora. Żadnych krótkich haseł. Używaj tagów <a> przy artykułach."
 }`;
 
                 try {
@@ -412,7 +414,7 @@ STRUKTURA JSON:
                         body: JSON.stringify({ 
                             prompt: query, 
                             system: systemPrompt, 
-                            temperature: 0.5, // Zwiększona temperatura dla bogatszych opisów i przykładów
+                            temperature: 0.4,
                             model: "gpt-4o-mini",
                             format: "json" 
                         })
@@ -689,7 +691,18 @@ STRUKTURA JSON:
                                             
                                             {/* Podstawa Prawna */}
                                             <div className="bg-blue-50 border-l-4 border-blue-600 p-6 rounded-r-xl print-bg-light">
-                                                <h3 className="text-xs font-black uppercase text-blue-800 tracking-widest mb-3 flex items-center gap-2"><i className="ph-bold ph-book-bookmark"></i> Akty Prawne i Artykuły</h3>
+                                                <h3 className="text-xs font-black uppercase text-blue-800 tracking-widest mb-4 flex items-center gap-2"><i className="ph-bold ph-book-bookmark"></i> Akty Prawne i Artykuły</h3>
+                                                
+                                                {aiResponse.legal_sources && aiResponse.legal_sources.length > 0 && (
+                                                    <div className="flex flex-wrap gap-2 mb-5">
+                                                        {aiResponse.legal_sources.map((src, idx) => (
+                                                            <a key={idx} href={`https://www.google.com/search?q=${encodeURIComponent(src.search_query)}`} target="_blank" rel="noopener noreferrer" className="bg-white border border-blue-200 text-blue-700 hover:bg-blue-600 hover:text-white hover:border-blue-600 px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 shadow-sm print-hidden">
+                                                                <i className="ph-bold ph-link text-sm"></i> Otwórz: {src.name}
+                                                            </a>
+                                                        ))}
+                                                    </div>
+                                                )}
+
                                                 <p className="font-medium text-slate-800 m-0" dangerouslySetInnerHTML={{ __html: formatAIResponse(aiResponse.legal_basis) }}></p>
                                             </div>
 
