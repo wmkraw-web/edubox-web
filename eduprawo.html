@@ -706,11 +706,18 @@ STRUKTURA JSON:
                                                 <p className="font-medium text-slate-800 m-0" dangerouslySetInnerHTML={{ __html: formatAIResponse(aiResponse.legal_basis) }}></p>
                                             </div>
 
-                                            {/* Wyjaśnienie */}
-                                            <div>
-                                                <h3 className="text-xs font-black uppercase text-slate-400 tracking-widest mb-4 border-b border-slate-200 pb-2">Dogłębna Analiza Prawna</h3>
-                                                
-                                                {aiResponse.explanation_sections && aiResponse.explanation_sections.length > 0 ? (
+                                            {/* Interpretacja Prawna (Nowość) */}
+                                            {aiResponse.interpretation && (
+                                                <div>
+                                                    <h3 className="text-xs font-black uppercase text-slate-400 tracking-widest mb-4 border-b border-slate-200 pb-2 flex items-center gap-2"><i className="ph-bold ph-magnifying-glass text-lg text-sky-500"></i> Jak to rozumieć w praktyce?</h3>
+                                                    <div className="text-slate-800 font-medium" dangerouslySetInnerHTML={{ __html: formatAIResponse(aiResponse.interpretation) }}></div>
+                                                </div>
+                                            )}
+
+                                            {/* Zabezpieczenie dla starych wpisów z Bazy Prawa (Akordiony) */}
+                                            {aiResponse.explanation_sections && aiResponse.explanation_sections.length > 0 && (
+                                                <div>
+                                                    <h3 className="text-xs font-black uppercase text-slate-400 tracking-widest mb-4 border-b border-slate-200 pb-2 flex items-center gap-2"><i className="ph-bold ph-archive text-lg text-sky-500"></i> Archiwalna Analiza Prawna</h3>
                                                     <div className="space-y-4">
                                                         {aiResponse.explanation_sections.map((section, idx) => (
                                                             <details key={idx} className="bg-white border border-slate-200 rounded-xl shadow-sm group print-bg-light overflow-hidden">
@@ -732,17 +739,70 @@ STRUKTURA JSON:
                                                             </details>
                                                         ))}
                                                     </div>
-                                                ) : (
-                                                    /* Zabezpieczenie dla starszych wpisów z Bazy Prawa, które nie mają jeszcze sekcji interaktywnych */
-                                                    <div className="text-slate-800 font-medium" dangerouslySetInnerHTML={{ __html: formatAIResponse(aiResponse.explanation) }}></div>
-                                                )}
-                                            </div>
+                                                </div>
+                                            )}
 
-                                            {/* Rekomendowane Kroki */}
-                                            <div className="bg-slate-50 border border-slate-200 p-8 rounded-xl mt-10 print-bg-light">
-                                                <h3 className="text-xs font-black uppercase text-emerald-600 tracking-widest mb-5 flex items-center gap-2"><i className="ph-bold ph-check-circle"></i> Rekomendowane Działania</h3>
-                                                <div className="text-slate-800 font-medium" dangerouslySetInnerHTML={{ __html: formatAIResponse(aiResponse.action_steps) }}></div>
-                                            </div>
+                                            {/* Zabezpieczenie dla bardzo starych wpisów */}
+                                            {aiResponse.explanation && !aiResponse.interpretation && !aiResponse.explanation_sections && (
+                                                <div>
+                                                    <h3 className="text-xs font-black uppercase text-slate-400 tracking-widest mb-4 border-b border-slate-200 pb-2 flex items-center gap-2"><i className="ph-bold ph-magnifying-glass text-lg text-sky-500"></i> Analiza Prawna</h3>
+                                                    <div className="text-slate-800 font-medium" dangerouslySetInnerHTML={{ __html: formatAIResponse(aiResponse.explanation) }}></div>
+                                                </div>
+                                            )}
+
+                                            {/* Przykłady z życia */}
+                                            {aiResponse.examples && aiResponse.examples.length > 0 && (
+                                                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 print-bg-light">
+                                                    <h3 className="text-xs font-black uppercase text-slate-500 tracking-widest mb-5 flex items-center gap-2"><i className="ph-bold ph-users-three text-lg text-sky-500"></i> Z życia szkoły (Przykłady)</h3>
+                                                    <div className="space-y-4">
+                                                        {aiResponse.examples.map((ex, idx) => (
+                                                            <div key={idx} className="bg-white p-5 rounded-xl border border-slate-100 shadow-sm">
+                                                                <p className="text-sky-800 font-bold mb-2"><i className="ph-fill ph-play-circle text-sky-500"></i> {ex.scenario}</p>
+                                                                <div className="w-full h-px bg-slate-100 my-3"></div>
+                                                                <p className="text-emerald-700 font-medium"><i className="ph-fill ph-check-circle text-emerald-500"></i> <strong>Rozwiązanie:</strong> {ex.solution}</p>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Check-lista */}
+                                            {aiResponse.checklist && aiResponse.checklist.length > 0 && (
+                                                <div>
+                                                    <h3 className="text-xs font-black uppercase text-slate-400 tracking-widest mb-4 border-b border-slate-200 pb-2 flex items-center gap-2"><i className="ph-bold ph-list-checks text-lg text-emerald-500"></i> Co musisz teraz zrobić (Check-lista)</h3>
+                                                    <div className="bg-emerald-50/50 border border-emerald-100 rounded-xl p-6">
+                                                        {aiResponse.checklist.map((task, idx) => (
+                                                            <div key={idx} className="checklist-item">
+                                                                <i className="ph-bold ph-square text-emerald-600 text-xl mt-0.5"></i>
+                                                                <span className="text-slate-800 font-bold leading-relaxed">{task}</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Zabezpieczenie starych Action Steps */}
+                                            {aiResponse.action_steps && (!aiResponse.checklist || aiResponse.checklist.length === 0) && (
+                                                <div className="bg-slate-50 border border-slate-200 p-8 rounded-xl mt-10 print-bg-light">
+                                                    <h3 className="text-xs font-black uppercase text-emerald-600 tracking-widest mb-5 flex items-center gap-2"><i className="ph-bold ph-check-circle text-lg"></i> Rekomendowane Działania</h3>
+                                                    <div className="text-slate-800 font-medium" dangerouslySetInnerHTML={{ __html: formatAIResponse(aiResponse.action_steps) }}></div>
+                                                </div>
+                                            )}
+
+                                            {/* Gotowiec / Pismo */}
+                                            {aiResponse.draft_template && (
+                                                <div className="mt-8 relative group">
+                                                    <div className="flex justify-between items-end border-b border-amber-200 pb-2 mb-4">
+                                                        <h3 className="text-xs font-black uppercase text-amber-600 tracking-widest flex items-center gap-2"><i className="ph-bold ph-file-text text-lg text-amber-500"></i> Twój Gotowiec (Wzór pisma / Argumentacja)</h3>
+                                                        <button onClick={() => { navigator.clipboard.writeText(aiResponse.draft_template.replace(/\\n/g, '\n')); showToast('Gotowiec skopiowany do schowka!'); }} className="text-[10px] font-bold bg-amber-100 text-amber-700 hover:bg-amber-200 px-3 py-1.5 rounded-lg transition-colors print-hidden flex items-center gap-1 active:scale-95 shadow-sm">
+                                                            <i className="ph-bold ph-copy"></i> Kopiuj tekst
+                                                        </button>
+                                                    </div>
+                                                    <div className="draft-box whitespace-pre-wrap">
+                                                        {aiResponse.draft_template}
+                                                    </div>
+                                                </div>
+                                            )}
 
                                         </div>
 
