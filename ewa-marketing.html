@@ -88,7 +88,15 @@
                     if (!textResponse.ok) throw new Error('Błąd połączenia z serwerem tekstu. Sprawdź Vercel.');
                     const textData = await textResponse.json();
                     
-                    let jsonStr = textData.text.replace(/```json/gi, '').replace(/```/g, '').trim();
+                    // Bezpieczne pobieranie tekstu niezależnie od nazwy zmiennej na Twoim serwerze (text, message, response, choices)
+                    const rawText = textData.text || textData.message || textData.response || (textData.choices && textData.choices[0]?.message?.content);
+                    
+                    if (!rawText) {
+                        console.error("Zwrócone dane z API:", textData);
+                        throw new Error("Serwer nie zwrócił tekstu. Naciśnij F12 i sprawdź zakładkę Konsola, co dokładnie zwrócił serwer.");
+                    }
+
+                    let jsonStr = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
                     const parsedData = JSON.parse(jsonStr);
                     setPostContent(parsedData.post_text);
 
