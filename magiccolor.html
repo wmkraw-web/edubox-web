@@ -192,131 +192,125 @@
         const { useState, useEffect, useRef } = React;
 
         // ==========================================
-        // KREATOR KOLOROWANEK ZE ZDJĘCIA (AI Image-to-Image)
+        // KREATOR KOLOROWANEK ZE ZDJĘCIA (Photoshop Engine - ZERO Halucynacji)
         // ==========================================
-        const PhotoToColoringBook = ({ secureApiImageCall, isPremium, showToast, EduBoxCore, setUsages }) => {
+        const PhotoToColoringBook = ({ showToast }) => {
             const [imageSrc, setImageSrc] = useState(null);
             const [styleOption, setStyleOption] = useState('szkola');
-            const [generationStep, setGenerationStep] = useState(null);
-            const [generatedImage, setGeneratedImage] = useState(null);
-            const resultRef = useRef(null);
+            const [isProcessing, setIsProcessing] = useState(false);
+            const canvasRef = useRef(null);
 
-            // 1. Wczytywanie zdjęcia z komputera
             const handleImageUpload = (e) => {
                 const file = e.target.files[0];
                 if (file) {
-                    if (file.size > 5 * 1024 * 1024) {
-                        showToast("Zdjęcie jest za duże. Maksymalny rozmiar to 5MB.", "error");
-                        return;
-                    }
                     const reader = new FileReader();
-                    reader.onload = (event) => {
-                        setImageSrc(event.target.result);
-                        setGeneratedImage(null);
-                    };
+                    reader.onload = (event) => setImageSrc(event.target.result);
                     reader.readAsDataURL(file);
                 }
             };
 
-            // 2. Wysłanie zdjęcia do AI (Img2Img)
-            const generateFromPhoto = () => {
+            const processImage = () => {
                 if (!imageSrc) return;
-
-                EduBoxCore.executeWithLimitCheck(isPremium, 
-                    async (newCount) => {
-                        setUsages(newCount);
-                        setGenerationStep('generating');
-                        
-                        try {
-                            let styleModifier = "";
-                            if (styleOption === 'przedszkole') {
-                                styleModifier = "extremely simple toddler coloring page, thick bold black vector lines, large empty white spaces, no details";
-                            } else if (styleOption === 'szkola') {
-                                styleModifier = "standard kids coloring book page, clean bold black outlines, uncolored, 2D flat vector style";
-                            } else if (styleOption === 'mandala') {
-                                styleModifier = "detailed adult coloring page, crisp black outlines, highly patterned, mandala style background";
-                            }
-
-                            const hiddenInstruction = `Line art coloring book page, high contrast. ${styleModifier}. Strictly black pen outlines on pure white background. Flat 2D vector art. No shading, no grayscale, no halftones, no colors, no photographic elements.`;
-                            const negativePrompt = "shading, gradients, grayscale, sketch, pencil, realistic, 3d, colors, shadows, halftone, text, watermark, painted, complex background, original photo elements";
-
-                            // Konfiguracja pod Image-to-Image
-                            const payload = {
-                                prompt: hiddenInstruction, 
-                                negative_prompt: negativePrompt,
-                                init_image: imageSrc, 
-                                style_preset: 'line-art',
-                                image_strength: 0.85, // ZMIANA Z 0.45 NA 0.85 - AI dostaje pozwolenie na usunięcie kolorów!
-                                aspect_ratio: '1:1',
-                                width: 1024,
-                                height: 1024
-                            };
-
-                            const data = await secureApiImageCall(payload);
-                            const base64Image = data.predictions?.[0]?.bytesBase64Encoded || data.artifacts?.[0]?.base64 || data.image || data.imageUrl || data.image_url || data.url; 
-                            
-                            if (base64Image) {
-                                const finalImage = base64Image.startsWith('http') || base64Image.startsWith('data:image') ? base64Image : `data:image/png;base64,${base64Image}`;
-                                setGeneratedImage(finalImage);
-                                setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
-                            } else {
-                                throw new Error("API nie zwróciło obrazu.");
-                            }
-
-                        } catch (error) {
-                            console.error("Błąd AI Image-to-Image:", error); 
-                            showToast(`Błąd: ${error.message}`, 'error');
-                        } finally { 
-                            setGenerationStep(null); 
+                setIsProcessing(true);
+                
+                setTimeout(() => {
+                    const canvas = canvasRef.current;
+                    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+                    const img = new Image();
+                    
+                    img.onload = () => {
+                        // Ograniczamy maksymalny rozmiar, żeby przeglądarka nie "chrupnęła"
+                        const MAX_WIDTH = 1200;
+                        let width = img.width;
+                        let height = img.height;
+                        if (width > MAX_WIDTH) {
+                            height = Math.round((height * MAX_WIDTH) / width);
+                            width = MAX_WIDTH;
                         }
-                    },
-                    (errMsg) => showToast(errMsg, 'error'),
-                    (msg) => showToast(msg, 'info')
-                );
+
+                        canvas.width = width;
+                        canvas.height = height;
+                        
+                        // Grubość krawędzi dostosowana do wybranego przycisku
+                        let blurRadius = 4; // Szkoła
+                        if (styleOption === 'przedszkole') blurRadius = 8;
+                        if (styleOption === 'mandala') blurRadius = 2;
+
+                        // 1. Warstwa bazowa: Skala szarości
+                        ctx.filter = 'grayscale(100%)';
+                        ctx.drawImage(img, 0, 0, width, height);
+                        const grayData = ctx.getImageData(0, 0, width, height);
+                        
+                        // 2. Warstwa górna: Odwrócenie kolorów i rozmycie
+                        ctx.filter = `grayscale(100%) invert(100%) blur(${blurRadius}px)`;
+                        ctx.drawImage(img, 0, 0, width, height);
+                        const blurredData = ctx.getImageData(0, 0, width, height);
+                        
+                        // 3. Magia Photoshopa: Łączenie warstw (Color Dodge)
+                        const finalData = ctx.createImageData(width, height);
+                        for(let i = 0; i < finalData.data.length; i += 4) {
+                            const g = grayData.data[i];
+                            const b = blurredData.data[i];
+                            
+                            let val;
+                            if (b === 255) val = 255;
+                            else val = Math.min(255, (g * 255) / (255 - b));
+                            
+                            // Wybielanie tła i ekstremalne przyciemnianie samych konturów
+                            if (val > 215) val = 255; // Czysta kartka papieru
+                            else val = val * 0.5;     // Wyraźny czarny ołówek
+                            
+                            finalData.data[i] = val;
+                            finalData.data[i+1] = val;
+                            finalData.data[i+2] = val;
+                            finalData.data[i+3] = 255;
+                        }
+                        
+                        ctx.putImageData(finalData, 0, 0);
+                        setIsProcessing(false);
+                    };
+                    img.src = imageSrc;
+                }, 50); // Minimalne opóźnienie, by React zdążył wyrenderować status
             };
+
+            // Przelicz obrazek od nowa natychmiast po zmianie stylu z menu
+            useEffect(() => {
+                if (imageSrc) processImage();
+            }, [imageSrc, styleOption]);
 
             const handleDownload = () => {
                 const link = document.createElement('a');
-                link.download = 'kolorowanka-ze-zdjecia.png';
-                link.href = generatedImage;
+                link.download = 'moja-kolorowanka.png';
+                link.href = canvasRef.current.toDataURL('image/png');
                 link.click();
             };
 
             return (
                 <div className="glass-panel p-6 sm:p-10 rounded-[2.5rem] fade-in border border-slate-700/50 mt-12 print-hidden shadow-xl">
                     <div className="text-center mb-8">
-                        <div className="inline-flex items-center gap-2 bg-emerald-900/30 border border-emerald-500/30 px-4 py-1.5 rounded-full text-[10px] font-black text-emerald-400 uppercase tracking-widest mb-4 backdrop-blur-sm">
-                            <i className="ph-bold ph-sparkle"></i> Nowość AI
+                        <div className="inline-flex items-center gap-2 bg-blue-900/30 border border-blue-500/30 px-4 py-1.5 rounded-full text-[10px] font-black text-blue-400 uppercase tracking-widest mb-4 backdrop-blur-sm">
+                            <i className="ph-bold ph-lightning"></i> Smart Filter Local
                         </div>
                         <h2 className="text-3xl font-black text-white mb-4">Zamień Zdjęcie w Kolorowankę! 🪄</h2>
                         <p className="text-slate-400 max-w-xl mx-auto text-lg">
-                            Wgraj zdjęcie, a sztuczna inteligencja przerysuje je od nowa, tworząc piękną, gładką kolorowankę dopasowaną do wieku Twoich uczniów.
+                            System działa w 100% lokalnie u Ciebie w przeglądarce. Zachowuje idealnie wszystkie twarze i postacie bez zniekształceń.
                         </p>
                     </div>
 
                     <div className="mb-8 max-w-3xl mx-auto">
-                        <label className="block text-slate-300 font-bold mb-3 text-sm uppercase tracking-wider text-center">1. Wybierz styl przerysowania:</label>
+                        <label className="block text-slate-300 font-bold mb-3 text-sm uppercase tracking-wider text-center">1. Wybierz grubość linii:</label>
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                            <button 
-                                onClick={() => setStyleOption('przedszkole')}
-                                className={`p-3 rounded-xl border-2 font-bold text-sm transition-all flex flex-col items-center justify-center gap-1 ${styleOption === 'przedszkole' ? 'bg-pink-600/20 border-pink-500 text-pink-400' : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:border-slate-500'}`}
-                            >
+                            <button onClick={() => setStyleOption('przedszkole')} className={`p-3 rounded-xl border-2 font-bold text-sm transition-all flex flex-col items-center justify-center gap-1 ${styleOption === 'przedszkole' ? 'bg-pink-600/20 border-pink-500 text-pink-400' : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:border-slate-500'}`}>
                                 <span className="text-2xl">🧸</span> Przedszkole
-                                <span className="text-[10px] font-normal opacity-80">(Proste kształty)</span>
+                                <span className="text-[10px] font-normal opacity-80">(Grube linie)</span>
                             </button>
-                            <button 
-                                onClick={() => setStyleOption('szkola')}
-                                className={`p-3 rounded-xl border-2 font-bold text-sm transition-all flex flex-col items-center justify-center gap-1 ${styleOption === 'szkola' ? 'bg-amber-600/20 border-amber-500 text-amber-400' : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:border-slate-500'}`}
-                            >
+                            <button onClick={() => setStyleOption('szkola')} className={`p-3 rounded-xl border-2 font-bold text-sm transition-all flex flex-col items-center justify-center gap-1 ${styleOption === 'szkola' ? 'bg-amber-600/20 border-amber-500 text-amber-400' : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:border-slate-500'}`}>
                                 <span className="text-2xl">🎒</span> Klasy 1-3
-                                <span className="text-[10px] font-normal opacity-80">(Standardowa)</span>
+                                <span className="text-[10px] font-normal opacity-80">(Standardowe)</span>
                             </button>
-                            <button 
-                                onClick={() => setStyleOption('mandala')}
-                                className={`p-3 rounded-xl border-2 font-bold text-sm transition-all flex flex-col items-center justify-center gap-1 ${styleOption === 'mandala' ? 'bg-purple-600/20 border-purple-500 text-purple-400' : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:border-slate-500'}`}
-                            >
+                            <button onClick={() => setStyleOption('mandala')} className={`p-3 rounded-xl border-2 font-bold text-sm transition-all flex flex-col items-center justify-center gap-1 ${styleOption === 'mandala' ? 'bg-purple-600/20 border-purple-500 text-purple-400' : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:border-slate-500'}`}>
                                 <span className="text-2xl">✨</span> Mandala / Dorośli
-                                <span className="text-[10px] font-normal opacity-80">(Dużo detali)</span>
+                                <span className="text-[10px] font-normal opacity-80">(Cienkie detale)</span>
                             </button>
                         </div>
                     </div>
@@ -329,38 +323,20 @@
                         </label>
                     </div>
 
-                    {imageSrc && !generatedImage && (
-                        <div className="mt-4 flex flex-col items-center">
-                            <img src={imageSrc} alt="Podgląd" className="max-w-xs rounded-xl opacity-50 mb-6 border-2 border-slate-700" />
-                            <button 
-                                onClick={generateFromPhoto}
-                                disabled={generationStep !== null}
-                                className={`px-12 py-5 rounded-2xl font-black text-white text-lg transition-all flex items-center justify-center gap-3 shadow-[0_0_20px_rgba(16,185,129,0.3)] btn-bounce
-                                    ${generationStep !== null ? 'bg-slate-700 cursor-not-allowed' : 'bg-gradient-to-r from-emerald-600 to-teal-500 hover:scale-105 active:scale-95'}`}
-                            >
-                                {generationStep !== null ? (
-                                    <><i className="ph-bold ph-spinner animate-spin text-xl"></i> Magia AI działa...</>
-                                ) : (
-                                    <><i className="ph-bold ph-magic-wand text-xl"></i> 3. Wygeneruj Kolorowankę</>
-                                )}
-                            </button>
-                        </div>
-                    )}
+                    {isProcessing && <div className="text-center text-blue-400 font-bold mb-4 animate-pulse">Analizowanie obrazu...</div>}
 
-                    {generatedImage && (
-                        <div ref={resultRef} className="mt-8 flex flex-col items-center animate-[fadeIn_0.5s_ease-out]">
-                            <h3 className="text-xl font-bold text-white mb-4">Gotowe!</h3>
-                            <div className="bg-white p-2 rounded-2xl max-w-lg w-full mb-6">
-                                <img src={generatedImage} alt="Gotowa kolorowanka" className="w-full h-auto rounded-xl" />
-                            </div>
-                            <div className="flex gap-4">
-                                <button onClick={() => setGeneratedImage(null)} className="bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 px-6 rounded-xl transition-all">
-                                    Wgraj inne zdjęcie
-                                </button>
-                                <button onClick={handleDownload} className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 px-6 rounded-xl shadow-lg transition-all flex items-center gap-2">
-                                    <i className="ph-bold ph-download-simple text-xl"></i> Pobierz
-                                </button>
-                            </div>
+                    <div className={`overflow-hidden rounded-2xl border-4 border-dashed border-slate-700 bg-white relative ${imageSrc ? 'block' : 'hidden'} max-w-2xl mx-auto`}>
+                        <canvas ref={canvasRef} className="max-w-full h-auto mx-auto print-only-image"></canvas>
+                    </div>
+
+                    {imageSrc && (
+                        <div className="mt-8 flex justify-center gap-4">
+                            <button onClick={() => setImageSrc(null)} className="bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 px-6 rounded-xl transition-all">
+                                Zmień zdjęcie
+                            </button>
+                            <button onClick={handleDownload} className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 px-6 rounded-xl shadow-lg transition-all flex items-center gap-2">
+                                <i className="ph-bold ph-download-simple text-xl"></i> Pobierz do druku
+                            </button>
                         </div>
                     )}
                 </div>
@@ -914,13 +890,7 @@
                             </div>
                             
                             {/* WSTAWIENIE MODUŁU "ZDJĘCIE -> KOLOROWANKA" */}
-                            <PhotoToColoringBook 
-                                secureApiImageCall={secureApiImageCall} 
-                                isPremium={isPremium} 
-                                showToast={showToast} 
-                                EduBoxCore={window.EduBoxCore} 
-                                setUsages={setUsages} 
-                            />
+                            <PhotoToColoringBook showToast={showToast} />
                         </div>
 
                         {/* WYNIKI */}
