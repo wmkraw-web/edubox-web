@@ -191,6 +191,123 @@
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
 
+        // ==========================================
+        // KREATOR KOLOROWANEK ZE ZDJĘCIA (Filtry Canvas)
+        // ==========================================
+        const PhotoToColoringBook = () => {
+            const [imageSrc, setImageSrc] = useState(null);
+            const canvasRef = useRef(null);
+
+            const handleImageUpload = (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (event) => setImageSrc(event.target.result);
+                    reader.readAsDataURL(file);
+                }
+            };
+
+            const processImage = () => {
+                const canvas = canvasRef.current;
+                const ctx = canvas.getContext('2d');
+                const img = new Image();
+                
+                img.onload = () => {
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    ctx.drawImage(img, 0, 0);
+
+                    const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    const data = imgData.data;
+                    const width = canvas.width;
+                    const height = canvas.height;
+
+                    const grayscale = new Uint8ClampedArray(width * height);
+                    for (let i = 0; i < data.length; i += 4) {
+                        grayscale[i/4] = data[i] * 0.3 + data[i+1] * 0.59 + data[i+2] * 0.11;
+                    }
+
+                    const sobelData = new Uint8ClampedArray(data.length);
+                    const sobelX = [[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]];
+                    const sobelY = [[-1, -2, -1], [0, 0, 0], [1, 2, 1]];
+
+                    for (let i = 0; i < sobelData.length; i++) sobelData[i] = 255; 
+
+                    for (let y = 1; y < height - 1; y++) {
+                        for (let x = 1; x < width - 1; x++) {
+                            let pixelX = 0;
+                            let pixelY = 0;
+                            for (let j = -1; j <= 1; j++) {
+                                for (let i = -1; i <= 1; i++) {
+                                    const pixelVal = grayscale[(y + j) * width + (x + i)];
+                                    pixelX += pixelVal * sobelX[j + 1][i + 1];
+                                    pixelY += pixelVal * sobelY[j + 1][i + 1];
+                                }
+                            }
+                            const magnitude = Math.sqrt(pixelX * pixelX + pixelY * pixelY);
+                            
+                            const val = magnitude > 50 ? 0 : 255; 
+                            const idx = (y * width + x) * 4;
+                            sobelData[idx] = val;    
+                            sobelData[idx+1] = val;  
+                            sobelData[idx+2] = val;  
+                            sobelData[idx+3] = 255;  
+                        }
+                    }
+                    
+                    const newImgData = new ImageData(sobelData, width, height);
+                    ctx.putImageData(newImgData, 0, 0);
+                };
+                img.src = imageSrc;
+            };
+
+            useEffect(() => {
+                if (imageSrc) processImage();
+            }, [imageSrc]);
+
+            const handleDownload = () => {
+                const link = document.createElement('a');
+                link.download = 'moja-kolorowanka.png';
+                link.href = canvasRef.current.toDataURL('image/png');
+                link.click();
+            };
+
+            return (
+                <div className="glass-panel p-6 sm:p-10 rounded-[2.5rem] fade-in border border-slate-700/50 mt-12 print-hidden text-center shadow-xl">
+                    <div className="inline-flex items-center gap-2 bg-emerald-900/30 border border-emerald-500/30 px-4 py-1.5 rounded-full text-[10px] font-black text-emerald-400 uppercase tracking-widest mb-4 backdrop-blur-sm">
+                        <i className="ph-bold ph-sparkle"></i> Nowość
+                    </div>
+                    <h2 className="text-3xl font-black text-white mb-4">Zamień Zdjęcie w Kolorowankę! 🪄</h2>
+                    <p className="text-slate-400 mb-8 max-w-xl mx-auto text-lg">
+                        Wgraj zdjęcie ze swojego urządzenia, a nasz system (bez użycia internetu) natychmiast wykryje kontury i przygotuje obrazek gotowy do druku.
+                    </p>
+
+                    <label className="inline-block bg-gradient-to-r from-emerald-600 to-teal-500 hover:scale-105 text-white font-bold py-4 px-8 rounded-2xl cursor-pointer shadow-[0_0_20px_rgba(16,185,129,0.3)] transition-all active:scale-95 mb-8 text-lg">
+                        <i className="ph-bold ph-upload-simple mr-2 text-xl"></i>
+                        Wybierz zdjęcie z dysku
+                        <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+                    </label>
+
+                    <div className={`overflow-hidden rounded-2xl border-4 border-dashed border-slate-700 bg-slate-900/50 relative ${imageSrc ? 'block' : 'hidden'} max-w-2xl mx-auto`}>
+                        <canvas 
+                            ref={canvasRef} 
+                            className="max-w-full h-auto mx-auto bg-white print-only-image"
+                        ></canvas>
+                    </div>
+
+                    {imageSrc && (
+                        <button 
+                            onClick={handleDownload}
+                            className="mt-8 bg-slate-800 hover:bg-emerald-600 text-white font-bold py-4 px-8 rounded-2xl shadow-lg transition-all active:scale-95 border border-slate-700 hover:border-emerald-500 flex items-center justify-center gap-2 mx-auto text-lg"
+                        >
+                            <i className="ph-bold ph-download-simple text-xl"></i>
+                            Pobierz do druku
+                        </button>
+                    )}
+                </div>
+            );
+        };
+
         function App() {
             // === SYSTEM & LIMITS STATE ===
             const [user, setUser] = useState(null);
@@ -284,7 +401,7 @@
                 throw lastErr;
             };
 
-            // TŁUMACZ POLECEŃ (Rozwiązuje problem nierozumienia polskich słów przez generator obrazów)
+            // TŁUMACZ POLECEŃ
             const fetchTranslatedPrompt = async (polishText) => {
                 try {
                     const res = await fetch('/api/chat', {
@@ -369,11 +486,9 @@
                         setGeneratedImage(null);
                         
                         try {
-                            // 1. Tłumaczenie polecenia na angielski
                             setGenerationStep('translating');
                             const englishSubject = await fetchTranslatedPrompt(promptInput);
 
-                            // 2. Generowanie grafiki
                             setGenerationStep('generating');
                             let styleModifier = "";
                             if (styleOption === 'przedszkole') {
@@ -384,7 +499,6 @@
                                 styleModifier = "detailed mandala coloring page, crisp black outlines, uncolored, geometric";
                             }
 
-                            // Używamy PRZETŁUMACZONEGO polecenia (englishSubject), żeby AI nie rysowało "sów" zamiast nierozpoznanych polskich księżniczek
                             const hiddenInstruction = `Monochrome coloring book page of ${englishSubject}. ${styleModifier}. Strictly black outlines on pure white background. Flat 2D vector art. No shading, no grayscale, no halftones, no colors.`;
                             const negativePrompt = "shading, gradients, grayscale, sketch, pencil, realistic, 3d, colors, shadows, halftone, text, watermark, painted, complex background";
 
@@ -451,7 +565,7 @@
                     const canvas = canvasRef.current;
                     const ctx = canvas.getContext("2d");
                     const img = new Image();
-                    img.crossOrigin = "Anonymous"; // Na wypadek ładowania z URL zewnętrznego
+                    img.crossOrigin = "Anonymous"; 
                     
                     img.onload = () => {
                         canvas.width = img.width;
@@ -461,7 +575,6 @@
                         ctx.fillRect(0, 0, canvas.width, canvas.height);
                         ctx.drawImage(img, 0, 0);
                         
-                        // Inteligentny Wybielacz Pikseli
                         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
                         const data = imageData.data;
                         
@@ -472,7 +585,6 @@
                             
                             const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
                             
-                            // Próg kasowania szarości tła (zachowuje linie)
                             if (luminance > 220) { 
                                 data[i] = 255; data[i + 1] = 255; data[i + 2] = 255;
                             } else {
@@ -741,6 +853,10 @@
                                     </button>
                                 </div>
                             </div>
+                            
+                            {/* WSTAWIENIE MODUŁU "ZDJĘCIE -> KOLOROWANKA" */}
+                            <PhotoToColoringBook />
+
                         </div>
 
                         {/* WYNIKI */}
