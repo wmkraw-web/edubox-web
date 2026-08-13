@@ -1,6 +1,6 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
 import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
-import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp, doc, setDoc, increment } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
 
 // 1. WSPÓLNA KONFIGURACJA FIREBASE
 const FIREBASE_CONFIG = {
@@ -13,6 +13,14 @@ const FIREBASE_CONFIG = {
 };
 
 const APP_ID = "eduboxpro";
+
+// Wyznacza klucz aktualnego tygodnia (np. "2026-W33") - do statystyk "najpopularniejsze w tym tygodniu"
+const getWeekKey = () => {
+    const d = new Date();
+    const oneJan = new Date(d.getFullYear(), 0, 1);
+    const week = Math.ceil((((d - oneJan) / 86400000) + oneJan.getDay() + 1) / 7);
+    return `${d.getFullYear()}-W${week}`;
+};
 
 // Zmienne wewnętrzne
 let app, auth, db, currentUser = null;
@@ -78,6 +86,7 @@ export const EduBoxCore = {
         const status = localStorage.getItem('eduboxProStatus');
         if (status === 'PRO' || status === 'active' || isPremium) {
             // Konto PRO - akcja bez zwiększania licznika, ale podajemy dotychczasowy stan
+            EduBoxCore.bumpGlobalCounter();
             onSuccess(EduBoxCore.getUsageCount());
             return;
         }
@@ -93,6 +102,7 @@ export const EduBoxCore = {
         localStorage.setItem('eduboxUsage', JSON.stringify({ date: today, count: newCount }));
         
         onToastUpdate(`Wykorzystano ${newCount}/5 darmowych działań`);
+        EduBoxCore.bumpGlobalCounter();
         onSuccess(newCount);
     },
 
@@ -112,6 +122,7 @@ export const EduBoxCore = {
     executeImageLimitCheck: (isPremium, onSuccess, onLimitReached, onToastUpdate) => {
         const status = localStorage.getItem('eduboxProStatus');
         if (status === 'PRO' || status === 'active' || isPremium) {
+            EduBoxCore.bumpGlobalCounter();
             onSuccess(EduBoxCore.getImageUsageCount());
             return;
         }
@@ -127,6 +138,7 @@ export const EduBoxCore = {
         localStorage.setItem('eduboxImageUsage', JSON.stringify({ date: today, count: newCount }));
 
         onToastUpdate(`Wykorzystano ${newCount}/2 darmowych obrazków dzisiaj`);
+        EduBoxCore.bumpGlobalCounter();
         onSuccess(newCount);
     },
 
@@ -177,5 +189,42 @@ export const EduBoxCore = {
             loaded.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
             onDataLoaded(loaded);
         }, onError);
+    },
+
+    // STATYSTYKI - prawdziwy, globalny licznik wykonanych działań AI (nie fałszywy!)
+    bumpGlobalCounter: () => {
+        if (!db) return;
+        const statsRef = doc(db, 'artifacts', APP_ID, 'public', 'data', 'stats', 'global_counter');
+        setDoc(statsRef, { total: increment(1) }, { merge: true }).catch(() => {});
+    },
+
+    subscribeGlobalCounter: (callback) => {
+        if (!db) return () => {};
+        const statsRef = doc(db, 'artifacts', APP_ID, 'public', 'data', 'stats', 'global_counter');
+        return onSnapshot(statsRef, (snap) => {
+            callback(snap.exists() ? (snap.data().total || 0) : 0);
+        }, () => {});
+    },
+
+    // STATYSTYKI - popularność narzędzi w bieżącym tygodniu (na podstawie kliknięć na stronie głównej)
+    trackAppClick: (appUrl) => {
+        if (!db) return;
+        const safeKey = appUrl.replace(/[.\/]/g, '_');
+        const clickRef = doc(db, 'artifacts', APP_ID, 'public', 'data', 'stats', `clicks_${getWeekKey()}`);
+        setDoc(clickRef, { [safeKey]: increment(1) }, { merge: true }).catch(() => {});
+    },
+
+    subscribeWeeklyPopular: (callback, topN = 5) => {
+        if (!db) return () => {};
+        const clickRef = doc(db, 'artifacts', APP_ID, 'public', 'data', 'stats', `clicks_${getWeekKey()}`);
+        return onSnapshot(clickRef, (snap) => {
+            if (!snap.exists()) { callback([]); return; }
+            const data = snap.data();
+            const sorted = Object.entries(data)
+                .map(([safeKey, count]) => ({ url: safeKey.replace(/_/g, '.'), count }))
+                .sort((a, b) => b.count - a.count)
+                .slice(0, topN);
+            callback(sorted);
+        }, () => callback([]));
     }
 };
