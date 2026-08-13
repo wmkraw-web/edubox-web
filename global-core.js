@@ -76,7 +76,7 @@ export const EduBoxCore = {
     // Mechanizm blokady limitów (do użycia pod przyciskiem 'Drukuj' itp.)
     executeWithLimitCheck: (isPremium, onSuccess, onLimitReached, onToastUpdate) => {
         const status = localStorage.getItem('eduboxProStatus');
-        if (status === 'PRO' || isPremium) {
+        if (status === 'PRO' || status === 'active' || isPremium) {
             // Konto PRO - akcja bez zwiększania licznika, ale podajemy dotychczasowy stan
             onSuccess(EduBoxCore.getUsageCount());
             return;

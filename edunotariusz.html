@@ -203,7 +203,8 @@ ${prompt}`;
                     const savedGens = window.localStorage.getItem('edubox_edunotariusz_ai');
                     if (savedGens) setAiGenerations(parseInt(savedGens));
                     const savedPremium = window.localStorage.getItem('edubox_premium');
-                    if (savedPremium === 'unlocked') setIsPremium(true);
+                    const sharedPro = window.localStorage.getItem('eduboxProStatus') === 'active' || window.localStorage.getItem('eduAwansPremium') === 'active';
+                    if (savedPremium === 'unlocked' || sharedPro) setIsPremium(true);
                 } catch (e) {}
             }, []);
 
@@ -273,7 +274,12 @@ Chaotyczne notatki od nauczyciela (ZAMIEŃ TO NA JĘZYK FORMALNY): ${rawNotes}`;
                     if (!isPremium) {
                         const newCount = aiGenerations + 1;
                         setAiGenerations(newCount);
-                        try { window.localStorage.setItem('edubox_edunotariusz_ai', newCount.toString()); } catch(e) {}
+                        try {
+                            window.localStorage.setItem('edubox_edunotariusz_ai', newCount.toString());
+                            const today = new Date().toISOString().split('T')[0];
+                            window.localStorage.setItem('eduboxUsage', JSON.stringify({ date: today, count: newCount }));
+                            if (window.updateGlobalLimitDisplay) window.updateGlobalLimitDisplay();
+                        } catch(e) {}
                     }
                     showMessage('Wygenerowano profesjonalny dokument!', 'success');
                 } catch (error) {
