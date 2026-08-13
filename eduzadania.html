@@ -146,6 +146,13 @@
 
     <div id="root"></div>
 
+    <!-- MODUŁ EDUBOX CORE (Wspólny silnik dla wszystkich apek) -->
+    <script type="module">
+        import { EduBoxCore } from './global-core.js';
+        window.EduBoxCore = EduBoxCore;
+        window.dispatchEvent(new Event('EduBoxCoreReady'));
+    </script>
+
     <script type="text/babel">
         const { useState, useEffect } = React;
 
@@ -181,6 +188,51 @@
             
             const [aiResponse, setAiResponse] = useState('');
             const [isGenerating, setIsGenerating] = useState(false);
+            const [user, setUser] = useState(null);
+            const [viewMode, setViewMode] = useState('generator'); // 'generator' | 'biblioteka'
+            const [libraryItems, setLibraryItems] = useState([]);
+            const [showPublishModal, setShowPublishModal] = useState(false);
+            const [publishTitle, setPublishTitle] = useState('');
+            const [isPublishing, setIsPublishing] = useState(false);
+
+            useEffect(() => {
+                const initCore = () => {
+                    if (window.EduBoxCore && window.EduBoxCore.init) {
+                        window.EduBoxCore.init((u) => setUser(u));
+                    } else { setTimeout(initCore, 100); }
+                };
+                initCore();
+            }, []);
+
+            useEffect(() => {
+                if (viewMode !== 'biblioteka' || !window.EduBoxCore || !window.EduBoxCore.subscribeToGielda) return;
+                const unsubscribe = window.EduBoxCore.subscribeToGielda('gielda_wzorow_eduzadania', setLibraryItems, (e) => console.error(e));
+                return () => unsubscribe && unsubscribe();
+            }, [viewMode]);
+
+            const handlePublishToLibrary = async () => {
+                if (!publishTitle.trim()) return showToast("Zanim udostępnisz, podaj krótki tytuł!");
+                if (!aiResponse) return showToast("Najpierw wygeneruj zadanie!");
+                setIsPublishing(true);
+                try {
+                    await window.EduBoxCore.saveToGielda('gielda_wzorow_eduzadania', 'EduZadania', publishTitle, { aiResponse, topic, theme, ageGroup });
+                    showToast("✨ Opublikowano w Bibliotece!");
+                    setShowPublishModal(false);
+                    setPublishTitle('');
+                } catch (e) {
+                    showToast(e.message || "Błąd podczas publikacji.");
+                } finally {
+                    setIsPublishing(false);
+                }
+            };
+
+            const loadFromLibrary = (item) => {
+                if (item.config && item.config.aiResponse) {
+                    setAiResponse(item.config.aiResponse);
+                    setViewMode('generator');
+                    showToast("✨ Wczytano zadanie z Biblioteki!");
+                }
+            };
             const [toastMessage, setToastMessage] = useState('');
             const [printWithKey, setPrintWithKey] = useState(false);
 
@@ -528,6 +580,61 @@ FORMAT ODPOWIEDZI (Używaj Markdown):
                         </div>
 
                     </main>
+
+                    {/* PRZYCISK BIBLIOTEKI */}
+                    <button onClick={() => setViewMode('biblioteka')} className="print-hidden fixed bottom-6 left-6 z-40 bg-slate-800 border border-sky-500/40 text-white px-5 py-3 rounded-full font-bold text-xs shadow-lg flex items-center gap-2 hover:bg-slate-700 transition-all">
+                        <i className="ph-bold ph-books"></i> Biblioteka Zadań
+                    </button>
+
+                    {/* MODAL PUBLIKACJI */}
+                    {showPublishModal && (
+                        <div className="print-hidden fixed inset-0 z-[150] flex items-center justify-center px-4 bg-slate-950/80 backdrop-blur-sm">
+                            <div className="bg-slate-900 border border-sky-500/50 p-6 sm:p-8 rounded-2xl shadow-2xl max-w-md w-full relative">
+                                <button onClick={() => setShowPublishModal(false)} className="absolute top-4 right-4 text-slate-500 hover:text-white">✕</button>
+                                <h3 className="text-2xl font-black text-sky-400 mb-2 flex items-center gap-2"><i className="ph-bold ph-share-network"></i> Udostępnij zadanie</h3>
+                                <div className="bg-red-500/10 border border-red-500/30 text-red-400 p-3 rounded-lg text-xs font-bold mb-4">
+                                    ⚠️ Upewnij się, że zadanie nie zawiera prawdziwych imion uczniów!
+                                </div>
+                                <label className="text-xs font-bold text-slate-400 uppercase tracking-widest block mb-1">Krótki tytuł</label>
+                                <input type="text" value={publishTitle} onChange={(e) => setPublishTitle(e.target.value)} placeholder="np. Zadania Minecraft - ułamki" className="w-full bg-slate-800 border border-slate-700 text-white rounded-xl p-3 mb-6 focus:outline-none focus:border-sky-500" />
+                                <button onClick={handlePublishToLibrary} disabled={isPublishing} className="w-full bg-sky-600 hover:bg-sky-500 text-white font-black py-3 rounded-xl shadow-lg flex justify-center items-center gap-2">
+                                    {isPublishing ? 'Publikowanie...' : 'Opublikuj w Bibliotece'}
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* NAKŁADKA BIBLIOTEKI */}
+                    {viewMode === 'biblioteka' && (
+                        <div className="print-hidden fixed inset-0 z-[140] bg-slate-950/95 backdrop-blur-sm overflow-y-auto">
+                            <div className="max-w-6xl mx-auto px-4 sm:px-6 py-10">
+                                <div className="flex items-center justify-between mb-8">
+                                    <h2 className="text-3xl font-black text-white">Biblioteka Zadań</h2>
+                                    <button onClick={() => setViewMode('generator')} className="text-slate-400 hover:text-white flex items-center gap-2 text-sm font-bold">
+                                        <i className="ph-bold ph-x text-xl"></i> Zamknij
+                                    </button>
+                                </div>
+                                {libraryItems.length === 0 ? (
+                                    <div className="glass-panel p-10 text-center rounded-[2rem] border-slate-700">
+                                        <i className="ph-duotone ph-books text-6xl mb-4 text-slate-400"></i>
+                                        <h3 className="text-xl font-bold text-white mb-2">Biblioteka jest jeszcze pusta...</h3>
+                                        <p className="text-slate-400">Wygeneruj zadanie i opublikuj je jako pierwsze!</p>
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                        {libraryItems.map((item) => (
+                                            <div key={item.id} className="glass-panel rounded-2xl p-6 border border-sky-500/20 hover:border-sky-500/50 transition-all shadow-lg flex flex-col">
+                                                <h3 className="text-lg font-bold text-white mb-4">{item.name}</h3>
+                                                <button onClick={() => loadFromLibrary(item)} className="mt-auto bg-sky-600 hover:bg-sky-500 text-white font-bold py-2.5 rounded-xl flex items-center justify-center gap-2 text-sm">
+                                                    <i className="ph-bold ph-download-simple"></i> Wczytaj zadanie
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
                 </div>
             );
         }
