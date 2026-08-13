@@ -155,6 +155,16 @@
                 .replace(/\n/g, '<br/>');
         };
 
+        // Zweryfikowana baza źródeł prawnych - AI może z niej TYLKO WYBIERAĆ, nigdy nie generuje własnych linków
+        const LEGAL_SOURCES = {
+            karta_nauczyciela: { name: "Karta Nauczyciela (ustawa) - ISAP", url: "https://isap.sejm.gov.pl/isap.nsf/ByKeyword.xsp?key=Karta+Nauczyciela" },
+            prawo_oswiatowe: { name: "Ustawa Prawo oświatowe - ISAP", url: "https://isap.sejm.gov.pl/isap.nsf/ByKeyword.xsp?key=Prawo+o%C5%9Bwiatowe" },
+            awans_zawodowy: { name: "Rozporządzenie ws. uzyskiwania stopni awansu zawodowego (6.09.2022)", url: "https://isap.sejm.gov.pl/isap.nsf/DocDetails.xsp?id=WDU20220001914" },
+            orzeczenia_poradnie: { name: "Rozporządzenie ws. orzeczeń i opinii poradni PPP, w tym ocena funkcjonalna (2.03.2026)", url: "https://isap.sejm.gov.pl/isap.nsf/DocDetails.xsp?id=WDU20260000428" },
+            podstawa_programowa: { name: "Rozporządzenie ws. nowej podstawy programowej \"Kompas Jutra\" (11.03.2026)", url: "https://isap.sejm.gov.pl/isap.nsf/DocDetails.xsp?id=WDU20260000378" },
+            oswiata_ogolnie: { name: "Portal Ministerstwa Edukacji - aktualności i akty prawne", url: "https://www.gov.pl/web/edukacja" }
+        };
+
         function EduPrawoApp() {
             // --- V3 PRO MAX STATES (CORE) ---
             const [coreReady, setCoreReady] = useState(!!window.EduBoxCore);
@@ -286,12 +296,23 @@ WAŻNY KONTEKST CZASOWY: Dzisiejsza data to ${new Date().toLocaleDateString('pl-
 
 Jeśli pytanie dotyczy obszaru, w którym niedawno zaszły zmiany, zaznacz to wyraźnie w odpowiedzi. Jeśli nie masz pewności co do najbardziej aktualnego stanu prawnego w wąskiej, szczegółowej kwestii, wyraźnie to zaznacz i zarekomenduj weryfikację w kuratorium oświaty lub u prawnika specjalizującego się w prawie oświatowym - zwłaszcza przy decyzjach wiążących lub spornych.
 
+WYMAGANIA CO DO SZCZEGÓŁOWOŚCI: Pisz wyczerpująco. W polu "explanation" nie ograniczaj się do jednego zdania - wyjaśnij kontekst przepisu, jego praktyczne zastosowanie w szkole oraz - jeśli to pomaga zrozumieć sytuację - krótki przykład. W polu "action_steps" podaj konkretne, praktyczne kroki (zwykle 3-5 punktów), nie ogólniki.
+
+WYBÓR ŹRÓDEŁ: W polu "related_topics" wskaż od 1 do 3 kluczy z poniższej ZAMKNIĘTEJ listy, które najlepiej pasują do tematu pytania. Wybieraj TYLKO z tej listy, nigdy nie wymyślaj własnych kluczy ani adresów URL:
+- "karta_nauczyciela" (sprawy pracownicze, urlopy, wynagrodzenie, obowiązki nauczyciela)
+- "prawo_oswiatowe" (ogólne funkcjonowanie szkoły, uczniowie, dyrekcja)
+- "awans_zawodowy" (stopnie awansu, staż, mianowanie, dyplomowanie)
+- "orzeczenia_poradnie" (orzeczenia, opinie PPP, ocena funkcjonalna, WOPFU)
+- "podstawa_programowa" (treści nauczania, nowa podstawa programowa, przedmioty)
+- "oswiata_ogolnie" (gdy żaden z powyższych nie pasuje precyzyjnie)
+
 Odpowiadaj WYŁĄCZNIE poprawnym formatem JSON. Nie dodawaj znaczników Markdown wokół JSONa, tylko sam obiekt.
 Struktura JSON:
 {
   "legal_basis": "Dokładna podstawa prawna (np. Art. 73 ust. 2 Karty Nauczyciela)",
-  "explanation": "Zrozumiałe, rzeczowe wyjaśnienie sytuacji prawnej (używaj znaczników <strong> dla ważnych słów, możesz używać \\n do nowych linii)",
-  "action_steps": "Rekomendowane kroki działania dla nauczyciela/dyrektora w tej sytuacji (tekst z wypunktowaniem za pomocą •)"
+  "explanation": "Wyczerpujące, rzeczowe wyjaśnienie sytuacji prawnej wraz z kontekstem praktycznym (używaj znaczników <strong> dla ważnych słów, możesz używać \\n do nowych linii)",
+  "action_steps": "Rekomendowane, konkretne kroki działania dla nauczyciela/dyrektora w tej sytuacji, zwykle 3-5 punktów (tekst z wypunktowaniem za pomocą •)",
+  "related_topics": ["klucz1", "klucz2"]
 }`;
 
                 try {
@@ -339,7 +360,8 @@ Struktura JSON:
                         parsedData = {
                             legal_basis: "Podstawa prawna wynikająca z przepisów ogólnych",
                             explanation: cleanText,
-                            action_steps: "Skonsultuj się z radcą prawnym organu prowadzącego."
+                            action_steps: "Skonsultuj się z radcą prawnym organu prowadzącego.",
+                            related_topics: ["oswiata_ogolnie"]
                         };
                     }
 
@@ -593,6 +615,25 @@ Struktura JSON:
                                                 <h3 className="text-xs font-black uppercase text-emerald-600 tracking-widest mb-4 flex items-center gap-2"><i className="ph-bold ph-check-circle"></i> Rekomendowane Działania</h3>
                                                 <div className="text-slate-800" dangerouslySetInnerHTML={{ __html: formatAIResponse(aiResponse.action_steps) }}></div>
                                             </div>
+
+                                            {/* Źródła i dalsza lektura */}
+                                            {aiResponse.related_topics && aiResponse.related_topics.length > 0 && (
+                                                <div className="no-print border border-slate-200 p-6 rounded-xl">
+                                                    <h3 className="text-xs font-black uppercase text-slate-400 tracking-widest mb-4 flex items-center gap-2"><i className="ph-bold ph-link"></i> Źródła i dalsza lektura</h3>
+                                                    <div className="flex flex-col gap-2">
+                                                        {aiResponse.related_topics
+                                                            .filter(key => LEGAL_SOURCES[key])
+                                                            .map(key => (
+                                                                <a key={key} href={LEGAL_SOURCES[key].url} target="_blank" rel="noopener noreferrer"
+                                                                   className="flex items-center gap-2 text-sm text-blue-700 hover:text-blue-900 hover:underline font-semibold">
+                                                                    <i className="ph-bold ph-arrow-square-out shrink-0"></i>
+                                                                    {LEGAL_SOURCES[key].name}
+                                                                </a>
+                                                            ))}
+                                                    </div>
+                                                    <p className="text-[10px] text-slate-400 mt-3">Linki prowadzą do oficjalnej bazy ISAP (Sejm RP) lub portalu Ministerstwa Edukacji.</p>
+                                                </div>
+                                            )}
 
                                         </div>
 
