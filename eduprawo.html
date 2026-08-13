@@ -96,7 +96,7 @@
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
         /* Stylizacja formatowania AI */
-        .ai-content strong { color: #f8fafc; font-weight: 800; }
+        .ai-content strong { color: #0f172a; font-weight: 800; }
         .ai-content p { margin-bottom: 1rem; }
         .ai-content ul { list-style-type: disc; margin-left: 1.5rem; margin-bottom: 1rem; }
         .ai-content li { margin-bottom: 0.5rem; }
@@ -289,7 +289,7 @@
 
                 const systemPrompt = `Jesteś ekspertem prawa oświatowego w Polsce. Masz za zadanie udzielić rzetelnej, opartej na przepisach porady prawnej dla dyrektora lub nauczyciela.
 
-WAŻNY KONTEKST CZASOWY: Dzisiejsza data to ${new Date().toLocaleDateString('pl-PL', { day: 'numeric', month: 'long', year: 'numeric' })}, trwa rok szkolny 2026/2027. Miej na uwadze aktualne zmiany prawne obowiązujące w tym okresie, w tym m.in.:
+WAŻNY KONTEKST CZASOWY: Dzisiejsza data to ${new Date().toLocaleDateString('pl-PL', { day: 'numeric', month: 'long', year: 'numeric' })}, trwa rok szkolny 2026/2027. Aktualna nazwa resortu to "Ministerstwo Edukacji Narodowej" (MEN), a nowe akty prawne od 2024 r. podpisuje "Minister Edukacji" (BEZ członu "i Nauki" - ten człon to nazwa sprzed podziału resortu w 2024 r., już nieaktualna). Miej na uwadze aktualne zmiany prawne obowiązujące w tym okresie, w tym m.in.:
 - reformę awansu zawodowego z 2022 r. (Karta Nauczyciela) - obecne stopnie to nauczyciel początkujący, mianowany i dyplomowany (stopnie stażysty i kontraktowego zniesiono, ale przepisy przejściowe dla części nauczycieli obowiązują do 31 sierpnia 2027 r.);
 - reformę podstawy programowej "Kompas jutra" (rozporządzenie z 11 marca 2026 r.) - nowa podstawa programowa obowiązuje od 1 września 2026 r. w przedszkolach oraz klasach I i IV szkoły podstawowej;
 - zmiany w zasadach wydawania orzeczeń i opinii przez poradnie psychologiczno-pedagogiczne (rozporządzenie z 2 marca 2026 r.), w tym obowiązkową "ocenę funkcjonalną" ucznia od 1 września 2026 r. oraz nowe, 10-dniowe terminy na przygotowanie przez szkołę aktualnej WOPFU na prośbę poradni.
@@ -363,6 +363,19 @@ Struktura JSON:
                             action_steps: "Skonsultuj się z radcą prawnym organu prowadzącego.",
                             related_topics: ["oswiata_ogolnie"]
                         };
+                    }
+
+                    // Zabezpieczenie: jeśli AI nie podało related_topics (lub podało pustą tablicę),
+                    // dobieramy je sami na podstawie słów kluczowych - żeby link ZAWSZE się pojawił
+                    if (!parsedData.related_topics || parsedData.related_topics.length === 0) {
+                        const haystack = (query + ' ' + (parsedData.legal_basis || '') + ' ' + (parsedData.explanation || '')).toLowerCase();
+                        const guessed = [];
+                        if (/awans|staż|mianowan|dyplomowan|nauczyciel początkując|kontraktow/.test(haystack)) guessed.push('awans_zawodowy');
+                        if (/orzeczen|opini[ai]|wopfu|ipet|poradni|ocena funkcjonaln|niepełnosprawn/.test(haystack)) guessed.push('orzeczenia_poradnie');
+                        if (/podstawa programowa|przedmiot|kompas jutra|program nauczania/.test(haystack)) guessed.push('podstawa_programowa');
+                        if (/urlop|wynagrodzeni|godzin|pensum|karta nauczyciela|obowiązk[iu] nauczyciela/.test(haystack)) guessed.push('karta_nauczyciela');
+                        if (/dyrektor|statut|uczni|szkoł[ay]|prawo oświatowe/.test(haystack)) guessed.push('prawo_oswiatowe');
+                        parsedData.related_topics = guessed.length > 0 ? guessed.slice(0, 3) : ['oswiata_ogolnie'];
                     }
 
                     setAiResponse(parsedData);
