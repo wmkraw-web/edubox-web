@@ -96,6 +96,40 @@ export const EduBoxCore = {
         onSuccess(newCount);
     },
 
+    // Osobny, niższy licznik TYLKO dla kosztownego generowania obrazków AI (Fal.ai)
+    getImageUsageCount: () => {
+        const today = new Date().toISOString().split('T')[0];
+        let usageStr = localStorage.getItem('eduboxImageUsage');
+        if (usageStr) {
+            try {
+                const parsed = JSON.parse(usageStr);
+                if (parsed.date === today) return parsed.count;
+            } catch(e) {}
+        }
+        return 0;
+    },
+
+    executeImageLimitCheck: (isPremium, onSuccess, onLimitReached, onToastUpdate) => {
+        const status = localStorage.getItem('eduboxProStatus');
+        if (status === 'PRO' || status === 'active' || isPremium) {
+            onSuccess(EduBoxCore.getImageUsageCount());
+            return;
+        }
+
+        let currentCount = EduBoxCore.getImageUsageCount();
+        if (currentCount >= 2) {
+            onLimitReached("⚠️ Dzienny limit darmowych obrazków (2/2) wyczerpany. Wpisz kod odblokowujący, by generować dalej!");
+            return;
+        }
+
+        const newCount = currentCount + 1;
+        const today = new Date().toISOString().split('T')[0];
+        localStorage.setItem('eduboxImageUsage', JSON.stringify({ date: today, count: newCount }));
+
+        onToastUpdate(`Wykorzystano ${newCount}/2 darmowych obrazków dzisiaj`);
+        onSuccess(newCount);
+    },
+
     // Weryfikacja kodu premium
     verifyPremiumCode: async (code) => {
         try {

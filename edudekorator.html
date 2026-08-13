@@ -222,7 +222,9 @@
             };
 
             const generateContent = async () => {
-                if (!isPremium && aiGenerations >= 3) { showMessage('Limit wyczerpany.', 'error'); return; }
+                const imgProStatus = localStorage.getItem('eduboxProStatus');
+                const imgIsPro = imgProStatus === 'PRO' || imgProStatus === 'active' || isPremium;
+                if (!imgIsPro && window.EduBoxCore.getImageUsageCount() >= 2) { showMessage('⚠️ Dzienny limit darmowych obrazków (2/2) wyczerpany. Wpisz kod odblokowujący!', 'error'); return; }
                 if (!theme.trim()) { showMessage('Wpisz motyw!', 'error'); return; }
                 
                 setIsGenerating(true);
@@ -311,6 +313,11 @@ WYMÓG JSON:
                     
                     parsedJson.items = itemsWithImages;
 
+                    if (!imgIsPro) {
+                        const today = new Date().toISOString().split('T')[0];
+                        const newImgCount = window.EduBoxCore.getImageUsageCount() + 1;
+                        localStorage.setItem('eduboxImageUsage', JSON.stringify({ date: today, count: newImgCount }));
+                    }
                     setResultData({ type: layoutType, data: parsedJson, params: { theme, groupAge } });
                     
                     if(layoutType === 'etykiety') setPrintSize('medium');

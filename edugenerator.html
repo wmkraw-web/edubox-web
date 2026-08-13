@@ -377,6 +377,12 @@
 
             const handleGenerateAiImage = async () => {
                 if (!aiPrompt.trim()) return;
+                const imgProStatus = localStorage.getItem('eduboxProStatus');
+                const imgIsPro = imgProStatus === 'PRO' || imgProStatus === 'active' || isPremium;
+                if (!imgIsPro && window.EduBoxCore.getImageUsageCount() >= 2) {
+                    showToast('⚠️ Dzienny limit darmowych obrazków (2/2) wyczerpany. Wpisz kod odblokowujący!');
+                    return;
+                }
                 setIsGenerating(true);
                 let translatedPrompt = aiPrompt;
                 try {
@@ -411,6 +417,11 @@
                     } else {
                         const transparentImg = await makeWhiteTransparent(data.imageUrl);
                         setCustomImage(transparentImg);
+                    }
+                    if (!imgIsPro) {
+                        const today = new Date().toISOString().split('T')[0];
+                        const newImgCount = window.EduBoxCore.getImageUsageCount() + 1;
+                        localStorage.setItem('eduboxImageUsage', JSON.stringify({ date: today, count: newImgCount }));
                     }
                     showToast("✨ Grafika gotowa i wycięta!");
                 } catch (e) { 

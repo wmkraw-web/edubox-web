@@ -154,12 +154,28 @@
             },
             executeWithLimitCheck: (isPremium, onSuccess, onLimitReached, onToastUpdate) => {
                 const status = localStorage.getItem('eduboxProStatus');
-                if (status === 'PRO' || isPremium) { onSuccess(window.EduBoxCore.getUsageCount()); return; }
+                if (status === 'PRO' || status === 'active' || isPremium) { onSuccess(window.EduBoxCore.getUsageCount()); return; }
                 let currentCount = window.EduBoxCore.getUsageCount();
                 if (currentCount >= 5) { onLimitReached("⚠️ Dzienny limit użyć (5/5) wyczerpany. Wpisz kod odblokowujący na pasku bocznym!"); return; }
                 const newCount = currentCount + 1;
                 localStorage.setItem('eduboxUsage', JSON.stringify({ date: new Date().toISOString().split('T')[0], count: newCount }));
                 onToastUpdate(`Wykorzystano ${newCount}/5 darmowych działań`);
+                onSuccess(newCount);
+            },
+            getImageUsageCount: () => {
+                const today = new Date().toISOString().split('T')[0];
+                let usageStr = localStorage.getItem('eduboxImageUsage');
+                if (usageStr) { try { const parsed = JSON.parse(usageStr); if (parsed.date === today) return parsed.count; } catch(e) {} }
+                return 0;
+            },
+            executeImageLimitCheck: (isPremium, onSuccess, onLimitReached, onToastUpdate) => {
+                const status = localStorage.getItem('eduboxProStatus');
+                if (status === 'PRO' || status === 'active' || isPremium) { onSuccess(window.EduBoxCore.getImageUsageCount()); return; }
+                let currentCount = window.EduBoxCore.getImageUsageCount();
+                if (currentCount >= 2) { onLimitReached("⚠️ Dzienny limit darmowych obrazków (2/2) wyczerpany. Wpisz kod odblokowujący!"); return; }
+                const newCount = currentCount + 1;
+                localStorage.setItem('eduboxImageUsage', JSON.stringify({ date: new Date().toISOString().split('T')[0], count: newCount }));
+                onToastUpdate(`Wykorzystano ${newCount}/2 darmowych obrazków dzisiaj`);
                 onSuccess(newCount);
             },
             verifyPremiumCode: async (code) => {
@@ -404,7 +420,7 @@
             const generateContent = () => {
                 if (!topic.trim()) { showToast('Wpisz najpierw temat!', 'error'); return; }
                 
-                window.EduBoxCore.executeWithLimitCheck(isPremium, 
+                window.EduBoxCore.executeImageLimitCheck(isPremium, 
                     async (newCount) => {
                         setUsages(newCount);
                         setIsGenerating(true);

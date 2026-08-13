@@ -288,10 +288,22 @@
                     setLoadingProgress(Math.round(((i) / updatedSlides.length) * 100));
                     if (updatedSlides[i].imageUrl) continue; 
 
+                    const proStatus = localStorage.getItem('eduboxProStatus');
+                    const isPro = proStatus === 'PRO' || proStatus === 'active' || isPremium;
+                    if (!isPro && window.EduBoxCore.getImageUsageCount() >= 2) {
+                        showToast('⚠️ Dzienny limit darmowych obrazków (2/2) wyczerpany. Pozostałe slajdy zostaną bez grafiki - wpisz kod odblokowujący, by kontynuować.', 'error');
+                        break;
+                    }
+
                     try {
                         const imgUrl = await fetchEduBoxImage(updatedSlides[i].imagePrompt, theme);
                         updatedSlides[i].imageUrl = imgUrl;
                         setSlides([...updatedSlides]);
+                        if (!isPro) {
+                            const today = new Date().toISOString().split('T')[0];
+                            const newImgCount = window.EduBoxCore.getImageUsageCount() + 1;
+                            localStorage.setItem('eduboxImageUsage', JSON.stringify({ date: today, count: newImgCount }));
+                        }
                     } catch (err) { 
                         console.error(`Błąd przy obrazku ${i}:`, err);
                     }
@@ -302,12 +314,23 @@
             };
 
             const regenerateSingleImage = async (index) => {
+                const proStatus = localStorage.getItem('eduboxProStatus');
+                const isPro = proStatus === 'PRO' || proStatus === 'active' || isPremium;
+                if (!isPro && window.EduBoxCore.getImageUsageCount() >= 2) {
+                    showToast('⚠️ Dzienny limit darmowych obrazków (2/2) wyczerpany. Wpisz kod odblokowujący!', 'error');
+                    return;
+                }
                 setIsRegeneratingImage(index);
                 try {
                     const imgUrl = await fetchEduBoxImage(slides[index].imagePrompt, theme);
                     const newSlides = [...slides];
                     newSlides[index].imageUrl = imgUrl;
                     setSlides(newSlides);
+                    if (!isPro) {
+                        const today = new Date().toISOString().split('T')[0];
+                        const newImgCount = window.EduBoxCore.getImageUsageCount() + 1;
+                        localStorage.setItem('eduboxImageUsage', JSON.stringify({ date: today, count: newImgCount }));
+                    }
                     showToast("🎨 Grafika pomyślnie zmieniona!", "success");
                 } catch (err) {
                     console.error(err);

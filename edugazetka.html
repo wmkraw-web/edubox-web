@@ -362,6 +362,14 @@
             // ETAP 1 & 2: GENEROWANIE ŁAŃCUCHOWE
             const generateGazetka = async () => {
                 if (!topic.trim()) return showToast('Wpisz temat gazetki!');
+                const imgProStatus = localStorage.getItem('eduboxProStatus');
+                const imgIsPro = imgProStatus === 'PRO' || imgProStatus === 'active' || isPro;
+                if (!imgIsPro) {
+                    const todayImg = new Date().toISOString().split('T')[0];
+                    let imgUsage = JSON.parse(localStorage.getItem('eduboxImageUsage') || '{}');
+                    const imgCount = (imgUsage.date === todayImg) ? imgUsage.count : 0;
+                    if (imgCount >= 2) { showToast('⚠️ Dzienny limit darmowych obrazków (2/2) wyczerpany. Wpisz kod odblokowujący!'); return; }
+                }
                 if (!updateAndCheckLimit()) return;
 
                 setStep('generating');
@@ -441,6 +449,12 @@
 
                     setGazetkaData(gazetkaObj);
                     setLoadingProgress(100);
+                    if (!imgIsPro) {
+                        const todayImg2 = new Date().toISOString().split('T')[0];
+                        let imgUsage2 = JSON.parse(localStorage.getItem('eduboxImageUsage') || '{}');
+                        const newImgCount = (imgUsage2.date === todayImg2 ? imgUsage2.count : 0) + 1;
+                        localStorage.setItem('eduboxImageUsage', JSON.stringify({ date: todayImg2, count: newImgCount }));
+                    }
                     setTimeout(() => setStep('review'), 500);
 
                 } catch (error) {

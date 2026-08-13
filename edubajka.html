@@ -344,7 +344,14 @@
             };
 
             const generateStory = async () => {
-                if (!isPremium && aiGenerations >= 2) { showMessage('Limit wyczerpany.', 'error'); return; }
+                const imgProStatus = localStorage.getItem('eduboxProStatus');
+                const imgIsPro = imgProStatus === 'active' || isPremium;
+                if (!imgIsPro) {
+                    const todayImg = new Date().toISOString().split('T')[0];
+                    let imgUsage = JSON.parse(localStorage.getItem('eduboxImageUsage') || '{}');
+                    const imgCount = (imgUsage.date === todayImg) ? imgUsage.count : 0;
+                    if (imgCount >= 2) { showMessage('⚠️ Dzienny limit darmowych obrazków (2/2) wyczerpany. Wpisz kod odblokowujący!', 'error'); return; }
+                }
                 if (!problem.trim() || !theme.trim()) { showMessage('Uzupełnij formularz!', 'error'); return; }
                 
                 setIsGenerating(true);
@@ -393,14 +400,12 @@ Napisz piękną historię.`;
 
                     setResultData(parsedJson);
                     
-                    if (!isPremium) {
-                        const newCount = aiGenerations + 1;
-                        setAiGenerations(newCount);
+                    if (!imgIsPro) {
                         try {
-                            window.localStorage.setItem('edubox_edubajka_ai', newCount.toString());
                             const today = new Date().toISOString().split('T')[0];
-                            window.localStorage.setItem('eduboxUsage', JSON.stringify({ date: today, count: newCount }));
-                            if (window.updateGlobalLimitDisplay) window.updateGlobalLimitDisplay();
+                            let imgUsage = JSON.parse(localStorage.getItem('eduboxImageUsage') || '{}');
+                            const newImgCount = (imgUsage.date === today ? imgUsage.count : 0) + 1;
+                            window.localStorage.setItem('eduboxImageUsage', JSON.stringify({ date: today, count: newImgCount }));
                         } catch(e) {}
                     }
                     showMessage('Gotowe do druku!', 'success');
