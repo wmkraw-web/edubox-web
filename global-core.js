@@ -46,7 +46,16 @@ export const EduBoxCore = {
         if (container) {
             fetch('/menu.html')
                 .then(r => r.text())
-                .then(html => { container.innerHTML = html; })
+                .then(html => {
+                    container.innerHTML = html;
+                    // innerHTML nie wykonuje tagów <script> - trzeba je ręcznie odtworzyć
+                    container.querySelectorAll('script').forEach(oldScript => {
+                        const newScript = document.createElement('script');
+                        if (oldScript.src) newScript.src = oldScript.src;
+                        newScript.textContent = oldScript.textContent;
+                        oldScript.parentNode.replaceChild(newScript, oldScript);
+                    });
+                })
                 .catch(err => console.log('Brak pliku menu lokalnie.', err));
         }
     },
