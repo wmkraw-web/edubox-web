@@ -70,6 +70,16 @@
                     name: itemName,
                     config: config
                 });
+            },
+            subscribeToGielda: (collectionName, onDataLoaded, onError) => {
+                if (!db) return () => {};
+                const publicRef = collection(db, 'artifacts', APP_ID, 'public', 'data', collectionName);
+                return onSnapshot(publicRef, (snapshot) => {
+                    const loaded = [];
+                    snapshot.forEach(doc => loaded.push({ id: doc.id, ...doc.data() }));
+                    loaded.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
+                    onDataLoaded(loaded);
+                }, onError);
             }
         };
     </script>
@@ -197,6 +207,11 @@
             const [ageGroup, setAgeGroup] = useState('Edukacja Wczesnoszkolna (1-3)');
             const [speNeeds, setSpeNeeds] = useState('Brak specjalnych dostosowań');
             const [length, setLength] = useState('Średni (1-2 zdania)');
+            const [viewMode, setViewMode] = useState('generator'); // 'generator' | 'biblioteka'
+            const [libraryItems, setLibraryItems] = useState([]);
+            const [showPublishModal, setShowPublishModal] = useState(false);
+            const [publishTitle, setPublishTitle] = useState('');
+            const [isPublishing, setIsPublishing] = useState(false);
 
             useEffect(() => {
                 const initDb = () => {
@@ -210,13 +225,44 @@
                     const savedGens = window.localStorage.getItem('edubox_eduwpisy_ai');
                     if (savedGens) setAiGenerations(parseInt(savedGens));
                     const savedPremium = window.localStorage.getItem('edubox_premium');
-                    if (savedPremium === 'unlocked') setIsPremium(true);
+                    const sharedPro = window.localStorage.getItem('eduboxProStatus') === 'active' || window.localStorage.getItem('eduAwansPremium') === 'active';
+                    if (savedPremium === 'unlocked' || sharedPro) setIsPremium(true);
                 } catch (e) {}
             }, []);
 
             const showMessage = (text, type = 'success') => {
                 setMessage({ text, type });
                 setTimeout(() => setMessage(null), 4000);
+            };
+
+            useEffect(() => {
+                if (viewMode !== 'biblioteka' || !window.EduBoxCore || !window.EduBoxCore.subscribeToGielda) return;
+                const unsubscribe = window.EduBoxCore.subscribeToGielda('gielda_wzorow_eduwpisy', setLibraryItems, (e) => console.error(e));
+                return () => unsubscribe && unsubscribe();
+            }, [viewMode]);
+
+            const handlePublishToLibrary = async () => {
+                if (!publishTitle.trim()) return showMessage("Zanim udostępnisz, podaj krótki tytuł!", 'error');
+                if (!resultData) return showMessage("Najpierw wygeneruj wpisy!", 'error');
+                setIsPublishing(true);
+                try {
+                    await window.EduBoxCore.saveToGielda('gielda_wzorow_eduwpisy', 'EduWpisy', publishTitle, { resultData });
+                    showMessage("✨ Opublikowano w Bibliotece!", 'success');
+                    setShowPublishModal(false);
+                    setPublishTitle('');
+                } catch (e) {
+                    showMessage(e.message || "Błąd podczas publikacji.", 'error');
+                } finally {
+                    setIsPublishing(false);
+                }
+            };
+
+            const loadFromLibrary = (item) => {
+                if (item.config && item.config.resultData) {
+                    setResultData(item.config.resultData);
+                    setViewMode('generator');
+                    showMessage("✨ Wczytano wpisy z Biblioteki!", 'success');
+                }
             };
 
             const handlePremiumCheck = async () => {
@@ -277,7 +323,12 @@
                     if (!isPremium) {
                         const newCount = aiGenerations + 1;
                         setAiGenerations(newCount);
-                        try { window.localStorage.setItem('edubox_eduwpisy_ai', newCount.toString()); } catch(e){}
+                        try {
+                            window.localStorage.setItem('edubox_eduwpisy_ai', newCount.toString());
+                            const today = new Date().toISOString().split('T')[0];
+                            window.localStorage.setItem('eduboxUsage', JSON.stringify({ date: today, count: newCount }));
+                            if (window.updateGlobalLimitDisplay) window.updateGlobalLimitDisplay();
+                        } catch(e) {}
                     }
                 } catch (error) {
                     showMessage(error.message, 'error');
@@ -417,11 +468,14 @@
                             {resultData && !isGenerating && (
                                 <div className="max-w-4xl mx-auto space-y-6 pb-20 animate-[reveal_0.3s_ease-out]">
                                     
-                                    <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200 flex items-center justify-between">
+                                    <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200 flex items-center justify-between flex-wrap gap-4">
                                         <div>
                                             <h2 className="text-xl font-black text-slate-800 mb-1">Wyniki dla: "{topic}"</h2>
                                             <p className="text-xs font-bold text-emerald-600 flex items-center gap-1"><i className="ph-fill ph-check-circle"></i> Gotowe do przeklejenia do Dziennika (Librus / Vulcan)</p>
                                         </div>
+                                        <button onClick={() => setShowPublishModal(true)} className="bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 font-bold py-2.5 px-5 rounded-xl transition-all flex items-center gap-2 text-sm">
+                                            <i className="ph-bold ph-share-network"></i> Udostępnij
+                                        </button>
                                     </div>
 
                                     {resultData.map((variant, index) => {
@@ -464,6 +518,61 @@
                             )}
                         </div>
                     </main>
+
+                    {/* PRZYCISK BIBLIOTEKI */}
+                    <button onClick={() => setViewMode('biblioteka')} className="no-print fixed top-20 right-4 sm:right-6 z-40 bg-gradient-to-r from-indigo-600 to-blue-600 text-white px-6 py-3.5 rounded-full font-bold text-sm shadow-[0_0_25px_rgba(79,70,229,0.6)] flex items-center gap-2 hover:scale-105 transition-all animate-pulse">
+                        <i className="ph-bold ph-books"></i> Biblioteka Wpisów
+                    </button>
+
+                    {/* MODAL PUBLIKACJI */}
+                    {showPublishModal && (
+                        <div className="no-print fixed inset-0 z-[150] flex items-center justify-center px-4 bg-slate-950/80 backdrop-blur-sm">
+                            <div className="bg-white border border-indigo-300 p-6 sm:p-8 rounded-2xl shadow-2xl max-w-md w-full relative">
+                                <button onClick={() => setShowPublishModal(false)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-800">✕</button>
+                                <h3 className="text-2xl font-black text-indigo-600 mb-2 flex items-center gap-2"><i className="ph-bold ph-share-network"></i> Udostępnij wpisy</h3>
+                                <div className="bg-red-50 border border-red-200 text-red-600 p-3 rounded-lg text-xs font-bold mb-4">
+                                    ⚠️ Upewnij się, że wpisy nie zawierają prawdziwych imion uczniów!
+                                </div>
+                                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest block mb-1">Krótki tytuł</label>
+                                <input type="text" value={publishTitle} onChange={(e) => setPublishTitle(e.target.value)} placeholder="np. Wpisy - zajęcia plastyczne" className="w-full bg-slate-100 border border-slate-300 text-slate-800 rounded-xl p-3 mb-6 focus:outline-none focus:border-indigo-500" />
+                                <button onClick={handlePublishToLibrary} disabled={isPublishing} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black py-3 rounded-xl shadow-lg flex justify-center items-center gap-2">
+                                    {isPublishing ? 'Publikowanie...' : 'Opublikuj w Bibliotece'}
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* NAKŁADKA BIBLIOTEKI */}
+                    {viewMode === 'biblioteka' && (
+                        <div className="no-print fixed inset-0 z-[140] bg-slate-950/95 backdrop-blur-sm overflow-y-auto">
+                            <div className="max-w-6xl mx-auto px-4 sm:px-6 py-10">
+                                <div className="flex items-center justify-between mb-8">
+                                    <h2 className="text-3xl font-black text-white">Biblioteka Wpisów</h2>
+                                    <button onClick={() => setViewMode('generator')} className="text-slate-400 hover:text-white flex items-center gap-2 text-sm font-bold">
+                                        <i className="ph-bold ph-x text-xl"></i> Zamknij
+                                    </button>
+                                </div>
+                                {libraryItems.length === 0 ? (
+                                    <div className="glass-panel p-10 text-center rounded-[2rem] border-slate-700">
+                                        <i className="ph-duotone ph-books text-6xl mb-4 text-slate-400"></i>
+                                        <h3 className="text-xl font-bold text-white mb-2">Biblioteka jest jeszcze pusta...</h3>
+                                        <p className="text-slate-400">Wygeneruj wpisy i opublikuj je jako pierwsze!</p>
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                        {libraryItems.map((item) => (
+                                            <div key={item.id} className="glass-panel rounded-2xl p-6 border border-indigo-500/20 hover:border-indigo-500/50 transition-all shadow-lg flex flex-col">
+                                                <h3 className="text-lg font-bold text-white mb-4">{item.name}</h3>
+                                                <button onClick={() => loadFromLibrary(item)} className="mt-auto bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 rounded-xl flex items-center justify-center gap-2 text-sm">
+                                                    <i className="ph-bold ph-download-simple"></i> Wczytaj wpisy
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
 
                 </div>
             );

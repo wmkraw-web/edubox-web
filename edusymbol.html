@@ -132,6 +132,13 @@
 
     <div id="root"></div>
 
+    <!-- MODUŁ EDUBOX CORE (Wspólny silnik dla wszystkich apek) -->
+    <script type="module">
+        import { EduBoxCore } from './global-core.js';
+        window.EduBoxCore = EduBoxCore;
+        window.dispatchEvent(new Event('EduBoxCoreReady'));
+    </script>
+
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
 
@@ -152,6 +159,9 @@
             const [generationStep, setGenerationStep] = useState(null); // null, 'translating', 'generating'
             const [error, setError] = useState('');
             const [showClearConfirm, setShowClearConfirm] = useState(false);
+            const [showPublishModal, setShowPublishModal] = useState(false);
+            const [publishTitle, setPublishTitle] = useState('');
+            const [isPublishing, setIsPublishing] = useState(false);
             
             // Baza zebranych kart
             const [symbolCards, setSymbolCards] = useState([]);
@@ -172,7 +182,7 @@
                         
                         await window.EduBoxCore.init((u) => {
                             const savedAuth = localStorage.getItem('eduSymbolAuth') === 'true';
-                            if (savedAuth || localStorage.getItem('eduboxProStatus') === 'PRO') setIsAuthenticated(true);
+                            if (savedAuth || localStorage.getItem('eduboxProStatus') === 'PRO' || localStorage.getItem('eduboxProStatus') === 'active') setIsAuthenticated(true);
                             setFreeTries(window.EduBoxCore.getUsageCount());
                         });
                         
@@ -402,6 +412,21 @@
                     setError(err.message || 'Wystąpił problem z generowaniem obrazu.');
                 } finally {
                     setGenerationStep(null);
+                }
+            };
+
+            const handlePublishToLibrary = async () => {
+                if (!publishTitle.trim()) return setError("Zanim udostępnisz, podaj krótki tytuł!");
+                if (!generatedImage) return setError("Najpierw wygeneruj symbol!");
+                setIsPublishing(true);
+                try {
+                    await window.EduBoxCore.saveToGielda('symbols_market', 'EduSymbol', publishTitle, { promptInput, ageGroup, imageUrl: generatedImage });
+                    setShowPublishModal(false);
+                    setPublishTitle('');
+                } catch (e) {
+                    setError(e.message || "Błąd podczas publikacji.");
+                } finally {
+                    setIsPublishing(false);
                 }
             };
 
@@ -670,6 +695,9 @@
                                         <button onClick={addCard} className="w-full bg-amber-600 hover:bg-amber-500 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all btn-bounce shadow-lg">
                                             <i className="ph-bold ph-plus-circle text-lg"></i> Przypnij na Tablicę
                                         </button>
+                                        <button onClick={() => setShowPublishModal(true)} className="w-full mt-2 bg-slate-800 border border-amber-500/40 hover:bg-slate-700 text-white py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all">
+                                            <i className="ph-bold ph-share-network"></i> Udostępnij w Giełdzie
+                                        </button>
                                     </div>
                                 )}
                             </div>
@@ -759,6 +787,24 @@
                                     <button onClick={() => setShowClearConfirm(false)} className="flex-1 bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 rounded-xl transition-colors">Anuluj</button>
                                     <button onClick={() => { setSymbolCards([]); setShowClearConfirm(false); }} className="flex-1 bg-red-600 hover:bg-red-500 text-white font-bold py-3 rounded-xl transition-colors shadow-lg">Usuń wszystko</button>
                                 </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* MODAL PUBLIKACJI */}
+                    {showPublishModal && (
+                        <div className="print-hidden fixed inset-0 z-[150] flex items-center justify-center px-4 bg-slate-950/80 backdrop-blur-sm">
+                            <div className="bg-slate-900 border border-amber-500/50 p-6 sm:p-8 rounded-2xl shadow-2xl max-w-md w-full relative">
+                                <button onClick={() => setShowPublishModal(false)} className="absolute top-4 right-4 text-slate-500 hover:text-white">✕</button>
+                                <h3 className="text-2xl font-black text-amber-500 mb-2 flex items-center gap-2"><i className="ph-bold ph-share-network"></i> Udostępnij symbol</h3>
+                                <div className="bg-white p-2 rounded-xl mx-auto w-24 h-24 flex items-center justify-center mb-4 border-2 border-slate-300">
+                                    {generatedImage && <img src={generatedImage} className="max-w-full max-h-full object-contain mix-blend-multiply" />}
+                                </div>
+                                <label className="text-xs font-bold text-slate-400 uppercase tracking-widest block mb-1">Krótki opis</label>
+                                <input type="text" value={publishTitle} onChange={(e) => setPublishTitle(e.target.value)} placeholder="np. Mycie zębów" className="w-full bg-slate-800 border border-slate-700 text-white rounded-xl p-3 mb-6 focus:outline-none focus:border-amber-500" />
+                                <button onClick={handlePublishToLibrary} disabled={isPublishing} className="w-full bg-amber-500 hover:bg-amber-400 text-slate-900 font-black py-3 rounded-xl shadow-lg flex justify-center items-center gap-2">
+                                    {isPublishing ? 'Publikowanie...' : 'Opublikuj w Giełdzie'}
+                                </button>
                             </div>
                         </div>
                     )}
