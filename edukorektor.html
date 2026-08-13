@@ -189,8 +189,18 @@
                 onSuccess(newCount);
             },
 
-            verifyPremiumCode: (code) => {
-                return code.toUpperCase() === 'KAWA2024';
+            verifyPremiumCode: async (code) => {
+                try {
+                    const res = await fetch('/api/verify-code', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ code })
+                    });
+                    const data = await res.json();
+                    return data.valid === true;
+                } catch (e) {
+                    return false;
+                }
             },
 
             saveToGielda: async (collectionName, appType, itemName, config) => {
@@ -296,9 +306,9 @@ WYMOGI STYLU I STRUKTURY:
 
             const showToast = (msg) => { setToastMessage(msg); setTimeout(() => setToastMessage(''), 4000); };
 
-            const handleVerifyCode = (e) => {
+            const handleVerifyCode = async (e) => {
                 e?.preventDefault();
-                if (window.EduBoxCore.verifyPremiumCode(accessCode)) {
+                if (await window.EduBoxCore.verifyPremiumCode(accessCode)) {
                     setIsPremium(true); 
                     setAccessCode(''); 
                     localStorage.setItem('eduboxProStatus', 'PRO');

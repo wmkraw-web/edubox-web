@@ -165,7 +165,19 @@
                 onToastUpdate(`Wykorzystano ${newCount}/5 darmowych działań`);
                 onSuccess(newCount);
             },
-            verifyPremiumCode: (code) => code.toUpperCase() === 'KAWA2024',
+            verifyPremiumCode: async (code) => {
+                try {
+                    const res = await fetch('/api/verify-code', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ code })
+                    });
+                    const data = await res.json();
+                    return data.valid === true;
+                } catch (e) {
+                    return false;
+                }
+            },
             saveToGielda: async (collectionName, appType, itemName, config) => {
                 if (!currentUser && !db) throw new Error("Brak połączenia z chmurą.");
                 const publicRef = collection(db, 'artifacts', APP_ID, 'public', 'data', collectionName);
@@ -398,8 +410,8 @@
                 setTimeout(() => setToast(t => ({ ...t, visible: false })), 4000);
             };
 
-            const handleVerifyCode = () => {
-                if (window.EduBoxCore.verifyPremiumCode(accessCode)) {
+            const handleVerifyCode = async () => {
+                if (await window.EduBoxCore.verifyPremiumCode(accessCode)) {
                     localStorage.setItem('eduboxProStatus', 'PRO');
                     setIsPremium(true);
                     setAccessCode('');

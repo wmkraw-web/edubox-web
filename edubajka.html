@@ -221,7 +221,7 @@
                     const savedGens = window.localStorage.getItem('edubox_edubajka_ai');
                     if (savedGens) setAiGenerations(parseInt(savedGens));
                     const savedPremium = window.localStorage.getItem('edubox_premium');
-                    if (savedPremium === 'KAWA2024') setIsPremium(true);
+                    if (savedPremium === 'unlocked') setIsPremium(true);
                 } catch (e) {}
             }, []);
 
@@ -230,10 +230,16 @@
                 setTimeout(() => setMessage(null), 4000);
             };
 
-            const handlePremiumCheck = () => {
-                if (premiumCode.toUpperCase() === 'KAWA2024') {
-                    setIsPremium(true); 
-                    try { window.localStorage.setItem('edubox_premium', 'KAWA2024'); } catch(e) {}
+            const handlePremiumCheck = async () => {
+                const __res = await fetch('/api/verify-code', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ code: premiumCode })
+                });
+                const __data = await __res.json();
+                if (__data.valid) {
+                    setIsPremium(true);
+                    try { window.localStorage.setItem('edubox_premium', 'unlocked'); } catch(e) {}
                     setPremiumCode('');
                     showMessage('Kod Premium zaakceptowany!', 'success');
                 } else { showMessage('Nieprawidłowy kod', 'error'); }

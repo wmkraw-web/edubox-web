@@ -239,7 +239,7 @@
                 if (savedGens) setAiGenerations(parseInt(savedGens));
                 
                 const savedPremium = localStorage.getItem('edubox_premium');
-                if (savedPremium === 'KAWA2024') setIsPremium(true);
+                if (savedPremium === 'unlocked') setIsPremium(true);
             }, []);
 
             // Handlers
@@ -248,10 +248,16 @@
                 setTimeout(() => setMessage(null), 3000);
             };
 
-            const handlePremiumCheck = () => {
-                if (premiumCode.toUpperCase() === 'KAWA2024') {
+            const handlePremiumCheck = async () => {
+                const __res = await fetch('/api/verify-code', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ code: premiumCode })
+                });
+                const __data = await __res.json();
+                if (__data.valid) {
                     setIsPremium(true);
-                    localStorage.setItem('edubox_premium', 'KAWA2024');
+                    localStorage.setItem('edubox_premium', 'unlocked');
                     setPremiumCode('');
                     showMessage('Kod Premium zaakceptowany!', 'success');
                 } else {
@@ -275,7 +281,7 @@
                 if (!aiPrompt.trim()) return;
                 
                 if (!isPremium && aiGenerations >= 3) {
-                    showMessage('Limit darmowych generacji wyczerpany. Wpisz kod KAWA2024.', 'error');
+                    showMessage('Limit darmowych generacji wyczerpany. Wpisz kod odblokowujący.', 'error');
                     return;
                 }
 
