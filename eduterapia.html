@@ -127,86 +127,11 @@
     
     <div id="root"></div>
 
-    <!-- MOCK EduBoxCore -->
+    <!-- MODUŁ EDUBOX CORE (Wspólny silnik dla wszystkich apek) -->
     <script type="module">
-        import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
-        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
-        import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
-        
-        let FIREBASE_CONFIG;
-        try { FIREBASE_CONFIG = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : { apiKey: "mock-key", authDomain: "mock", projectId: "mock", appId: "1:123" }; } catch(e) { FIREBASE_CONFIG = {}; }
-        const APP_ID = typeof __app_id !== 'undefined' ? __app_id : "eduboxpro";
-        
-        let app, auth, db, currentUser = null;
-        let isInitialized = false;
-
-        window.EduBoxCore = {
-            init: async (onUserLoad) => {
-                if (!isInitialized) {
-                    try {
-                        app = initializeApp(FIREBASE_CONFIG);
-                        auth = getAuth(app);
-                        db = getFirestore(app);
-                        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) await signInWithCustomToken(auth, __initial_auth_token);
-                        else await signInAnonymously(auth);
-                        isInitialized = true;
-                        window.EduBoxCore.loadMenu();
-                    } catch(e) { console.warn("Firebase init error", e); }
-                }
-                if (auth) onAuthStateChanged(auth, (user) => { currentUser = user; if(onUserLoad) onUserLoad(user); });
-                else if(onUserLoad) onUserLoad({ uid: 'mock-user-123' });
-            },
-            loadMenu: () => {
-                const container = document.getElementById('wspolne-menu-kontener');
-                if (container) container.innerHTML = `<div class="bg-pink-600 text-white text-xs text-center py-1 font-bold print-hidden">EduBox V3 PRO MAX - System Core Loaded</div>`;
-            },
-            getUsageCount: () => {
-                const today = new Date().toISOString().split('T')[0];
-                let usageStr = localStorage.getItem('eduboxUsage');
-                if (usageStr) { try { const parsed = JSON.parse(usageStr); if (parsed.date === today) return parsed.count; } catch(e) {} }
-                return 0;
-            },
-            executeWithLimitCheck: (isPremium, onSuccess, onLimitReached, onToastUpdate) => {
-                const status = localStorage.getItem('eduboxProStatus');
-                if (status === 'PRO' || isPremium) { onSuccess(window.EduBoxCore.getUsageCount()); return; }
-                let currentCount = window.EduBoxCore.getUsageCount();
-                if (currentCount >= 5) { onLimitReached("⚠️ Dzienny limit użyć (5/5) wyczerpany. Wpisz kod odblokowujący na pasku bocznym!"); return; }
-                const newCount = currentCount + 1;
-                localStorage.setItem('eduboxUsage', JSON.stringify({ date: new Date().toISOString().split('T')[0], count: newCount }));
-                onToastUpdate(`Wykorzystano ${newCount}/5 darmowych działań`);
-                onSuccess(newCount);
-            },
-            verifyPremiumCode: async (code) => {
-                try {
-                    const res = await fetch('/api/verify-code', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ code })
-                    });
-                    const data = await res.json();
-                    return data.valid === true;
-                } catch (e) {
-                    return false;
-                }
-            },
-            saveToGielda: async (collectionName, appType, itemName, config) => {
-                if (!currentUser && !db) throw new Error("Brak połączenia z chmurą.");
-                const publicRef = collection(db, 'artifacts', APP_ID, 'public', 'data', collectionName);
-                const payload = { userId: currentUser?.uid || 'anonymous', createdAt: serverTimestamp(), type: appType, name: itemName, config: config };
-                if (JSON.stringify(payload).length > 950000) throw new Error("🚨 Użyta grafika jest za duża by zapisać ją w chmurze (Max ~1MB)!");
-                await addDoc(publicRef, payload);
-            },
-            subscribeToGielda: (collectionName, onDataLoaded, onError) => {
-                if (!db) return () => {};
-                const publicRef = collection(db, 'artifacts', APP_ID, 'public', 'data', collectionName);
-                return onSnapshot(publicRef, (snapshot) => {
-                    const loaded = [];
-                    snapshot.forEach(doc => loaded.push({ id: doc.id, ...doc.data() }));
-                    loaded.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
-                    onDataLoaded(loaded);
-                }, onError);
-            }
-        };
+        import { EduBoxCore } from './global-core.js';
+        window.EduBoxCore = EduBoxCore;
+        window.dispatchEvent(new Event('EduBoxCoreReady'));
     </script>
 
     <script type="text/babel">

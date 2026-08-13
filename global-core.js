@@ -88,8 +88,18 @@ export const EduBoxCore = {
     },
 
     // Weryfikacja kodu premium
-    verifyPremiumCode: (code) => {
-        return code.toUpperCase() === 'KAWA2024';
+    verifyPremiumCode: async (code) => {
+        try {
+            const res = await fetch('/api/verify-code', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ code })
+            });
+            const data = await res.json();
+            return data.valid === true;
+        } catch (e) {
+            return false;
+        }
     },
 
     // Giełda Wzorów - ZAPIS
