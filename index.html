@@ -30,6 +30,11 @@
     <!-- Phosphor Icons (Standard V3 PRO MAX) -->
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <script src="apps.js"></script>
+    <script type="module">
+        import { EduBoxCore } from './global-core.js';
+        window.EduBoxCore = EduBoxCore;
+        window.dispatchEvent(new Event('EduBoxCoreReady'));
+    </script>
     
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&amp;display=swap" rel="stylesheet">
     
@@ -559,6 +564,26 @@
                 try { return JSON.parse(localStorage.getItem('edubox_favorites')) || []; } catch(e) { return []; }
             });
 
+            // Prawdziwe statystyki (Firestore) - licznik globalny i popularność tygodniowa
+            const [globalCounter, setGlobalCounter] = useState(null);
+            const [popularApps, setPopularApps] = useState([]);
+
+            useEffect(() => {
+                const initStats = () => {
+                    if (!window.EduBoxCore || !window.EduBoxCore.init) { setTimeout(initStats, 150); return; }
+                    window.EduBoxCore.init(() => {});
+                    const unsubCounter = window.EduBoxCore.subscribeGlobalCounter(setGlobalCounter);
+                    const unsubPopular = window.EduBoxCore.subscribeWeeklyPopular((list) => {
+                        const enriched = list
+                            .map(item => ({ ...item, appData: APPS.find(a => a.url === item.url) }))
+                            .filter(item => item.appData);
+                        setPopularApps(enriched);
+                    }, 5);
+                    return () => { unsubCounter && unsubCounter(); unsubPopular && unsubPopular(); };
+                };
+                initStats();
+            }, []);
+
             // Handle Theme switch
             useEffect(() => {
                 document.documentElement.classList.toggle('dark', theme === 'dark');
@@ -576,6 +601,9 @@
                     const filtered = prev.filter(a => a.url !== app.url);
                     return [app, ...filtered].slice(0, 4); // Trzyma tylko 4 ostatnie
                 });
+                if (window.EduBoxCore && window.EduBoxCore.trackAppClick) {
+                    window.EduBoxCore.trackAppClick(app.url);
+                }
             };
 
             const handleSearch = (e) => {
@@ -717,6 +745,27 @@
                                     </div>
                                 </div>
                             )}
+
+                            {/* Najpopularniejsze w tym tygodniu - prawdziwe dane, tylko gdy jest co najmniej kilka klikniec */}
+                            {popularApps.length >= 3 && activeCategory === 'all' && searchTerm === '' && (
+                                <div className="mb-12 max-w-4xl mx-auto bg-amber-50 dark:bg-slate-900/80 p-6 rounded-3xl border border-amber-100 dark:border-slate-700">
+                                    <div className="flex items-center gap-2 mb-4">
+                                        <i className="ph-bold ph-fire text-amber-500"></i>
+                                        <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 uppercase tracking-widest">Najpopularniejsze w tym tygodniu</h3>
+                                    </div>
+                                    <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                                        {popularApps.map((item, idx) => (
+                                            <a key={idx} href={item.appData.url} onClick={() => handleAppClick(item.appData)} className="flex flex-col items-center text-center gap-2 bg-white dark:bg-slate-800 p-3 rounded-2xl border border-slate-200 dark:border-slate-700 hover:border-amber-400 transition-all shadow-sm group relative">
+                                                {idx === 0 && <span className="absolute -top-2 -right-2 bg-amber-500 text-white text-[9px] font-black w-5 h-5 rounded-full flex items-center justify-center shadow-md">1</span>}
+                                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${item.appData.color} bg-slate-50 dark:bg-slate-900`}>
+                                                    <i className={`ph-bold ${item.appData.icon} text-xl`}></i>
+                                                </div>
+                                                <p className="text-[11px] font-bold text-slate-900 dark:text-white truncate group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors w-full">{item.appData.title}</p>
+                                            </a>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                             
                             <div className="flex flex-wrap justify-center gap-3 mb-6">
                                 {categoryButtons.map(cat => (
@@ -756,6 +805,41 @@
                                 </button>
                             </div>
                         )}
+                    </section>
+
+                    {/* BIBLIOTEKA WZORÓW */}
+                    <section className="max-w-[90rem] mx-auto px-6 py-20 z-10 relative border-t border-slate-200 dark:border-slate-800/50">
+                        <Reveal>
+                            <div className="bg-gradient-to-br from-purple-600 via-blue-600 to-purple-700 rounded-[2.5rem] p-10 md:p-16 relative overflow-hidden shadow-2xl">
+                                <div className="absolute -top-24 -right-24 w-96 h-96 bg-white/10 rounded-full blur-3xl"></div>
+                                <div className="relative z-10 flex flex-col lg:flex-row items-center gap-10">
+                                    <div className="flex-1 text-center lg:text-left">
+                                        <div className="inline-flex items-center gap-2 bg-white/15 text-white text-xs font-black uppercase tracking-widest px-4 py-2 rounded-full mb-5">
+                                            <i className="ph-bold ph-books"></i> Ponad 40 narzędzi
+                                        </div>
+                                        <h2 className="text-3xl md:text-4xl font-black text-white mb-4 tracking-tight">Nie zaczynaj od zera. Skorzystaj z Biblioteki Wzorów.</h2>
+                                        <p className="text-white/85 text-base md:text-lg leading-relaxed max-w-2xl">
+                                            W większości narzędzi EduBox możesz w jednym kliknięciu <strong className="text-white">opublikować sprawdzony wzór</strong> (bez danych ucznia) i <strong className="text-white">wczytać gotowe</strong> materiały opublikowane przez innych nauczycieli. Szukaj przycisku "Biblioteka" w prawym górnym rogu narzędzia.
+                                        </p>
+                                    </div>
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 shrink-0">
+                                        {[
+                                            { title: 'EduOcena AI', url: 'eduocena.html', icon: 'ph-star' },
+                                            { title: 'Asystent Pedagoga', url: 'asystent-pedagoga.html', icon: 'ph-file-text' },
+                                            { title: 'EduBajka', url: 'edubajka.html', icon: 'ph-book-open' },
+                                            { title: 'Scenariusz AI', url: 'eduscenariusz.html', icon: 'ph-chalkboard-teacher' },
+                                            { title: 'Magic Color', url: 'magiccolor.html', icon: 'ph-palette' },
+                                            { title: 'EduPrawo AI', url: 'eduprawo.html', icon: 'ph-scales' },
+                                        ].map(item => (
+                                            <a key={item.url} href={item.url} className="flex flex-col items-center justify-center gap-2 bg-white/10 hover:bg-white/20 border border-white/20 rounded-2xl p-4 w-28 sm:w-32 transition-all hover:-translate-y-1">
+                                                <i className={`ph-bold ${item.icon} text-white text-2xl`}></i>
+                                                <span className="text-white text-[11px] font-bold text-center leading-tight">{item.title}</span>
+                                            </a>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        </Reveal>
                     </section>
 
                     {/* POLECANE LINKI */}
@@ -803,8 +887,22 @@
                                         <div className="text-slate-500 dark:text-slate-400 font-bold uppercase tracking-widest text-xs">Zaoszczędzonych Godzin</div>
                                     </div>
                                     <div>
-                                        <div className="text-5xl font-black text-purple-600 dark:text-purple-500 mb-2 drop-shadow-sm"><Counter target={15200} />+</div>
+                                        <div className="text-5xl font-black text-purple-600 dark:text-purple-500 mb-2 drop-shadow-sm flex items-center justify-center gap-3">
+                                            {globalCounter === null ? (
+                                                <span className="inline-block w-24 h-10 bg-slate-200 dark:bg-slate-700 rounded-lg animate-pulse"></span>
+                                            ) : (
+                                                <><Counter target={globalCounter} />+</>
+                                            )}
+                                        </div>
+                                        <div className="flex items-center justify-center gap-1.5 mb-1">
+                                            <span className="relative flex h-2 w-2">
+                                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                                                <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                                            </span>
+                                            <span className="text-red-500 dark:text-red-400 font-black text-[10px] uppercase tracking-widest">Na żywo</span>
+                                        </div>
                                         <div className="text-slate-500 dark:text-slate-400 font-bold uppercase tracking-widest text-xs">Wygenerowanych Materiałów</div>
+                                        <div className="text-slate-400 dark:text-slate-500 text-[10px] mt-1">Śledzimy na żywo od sierpnia 2026</div>
                                     </div>
                                     <div>
                                         <div className="text-5xl font-black text-emerald-600 dark:text-emerald-500 mb-2 drop-shadow-sm"><Counter target={100} />%</div>
