@@ -28,60 +28,11 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
 
     <!-- WBUDOWANA BAZA DANYCH -->
+        <!-- MODUŁ EDUBOX CORE (Wspólny silnik dla wszystkich apek) -->
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, serverTimestamp, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        const FIREBASE_CONFIG = {
-            apiKey: "AIzaSyDL_mvepNJjMmZYQzifN2cXzoKwCE8jNd0",
-            authDomain: "edubox-pro.firebaseapp.com",
-            projectId: "edubox-pro",
-            storageBucket: "edubox-pro.firebasestorage.app",
-            messagingSenderId: "570263845714",
-            appId: "1:570263845714:web:0b029211f7af071b66988b"
-        };
-        const APP_ID = "eduboxpro";
-
-        let app, auth, db;
-        try {
-            app = initializeApp(FIREBASE_CONFIG);
-            auth = getAuth(app);
-            db = getFirestore(app);
-        } catch (e) { console.warn("Firebase init failed", e); }
-
-        window.EduBoxCore = {
-            user: null,
-            init: (callback) => {
-                if (!auth) return;
-                signInAnonymously(auth).catch(e => console.error(e));
-                onAuthStateChanged(auth, (user) => {
-                    window.EduBoxCore.user = user;
-                    if(callback) callback(user);
-                });
-            },
-            saveToGielda: async (collectionName, appType, itemName, config) => {
-                if (!db || !window.EduBoxCore.user) throw new Error("Brak połączenia z chmurą.");
-                const publicRef = collection(db, 'artifacts', APP_ID, 'public', 'data', collectionName);
-                await addDoc(publicRef, {
-                    userId: window.EduBoxCore.user.uid,
-                    createdAt: serverTimestamp(),
-                    type: appType,
-                    name: itemName,
-                    config: config
-                });
-            },
-            subscribeToGielda: (collectionName, onDataLoaded, onError) => {
-                if (!db) return () => {};
-                const publicRef = collection(db, 'artifacts', APP_ID, 'public', 'data', collectionName);
-                return onSnapshot(publicRef, (snapshot) => {
-                    const loaded = [];
-                    snapshot.forEach(doc => loaded.push({ id: doc.id, ...doc.data() }));
-                    loaded.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
-                    onDataLoaded(loaded);
-                }, onError);
-            }
-        };
+        import { EduBoxCore } from './global-core.js';
+        window.EduBoxCore = EduBoxCore;
+        window.dispatchEvent(new Event('EduBoxCoreReady'));
     </script>
 
     <style>

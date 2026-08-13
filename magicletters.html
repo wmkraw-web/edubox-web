@@ -112,67 +112,11 @@
 
 
     <!-- Firebase & Core Logic -->
+        <!-- MODUŁ EDUBOX CORE (Wspólny silnik dla wszystkich apek) -->
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, getDocs, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'edubox-magicletters-v3';
-        
-        let app, auth, db;
-        try {
-            app = initializeApp(firebaseConfig);
-            auth = getAuth(app);
-            db = getFirestore(app);
-        } catch (e) {
-            console.warn("Firebase init ignored in dev environment.");
-        }
-
-        window.EduBoxCore = {
-            db, auth, appId,
-            user: null,
-            initAuth: async () => {
-                if (!auth) return null;
-                try {
-                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                        await signInWithCustomToken(auth, __initial_auth_token);
-                    } else {
-                        await signInAnonymously(auth);
-                    }
-                } catch (e) {
-                    console.error("Auth error:", e);
-                }
-            },
-            onUserChange: (callback) => {
-                if (!auth) return;
-                onAuthStateChanged(auth, (user) => {
-                    window.EduBoxCore.user = user;
-                    callback(user);
-                });
-            },
-            publishToMarket: async (data) => {
-                if (!db || !window.EduBoxCore.user) throw new Error("Brak autoryzacji");
-                const marketRef = collection(db, 'artifacts', appId, 'public', 'data', 'market');
-                await addDoc(marketRef, {
-                    ...data,
-                    authorId: window.EduBoxCore.user.uid,
-                    createdAt: serverTimestamp()
-                });
-            },
-            fetchMarket: async () => {
-                if (!db || !window.EduBoxCore.user) return [];
-                const marketRef = collection(db, 'artifacts', appId, 'public', 'data', 'market');
-                // Proste zapytanie pobierające wszystkie dokumenty - sortowanie w JS pamięci dla optymalizacji limitów Firestore
-                const snapshot = await getDocs(marketRef);
-                const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                // Sort by createdAt descending in memory
-                return items.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
-            }
-        };
-
-        // Initialize immediately
-        window.EduBoxCore.initAuth();
+        import { EduBoxCore } from './global-core.js';
+        window.EduBoxCore = EduBoxCore;
+        window.dispatchEvent(new Event('EduBoxCoreReady'));
     </script>
 
     <div id="root" class="h-screen flex flex-col"></div>

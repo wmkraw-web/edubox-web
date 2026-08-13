@@ -142,19 +142,19 @@
     <!-- Uwaga: Używamy type="text/babel" data-type="module" aby obsłużyć importy z chmury -->
     <script type="text/babel" data-type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { EduBoxCore } from './global-core.js';
+        window.EduBoxCore = EduBoxCore;
+                import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         const { useState, useRef, useEffect } = React;
 
         const DAILY_LIMIT = 5;
 
         // INICJALIZACJA BAZY DANYCH CHMUROWEJ
-        let app, auth, db, appId;
+        let app, db, appId;
         try {
             const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
             app = initializeApp(firebaseConfig);
-            auth = getAuth(app);
             db = getFirestore(app);
             appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
         } catch (e) {
@@ -279,21 +279,9 @@
 
             const resultRef = useRef(null);
 
-            // --- FIREBASE INIT ---
+            // --- LOGOWANIE (wspólny silnik) ---
             useEffect(() => {
-                if (!auth) return;
-                const initAuth = async () => {
-                    try {
-                        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                            await signInWithCustomToken(auth, __initial_auth_token);
-                        } else {
-                            await signInAnonymously(auth);
-                        }
-                    } catch(e) { console.error("Auth err", e); }
-                };
-                initAuth();
-                const unsubscribe = onAuthStateChanged(auth, setUser);
-                return () => unsubscribe();
+                EduBoxCore.init((u) => setUser(u));
             }, []);
 
             // --- FETCH LIBRARY ---
