@@ -1,0 +1,439 @@
+<!DOCTYPE html><html lang="pl" translate="no" class="notranslate"><head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduDyplom Wideo - Animowane Dyplomy dla Przedszkolaków</title>
+    <meta property="og:title" content="EduDyplom Wideo - Animowane Dyplomy dla Przedszkolaków">
+    <meta property="og:description" content="Wygeneruj animowany, unikalny dyplom wideo dopasowany do okazji i wieku dziecka. Gotowy do pobrania i wysłania rodzicom.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://eduboxpro.pl/edudyplom.html">
+    <meta property="og:image" content="https://eduboxpro.pl/okladka.jpg">
+    <meta property="og:locale" content="pl_PL">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="EduDyplom Wideo - Animowane Dyplomy dla Przedszkolaków">
+    <meta name="twitter:description" content="Wygeneruj animowany, unikalny dyplom wideo dopasowany do okazji i wieku dziecka.">
+
+    <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-3RQ9R0N0K8"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-3RQ9R0N0K8');
+    </script>
+
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin=""></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin=""></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <script src="apps.js"></script>
+
+    <style>
+        body { font-family: 'Nunito', sans-serif; background-color: #FFF6E5; color: #4A2E10; min-height: 100vh; }
+        .display-font { font-family: 'Baloo 2', sans-serif; }
+        .card-panel { background: #ffffff; border-radius: 22px; box-shadow: 0 8px 24px rgba(146, 100, 30, 0.08); }
+        .chip { font-size: 12px; background: #FFF1D6; color: #B0501F; border: 2px solid transparent; border-radius: 999px; padding: 7px 13px; cursor: pointer; font-weight: 700; transition: all 0.15s; }
+        .chip.active { background: #FF6B6B; color: #ffffff; }
+        .generate-btn { background: #FF6B6B; box-shadow: 0 6px 0 #D94848; }
+        .generate-btn:active { transform: translateY(4px); box-shadow: 0 2px 0 #D94848; }
+        .generate-btn:disabled { opacity: 0.55; box-shadow: 0 6px 0 #cbb; cursor: default; }
+        #wspolne-menu-kontener { print-hidden: none; }
+    </style>
+
+  <link rel="canonical" href="https://eduboxpro.pl/edudyplom.html">
+  <meta name="description" content="Wygeneruj animowany, unikalny dyplom wideo dopasowany do okazji i wieku dziecka. Gotowy do pobrania i wysłania rodzicom.">
+  <link rel="icon" href="/icon-96.png" type="image/png">
+</head>
+<body>
+    <script>window.EDUBOX_IMAGE_APP = true;</script>
+    <div id="wspolne-menu-kontener"></div>
+
+    <script type="module">
+        import { EduBoxCore } from './global-core.js';
+        window.EduBoxCore = EduBoxCore;
+        window.dispatchEvent(new Event('EduBoxCoreReady'));
+    </script>
+
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        const AGE_GROUPS = [
+            { id: 'maluchy', label: 'Maluchy', sub: '3-latki', suggestions: ['Za uśmiech każdego dnia!', 'Za odwagę bez mamy!', 'Za pyszne sprzątanie zabawek!'], closing: ['Jesteś super!', 'Brawo Ty!', 'Kochamy Cię!'] },
+            { id: 'sredniaki', label: 'Średniaki', sub: '4-latki', suggestions: ['Za dzielność w przedszkolu!', 'Za pomoc koledze!', 'Za piękny rysunek!'], closing: ['Tak trzymaj!', 'Jesteśmy dumni!', 'Super sprawa!'] },
+            { id: 'starszaki', label: 'Starszaki', sub: '5-6 lat', suggestions: ['Za odwagę w pierwszym dniu!', 'Za naukę liczenia do 10!', 'Za samodzielność!'], closing: ['Świetna robota!', 'Jesteśmy z Ciebie dumni!', 'Brawo, Mistrzu!'] },
+            { id: 'wczesnoszkolne', label: 'Wczesnoszkolne', sub: 'kl. I-III', suggestions: ['Za pierwszą przeczytaną książkę!', 'Za piękny postęp w nauce!', 'Za pomoc koleżance!'], closing: ['Wspaniały postęp!', 'Tak się buduje sukces!', 'Dumni jesteśmy!'] }
+        ];
+
+        const OCCASIONS = [
+            'Rozpoczęcie roku przedszkolnego', 'Pasowanie na przedszkolaka', 'Dzień Chłopaka', 'Dzień Dziewczynek',
+            'Dzień Edukacji Narodowej', 'Dzień Postaci z Bajek', 'Andrzejki', 'Mikołajki',
+            'Jasełka / Wigilia przedszkolna', 'Bal karnawałowy', 'Dzień Babci i Dziadka', 'Powitanie wiosny',
+            'Dzień Mamy i Taty', 'Dzień Dziecka', 'Zakończenie roku przedszkolnego', 'Pożegnanie starszaków'
+        ];
+
+        function App() {
+            const [user, setUser] = useState(null);
+            const [isPremium, setIsPremium] = useState(false);
+            const [accessCode, setAccessCode] = useState('');
+            const [toastMessage, setToastMessage] = useState(null);
+
+            const [ageGroup, setAgeGroup] = useState(AGE_GROUPS[2]);
+            const [occasion, setOccasion] = useState(OCCASIONS[0]);
+            const [customOccasion, setCustomOccasion] = useState('');
+            const [childName, setChildName] = useState('Zosia');
+            const [achievement, setAchievement] = useState(AGE_GROUPS[2].suggestions[0]);
+
+            const [stage, setStage] = useState('form');
+            const [statusText, setStatusText] = useState('');
+            const [progressPct, setProgressPct] = useState(0);
+            const [downloadUrl, setDownloadUrl] = useState(null);
+
+            const canvasRef = useRef(null);
+            const generatedImgRef = useRef(null);
+            const mediaRecorderRef = useRef(null);
+            const chunksRef = useRef([]);
+            const particlesRef = useRef([]);
+
+            useEffect(() => {
+                const initCore = () => {
+                    if (window.EduBoxCore && window.EduBoxCore.init) {
+                        window.EduBoxCore.init((u) => setUser(u));
+                        const status = localStorage.getItem('eduboxProStatus');
+                        if (status === 'PRO' || status === 'active') setIsPremium(true);
+                    } else { setTimeout(initCore, 100); }
+                };
+                initCore();
+            }, []);
+
+            const showToast = (text) => { setToastMessage(text); setTimeout(() => setToastMessage(null), 4000); };
+
+            const handleVerifyCode = async () => {
+                const isValid = await window.EduBoxCore.verifyPremiumCode(accessCode);
+                if (isValid) { setIsPremium(true); setAccessCode(''); localStorage.setItem('eduboxProStatus', 'active'); showToast('Kod aktywny! Witamy w Premium 🌟'); }
+                else showToast('Nieprawidłowy kod dostępu!');
+            };
+
+            const effectiveOccasion = customOccasion.trim() || occasion;
+
+            const PARTICLE_COLORS = ['#FF6B6B', '#FFD972', '#4ECDC4', '#FF9F6B', '#C77DFF', '#FFFFFF'];
+
+            function ease(t) { return 1 - Math.pow(1 - t, 3); }
+            function easeBounce(t) {
+                const n1 = 7.5625, d1 = 2.75;
+                if (t < 1 / d1) return n1 * t * t;
+                if (t < 2 / d1) return n1 * (t -= 1.5 / d1) * t + 0.75;
+                if (t < 2.5 / d1) return n1 * (t -= 2.25 / d1) * t + 0.9375;
+                return n1 * (t -= 2.625 / d1) * t + 0.984375;
+            }
+
+            function initParticles(W, H) {
+                const arr = [];
+                for (let i = 0; i < 36; i++) {
+                    arr.push({
+                        x: Math.random() * W, y: Math.random() * H,
+                        size: 8 + Math.random() * 12, speed: 1.3 + Math.random() * 2,
+                        drift: (Math.random() - 0.5) * 1.5, rot: Math.random() * 7,
+                        rotSpeed: (Math.random() - 0.5) * 0.08,
+                        color: PARTICLE_COLORS[Math.floor(Math.random() * PARTICLE_COLORS.length)]
+                    });
+                }
+                particlesRef.current = arr;
+            }
+
+            function drawPill(ctx, cx, topY, text, font, padX, padY, bg, fg, alpha) {
+                ctx.save();
+                ctx.globalAlpha = alpha;
+                ctx.font = font;
+                const w = ctx.measureText(text).width + padX * 2;
+                const h = parseInt(font.match(/(\d+)px/)[1]) + padY * 2;
+                ctx.fillStyle = bg;
+                const x = cx - w / 2, y = topY;
+                const r = h / 2;
+                ctx.beginPath();
+                ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r);
+                ctx.closePath(); ctx.fill();
+                ctx.fillStyle = fg;
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText(text, cx, y + h / 2 + 2);
+                ctx.restore();
+                return h;
+            }
+
+            function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
+                const words = text.split(' ');
+                let line = '', lines = [];
+                for (const w of words) {
+                    const test = line + w + ' ';
+                    if (ctx.measureText(test).width > maxWidth && line) { lines.push(line); line = w + ' '; }
+                    else line = test;
+                }
+                lines.push(line);
+                lines.forEach((l, i) => ctx.fillText(l.trim(), x, y + i * lineHeight));
+                return lines.length;
+            }
+
+            function buildTimeline() {
+                return {
+                    mascotIn: { start: 300, end: 1100 },
+                    badge: { start: 1100, end: 1700 },
+                    name: { start: 2000, end: 2800 },
+                    achievement: { start: 3100, end: 8300 },
+                    closing: { start: 8500, end: 10800 },
+                    stars: [{ start: 11000, end: 12000 }, { start: 12000, end: 13000 }, { start: 13000, end: 14000 }]
+                };
+            }
+            function prog(el, t) { if (t < el.start) return 0; if (t > el.end) return 1; return (t - el.start) / (el.end - el.start); }
+
+            function renderFrame(ctx, W, H, t, img, timeline) {
+                ctx.save();
+                const zoom = 1 + Math.min(0.12, t / 15000 * 0.12);
+                const dw = W * zoom, dh = H * zoom;
+                ctx.drawImage(img, (W - dw) / 2, (H - dh) / 2, dw, dh);
+                ctx.restore();
+
+                ctx.fillStyle = 'rgba(0,0,0,0.18)';
+                ctx.fillRect(0, 0, W, H);
+
+                particlesRef.current.forEach(p => {
+                    p.y += p.speed; p.x += p.drift; p.rot += p.rotSpeed;
+                    if (p.y > H + 20) { p.y = -20; p.x = Math.random() * W; }
+                    ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot);
+                    ctx.fillStyle = p.color; ctx.fillRect(-p.size / 2, -p.size / 3, p.size, p.size * 0.6);
+                    ctx.restore();
+                });
+
+                const badgeP = prog(timeline.badge, t);
+                if (badgeP > 0) drawPill(ctx, W / 2, H * 0.06, '🎉 ' + effectiveOccasion.toUpperCase(), "800 30px 'Baloo 2'", 26, 14, 'rgba(20,15,10,0.72)', '#FFFFFF', ease(badgeP));
+
+                const nameP = prog(timeline.name, t);
+                if (nameP > 0) {
+                    const s = easeBounce(nameP);
+                    ctx.save();
+                    ctx.translate(W / 2, H * 0.19);
+                    ctx.scale(0.3 + s * 0.7, 0.3 + s * 0.7);
+                    drawPill(ctx, 0, -60, childName || 'Imię', "800 84px 'Baloo 2'", 40, 18, 'rgba(255,255,255,0.96)', '#B0501F', Math.min(1, s * 1.4));
+                    ctx.restore();
+                }
+
+                const achP = prog(timeline.achievement, t) > 0 ? ease(Math.min(1, prog(timeline.achievement, t) * 3)) : 0;
+                if (achP > 0) {
+                    const cardY = H * 0.68 + (1 - achP) * 20;
+                    ctx.save(); ctx.globalAlpha = achP;
+                    const cw = W * 0.82, ch = 170, cx = W / 2 - cw / 2;
+                    ctx.fillStyle = 'rgba(255,255,255,0.95)';
+                    ctx.beginPath();
+                    ctx.moveTo(cx + 26, cardY); ctx.arcTo(cx + cw, cardY, cx + cw, cardY + ch, 26); ctx.arcTo(cx + cw, cardY + ch, cx, cardY + ch, 26); ctx.arcTo(cx, cardY + ch, cx, cardY, 26); ctx.arcTo(cx, cardY, cx + cw, cardY, 26);
+                    ctx.closePath(); ctx.fill();
+                    ctx.fillStyle = '#B0501F'; ctx.font = "800 42px 'Nunito'"; ctx.textAlign = 'center';
+                    wrapText(ctx, achievement || '', W / 2, cardY + 58, cw * 0.86, 50);
+                    ctx.restore();
+                }
+
+                const closeP = prog(timeline.closing, t) > 0 ? ease(Math.min(1, prog(timeline.closing, t) * 3)) : 0;
+                if (closeP > 0) drawPill(ctx, W / 2, H * 0.855, ageGroup.closing[0], "800 52px 'Baloo 2'", 30, 16, 'rgba(20,15,10,0.72)', '#FFD972', closeP);
+
+                timeline.stars.forEach((se, idx) => {
+                    const sp = prog(se, t);
+                    if (sp > 0) {
+                        const s = easeBounce(sp);
+                        ctx.save(); ctx.translate(W / 2 + (idx - 1) * 100, H * 0.93); ctx.scale(s, s);
+                        ctx.font = '68px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('⭐', 0, 0);
+                        ctx.restore();
+                    }
+                });
+            }
+
+            function playAndRecord(img) {
+                const canvas = canvasRef.current;
+                const W = 720, H = 1280;
+                canvas.width = W; canvas.height = H;
+                const ctx = canvas.getContext('2d');
+                initParticles(W, H);
+                const timeline = buildTimeline();
+                const duration = 15000;
+
+                const stream = canvas.captureStream(30);
+                const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9' : 'video/webm';
+                const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 4000000 });
+                chunksRef.current = [];
+                recorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
+                recorder.onstop = () => {
+                    const blob = new Blob(chunksRef.current, { type: 'video/webm' });
+                    setDownloadUrl(URL.createObjectURL(blob));
+                    setStage('done');
+                    setStatusText('');
+                };
+                mediaRecorderRef.current = recorder;
+                recorder.start();
+
+                const startTime = performance.now();
+                function loop(now) {
+                    const t = now - startTime;
+                    renderFrame(ctx, W, H, t, img, timeline);
+                    setProgressPct(Math.min(100, (t / duration) * 100));
+                    if (t < duration) requestAnimationFrame(loop);
+                    else if (recorder.state !== 'inactive') recorder.stop();
+                }
+                requestAnimationFrame(loop);
+            }
+
+            const handleGenerate = () => {
+                if (!childName.trim()) { showToast('Wpisz imię dziecka!'); return; }
+                window.EduBoxCore.executeImageLimitCheck(isPremium,
+                    async () => {
+                        setStage('generating');
+                        setStatusText('Tworzę obrazek dopasowany do okazji...');
+                        setProgressPct(0);
+                        try {
+                            const prompt = `Stwórz kolorową, radosną ilustrację w stylu bajkowym (nie fotografia, nie realizm) na dyplom dla przedszkolaka z okazji: "${effectiveOccasion}". Grupa wiekowa: ${ageGroup.label} (${ageGroup.sub}). Styl: przyjazny, prosty, żywe kolory, urocza scena lub maskotka pasująca tematycznie do okazji, odpowiednia dla małych dzieci, ciepłe oświetlenie. Format pionowy, portretowy.`;
+                            const payload = { prompt, aspect_ratio: '9:16', width: 1024, height: 1536 };
+                            const res = await fetch('/api/generate', {
+                                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+                            });
+                            if (!res.ok) throw new Error('Status API: ' + res.status);
+                            const data = await res.json();
+                            const raw = data.predictions?.[0]?.bytesBase64Encoded || data.artifacts?.[0]?.base64 || data.image || data.imageUrl || data.image_url || data.url;
+                            if (!raw) throw new Error('Brak danych obrazu');
+                            const finalSrc = raw.startsWith('http') || raw.startsWith('data:image') ? raw : `data:image/png;base64,${raw}`;
+
+                            const img = new Image();
+                            img.crossOrigin = 'anonymous';
+                            img.onload = () => {
+                                generatedImgRef.current = img;
+                                setStage('recording');
+                                setStatusText('Nagrywam wideo...');
+                                playAndRecord(img);
+                            };
+                            img.onerror = () => { showToast('Błąd wczytywania wygenerowanego obrazka.'); setStage('form'); };
+                            img.src = finalSrc;
+                        } catch (err) {
+                            showToast('Błąd: ' + err.message);
+                            setStage('form');
+                        }
+                    },
+                    (limitMsg) => { showToast(limitMsg); },
+                    (toastMsg) => { showToast(toastMsg); }
+                );
+            };
+
+            const handleReplay = () => {
+                if (generatedImgRef.current) { setStage('recording'); setStatusText('Nagrywam wideo...'); playAndRecord(generatedImgRef.current); }
+            };
+
+            return (
+                <div className="min-h-screen">
+                    <main className="max-w-md mx-auto px-4 py-10">
+                        <div className="text-center mb-8">
+                            <div className="inline-flex items-center gap-2 bg-pink-100 text-pink-600 text-xs font-black uppercase tracking-widest px-4 py-2 rounded-full mb-4">
+                                <i className="ph-bold ph-confetti"></i> EduDyplom Wideo
+                            </div>
+                            <h1 className="display-font text-3xl font-extrabold text-[#B0501F] mb-2">Animowany dyplom dla przedszkolaka</h1>
+                            <p className="text-sm text-[#A9895F]">Unikalny obrazek dopasowany do okazji, generowany za każdym razem od nowa.</p>
+                        </div>
+
+                        {!isPremium && (
+                            <div className="max-w-sm mx-auto mb-6 flex items-center gap-2 bg-white border-2 border-[#FFE3B0] rounded-2xl p-2">
+                                <input type="text" value={accessCode} onChange={(e) => setAccessCode(e.target.value)} placeholder="Masz kod PRO? Wpisz tutaj..." className="flex-1 bg-transparent text-sm px-3 py-2 outline-none" />
+                                <button onClick={handleVerifyCode} className="bg-[#FF6B6B] text-white text-xs font-bold px-4 py-2.5 rounded-xl">Odblokuj</button>
+                            </div>
+                        )}
+
+                        {stage === 'form' && (
+                            <div className="card-panel p-5 space-y-5">
+                                <div>
+                                    <label className="text-xs font-black uppercase text-[#8A5A2B] mb-2 block">Grupa wiekowa</label>
+                                    <div className="grid grid-cols-4 gap-2">
+                                        {AGE_GROUPS.map(g => (
+                                            <button key={g.id} onClick={() => { setAgeGroup(g); setAchievement(g.suggestions[0]); }} className={`border-2 rounded-xl py-2 text-[11px] font-bold leading-tight ${ageGroup.id === g.id ? 'border-[#FF6B6B] bg-[#FFEAEA] text-[#D94848]' : 'border-[#FFE3B0] bg-[#FFFBF2] text-[#B0501F]'}`}>
+                                                {g.label}<br /><span className="opacity-70">{g.sub}</span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="text-xs font-black uppercase text-[#8A5A2B] mb-2 block">Okazja</label>
+                                    <div className="flex flex-wrap gap-2 mb-2 max-h-40 overflow-y-auto">
+                                        {OCCASIONS.map(o => (
+                                            <button key={o} onClick={() => { setOccasion(o); setCustomOccasion(''); }} className={`chip ${occasion === o && !customOccasion ? 'active' : ''}`}>{o}</button>
+                                        ))}
+                                    </div>
+                                    <input type="text" value={customOccasion} onChange={(e) => setCustomOccasion(e.target.value)} placeholder="Inna okazja? Wpisz własną..." className="w-full border-2 border-[#FFE3B0] rounded-xl px-3 py-2.5 text-sm outline-none focus:border-[#FFB627]" />
+                                </div>
+
+                                <div>
+                                    <label className="text-xs font-black uppercase text-[#8A5A2B] mb-2 block">Imię dziecka</label>
+                                    <input type="text" value={childName} onChange={(e) => setChildName(e.target.value)} maxLength="20" className="w-full border-2 border-[#FFE3B0] rounded-xl px-3 py-2.5 text-sm outline-none focus:border-[#FFB627]" />
+                                </div>
+
+                                <div>
+                                    <label className="text-xs font-black uppercase text-[#8A5A2B] mb-2 block">Za co dyplom?</label>
+                                    <input type="text" value={achievement} onChange={(e) => setAchievement(e.target.value)} maxLength="70" className="w-full border-2 border-[#FFE3B0] rounded-xl px-3 py-2.5 text-sm outline-none focus:border-[#FFB627] mb-2" />
+                                    <div className="flex flex-wrap gap-2">
+                                        {ageGroup.suggestions.map(s => (
+                                            <button key={s} onClick={() => setAchievement(s)} className="chip">{s}</button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <button onClick={handleGenerate} className="generate-btn w-full text-white display-font font-bold text-lg py-4 rounded-2xl">
+                                    Wygeneruj i nagraj wideo
+                                </button>
+                            </div>
+                        )}
+
+                        {(stage === 'generating' || stage === 'recording' || stage === 'done') && (
+                            <div className="card-panel p-5">
+                                <div className="relative w-full max-w-[300px] mx-auto rounded-3xl overflow-hidden shadow-lg" style={{ aspectRatio: '9/16' }}>
+                                    <canvas ref={canvasRef} className="w-full h-full block bg-[#FFE3B0]"></canvas>
+                                    {stage === 'generating' && (
+                                        <div className="absolute inset-0 flex items-center justify-center bg-[#FFE3B0]">
+                                            <i className="ph-bold ph-sparkle text-5xl text-[#FF9F1C] animate-pulse"></i>
+                                        </div>
+                                    )}
+                                </div>
+                                {stage !== 'done' && (
+                                    <React.Fragment>
+                                        <div className="h-1.5 bg-[#FFE3B0] rounded-full overflow-hidden mt-4 max-w-[300px] mx-auto">
+                                            <div className="h-full bg-[#FF6B6B] transition-all" style={{ width: progressPct + '%' }}></div>
+                                        </div>
+                                        <p className="text-center text-xs text-[#A9895F] mt-2">{statusText}</p>
+                                    </React.Fragment>
+                                )}
+                                {stage === 'done' && (
+                                    <div className="flex gap-2 mt-4 max-w-[300px] mx-auto">
+                                        <a href={downloadUrl} download="edudyplom.webm" className="flex-1 bg-[#4ECDC4] text-white text-center font-bold text-sm py-3 rounded-xl">⬇ Pobierz wideo</a>
+                                        <button onClick={handleReplay} className="flex-1 bg-white border-2 border-[#FFD972] text-[#B0501F] font-bold text-sm py-3 rounded-xl">↻ Podgląd</button>
+                                    </div>
+                                )}
+                                {stage === 'done' && (
+                                    <button onClick={() => { setStage('form'); setDownloadUrl(null); }} className="w-full text-center text-xs text-[#A9895F] font-bold mt-4 underline">Zrób kolejny dyplom</button>
+                                )}
+                            </div>
+                        )}
+
+                        <p className="text-center text-[11px] text-[#A9895F] mt-6 leading-relaxed">Nagrywanie tworzy prawdziwy plik wideo (WebM) w Twojej przeglądarce.</p>
+                    </main>
+
+                    {toastMessage && (
+                        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-[#4A2E10] text-white px-6 py-3 rounded-full text-sm font-bold shadow-2xl">{toastMessage}</div>
+                    )}
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/service-worker.js').catch(() => {});
+            });
+        }
+    </script>
+
+</body></html>
