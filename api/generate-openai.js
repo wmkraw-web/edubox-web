@@ -22,9 +22,10 @@ export default async function handler(req, res) {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'gpt-image-1',
+        model: 'gpt-image-2',
         prompt: prompt,
         size: size || '1024x1536',
+        quality: 'medium',
         n: 1
       })
     });
