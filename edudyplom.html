@@ -73,6 +73,32 @@
             'Dzień Mamy i Taty', 'Dzień Dziecka', 'Zakończenie roku przedszkolnego', 'Pożegnanie starszaków'
         ];
 
+        const OCCASION_ANIMALS = {
+            'Rozpoczęcie roku przedszkolnego': 'wiewiórkę z plecaczkiem',
+            'Pasowanie na przedszkolaka': 'liska w małej koronie',
+            'Dzień Chłopaka': 'dzielnego lwiątka',
+            'Dzień Dziewczynek': 'kotka z kokardką',
+            'Dzień Edukacji Narodowej': 'mądrą sówkę w okularach',
+            'Dzień Postaci z Bajek': 'małego smoka',
+            'Andrzejki': 'tajemniczego czarnego kotka',
+            'Mikołajki': 'renifera z czerwonym szalikiem',
+            'Jasełka / Wigilia przedszkolna': 'owieczkę',
+            'Bal karnawałowy': 'kolorową papugę',
+            'Dzień Babci i Dziadka': 'jeża z herbatą',
+            'Powitanie wiosny': 'zajączka wśród kwiatów',
+            'Dzień Mamy i Taty': 'słonika w otoczeniu serduszek',
+            'Dzień Dziecka': 'wesołą pandę',
+            'Zakończenie roku przedszkolnego': 'motylka',
+            'Pożegnanie starszaków': 'orzełka szykującego się do lotu'
+        };
+        const FALLBACK_ANIMALS = ['liska', 'sówkę', 'króliczka', 'jeżyka', 'wiewiórkę', 'pandę', 'żółwika'];
+        function pickAnimalFor(occasionText) {
+            if (OCCASION_ANIMALS[occasionText]) return OCCASION_ANIMALS[occasionText];
+            let hash = 0;
+            for (let i = 0; i < occasionText.length; i++) hash = (hash * 31 + occasionText.charCodeAt(i)) >>> 0;
+            return FALLBACK_ANIMALS[hash % FALLBACK_ANIMALS.length];
+        }
+
         function App() {
             const [user, setUser] = useState(null);
             const [isPremium, setIsPremium] = useState(false);
@@ -287,7 +313,8 @@
                         setStatusText('Tworzę obrazek dopasowany do okazji...');
                         setProgressPct(0);
                         try {
-                            const prompt = `Stwórz kolorową, ciepłą ilustrację w stylu dziecięcej książki obrazkowej, przedstawiającą uroczą maskotkę-zwierzątko (np. miś, lisek, sówka lub królik) w scenie związanej z tematem: "${effectiveOccasion}". Odbiorcą jest dziecko w wieku ${ageGroup.sub}. Styl: przyjazny, ciepłe barwy, bajkowe oświetlenie, format pionowy. Na obrazku nie mogą znajdować się żadne napisy, litery ani cyfry, oraz żadni ludzie - tylko zwierzątko i pasująca do okazji sceneria.`;
+                            const chosenAnimal = pickAnimalFor(effectiveOccasion);
+                            const prompt = `Stwórz kolorową, ciepłą ilustrację w stylu dziecięcej książki obrazkowej, przedstawiającą ${chosenAnimal} w scenie związanej z tematem: "${effectiveOccasion}". Odbiorcą jest dziecko w wieku ${ageGroup.sub}. Styl: przyjazny, ciepłe barwy, bajkowe oświetlenie, format pionowy. Na obrazku nie mogą znajdować się żadne napisy, litery ani cyfry, oraz żadni ludzie - tylko to jedno zwierzątko i pasująca do okazji sceneria.`;
                             const res = await fetch('/api/generate-openai', {
                                 method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt, size: '1024x1536' })
                             });
