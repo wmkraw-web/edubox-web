@@ -1,327 +1,141 @@
-toString( toBinary( replace( Ly8gUGxpayB6IHdwaXNhbWkgYmxvZ2EgRWR1Qm94IEFJLiBBYnkgZG9kYcSH
-IG5vd3kgd3BpcywgZG9waXN6IGtvbGVqbnkgb2JpZWt0IGRvIHRhYmxpY3kg
-cG9uacW8ZWouCndpbmRvdy5CTE9HX1BPU1RTID0gWwogICAgewogICAgICAg
-IHNsdWc6ICdyZWZvcm1hLWtvbXBhcy1qdXRyYS0yMDI2JywKICAgICAgICB0
-aXRsZTogJ1JlZm9ybWEgIktvbXBhcyBKdXRyYSIgMjAyNiDigJMgY28gc2nE
-mSB6bWllbmlhIGkgamFrIHNpxJkgcHJ6eWdvdG93YcSHJywKICAgICAgICBl
-eGNlcnB0OiAnT2QgMSB3cnplxZtuaWEgMjAyNiByLiB3IHByemVkc3prb2xh
-Y2ggb3JheiBrbGFzYWNoIEkgaSBJViBzemtvxYJ5IHBvZHN0YXdvd2VqIG9i
-b3dpxIV6dWplIG5vd2EgcG9kc3Rhd2EgcHJvZ3JhbW93YS4gV3lqYcWbbmlh
-bXksIGtvZ28gZG90eWN6eSBpIGNvIHJlYWxuaWUgc2nEmSB6bWllbmlhLics
-CiAgICAgICAgZGF0ZTogJzIwMjYtMDgtMTMnLAogICAgICAgIGNhdGVnb3J5
-OiAnUHJhd28gb8Wbd2lhdG93ZScsCiAgICAgICAgcmVhZFRpbWU6ICc1IG1p
-bicsCiAgICAgICAgaWNvbjogJ3BoLWNvbXBhc3MnLAogICAgICAgIGNvbG9y
-OiAndGV4dC10ZWFsLTUwMCcsCiAgICAgICAgY29udGVudDogYAogICAgICAg
-ICAgICA8cD4xMSBtYXJjYSAyMDI2IHIuIE1pbmlzdGVyIEVkdWthY2ppIHBv
-ZHBpc2HFgmEgcm96cG9yesSFZHplbmllIHdwcm93YWR6YWrEhWNlIG5vd8SF
-IHBvZHN0YXfEmSBwcm9ncmFtb3fEhSB3IHJhbWFjaCByZWZvcm15ICJLb21w
-YXMgSnV0cmEiLiBUbyBqZWRuYSB6IG5handpxJlrc3p5Y2ggem1pYW4gdyBw
-b2xza2llaiBlZHVrYWNqaSBvZCBsYXQg4oCTIGFsZSwgY28gd2HFvG5lLCA8
-c3Ryb25nPm5pZSBkb3R5Y3p5IHdzenlzdGtpY2ggdWN6bmnDs3cgbmFyYXo8
-L3N0cm9uZz4uPC9wPgoKICAgICAgICAgICAgPGgyPktvZ28gZG90eWN6eSBy
-ZWZvcm1hIHcgcm9rdSBzemtvbG55bSAyMDI2LzIwMjc8L2gyPgogICAgICAg
-ICAgICA8cD5Ob3dlIHByemVwaXN5IG9ib3dpxIV6dWrEhSBvZCAxIHdyemXF
-m25pYSAyMDI2IHIuIHd5xYLEhWN6bmllIHdlIHdzenlzdGtpY2ggcHJ6ZWRz
-emtvbGFjaCBpIG9kZHppYcWCYWNoIHByemVkc3prb2xueWNoIG9yYXogdyBr
-bGFzYWNoIEkgaSBJViBzemtvxYJ5IHBvZHN0YXdvd2VqLiBVY3puaW93aWUg
-a2xhcyBJSSwgSUlJIG9yYXogVuKAk1ZJSUkgcG96b3N0YWrEhSBqZXN6Y3pl
-IHByemV6IGpha2nFmyBjemFzIHByenkgZG90eWNoY3phc293ZWogcG9kc3Rh
-d2llIHByb2dyYW1vd2VqIHogMjAxNyByLiDigJMgcmVmb3JtYSBvYmVqbWll
-IGljaCBzdWtjZXN5d25pZSB3IGtvbGVqbnljaCBsYXRhY2ggc3prb2xueWNo
-LjwvcD4KCiAgICAgICAgICAgIDxoMj5DbyB6bWllbmlhIHNpxJkgdyBwcnpl
-ZHN6a29sdTwvaDI+CiAgICAgICAgICAgIDxwPk5hamJhcmR6aWVqIGplZG5v
-em5hY3puZSB6bWlhbnkgZG90eWN6xIUgd3ljaG93YW5pYSBwcnplZHN6a29s
-bmVnby4gTm93YSBwb2RzdGF3YSB3cHJvd2FkemEgb2dyYW5pY3plbmllIGtv
-cnp5c3RhbmlhIHogdXJ6xIVkemXFhCBla3Jhbm93eWNoIOKAkyBuYXVjenlj
-aWVsIG1vxbxlIHogbmljaCBrb3J6eXN0YcSHIHd5xYLEhWN6bmllIHcgY2Vs
-YWNoIGR5ZGFrdHljem55Y2guIFRvIGVsZW1lbnQgc3plcnN6ZWogaWRlaSAi
-aGlnaWVueSBjeWZyb3dlaiIsIGt0w7NyYSBtYSB6YWNoxJljYcSHIGRvIGFr
-dHl3bm/Fm2NpIHJ1Y2hvd3ljaCBpIHNwb8WCZWN6bnljaCB6YW1pYXN0IGJp
-ZXJuZWdvIGtvcnp5c3RhbmlhIHogZWtyYW51LjwvcD4KCiAgICAgICAgICAg
-IDxoMj5DbyB6bWllbmlhIHNpxJkgdyBrbGFzaWUgSTwvaDI+CiAgICAgICAg
-ICAgIDxwPlcgZWR1a2Fjamkgd2N6ZXNub3N6a29sbmVqIG5hY2lzayBwcnpl
-c3V3YSBzacSZIHogbGljemJ5IHBvem5hd2FueWNoIHBvasSZxIcgbmEgamFr
-b8WbxIcgcm96d2lqYW55Y2ggdW1pZWrEmXRub8WbY2kg4oCTIG3Ds3dpZW5p
-YSwgY3p5dGFuaWEsIHBpc2FuaWEgaSBzxYJ1Y2hhbmlhLiBad2nEmWtzem9u
-byB0ZcW8IHR5Z29kbmlvd3kgd3ltaWFyIGdvZHppbiBlZHVrYWNqaSB3Y3pl
-c25vc3prb2xuZWogeiAyMCBkbyAyMSBnb2R6aW4sIMW8ZWJ5IGRhxIcgbmF1
-Y3p5Y2llbG9tIGkgdWN6bmlvbSB3acSZY2VqIGN6YXN1IG5hIHNwb2tvam7E
-hSwgcG9nxYLEmWJpb27EhSBwcmFjxJkuIFBvamF3aWEgc2nEmSB0ZcW8ICJ0
-eWR6aWXFhCBwcm9qZWt0b3d5IiBvcmF6IG1vY25pZWpzenkgbmFjaXNrIG5h
-IGVkdWthY2rEmSBtZWRpYWxuxIUg4oCTIHcgdHltIG5hdWvEmSBrcnl0eWN6
-bmVnbyBwb2RlasWbY2lhIGRvIHRyZcWbY2ksIHLDs3duaWXFvCB0eWNoIGdl
-bmVyb3dhbnljaCBwcnpleiBzenR1Y3puxIUgaW50ZWxpZ2VuY2rEmS48L3A+
-CgogICAgICAgICAgICA8aDI+Q28gem1pZW5pYSBzacSZIHcga2xhc2llIElW
-PC9oMj4KICAgICAgICAgICAgPHA+VHUgem1pYW5hIGplc3QgY2h5YmEgbmFq
-YmFyZHppZWogb2RjenV3YWxuYS4gVHJlxZtjaSBuYXVjemFuaWEgb3JnYW5p
-enVqZSBzacSZIHdva8OzxYIgc3plxZtjaXUgaW50ZXJkeXNjeXBsaW5hcm55
-Y2ggbW9kdcWCw7N3IHRlbWF0eWN6bnljaCB6YW1pYXN0IHN6dHl3bmVnbyBw
-b2R6aWHFgnUgbmEgb3NvYm5lIHByemVkbWlvdHkuIFBvIGxhdGFjaCBwcnpl
-cnd5IGRvIGtsYXMgNOKAkzYgd3JhY2EgPHN0cm9uZz5wcnp5cm9kYTwvc3Ry
-b25nPiBqYWtvIHppbnRlZ3Jvd2FueSBwcnplZG1pb3QgxYLEhWN6xIVjeSBl
-bGVtZW50eSBiaW9sb2dpaSwgY2hlbWlpLCBmaXp5a2kgaSBnZW9ncmFmaWku
-ICJUZWNobmlrYSIgem9zdGFqZSB6YXN0xIVwaW9uYSAiemFqxJljaWFtaSBw
-cmFrdHljem5vLXRlY2huaWN6bnltaSIuIFBvZG9ibmllIGphayB3IGtsYXNp
-ZSBJLCBwb2phd2lhIHNpxJkgdHlkemllxYQgcHJvamVrdG93eSBvcmF6IHNp
-bG5pZWpzenkgbmFjaXNrIG5hIGtvbXBldGVuY2plIHByemVrcm9qb3dlOiBr
-cnl0eWN6bmUgbXnFm2xlbmllLCBrcmVhdHl3bm/Fm8SHLCB3c3DDs8WCcHJh
-Y8SZIGkgcm96d2nEhXp5d2FuaWUgcHJvYmxlbcOzdy48L3A+CgogICAgICAg
-ICAgICA8aDI+SmFrIHNpxJkgcHJ6eWdvdG93YcSHIGp1xbwgdGVyYXo8L2gy
-PgogICAgICAgICAgICA8cD5KZcWbbGkgdWN6eXN6IHcgamVkbnltIHogb2Jq
-xJl0eWNoIHJlZm9ybcSFIGV0YXDDs3csIHdhcnRvIHphY3rEhcSHIG9kIHph
-cG96bmFuaWEgc2nEmSB6IHBlxYJuxIUgdHJlxZtjacSFIHJvenBvcnrEhWR6
-ZW5pYSBpIG1hdGVyaWHFgmFtaSBtZXRvZHljem55bWkgcHVibGlrb3dhbnlt
-aSBwcnpleiBJbnN0eXR1dCBCYWRhxYQgRWR1a2FjeWpueWNoLiBEb2JyeW0g
-cGllcndzenltIGtyb2tpZW0gamVzdCB0ZcW8IHByemVnbMSFZCB3xYJhc255
-Y2ggbWF0ZXJpYcWCw7N3IHBvZCBrxIV0ZW0gdGVnbywga3TDs3JlIHogbmlj
-aCBkYSBzacSZIMWCYXR3byBkb3N0b3Nvd2HEhyBkbyBub3d5Y2ggbW9kdcWC
-w7N3IHRlbWF0eWN6bnljaCwgYSBrdMOzcmUgdHJ6ZWJhIGLEmWR6aWUgcHJ6
-eWdvdG93YcSHIG9kIG5vd2EuPC9wPgoKICAgICAgICAgICAgPHA+Q2hjZXN6
-IHNwcmF3ZHppxIcgZG9rxYJhZG5pZSwgY28gem1pZW5pYSBzacSZIHcgVHdv
-amVqIGtvbmtyZXRuZWoga2xhc2llPyBTa29yenlzdGFqIHogbmFzemVnbyA8
-YSBocmVmPSJlZHVyZWZvcm1hLmh0bWwiIGNsYXNzPSJ0ZXh0LXRlYWwtNjAw
-IGRhcms6dGV4dC10ZWFsLTQwMCBmb250LWJvbGQgaG92ZXI6dW5kZXJsaW5l
-Ij5Bc3lzdGVudGEgV2Ryb8W8ZW5pYSBSZWZvcm15IDIwMjY8L2E+IOKAkyB3
-eWJpZXJ6IGV0YXAgbmF1Y3phbmlhLCBhIHByenlnb3R1amVteSBkbGEgQ2ll
-YmllIHNwZXJzb25hbGl6b3dhbsSFIGxpc3TEmSB6bWlhbiBpIHByYWt0eWN6
-bmUga3Jva2kgcHJ6eWdvdG93YW5pYS48L3A+CiAgICAgICAgYAogICAgfSwK
-ICAgIHsKICAgICAgICBzbHVnOiAnaXBldC13b3BmdS16bWlhbnktMjAyNics
-CiAgICAgICAgdGl0bGU6ICdJUEVUIGkgV09QRlUgcG8gem1pYW5hY2ggMjAy
-NiDigJMgY28gbXVzaXN6IHdpZWR6aWXEhycsCiAgICAgICAgZXhjZXJwdDog
-J09kIDEgd3J6ZcWbbmlhIDIwMjYgci4gb2Jvd2nEhXp1asSFIG5vd2UgemFz
-YWR5IHd5ZGF3YW5pYSBvcnplY3plxYQgaSBvcGluaWkgcHJ6ZXogcG9yYWRu
-aWUgcHN5Y2hvbG9naWN6bm8tcGVkYWdvZ2ljem5lLCB3IHR5bSBvYm93acSF
-emtvd2EgIm9jZW5hIGZ1bmtjam9uYWxuYSIuIFNwcmF3ZHphbXksIGNvIHRv
-IG96bmFjemEgZGxhIHN6a8OzxYIuJywKICAgICAgICBkYXRlOiAnMjAyNi0w
-OC0xMCcsCiAgICAgICAgY2F0ZWdvcnk6ICdQZWRhZ29naWthIHNwZWNqYWxu
-YScsCiAgICAgICAgcmVhZFRpbWU6ICc0IG1pbicsCiAgICAgICAgaWNvbjog
-J3BoLXNoaWVsZC1jaGVjaycsCiAgICAgICAgY29sb3I6ICd0ZXh0LXJvc2Ut
-NTAwJywKICAgICAgICBjb250ZW50OiBgCiAgICAgICAgICAgIDxwPjIgbWFy
-Y2EgMjAyNiByLiBNaW5pc3RlciBFZHVrYWNqaSBwb2RwaXNhxYJhIG5vd2Ug
-cm96cG9yesSFZHplbmllIHcgc3ByYXdpZSBvcnplY3plxYQgaSBvcGluaWkg
-d3lkYXdhbnljaCBwcnpleiB6ZXNwb8WCeSBvcnpla2FqxIVjZSBkemlhxYJh
-asSFY2UgdyBwdWJsaWN6bnljaCBwb3JhZG5pYWNoIHBzeWNob2xvZ2ljem5v
-LXBlZGFnb2dpY3pueWNoLiBaYXN0xJlwdWplIG9ubyBkb3R5Y2hjemFzb3dl
-IHByemVwaXN5IHogMjAxNyByLiBDesSZxZvEhyB6YXBpc8OzdyB3ZXN6xYJh
-IHcgxbx5Y2llIGp1xbwgd2lvc27EhSwgYSBuYWp3YcW8bmllanN6ZSB6bWlh
-bnkgZGxhIHN6a8OzxYIgemFjenluYWrEhSBvYm93acSFenl3YcSHIG9kIDEg
-d3J6ZcWbbmlhIDIwMjYgci48L3A+CgogICAgICAgICAgICA8aDI+Tm93b8Wb
-xIc6IG9ib3dpxIV6a293YSAib2NlbmEgZnVua2Nqb25hbG5hIjwvaDI+CiAg
-ICAgICAgICAgIDxwPlphbmltIHBvcmFkbmlhIHd5ZGEgb3J6ZWN6ZW5pZSwg
-c3prb8WCYSBsdWIgcHJ6ZWRzemtvbGUgYsSZZHppZSBtdXNpYcWCbyBwcnpl
-cHJvd2FkemnEhyB0encuIG9jZW7EmSBmdW5rY2pvbmFsbsSFIOKAkyBrb21w
-bGVrc293xIUgY2hhcmFrdGVyeXN0eWvEmSBmdW5rY2pvbm93YW5pYSBkemll
-Y2thIGx1YiB1Y3puaWEgdyDFm3JvZG93aXNrdSBzemtvbG55bS4gVG8gem1p
-YW5hLCBrdMOzcmEgbWEgZGHEhyB6ZXNwb8WCb3dpIG9yemVrYWrEhWNlbXUg
-cGXFgm5pZWpzenkgb2JyYXogc3l0dWFjamkgZHppZWNrYSwgemFtaWFzdCBv
-cGllcmHEhyBzacSZIGfFgsOzd25pZSBuYSBkb2t1bWVudGFjamkgbWVkeWN6
-bmVqLjwvcD4KCiAgICAgICAgICAgIDxoMj5Ob3dlLCBrcsOzdHN6ZSB0ZXJt
-aW55IG5hIFdPUEZVPC9oMj4KICAgICAgICAgICAgPHA+SmXFm2xpIHBvcmFk
-bmlhIHBvcHJvc2kgc3prb8WCxJkgbyBvcGluacSZIG8gZnVua2Nqb25vd2Fu
-aXUgdWN6bmlhIG9iasSZdGVnbyBrc3p0YcWCY2VuaWVtIHNwZWNqYWxueW0s
-IHN6a2/FgmEgbWEgbmEgamVqIHByenlnb3Rvd2FuaWUgdHlsa28gPHN0cm9u
-Zz4xMCBkbmk8L3N0cm9uZz4gb2Qgb3RyenltYW5pYSBwcm/Fm2J5IGR5cmVr
-dG9yYSBwb3JhZG5pLiBPcGluaWEgdGEgcG93aW5uYSB6YXdpZXJhxIcgYWt0
-dWFsbsSFIHdpZWxvc3BlY2phbGlzdHljem7EhSBvY2VuxJkgcG96aW9tdSBm
-dW5rY2pvbm93YW5pYSB1Y3puaWEgKFdPUEZVKS48L3A+CgogICAgICAgICAg
-ICA8aDI+UHJha3R5Y3puYSB3c2thesOzd2thPC9oMj4KICAgICAgICAgICAg
-PHA+RWtzcGVyY2kgendyYWNhasSFIHV3YWfEmSwgxbxlIGplxZtsaSBXT1BG
-VSBqZXN0IHByb3dhZHpvbmEgbmEgYmllxbzEhWNvLCBrb25rcmV0bmllIGkg
-dXBvcnrEhWRrb3dhbmEgemdvZG5pZSB6IG9ic3phcmFtaSBJQ0YsIHByenln
-b3Rvd2FuaWUgdGFraWVqIG9waW5paSBuaWUgYsSZZHppZSB3eW1hZ2HFgm8g
-dyBrcsOzdGtpbSBjemFzaWUgcG9ub3duZWdvIHpiaWVyYW5pYSBpbmZvcm1h
-Y2ppIG9kIHdzenlzdGtpY2ggbmF1Y3p5Y2llbGkgaSBzcGVjamFsaXN0w7N3
-LiBJbm55bWkgc8WCb3d5IOKAkyByZWd1bGFybmEsIGRvYnJhIGpha2/Fm2Np
-b3dvIGRva3VtZW50YWNqYSB0ZXJheiBvc3pjesSZZHppIENpIHN0cmVzdSBw
-cnp5IDEwLWRuaW93eW0gdGVybWluaWUgcMOzxbpuaWVqLjwvcD4KCiAgICAg
-ICAgICAgIDxoMj5BIGNvIHogc2FteW0gSVBFVC1lbT88L2gyPgogICAgICAg
-ICAgICA8cD5abWlhbmEgcG9kc3Rhd3kgcHJvZ3JhbW93ZWogc2FtYSB3IHNv
-YmllIG5pZSBqZXN0IGplc3pjemUgcG93b2RlbSBkbyBtb2R5Zmlrb3dhbmlh
-IElQRVQtdSB3IGtsYXNhY2gsIGt0w7NyZSBuaWUgc8SFIG9iasSZdGUgcmVm
-b3JtxIUgIktvbXBhcyBKdXRyYSIgdyB0eW0gcm9rdSAoY3p5bGkgSUksIElJ
-SSBvcmF6IFbigJNWSUlJKS4gSW5hY3plaiBqZXN0IHcgcHJ6eXBhZGt1IHVj
-em5pw7N3IHJvenBvY3p5bmFqxIVjeWNoIGtsYXPEmSBJIGx1YiBJViDigJMg
-ZGxhIG5pY2ggSVBFVCBwb3dpbmllbiB1d3pnbMSZZG5pYcSHIHNwb3PDs2Ig
-cmVhbGl6b3dhbmlhIG5vd2VqIHBvZHN0YXd5IHByb2dyYW1vd2VqLCBjaG/E
-hyBuaWUgb3puYWN6YSB0byBwcnplcGlzeXdhbmlhIGplaiB0cmXFm2NpIGRv
-IGRva3VtZW50dS48L3A+CgogICAgICAgICAgICA8cD5Qb3RyemVidWplc3og
-cG9tb2N5IHByenkgdHdvcnplbml1IGx1YiBha3R1YWxpemFjamkgZG9rdW1l
-bnRhY2ppPyBOYXN6IDxhIGhyZWY9ImFzeXN0ZW50LXBlZGFnb2dhLmh0bWwi
-IGNsYXNzPSJ0ZXh0LXJvc2UtNjAwIGRhcms6dGV4dC1yb3NlLTQwMCBmb250
-LWJvbGQgaG92ZXI6dW5kZXJsaW5lIj5Bc3lzdGVudCBQZWRhZ29nYSAoSVBF
-VCk8L2E+IHR3b3J6eSBrb21wbGV0bmUgSVBFVC15IGkgV09QRlUgdyBvcGFy
-Y2l1IG8gYWt0dWFsbmUgcHJ6ZXBpc3kuPC9wPgogICAgICAgIGAKICAgIH0s
-CiAgICB7CiAgICAgICAgc2x1ZzogJ2F3YW5zLXphd29kb3d5LTIwMjYtc3Rh
-bi1wcnplcGlzb3cnLAogICAgICAgIHRpdGxlOiAnQXdhbnMgemF3b2Rvd3kg
-bmF1Y3p5Y2llbGEgdyAyMDI2IHJva3Ug4oCTIGFrdHVhbG55IHN0YW4gcHJ6
-ZXBpc8OzdycsCiAgICAgICAgZXhjZXJwdDogJ0N6dGVyeSBsYXRhIHBvIGR1
-xbxlaiByZWZvcm1pZSBLYXJ0eSBOYXVjenljaWVsYSB3Y2nEhcW8IGZ1bmtj
-am9udWrEhSBkd2llIHLDs3dub2xlZ8WCZSDFm2NpZcW8a2kgYXdhbnN1LiBX
-eWphxZtuaWFteSwga3RvIGF3YW5zdWplIG5hIHN0YXJ5Y2gsIGEga3RvIG5h
-IG5vd3ljaCB6YXNhZGFjaC4nLAogICAgICAgIGRhdGU6ICcyMDI2LTA4LTA1
-JywKICAgICAgICBjYXRlZ29yeTogJ0F3YW5zIHphd29kb3d5JywKICAgICAg
-ICByZWFkVGltZTogJzQgbWluJywKICAgICAgICBpY29uOiAncGgtYnJpZWZj
-YXNlJywKICAgICAgICBjb2xvcjogJ3RleHQtYmx1ZS01MDAnLAogICAgICAg
-IGNvbnRlbnQ6IGAKICAgICAgICAgICAgPHA+Q2hvxIcgcmVmb3JtYSBzeXN0
-ZW11IGF3YW5zdSB6YXdvZG93ZWdvIHdlc3rFgmEgdyDFvHljaWUganXFvCAx
-IHdyemXFm25pYSAyMDIyIHIuLCB3IDIwMjYgcm9rdSB3Y2nEhcW8IGZ1bmtj
-am9udWrEhSA8c3Ryb25nPmR3aWUgcsOzd25vbGVnxYJlIMWbY2llxbxraTwv
-c3Ryb25nPiB6ZG9ieXdhbmlhIGtvbGVqbnljaCBzdG9wbmkuIFdhcnRvIHdp
-ZWR6aWXEhywga3TDs3JhIGRvdHljenkgQ2llYmllLjwvcD4KCiAgICAgICAg
-ICAgIDxoMj5DbyB6bWllbmnFgmEgcmVmb3JtYSB6IDIwMjIgcm9rdTwvaDI+
-CiAgICAgICAgICAgIDxwPk5vd2VsaXphY2phIEthcnR5IE5hdWN6eWNpZWxh
-IHogNSBzaWVycG5pYSAyMDIyIHIuIHpsaWt3aWRvd2HFgmEgZG90eWNoY3ph
-c293ZSBzdG9wbmllIG5hdWN6eWNpZWxhIHN0YcW8eXN0eSBpIG5hdWN6eWNp
-ZWxhIGtvbnRyYWt0b3dlZ28uIFcgaWNoIG1pZWpzY2Ugd3Byb3dhZHpvbm8g
-c3RhdHVzIG5hdWN6eWNpZWxhIHBvY3rEhXRrdWrEhWNlZ28sIHBvIGt0w7Ny
-eW0gbW/FvG5hIHViaWVnYcSHIHNpxJkga29sZWpubyBvIHN0b3BpZcWEIG5h
-dWN6eWNpZWxhIG1pYW5vd2FuZWdvLCBhIG5hc3TEmXBuaWUgZHlwbG9tb3dh
-bmVnby48L3A+CgogICAgICAgICAgICA8aDI+RGxhY3plZ28gd2NpxIXFvCBt
-w7N3aSBzacSZIG8gImR3w7NjaCBzeXN0ZW1hY2giPC9oMj4KICAgICAgICAg
-ICAgPHA+TmF1Y3p5Y2llbGUsIGt0w7NyenkgcHJ6ZWQgMSB3cnplxZtuaWEg
-MjAyMiByLiB1enlza2FsaSBzdG9waWXFhCBrb250cmFrdG93eSBsdWIgcm96
-cG9jesSZbGkgc3RhxbwgbmEgc3RvcGllxYQgbWlhbm93YW5lZ28gY3p5IGR5
-cGxvbW93YW5lZ28sIHphY2hvd2FsaSBwcmF3byBkbyBkb2tvxYRjemVuaWEg
-YXdhbnN1IG5hIGRvdHljaGN6YXNvd3ljaCwgc3RhcnljaCB6YXNhZGFjaC4g
-VGEgbW/FvGxpd2/Fm8SHIG5pZSBqZXN0IGplZG5hayBiZXp0ZXJtaW5vd2Eg
-4oCTIDxzdHJvbmc+d3lnYXNhIDMxIHNpZXJwbmlhIDIwMjcgci48L3N0cm9u
-Zz4gUG8gdGVqIGRhY2llIG9ib3dpxIV6eXdhxIcgYsSZZMSFIGp1xbwgd3nF
-gsSFY3puaWUgbm93ZSBwcnplcGlzeSBkbGEgd3N6eXN0a2ljaC48L3A+Cgog
-ICAgICAgICAgICA8aDI+Q28gdG8gb3puYWN6YSB3IHByYWt0eWNlIGRsYSBk
-eXJla3RvcsOzdzwvaDI+CiAgICAgICAgICAgIDxwPkR5cmVrdG9yenkgc3pr
-w7PFgiBpIG9yZ2FueSBwcm93YWR6xIVjZSBtdXN6xIUgamVzemN6ZSBwcnpl
-eiBuYWpibGnFvHN6eSByb2sgc3prb2xueSBzcHJhd25pZSBwb3J1c3phxIcg
-c2nEmSB3IG9idSBwcm9jZWR1cmFjaCBqZWRub2N6ZcWbbmllIOKAkyB6YXLD
-s3dubyB0ZWogc3ByemVkIDIwMjIgci4sIGphayBpIG5vd2VqLiBQcnplcGlz
-eSDFm2NpxZtsZSB3acSFxbzEhSB0ZcW8IG9jZW7EmSBwcmFjeSBuYXVjenlj
-aWVsYSB6ZSDFm2NpZcW8a8SFIGF3YW5zdSB6YXdvZG93ZWdvLCB3acSZYyB3
-YXJ0byBuYSBiaWXFvMSFY28gc3ByYXdkemHEhywga3TDs3JhIHByb2NlZHVy
-YSBkb3R5Y3p5IGtvbmtyZXRuZWdvIG5hdWN6eWNpZWxhIHcgZ3JvbmllIHBl
-ZGFnb2dpY3pueW0uPC9wPgoKICAgICAgICAgICAgPGgyPkRvYnJhIHdpYWRv
-bW/Fm8SHIG5hIGtvbmllYzwvaDI+CiAgICAgICAgICAgIDxwPk9kIDMxIHNp
-ZXJwbmlhIDIwMjcgci4gc3l0dWFjamEgc2nEmSB1cHJvxZtjaSDigJMgdyBz
-eXN0ZW1pZSB6b3N0YW5pZSBqdcW8IHR5bGtvIGplZG5hLCBzcMOzam5hIMWb
-Y2llxbxrYTogbmF1Y3p5Y2llbCBwb2N6xIV0a3VqxIVjeSDihpIgbWlhbm93
-YW55IOKGkiBkeXBsb21vd2FueS4gVG8gb3N0YXRuaSByb2ssIGtpZWR5IHRy
-emViYSBwYW1pxJl0YcSHIG8gZHfDs2NoIHLDs3dub2xlZ8WCeWNoIHplc3Rh
-d2FjaCB6YXNhZC48L3A+CgogICAgICAgICAgICA8cD5Qcnp5Z290b3d1amVz
-eiBkb2t1bWVudGFjasSZIGF3YW5zb3fEhT8gU3ByYXdkxbogPGEgaHJlZj0i
-YXdhbnMuaHRtbCIgY2xhc3M9InRleHQtYmx1ZS02MDAgZGFyazp0ZXh0LWJs
-dWUtNDAwIGZvbnQtYm9sZCBob3Zlcjp1bmRlcmxpbmUiPktyZWF0b3IgQXdh
-bnN1IEFJPC9hPiBsdWIgPGEgaHJlZj0iZWR1YXdhbnMuaHRtbCIgY2xhc3M9
-InRleHQtYmx1ZS02MDAgZGFyazp0ZXh0LWJsdWUtNDAwIGZvbnQtYm9sZCBo
-b3Zlcjp1bmRlcmxpbmUiPkVkdUF3YW5zIFBSTyBNQVg8L2E+IOKAkyBvYmEg
-bmFyesSZZHppYSB1d3pnbMSZZG5pYWrEhSBha3R1YWxueSBzdGFuIHByemVw
-aXPDs3cuPC9wPgogICAgICAgIGAKICAgIH0sCiAgICB7CiAgICAgICAgc2x1
-ZzogJzUtc3Bvc29ib3ctYWktb2RjaWF6YS1uYXVjenljaWVsYScsCiAgICAg
-ICAgdGl0bGU6ICdKYWsgc3p0dWN6bmEgaW50ZWxpZ2VuY2phIG1vxbxlIG9k
-Y2nEhcW8ecSHIG5hdWN6eWNpZWxhIOKAkyA1IHNwb3NvYsOzdyBuYSBzdGFy
-dCcsCiAgICAgICAgZXhjZXJwdDogJ05pZSB0cnplYmEgYnnEhyBzcGVjamFs
-aXN0xIUgSVQsIMW8ZWJ5IEFJIHJlYWxuaWUgemFvc3pjesSZZHppxYJvIENp
-IGN6YXMuIE90byBwacSZxIcga29ua3JldG55Y2gsIHByb3N0eWNoIHNwb3Nv
-YsOzdyBuYSB6YWN6xIXEhyBqdcW8IGR6acWbLicsCiAgICAgICAgZGF0ZTog
-JzIwMjYtMDctMjgnLAogICAgICAgIGNhdGVnb3J5OiAnUG9yYWRuaWsnLAog
-ICAgICAgIHJlYWRUaW1lOiAnNCBtaW4nLAogICAgICAgIGljb246ICdwaC1s
-aWdodGJ1bGInLAogICAgICAgIGNvbG9yOiAndGV4dC1hbWJlci01MDAnLAog
-ICAgICAgIGNvbnRlbnQ6IGAKICAgICAgICAgICAgPHA+IlN6dHVjem5hIGlu
-dGVsaWdlbmNqYSB3IGVkdWthY2ppIiBicnptaSBjemFzZW0gamFrIHRlbWF0
-IG5hIGtvbmZlcmVuY2rEmSwgYSBuaWUgY2/FmywgY28gcmVhbG5pZSBwb21v
-xbxlIENpIHdlIHd0b3Jrb3dlIHBvcG/FgnVkbmllLCBnZHkgdHJ6ZWJhIHBy
-enlnb3Rvd2HEhyBzacSZIG5hIGp1dHJvLiBBIGplZG5hayDigJMga2lsa2Eg
-cHJvc3R5Y2ggbmF3eWvDs3cgcG90cmFmaSB6YW9zemN6xJlkemnEhyBuYXBy
-YXdkxJkgc3Bvcm8gY3phc3UuPC9wPgoKICAgICAgICAgICAgPGgyPjEuIFph
-Y3puaWogb2QgbmFqYmFyZHppZWogxbxtdWRuZWosIHBvd3RhcnphbG5laiBy
-emVjenk8L2gyPgogICAgICAgICAgICA8cD5OaWUgcHLDs2J1aiBvZCByYXp1
-IHphdXRvbWF0eXpvd2HEhyBjYcWCZWogcHJhY3kuIFphY3puaWogb2QgamVk
-bmVqLCBrb25rcmV0bmVqLCBwb3d0YXJ6YWxuZWogY3p5bm5vxZtjaSDigJMg
-bnAuIHBpc2FuaWEgb2NlbiBvcGlzb3d5Y2ggYWxibyB3cGlzw7N3IGRvIGR6
-aWVubmlrYS4gV8WCYcWbbmllIHRhbSBBSSBkYWplIG5hanN6eWJjaWVqIG9k
-Y3p1d2FsbsSFIHVsZ8SZLjwvcD4KCiAgICAgICAgICAgIDxoMj4yLiBUcmFr
-dHVqIHBpZXJ3c3p5IHd5bmlrIGpha28gc3praWMsIG5pZSBnb3Rvd2llYzwv
-aDI+CiAgICAgICAgICAgIDxwPk5hamxlcHN6ZSBlZmVrdHkgZGFqZSB0cmFr
-dG93YW5pZSB3eWdlbmVyb3dhbmVnbyB0ZWtzdHUgamFrbyBzb2xpZG5lZ28g
-cHVua3R1IHd5asWbY2lhLCBrdMOzcnkgZG9wcmFjb3d1amVzeiBwb2Qgc3fD
-s2ogc3R5bCBpIGtvbmtyZXRuZWdvIHVjem5pYSDigJMgYSBuaWUgamFrbyBn
-b3Rvd2VnbyBwcm9kdWt0dSBkbyB3a2xlamVuaWEgYmV6IHptaWFuLjwvcD4K
-CiAgICAgICAgICAgIDxoMj4zLiBaYXBpc3VqIHNwcmF3ZHpvbmUgd3pvcnkg
-emFtaWFzdCB6YWN6eW5hxIcgemEga2HFvGR5bSByYXplbSBvZCB6ZXJhPC9o
-Mj4KICAgICAgICAgICAgPHA+SmXFm2xpIGpha2nFmyBzY2VuYXJpdXN6IGN6
-eSBkb2t1bWVudCBkb2JyemUgc2nEmSBzcHJhd2R6acWCLCB3YXJ0byBnbyB6
-YWNob3dhxIcuIFcgd2llbHUgbmFzenljaCBuYXJ6xJlkemlhY2ggbW/FvGVz
-eiBvcHVibGlrb3dhxIcgc3ByYXdkem9ueSB3esOzciB3IEJpYmxpb3RlY2Ug
-V3pvcsOzdyAoYmV6IGRhbnljaCB1Y3puaWEpIGkgc2tvcnp5c3RhxIcgeiBn
-b3Rvd3ljaCBtYXRlcmlhxYLDs3cgaW5ueWNoIG5hdWN6eWNpZWxpLCB6YW1p
-YXN0IHphY3p5bmHEhyBrYcW8ZMSFIGxla2NqxJkgb2QgcHVzdGVqIGthcnRr
-aS48L3A+CgogICAgICAgICAgICA8aDI+NC4gVXN0YWwgc29iaWUgbGltaXQg
-Y3phc3UgbmEgImRvcGllc3pjemFuaWUiIHByb21wdHU8L2gyPgogICAgICAg
-ICAgICA8cD7FgWF0d28gd3BhxZvEhyB3IHB1xYJhcGvEmSBwcnplcGlzeXdh
-bmlhIHBvbGVjZW5pYSB3IG5pZXNrb8WEY3pvbm/Fm8SHIHcgcG9zenVraXdh
-bml1IGlkZWFsbmVnbyB3eW5pa3UuIEplxZtsaSBwbyBkd8OzY2gtdHJ6ZWNo
-IHByw7NiYWNoIGVmZWt0IGplc3QgInd5c3RhcmN6YWrEhWNvIGRvYnJ5Iiwg
-dG8gend5a2xlIGplc3QgdG8gbmFqbGVwc3p5IG1vbWVudCwgxbxlYnkgcHJ6
-ZWrFm8SHIGRvIHLEmWN6bmVqIGVkeWNqaS48L3A+CgogICAgICAgICAgICA8
-aDI+NS4gUGFtacSZdGFqLCDFvGUgQUkgbmllIHpuYSBUd29pY2ggdWN6bmnD
-s3cg4oCTIFR5IGljaCB6bmFzejwvaDI+CiAgICAgICAgICAgIDxwPk5hamxl
-cHN6ZSBtYXRlcmlhxYJ5IHBvd3N0YWrEhSB3dGVkeSwgZ2R5IEFJIG9kY2nE
-hcW8YSBDacSZIG9kIHBpZXJ3c3plaiwgbmFqYmFyZHppZWogY3phc29jaMWC
-b25uZWogd2Vyc2ppLCBhIFR5IGRva8WCYWRhc3ogdG8sIGN6ZWdvIMW8YWRl
-biBtb2RlbCBuaWUgd2llOiBrb250ZWtzdCBrb25rcmV0bmVqIGtsYXN5LCBr
-b25rcmV0bmVnbyBkemllY2thIGkga29ua3JldG5laiBzeXR1YWNqaS48L3A+
-CgogICAgICAgICAgICA8cD5TenVrYXN6IG1pZWpzY2EsIMW8ZWJ5IHphY3rE
-hcSHPyBXcsOzxIcgbmEgPGEgaHJlZj0iaW5kZXguaHRtbCIgY2xhc3M9InRl
-eHQtYW1iZXItNjAwIGRhcms6dGV4dC1hbWJlci00MDAgZm9udC1ib2xkIGhv
-dmVyOnVuZGVybGluZSI+c3Ryb27EmSBnxYLDs3duxIU8L2E+IGkgc2tvcnp5
-c3RhaiB6IGtyZWF0b3JhICJaYWN6bmlqIHR1dGFqIiDigJMgdyBraWxrYSBz
-ZWt1bmQgZG9wYXN1amVteSBDaSBuYXJ6xJlkemlhIGRvIGV0YXB1LCBuYSBr
-dMOzcnltIHVjenlzei48L3A+CiAgICAgICAgYAogICAgfSwKICAgIHsKICAg
-ICAgICBzbHVnOiAnZWR1a2FjamEtb2J5d2F0ZWxza2EtemRyb3dvdG5hLXJv
-ay1wb3puaWVqJywKICAgICAgICB0aXRsZTogJ0VkdWthY2phIE9ieXdhdGVs
-c2thIGkgWmRyb3dvdG5hIOKAkyByb2sgcG8gd3Byb3dhZHplbml1LCBjbyB3
-YXJ0byB3aWVkemllxIcnLAogICAgICAgIGV4Y2VycHQ6ICdXZSB3cnplxZtu
-aXUgMjAyNSByLiBkbyBzemvDs8WCIHdlc3rFgnkgZHdhIG5vd2UgcHJ6ZWRt
-aW90eS4gUm9rIHDDs8W6bmllaiBzcHJhd2R6YW15LCBqYWsgc2nEmSBwcnp5
-asSZxYJ5IGkgY28gdG8gb3puYWN6YSBkbGEgbmF1Y3p5Y2llbGkgaW5ueWNo
-IHByemVkbWlvdMOzdy4nLAogICAgICAgIGRhdGU6ICcyMDI2LTA3LTE1JywK
-ICAgICAgICBjYXRlZ29yeTogJ1BvZHN0YXdhIHByb2dyYW1vd2EnLAogICAg
-ICAgIHJlYWRUaW1lOiAnMyBtaW4nLAogICAgICAgIGljb246ICdwaC1zcGFy
-a2xlJywKICAgICAgICBjb2xvcjogJ3RleHQtZW1lcmFsZC01MDAnLAogICAg
-ICAgIGNvbnRlbnQ6IGAKICAgICAgICAgICAgPHA+T2Qgcm9rdSBzemtvbG5l
-Z28gMjAyNS8yMDI2IHcgcG9sc2tpY2ggc3prb8WCYWNoIGZ1bmtjam9udWrE
-hSBkd2Egc3Rvc3Vua293byBub3dlIHByemVkbWlvdHk6IDxzdHJvbmc+ZWR1
-a2FjamEgb2J5d2F0ZWxza2E8L3N0cm9uZz4gKHphc3TEmXB1asSFY2EgZG90
-eWNoY3phc293xIUgd2llZHrEmSBvIHNwb8WCZWN6ZcWEc3R3aWUpIG9yYXog
-PHN0cm9uZz5lZHVrYWNqYSB6ZHJvd290bmE8L3N0cm9uZz4uIFJvayBww7PF
-um5pZWogdG8ganXFvCBuaWUgIm5vd2/Fm8SHIiDigJMgdG8gY29kemllbm5v
-xZvEhywgZG8ga3TDs3JlaiB3YXJ0byBtaWXEhyBkb2JyZSBtYXRlcmlhxYJ5
-LjwvcD4KCiAgICAgICAgICAgIDxoMj5FZHVrYWNqYSBvYnl3YXRlbHNrYTwv
-aDI+CiAgICAgICAgICAgIDxwPlByemVkbWlvdCB3cHJvd2Fkem9ubyB3IGts
-YXNhY2ggVkkgaSBWSUksIHcgbWllanNjZSBkb3R5Y2hjemFzb3dlaiB3aWVk
-enkgbyBzcG/FgmVjemXFhHN0d2llLiBOYWNpc2sga8WCYWR6aWUgc2nEmSBu
-YSBidWRvd2FuaWUgxZt3aWFkb21lZ28sIGtyeXR5Y3puaWUgbXnFm2zEhWNl
-Z28gc3BvxYJlY3plxYRzdHdhIOKAkyBkZWJhdHksIHN5bXVsYWNqZSBpIGFu
-YWxpesSZIHJ6ZWN6eXdpc3R5Y2ggc3l0dWFjamkgc3BvxYJlY3pueWNoLCBh
-IG5pZSB0eWxrbyBwcnp5c3dhamFuaWUgZGVmaW5pY2ppLjwvcD4KCiAgICAg
-ICAgICAgIDxoMj5FZHVrYWNqYSB6ZHJvd290bmE8L2gyPgogICAgICAgICAg
-ICA8cD5EcnVnaSB6IG5vd3ljaCBwcnplZG1pb3TDs3cga29uY2VudHJ1amUg
-c2nEmSBuYSBwcmFrdHljem55Y2ggdW1pZWrEmXRub8WbY2lhY2ggZGJhbmlh
-IG8gemRyb3dpZSBmaXp5Y3puZSBpIHBzeWNoaWN6bmUuIENvIHdhxbxuZSDi
-gJMgcG9kc3Rhd2EgcHJvZ3JhbW93YSB3IHR5bSB6YWtyZXNpZSA8c3Ryb25n
-Pm5pZSB1bGVnYSB6bWlhbmllPC9zdHJvbmc+IHdyYXogeiByZWZvcm3EhSAi
-S29tcGFzIEp1dHJhIiB6IDIwMjYgci4gUG96b3N0YWplIHRha2Egc2FtYSwg
-amFrIHRhIG9ib3dpxIV6dWrEhWNhIG9kIHJva3Ugc3prb2xuZWdvIDIwMjUv
-MjAyNi48L3A+CgogICAgICAgICAgICA8aDI+Q28gdG8gb3puYWN6YSBkbGEg
-Q2llYmllLCBqZcWbbGkgbmllIHVjenlzeiB0eWNoIHByemVkbWlvdMOzdzwv
-aDI+CiAgICAgICAgICAgIDxwPk5hd2V0IGplxZtsaSBuaWUgcHJvd2Fkemlz
-eiBiZXpwb8WbcmVkbmlvIHR5Y2ggemFqxJnEhywgd2FydG8gem5hxIcgaWNo
-IHpha3JlcyDigJMgdGVtYXR5IHRha2llIGphayBrcnl0eWN6bmUgbXnFm2xl
-bmllLCByb3pwb3puYXdhbmllIG1hbmlwdWxhY2ppIGN6eSBkYmFuaWUgbyBk
-b2Jyb3N0YW4gcHN5Y2hpY3pueSBuYXR1cmFsbmllIHByemVuaWthasSFIHRl
-xbwgZG8gaW5ueWNoIHByemVkbWlvdMOzdyBpIGdvZHppbiB3eWNob3dhd2N6
-eWNoLjwvcD4KCiAgICAgICAgICAgIDxwPlByenlnb3Rvd3VqZXN6IG1hdGVy
-aWHFgnkgZG8gZWR1a2Fjamkgb2J5d2F0ZWxza2llaiBsdWIgemRyb3dvdG5l
-aj8gU3ByYXdkxbogPGEgaHJlZj0iZWR1a2FjamEyMDI1Lmh0bWwiIGNsYXNz
-PSJ0ZXh0LWVtZXJhbGQtNjAwIGRhcms6dGV4dC1lbWVyYWxkLTQwMCBmb250
-LWJvbGQgaG92ZXI6dW5kZXJsaW5lIj5FZHVrYWNqYSAyMDI1IEFJPC9hPiDi
-gJMgZ2VuZXJ1amUgZGViYXR5IGkgc3ltdWxhY2plIGRvcGFzb3dhbmUgZG8g
-b2J1IHByemVkbWlvdMOzdy48L3A+CiAgICAgICAgYAogICAgfQpdOwo=
- ) ) )
+// Plik z wpisami bloga EduBox AI. Aby dodać nowy wpis, dopisz kolejny obiekt do tablicy poniżej.
+window.BLOG_POSTS = [
+    {
+        slug: 'reforma-kompas-jutra-2026',
+        title: 'Reforma "Kompas Jutra" 2026 – co się zmienia i jak się przygotować',
+        excerpt: 'Od 1 września 2026 r. w przedszkolach oraz klasach I i IV szkoły podstawowej obowiązuje nowa podstawa programowa. Wyjaśniamy, kogo dotyczy i co realnie się zmienia.',
+        date: '2026-08-13',
+        category: 'Prawo oświatowe',
+        readTime: '5 min',
+        icon: 'ph-compass',
+        color: 'text-teal-500',
+        content: `
+            <p>11 marca 2026 r. Minister Edukacji podpisała rozporządzenie wprowadzające nową podstawę programową w ramach reformy "Kompas Jutra". To jedna z największych zmian w polskiej edukacji od lat – ale, co ważne, <strong>nie dotyczy wszystkich uczniów naraz</strong>.</p>
+
+            <h2>Kogo dotyczy reforma w roku szkolnym 2026/2027</h2>
+            <p>Nowe przepisy obowiązują od 1 września 2026 r. wyłącznie we wszystkich przedszkolach i oddziałach przedszkolnych oraz w klasach I i IV szkoły podstawowej. Uczniowie klas II, III oraz V–VIII pozostają jeszcze przez jakiś czas przy dotychczasowej podstawie programowej z 2017 r. – reforma obejmie ich sukcesywnie w kolejnych latach szkolnych.</p>
+
+            <h2>Co zmienia się w przedszkolu</h2>
+            <p>Najbardziej jednoznaczne zmiany dotyczą wychowania przedszkolnego. Nowa podstawa wprowadza ograniczenie korzystania z urządzeń ekranowych – nauczyciel może z nich korzystać wyłącznie w celach dydaktycznych. To element szerszej idei "higieny cyfrowej", która ma zachęcać do aktywności ruchowych i społecznych zamiast biernego korzystania z ekranu.</p>
+
+            <h2>Co zmienia się w klasie I</h2>
+            <p>W edukacji wczesnoszkolnej nacisk przesuwa się z liczby poznawanych pojęć na jakość rozwijanych umiejętności – mówienia, czytania, pisania i słuchania. Zwiększono też tygodniowy wymiar godzin edukacji wczesnoszkolnej z 20 do 21 godzin, żeby dać nauczycielom i uczniom więcej czasu na spokojną, pogłębioną pracę. Pojawia się też "tydzień projektowy" oraz mocniejszy nacisk na edukację medialną – w tym naukę krytycznego podejścia do treści, również tych generowanych przez sztuczną inteligencję.</p>
+
+            <h2>Co zmienia się w klasie IV</h2>
+            <p>Tu zmiana jest chyba najbardziej odczuwalna. Treści nauczania organizuje się wokół sześciu interdyscyplinarnych modułów tematycznych zamiast sztywnego podziału na osobne przedmioty. Po latach przerwy do klas 4–6 wraca <strong>przyroda</strong> jako zintegrowany przedmiot łączący elementy biologii, chemii, fizyki i geografii. "Technika" zostaje zastąpiona "zajęciami praktyczno-technicznymi". Podobnie jak w klasie I, pojawia się tydzień projektowy oraz silniejszy nacisk na kompetencje przekrojowe: krytyczne myślenie, kreatywność, współpracę i rozwiązywanie problemów.</p>
+
+            <h2>Jak się przygotować już teraz</h2>
+            <p>Jeśli uczysz w jednym z objętych reformą etapów, warto zacząć od zapoznania się z pełną treścią rozporządzenia i materiałami metodycznymi publikowanymi przez Instytut Badań Edukacyjnych. Dobrym pierwszym krokiem jest też przegląd własnych materiałów pod kątem tego, które z nich da się łatwo dostosować do nowych modułów tematycznych, a które trzeba będzie przygotować od nowa.</p>
+
+            <p>Chcesz sprawdzić dokładnie, co zmienia się w Twojej konkretnej klasie? Skorzystaj z naszego <a href="edureforma.html" class="text-teal-600 dark:text-teal-400 font-bold hover:underline">Asystenta Wdrożenia Reformy 2026</a> – wybierz etap nauczania, a przygotujemy dla Ciebie spersonalizowaną listę zmian i praktyczne kroki przygotowania.</p>
+        `
+    },
+    {
+        slug: 'ipet-wopfu-zmiany-2026',
+        title: 'IPET i WOPFU po zmianach 2026 – co musisz wiedzieć',
+        excerpt: 'Od 1 września 2026 r. obowiązują nowe zasady wydawania orzeczeń i opinii przez poradnie psychologiczno-pedagogiczne, w tym obowiązkowa "ocena funkcjonalna". Sprawdzamy, co to oznacza dla szkół.',
+        date: '2026-08-10',
+        category: 'Pedagogika specjalna',
+        readTime: '4 min',
+        icon: 'ph-shield-check',
+        color: 'text-rose-500',
+        content: `
+            <p>2 marca 2026 r. Minister Edukacji podpisała nowe rozporządzenie w sprawie orzeczeń i opinii wydawanych przez zespoły orzekające działające w publicznych poradniach psychologiczno-pedagogicznych. Zastępuje ono dotychczasowe przepisy z 2017 r. Część zapisów weszła w życie już wiosną, a najważniejsze zmiany dla szkół zaczynają obowiązywać od 1 września 2026 r.</p>
+
+            <h2>Nowość: obowiązkowa "ocena funkcjonalna"</h2>
+            <p>Zanim poradnia wyda orzeczenie, szkoła lub przedszkole będzie musiało przeprowadzić tzw. ocenę funkcjonalną – kompleksową charakterystykę funkcjonowania dziecka lub ucznia w środowisku szkolnym. To zmiana, która ma dać zespołowi orzekającemu pełniejszy obraz sytuacji dziecka, zamiast opierać się głównie na dokumentacji medycznej.</p>
+
+            <h2>Nowe, krótsze terminy na WOPFU</h2>
+            <p>Jeśli poradnia poprosi szkołę o opinię o funkcjonowaniu ucznia objętego kształceniem specjalnym, szkoła ma na jej przygotowanie tylko <strong>10 dni</strong> od otrzymania prośby dyrektora poradni. Opinia ta powinna zawierać aktualną wielospecjalistyczną ocenę poziomu funkcjonowania ucznia (WOPFU).</p>
+
+            <h2>Praktyczna wskazówka</h2>
+            <p>Eksperci zwracają uwagę, że jeśli WOPFU jest prowadzona na bieżąco, konkretnie i uporządkowana zgodnie z obszarami ICF, przygotowanie takiej opinii nie będzie wymagało w krótkim czasie ponownego zbierania informacji od wszystkich nauczycieli i specjalistów. Innymi słowy – regularna, dobra jakościowo dokumentacja teraz oszczędzi Ci stresu przy 10-dniowym terminie później.</p>
+
+            <h2>A co z samym IPET-em?</h2>
+            <p>Zmiana podstawy programowej sama w sobie nie jest jeszcze powodem do modyfikowania IPET-u w klasach, które nie są objęte reformą "Kompas Jutra" w tym roku (czyli II, III oraz V–VIII). Inaczej jest w przypadku uczniów rozpoczynających klasę I lub IV – dla nich IPET powinien uwzględniać sposób realizowania nowej podstawy programowej, choć nie oznacza to przepisywania jej treści do dokumentu.</p>
+
+            <p>Potrzebujesz pomocy przy tworzeniu lub aktualizacji dokumentacji? Nasz <a href="asystent-pedagoga.html" class="text-rose-600 dark:text-rose-400 font-bold hover:underline">Asystent Pedagoga (IPET)</a> tworzy kompletne IPET-y i WOPFU w oparciu o aktualne przepisy.</p>
+        `
+    },
+    {
+        slug: 'awans-zawodowy-2026-stan-przepisow',
+        title: 'Awans zawodowy nauczyciela w 2026 roku – aktualny stan przepisów',
+        excerpt: 'Cztery lata po dużej reformie Karty Nauczyciela wciąż funkcjonują dwie równoległe ścieżki awansu. Wyjaśniamy, kto awansuje na starych, a kto na nowych zasadach.',
+        date: '2026-08-05',
+        category: 'Awans zawodowy',
+        readTime: '4 min',
+        icon: 'ph-briefcase',
+        color: 'text-blue-500',
+        content: `
+            <p>Choć reforma systemu awansu zawodowego weszła w życie już 1 września 2022 r., w 2026 roku wciąż funkcjonują <strong>dwie równoległe ścieżki</strong> zdobywania kolejnych stopni. Warto wiedzieć, która dotyczy Ciebie.</p>
+
+            <h2>Co zmieniła reforma z 2022 roku</h2>
+            <p>Nowelizacja Karty Nauczyciela z 5 sierpnia 2022 r. zlikwidowała dotychczasowe stopnie nauczyciela stażysty i nauczyciela kontraktowego. W ich miejsce wprowadzono status nauczyciela początkującego, po którym można ubiegać się kolejno o stopień nauczyciela mianowanego, a następnie dyplomowanego.</p>
+
+            <h2>Dlaczego wciąż mówi się o "dwóch systemach"</h2>
+            <p>Nauczyciele, którzy przed 1 września 2022 r. uzyskali stopień kontraktowy lub rozpoczęli staż na stopień mianowanego czy dyplomowanego, zachowali prawo do dokończenia awansu na dotychczasowych, starych zasadach. Ta możliwość nie jest jednak bezterminowa – <strong>wygasa 31 sierpnia 2027 r.</strong> Po tej dacie obowiązywać będą już wyłącznie nowe przepisy dla wszystkich.</p>
+
+            <h2>Co to oznacza w praktyce dla dyrektorów</h2>
+            <p>Dyrektorzy szkół i organy prowadzące muszą jeszcze przez najbliższy rok szkolny sprawnie poruszać się w obu procedurach jednocześnie – zarówno tej sprzed 2022 r., jak i nowej. Przepisy ściśle wiążą też ocenę pracy nauczyciela ze ścieżką awansu zawodowego, więc warto na bieżąco sprawdzać, która procedura dotyczy konkretnego nauczyciela w gronie pedagogicznym.</p>
+
+            <h2>Dobra wiadomość na koniec</h2>
+            <p>Od 31 sierpnia 2027 r. sytuacja się uprości – w systemie zostanie już tylko jedna, spójna ścieżka: nauczyciel początkujący → mianowany → dyplomowany. To ostatni rok, kiedy trzeba pamiętać o dwóch równoległych zestawach zasad.</p>
+
+            <p>Przygotowujesz dokumentację awansową? Sprawdź <a href="awans.html" class="text-blue-600 dark:text-blue-400 font-bold hover:underline">Kreator Awansu AI</a> lub <a href="eduawans.html" class="text-blue-600 dark:text-blue-400 font-bold hover:underline">EduAwans PRO MAX</a> – oba narzędzia uwzględniają aktualny stan przepisów.</p>
+        `
+    },
+    {
+        slug: '5-sposobow-ai-odciaza-nauczyciela',
+        title: 'Jak sztuczna inteligencja może odciążyć nauczyciela – 5 sposobów na start',
+        excerpt: 'Nie trzeba być specjalistą IT, żeby AI realnie zaoszczędziło Ci czas. Oto pięć konkretnych, prostych sposobów na zacząć już dziś.',
+        date: '2026-07-28',
+        category: 'Poradnik',
+        readTime: '4 min',
+        icon: 'ph-lightbulb',
+        color: 'text-amber-500',
+        content: `
+            <p>"Sztuczna inteligencja w edukacji" brzmi czasem jak temat na konferencję, a nie coś, co realnie pomoże Ci we wtorkowe popołudnie, gdy trzeba przygotować się na jutro. A jednak – kilka prostych nawyków potrafi zaoszczędzić naprawdę sporo czasu.</p>
+
+            <h2>1. Zacznij od najbardziej żmudnej, powtarzalnej rzeczy</h2>
+            <p>Nie próbuj od razu zautomatyzować całej pracy. Zacznij od jednej, konkretnej, powtarzalnej czynności – np. pisania ocen opisowych albo wpisów do dziennika. Właśnie tam AI daje najszybciej odczuwalną ulgę.</p>
+
+            <h2>2. Traktuj pierwszy wynik jako szkic, nie gotowiec</h2>
+            <p>Najlepsze efekty daje traktowanie wygenerowanego tekstu jako solidnego punktu wyjścia, który dopracowujesz pod swój styl i konkretnego ucznia – a nie jako gotowego produktu do wklejenia bez zmian.</p>
+
+            <h2>3. Zapisuj sprawdzone wzory zamiast zaczynać za każdym razem od zera</h2>
+            <p>Jeśli jakiś scenariusz czy dokument dobrze się sprawdził, warto go zachować. W wielu naszych narzędziach możesz opublikować sprawdzony wzór w Bibliotece Wzorów (bez danych ucznia) i skorzystać z gotowych materiałów innych nauczycieli, zamiast zaczynać każdą lekcję od pustej kartki.</p>
+
+            <h2>4. Ustal sobie limit czasu na "dopieszczanie" promptu</h2>
+            <p>Łatwo wpaść w pułapkę przepisywania polecenia w nieskończoność w poszukiwaniu idealnego wyniku. Jeśli po dwóch-trzech próbach efekt jest "wystarczająco dobry", to zwykle jest to najlepszy moment, żeby przejść do ręcznej edycji.</p>
+
+            <h2>5. Pamiętaj, że AI nie zna Twoich uczniów – Ty ich znasz</h2>
+            <p>Najlepsze materiały powstają wtedy, gdy AI odciąża Cię od pierwszej, najbardziej czasochłonnej wersji, a Ty dokładasz to, czego żaden model nie wie: kontekst konkretnej klasy, konkretnego dziecka i konkretnej sytuacji.</p>
+
+            <p>Szukasz miejsca, żeby zacząć? Wróć na <a href="index.html" class="text-amber-600 dark:text-amber-400 font-bold hover:underline">stronę główną</a> i skorzystaj z kreatora "Zacznij tutaj" – w kilka sekund dopasujemy Ci narzędzia do etapu, na którym uczysz.</p>
+        `
+    },
+    {
+        slug: 'edukacja-obywatelska-zdrowotna-rok-pozniej',
+        title: 'Edukacja Obywatelska i Zdrowotna – rok po wprowadzeniu, co warto wiedzieć',
+        excerpt: 'We wrześniu 2025 r. do szkół weszły dwa nowe przedmioty. Rok później sprawdzamy, jak się przyjęły i co to oznacza dla nauczycieli innych przedmiotów.',
+        date: '2026-07-15',
+        category: 'Podstawa programowa',
+        readTime: '3 min',
+        icon: 'ph-sparkle',
+        color: 'text-emerald-500',
+        content: `
+            <p>Od roku szkolnego 2025/2026 w polskich szkołach funkcjonują dwa stosunkowo nowe przedmioty: <strong>edukacja obywatelska</strong> (zastępująca dotychczasową wiedzę o społeczeństwie) oraz <strong>edukacja zdrowotna</strong>. Rok później to już nie "nowość" – to codzienność, do której warto mieć dobre materiały.</p>
+
+            <h2>Edukacja obywatelska</h2>
+            <p>Przedmiot wprowadzono w klasach VI i VII, w miejsce dotychczasowej wiedzy o społeczeństwie. Nacisk kładzie się na budowanie świadomego, krytycznie myślącego społeczeństwa – debaty, symulacje i analizę rzeczywistych sytuacji społecznych, a nie tylko przyswajanie definicji.</p>
+
+            <h2>Edukacja zdrowotna</h2>
+            <p>Drugi z nowych przedmiotów koncentruje się na praktycznych umiejętnościach dbania o zdrowie fizyczne i psychiczne. Co ważne – podstawa programowa w tym zakresie <strong>nie ulega zmianie</strong> wraz z reformą "Kompas Jutra" z 2026 r. Pozostaje taka sama, jak ta obowiązująca od roku szkolnego 2025/2026.</p>
+
+            <h2>Co to oznacza dla Ciebie, jeśli nie uczysz tych przedmiotów</h2>
+            <p>Nawet jeśli nie prowadzisz bezpośrednio tych zajęć, warto znać ich zakres – tematy takie jak krytyczne myślenie, rozpoznawanie manipulacji czy dbanie o dobrostan psychiczny naturalnie przenikają też do innych przedmiotów i godzin wychowawczych.</p>
+
+            <p>Przygotowujesz materiały do edukacji obywatelskiej lub zdrowotnej? Sprawdź <a href="edukacja2025.html" class="text-emerald-600 dark:text-emerald-400 font-bold hover:underline">Edukacja 2025 AI</a> – generuje debaty i symulacje dopasowane do obu przedmiotów.</p>
+        `
+    }
+];
