@@ -43,10 +43,55 @@ jobs:
           console.log('Wpis dodany poprawnie.');
           EOF
 
+      - name: Update sitemap.xml with the new post
+        run: |
+          node <<'EOF'
+          const fs = require('fs');
+
+          const postsFileText = fs.readFileSync('blog-posts.js', 'utf8');
+          const fakeWindow = {};
+          new Function('window', postsFileText)(fakeWindow);
+          const posts = fakeWindow.BLOG_POSTS;
+
+          const today = new Date().toISOString().slice(0, 10);
+          const isDate = (d) => /^\d{4}-\d{2}-\d{2}$/.test(d || '');
+
+          let sitemap = fs.readFileSync('sitemap.xml', 'utf8');
+
+          // Remove all existing "blog.html?post=..." entries
+          sitemap = sitemap.replace(
+            /\s*<url>\s*<loc>https:\/\/eduboxpro\.pl\/blog\.html\?post=[^<]*<\/loc>[\s\S]*?<\/url>/g,
+            ''
+          );
+
+          // Rebuild one entry per current post, newest (top of array) first
+          const entries = posts.map((p) => {
+            const lastmod = isDate(p.date) ? p.date : today;
+            return (
+              '  <url>\n' +
+              `    <loc>https://eduboxpro.pl/blog.html?post=${p.slug}</loc>\n` +
+              `    <lastmod>${lastmod}</lastmod>\n` +
+              '    <changefreq>monthly</changefreq>\n' +
+              '    <priority>0.7</priority>\n' +
+              '  </url>'
+            );
+          }).join('\n');
+
+          // Insert the fresh list right after the plain blog.html entry,
+          // and bump that entry's own lastmod to today.
+          sitemap = sitemap.replace(
+            /<url>\s*<loc>https:\/\/eduboxpro\.pl\/blog\.html<\/loc>\s*<lastmod>[^<]*<\/lastmod>([\s\S]*?)<\/url>/,
+            `<url>\n    <loc>https://eduboxpro.pl/blog.html</loc>\n    <lastmod>${today}</lastmod>$1</url>\n${entries}`
+          );
+
+          fs.writeFileSync('sitemap.xml', sitemap);
+          console.log('sitemap.xml zaktualizowany, wpisów w mapie:', posts.length);
+          EOF
+
       - name: Commit and push
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add blog-posts.js
-          git commit -m "Nowy wpis na blogu (automat)" || echo "Brak zmian do commitu"
+          git add blog-posts.js sitemap.xml
+          git commit -m "Nowy wpis na blogu (automat) + aktualizacja sitemap" || echo "Brak zmian do commitu"
           git push
