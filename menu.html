@@ -94,7 +94,27 @@
         </div>
     </div>
 
+    <!-- WYSKAKUJĄCE OGŁOSZENIE -->
+    <div id="ogloszenie-overlay" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-[100] items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-700 rounded-3xl max-w-md w-full p-8 relative shadow-2xl">
+            <button onclick="closeOgloszenie()" class="absolute top-4 right-4 text-slate-400 hover:text-white transition-colors" aria-label="Zamknij ogłoszenie">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+            <div class="inline-flex items-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full mb-4">
+                🎉 Nowość
+            </div>
+            <h3 id="ogloszenie-title" class="text-xl font-black text-white mb-3"></h3>
+            <p id="ogloszenie-message" class="text-slate-300 text-sm leading-relaxed mb-6"></p>
+            <div id="ogloszenie-link-wrap" class="hidden">
+                <a id="ogloszenie-link" href="#" class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-full text-sm font-bold transition-all">
+                    <span id="ogloszenie-link-text"></span>
+                </a>
+            </div>
+        </div>
+    </div>
+
     <!-- SKRYPT LOGIKI MENU (Limity i Autoryzacja PRO) -->
+    <script src="ogloszenie.js"></script>
     <script>
         function initMenuLogic() {
             // Sprawdź w przeglądarce czy uzytkownik wpisał już kiedyś kod PRO
@@ -157,8 +177,56 @@
             }
         }
 
+        // Wyświetlenie wyskakującego ogłoszenia (jeśli jest aktywne i użytkownik go jeszcze nie widział)
+        function initOgloszenie(attempt) {
+            attempt = attempt || 0;
+            if (typeof window.OGLOSZENIE === 'undefined') {
+                if (attempt < 20) setTimeout(() => initOgloszenie(attempt + 1), 150);
+                return;
+            }
+            if (!window.OGLOSZENIE.active) return;
+
+            const seenId = localStorage.getItem('eduboxSeenAnnouncementId');
+            if (seenId === window.OGLOSZENIE.id) return;
+
+            const overlay = document.getElementById('ogloszenie-overlay');
+            if (!overlay) return;
+
+            document.getElementById('ogloszenie-title').innerText = window.OGLOSZENIE.title || '';
+            document.getElementById('ogloszenie-message').innerText = window.OGLOSZENIE.message || '';
+
+            const linkWrap = document.getElementById('ogloszenie-link-wrap');
+            const link = document.getElementById('ogloszenie-link');
+            const linkText = document.getElementById('ogloszenie-link-text');
+            if (window.OGLOSZENIE.linkUrl && window.OGLOSZENIE.linkText) {
+                link.href = window.OGLOSZENIE.linkUrl;
+                linkText.innerText = window.OGLOSZENIE.linkText;
+                linkWrap.classList.remove('hidden');
+            } else {
+                linkWrap.classList.add('hidden');
+            }
+
+            overlay.classList.remove('hidden');
+            overlay.classList.add('flex');
+        }
+
+        function closeOgloszenie() {
+            if (window.OGLOSZENIE && window.OGLOSZENIE.id) {
+                localStorage.setItem('eduboxSeenAnnouncementId', window.OGLOSZENIE.id);
+            }
+            const overlay = document.getElementById('ogloszenie-overlay');
+            overlay.classList.add('hidden');
+            overlay.classList.remove('flex');
+        }
+
+        // Zamknięcie po kliknięciu w przyciemnione tło (poza okienkiem)
+        document.addEventListener('click', function (e) {
+            if (e.target && e.target.id === 'ogloszenie-overlay') closeOgloszenie();
+        });
+
         // Uruchomienie skryptu natychmiast po załadowaniu menu w dowolnej aplikacji
         initMenuLogic();
+        initOgloszenie();
 
         // Zrobienie funkcji globalnej żeby React w innych plikach mógł wymusić odświeżenie licznika po kliknięciu "Generuj"
         window.updateGlobalLimitDisplay = initMenuLogic;
