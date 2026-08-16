@@ -1,5 +1,16 @@
 // Plik z wpisami bloga EduBox AI. Aby dodać nowy wpis, dopisz kolejny obiekt do tablicy poniżej.
 window.BLOG_POSTS = [
+{
+    "slug": "jak-napisac-skuteczny-plan-pracy-nauczyciela-klasy",
+    "title": "Jak napisać skuteczny plan pracy nauczyciela klasy na nowy rok szkolny",
+    "excerpt": "Praktyczny przewodnik po tworzeniu planu pracy. Sprawdź, jak skutecznie zorganizować nadchodzący rok szkolny.",
+    "date": "2026-08-16",
+    "category": "Poradnik",
+    "readTime": "5 min",
+    "icon": "ph-briefcase",
+    "color": "text-blue-500",
+    "content": "<p>Rok szkolny zbliża się wielkimi krokami i każdy nauczyciel staje przed wyzwaniem stworzenia planu pracy. Dobry plan to podstawa sukcesu, zarówno dla nauczyciela, jak i uczniów. Warto poświęcić chwilę na przemyślenie, jak zorganizować nadchodzący okres, by efektywnie wykorzystać czas oraz możliwości klasy.</p><h2>Zdefiniuj cele i zadania</h2><p>Pierwszym krokiem jest określenie celów, jakie chcemy osiągnąć w danym roku szkolnym. Zastanów się, jakie umiejętności i wiedzę chcesz przekazać uczniom. Ważne jest, aby były one zgodne z podstawą programową, ale także by były dostosowane do możliwości i zainteresowań uczniów. Warto również pomyśleć o zadaniach dodatkowych, które mogą pobudzić ich kreatywność i chęć do nauki.</p><h2>Planowanie zajęć i metod pracy</h2><p>Następnie warto zastanowić się nad metodami nauczania, które zastosujesz w trakcie roku. Czy będą to tradycyjne wykłady, prace grupowe, a może projekty? Dobry plan pracy powinien być zróżnicowany, aby uczniowie mogli uczyć się na różne sposoby. Warto także uwzględnić elementy, które mogą być wprowadzone dzięki nowym technologiom czy narzędziom, które mogą urozmaicić lekcje.</p><h2>Harmonogram i organizacja czasu</h2><p>Nie zapominaj o harmonogramie — przemyśl, jak podzielić czas na poszczególne przedmioty oraz dodatkowe aktywności, takie jak wyjścia do muzeum, wizyty w teatrze czy inne wydarzenia. Ważne jest, by zachować równowagę między nauką a wypoczynkiem, dlatego dobrze jest planować także czas na zajęcia integracyjne czy rehabilitacyjne, które wspierają rozwój uczniów. Przygotowanie planu pracy nie kończy się w momencie jego spisania. Powinieneś być elastyczny i gotowy do wprowadzania zmian, gdy zajdzie taka potrzeba. Warto też regularnie monitorować postępy uczniów oraz dostosowywać plan w zależności od ich potrzeb.</p><h2>Jak ułatwić sobie pisanie planu?</h2><p>Warto skorzystać z narzędzi, które pomogą Ci w tworzeniu dokumentacji. Na przykład <a href=\"eduwycieczka.html\" class=\"text-blue-600 dark:text-blue-400 font-bold hover:underline\">Asystent Wyjść Klasowych</a> to świetne narzędzie, które pomoże Ci w organizacji wycieczek oraz innych wydarzeń. Dzięki niemu łatwiej zaplanujesz wszystkie aktywności i upewnisz się, że nic nie umknie Twojej uwadze.</p>"
+},
   {
     slug: "jak-napisac-skuteczny-plan-pracy-nauczyciela-klasy-na-nowy-rok-szkolny",
     title: "Jak napisać skuteczny plan pracy nauczyciela klasy na nowy rok szkolny",
