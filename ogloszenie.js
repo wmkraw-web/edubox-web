@@ -1,8 +1,8 @@
 window.OGLOSZENIE = {
-  "id": "2026-08-16-start",
+  "id": "2026-08-16T16:21:34.102Z",
   "active": false,
   "title": "Nowość w EduBox AI!",
-  "message": "Tutaj wpisz treść ogłoszenia - np. o nowym narzędziu albo nowej funkcji. Gdy chcesz je pokazać odwiedzającym, zmień \"active\" na true i zapisz plik.",
+  "message": "Dodałem właśnie małą aplikację EduDyplom Video. Możecie wysyłać rodzicom .",
   "linkText": "Zobacz",
-  "linkUrl": "index.html"
+  "linkUrl": ""
 };
