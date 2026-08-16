@@ -4,21 +4,19 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>EduBox - Generator Influencerki</title>
-    
+
     <!-- Biblioteki -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    
+
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    
+
     <!-- Phosphor Icons (do UI) -->
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
-
     <!-- Fonty -->
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800;900&family=Fredoka:wght@400;600;700;900&display=swap" rel="stylesheet">
-
     <script>
         tailwind.config = {
             darkMode: 'class',
@@ -37,10 +35,8 @@
 </head>
 <body>
     <div id="root"></div>
-
     <script type="text/babel">
         const { useState } = React;
-
         function App() {
             const [topic, setTopic] = useState('');
             const [platform, setPlatform] = useState('Facebook Grupy');
@@ -48,7 +44,6 @@
             const [postContent, setPostContent] = useState('');
             const [imageUrl, setImageUrl] = useState('');
             const [errorMsg, setErrorMsg] = useState('');
-
             // Główna funkcja generująca post i zdjęcie Ewy
             const generateContent = async () => {
                 if (!topic.trim()) return;
@@ -56,66 +51,58 @@
                 setErrorMsg('');
                 setPostContent('');
                 setImageUrl('');
-
                 try {
                     // 1. ZAPYTANIE DO GPT O TEKST POSTA
-                    const systemPrompt = `Jesteś Ewą, 32-letnią pedagożką i ambasadorką platformy EduBox PRO. 
+                    const systemPrompt = `Jesteś Ewą, 32-letnią pedagożką i ambasadorką platformy EduBox PRO.
                     Masz krótkie blond włosy i ubierasz się elegancko (szary garnitur, biała koszula).
-                    Twoim celem jest pisanie postów na ${platform} dla innych nauczycieli. 
+                    Twoim celem jest pisanie postów na ${platform} dla innych nauczycieli.
                     Piszesz empatycznie, profesjonalnie, używasz emotikon. Promujesz jedną z 60 aplikacji z EduBox.
-                    
+
                     ZWRÓĆ ODPOWIEDŹ W FORMACIE JSON:
                     {
                         "post_text": "Gotowa treść posta na social media. Pamiętaj o wezwaniu do działania (linku).",
                         "image_prompt": "Krótki opis po angielsku do generatora obrazków opisujący co Ewa robi na zdjęciu pasującym do tego posta (np. Ewa siedzi przy biurku i trzyma sprawdzian, Ewa pije kawę w pokoju nauczycielskim). Pisz TYLKO samą akcję/tło."
                     }`;
-
                     const userPrompt = `Napisz post rozwiązujący problem: ${topic}`;
-
                     // Uderzamy do właściwego endpointu dla tekstów (OpenAI)
                     const textResponse = await fetch('/api/chat', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ 
-                            prompt: userPrompt, 
-                            system: systemPrompt, 
-                            format: 'json', 
-                            temperature: 0.7 
+                        body: JSON.stringify({
+                            prompt: userPrompt,
+                            system: systemPrompt,
+                            format: 'json',
+                            temperature: 0.7
                         })
                     });
-
                     if (!textResponse.ok) throw new Error('Błąd połączenia z serwerem tekstu. Sprawdź Vercel.');
                     const textData = await textResponse.json();
-                    
+
                     // Bezpieczne pobieranie tekstu niezależnie od nazwy zmiennej na Twoim serwerze (text, message, response, choices)
                     const rawText = textData.text || textData.message || textData.response || (textData.choices && textData.choices[0]?.message?.content);
-                    
+
                     if (!rawText) {
                         console.error("Zwrócone dane z API:", textData);
                         throw new Error("Serwer nie zwrócił tekstu. Naciśnij F12 i sprawdź zakładkę Konsola, co dokładnie zwrócił serwer.");
                     }
-
                     let jsonStr = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
                     const parsedData = JSON.parse(jsonStr);
                     setPostContent(parsedData.post_text);
-
                     // 2. ZAPYTANIE DO FAL AI (FLUX) O ZDJĘCIE EWY
                     // Tu wkodowujemy na sztywno wygląd Ewy z powitanie.mp4, żeby FAL generował ją spójnie!
                     const baseEwaPrompt = "SOLO PORTRAIT, ONLY ONE PERSON. A 32-year-old beautiful Polish female teacher named Ewa, short wavy blonde hair, wearing a stylish grey suit and a white shirt. Friendly expression, looking directly at the camera, photorealistic, 8k, highly detailed, alone in the scene.";
                     const finalImagePrompt = `${baseEwaPrompt} ${parsedData.image_prompt}. NO TEXT, NO WATERMARKS.`;
-
                     const imgResponse = await fetch('/api/generate', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ 
-                            type: 'image', 
+                        body: JSON.stringify({
+                            type: 'image',
                             prompt: finalImagePrompt,
                             negative_prompt: "text, words, letters, watermark, mutated, ugly, multiple people, extra person, man, men, crowd, boyfriend, date, background characters",
                             aspect_ratio: '4:5',
                             size: '1024x1280'
                         })
                     });
-
                     if (imgResponse.ok) {
                         const imgData = await imgResponse.json();
                         let url = imgData.imageUrl || imgData.url || (imgData.data && imgData.data[0]?.url) || imgData.image;
@@ -126,7 +113,6 @@
                     } else {
                         throw new Error('Nie udało się wygenerować zdjęcia z FAL AI.');
                     }
-
                 } catch (err) {
                     console.error(err);
                     setErrorMsg(err.message || 'Wystąpił nieznany błąd podczas generowania.');
@@ -134,16 +120,14 @@
                     setLoading(false);
                 }
             };
-
             const copyToClipboard = () => {
                 navigator.clipboard.writeText(postContent);
                 alert("Skopiowano tekst posta!");
             };
-
             return (
                 <div className="min-h-screen p-4 md:p-8 font-sans">
                     <div className="max-w-5xl mx-auto">
-                        
+
                         <header className="mb-8 flex items-center gap-4">
                             <div className="w-14 h-14 bg-gradient-to-br from-pink-500 to-rose-600 rounded-2xl flex items-center justify-center shadow-lg">
                                 <i className="ph-fill ph-instagram-logo text-3xl text-white"></i>
@@ -153,19 +137,18 @@
                                 <p className="text-slate-400">Twój wewnętrzny moduł do tworzenia postów Ewy na social media</p>
                             </div>
                         </header>
-
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                            
+
                             {/* LEWA KOLUMNA - PANEL STEROWANIA */}
                             <div className="lg:col-span-1 space-y-6">
                                 <div className="glass-panel p-6 rounded-2xl shadow-xl">
                                     <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
                                         <i className="ph-fill ph-faders text-pink-500"></i> Parametry Posta
                                     </h2>
-                                    
+
                                     <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Gdzie Ewa publikuje?</label>
-                                    <select 
-                                        value={platform} 
+                                    <select
+                                        value={platform}
                                         onChange={e => setPlatform(e.target.value)}
                                         className="w-full bg-slate-900 border border-slate-700 text-white p-3 rounded-xl mb-6 outline-none focus:border-pink-500"
                                     >
@@ -174,16 +157,14 @@
                                         <option>LinkedIn - Profil Profesjonalny</option>
                                         <option>Blog EduBoxPRO</option>
                                     </select>
-
                                     <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Jaki problem rozwiązujemy?</label>
-                                    <textarea 
+                                    <textarea
                                         value={topic}
                                         onChange={e => setTopic(e.target.value)}
                                         placeholder="np. Długie pisanie ocen opisowych, trudni rodzice, awans zawodowy..."
                                         className="w-full h-32 bg-slate-900 border border-slate-700 text-white p-4 rounded-xl resize-none outline-none focus:border-pink-500 mb-6"
                                     ></textarea>
-
-                                    <button 
+                                    <button
                                         onClick={generateContent}
                                         disabled={loading || !topic.trim()}
                                         className="w-full bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-500 hover:to-rose-500 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
@@ -191,7 +172,6 @@
                                         {loading ? <i className="ph-bold ph-spinner animate-spin text-xl"></i> : <i className="ph-bold ph-magic-wand text-xl"></i>}
                                         {loading ? 'Ewa przygotowuje materiał...' : 'Wygeneruj Post i Zdjęcie'}
                                     </button>
-
                                     {errorMsg && (
                                         <div className="mt-4 p-3 bg-red-900/50 border border-red-500/50 text-red-300 rounded-xl text-sm">
                                             <i className="ph-fill ph-warning-circle"></i> {errorMsg}
@@ -199,7 +179,6 @@
                                     )}
                                 </div>
                             </div>
-
                             {/* PRAWA KOLUMNA - WYNIK (GOTOWY POST) */}
                             <div className="lg:col-span-2">
                                 <div className="glass-panel p-6 md:p-8 rounded-2xl shadow-xl min-h-[500px]">
@@ -209,7 +188,6 @@
                                             <p className="font-medium text-lg">Tutaj pojawi się gotowy post Ewy i jej zdjęcie.</p>
                                         </div>
                                     )}
-
                                     {postContent && (
                                         <div className="animate-fade-in">
                                             <div className="flex items-center justify-between mb-6">
@@ -220,7 +198,6 @@
                                                     <i className="ph-bold ph-copy"></i> Skopiuj tekst
                                                 </button>
                                             </div>
-
                                             <div className="flex flex-col md:flex-row gap-8">
                                                 {/* Wygenerowane zdjęcie (FAL AI) */}
                                                 <div className="w-full md:w-1/2">
@@ -235,7 +212,6 @@
                                                     </div>
                                                     <p className="text-xs text-slate-500 mt-2 text-center">Kliknij prawym przyciskiem myszy, aby zapisać zdjęcie Ewy.</p>
                                                 </div>
-
                                                 {/* Tekst posta */}
                                                 <div className="w-full md:w-1/2">
                                                     <div className="bg-slate-900 border border-slate-700 rounded-xl p-5 h-full">
@@ -249,13 +225,11 @@
                                     )}
                                 </div>
                             </div>
-
                         </div>
                     </div>
                 </div>
             );
         }
-
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
     </script>
