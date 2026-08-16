@@ -1,0 +1,43 @@
+name: Update Porada Dnia
+
+on:
+  repository_dispatch:
+    types: [update-porada-dnia]
+
+permissions:
+  contents: write
+
+jobs:
+  update-porada:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Update porada-dnia.js
+        env:
+          TIP_TEXT: ${{ toJson(github.event.client_payload.tip) }}
+        run: |
+          node <<'EOF'
+          const fs = require('fs');
+
+          // TIP_TEXT is a JSON-encoded string - parse it back to raw text
+          const tip = JSON.parse(process.env.TIP_TEXT || '""');
+          const today = new Date().toISOString().slice(0, 10);
+
+          const data = { text: tip, date: today };
+          const content = 'window.PORADA_DNIA = ' + JSON.stringify(data, null, 2) + ';\n';
+
+          fs.writeFileSync('porada-dnia.js', content, 'utf8');
+          console.log('Porada dnia zaktualizowana:', tip);
+          EOF
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add porada-dnia.js
+          git commit -m "Nowa porada dnia (automat)" || echo "Brak zmian do commitu"
+          git push
