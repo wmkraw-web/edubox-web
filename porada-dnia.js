@@ -1,4 +1,4 @@
 window.PORADA_DNIA = {
-  "text": "Zacznij lekcję od jednego pytania otwierającego zamiast listy obecności – uczniowie szybciej się skupiają, a Ty zyskujesz naturalne wprowadzenie do tematu.",
+  "text": "Wprowadź codzienny, 5-minutowy czas na refleksję w klasie, aby uczniowie mogli podzielić się swoimi myślami i odczuciami, co poprawi komunikację i zbuduje zaufanie.",
   "date": "2026-08-16"
 };
