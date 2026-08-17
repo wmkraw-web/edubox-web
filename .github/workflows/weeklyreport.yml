@@ -1,0 +1,240 @@
+name: Cotygodniowy raport EduBox AI
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'   # co poniedziałek ok. 8:00 czasu polskiego (latem UTC+2)
+  workflow_dispatch: {}    # pozwala odpalić ręcznie z zakładki Actions, do testów
+
+permissions:
+  contents: write   # potrzebne, żeby zapisać automation-state.json (punkt odniesienia dla licznika materiałów)
+
+jobs:
+  weekly-report:
+    runs-on: ubuntu-latest
+    env:
+      OPENAI_ADMIN_KEY: ${{ secrets.OPENAI_ADMIN_KEY }}
+      FAL_KEY: ${{ secrets.FAL_KEY }}
+      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+      REPORT_EMAIL_TO: wmkraw@gmail.com
+      # Opcjonalne - jedno konto usługi Google odblokowuje ruch (GA4) ORAZ
+      # licznik wygenerowanych materiałów (Firestore). Bez tego sekretu obie
+      # sekcje po prostu pokazują "jeszcze nie skonfigurowane".
+      GOOGLE_SERVICE_ACCOUNT_KEY_BASE64: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_KEY_BASE64 }}
+      GA4_PROPERTY_ID: ${{ secrets.GA4_PROPERTY_ID }}
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Zbierz dane i wyślij raport
+        run: |
+          node <<'EOF'
+          const fs = require('fs');
+          const crypto = require('crypto');
+
+          const STATE_FILE = 'automation-state.json';
+          const FIRESTORE_PROJECT_ID = 'edubox-pro';
+          const COUNTER_DOC_PATH = 'artifacts/eduboxpro/public/data/stats/global_counter';
+          const GOOGLE_SCOPES = 'https://www.googleapis.com/auth/datastore https://www.googleapis.com/auth/analytics.readonly';
+
+          function base64url(input) {
+            return Buffer.from(input).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+          }
+
+          async function getGoogleAccessToken(serviceAccountJson, scope = GOOGLE_SCOPES) {
+            const sa = JSON.parse(serviceAccountJson);
+            const now = Math.floor(Date.now() / 1000);
+            const header = { alg: 'RS256', typ: 'JWT' };
+            const claim = {
+              iss: sa.client_email,
+              scope,
+              aud: 'https://oauth2.googleapis.com/token',
+              exp: now + 3600,
+              iat: now
+            };
+            const signingInput = base64url(JSON.stringify(header)) + '.' + base64url(JSON.stringify(claim));
+            const signature = crypto.createSign('RSA-SHA256').update(signingInput).sign(sa.private_key);
+            const jwt = signingInput + '.' + base64url(signature);
+
+            const res = await fetch('https://oauth2.googleapis.com/token', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+              body: 'grant_type=' + encodeURIComponent('urn:ietf:params:oauth:grant-type:jwt-bearer') + '&assertion=' + jwt
+            });
+            if (!res.ok) throw new Error('Google OAuth token error: ' + res.status + ' ' + await res.text());
+            const data = await res.json();
+            return data.access_token;
+          }
+
+          async function fetchGA4(propertyId, accessToken) {
+            const res = await fetch(`https://analyticsdata.googleapis.com/v1beta/properties/${propertyId}:runReport`, {
+              method: 'POST',
+              headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                dateRanges: [{ startDate: '7daysAgo', endDate: 'today' }],
+                metrics: [{ name: 'sessions' }, { name: 'activeUsers' }, { name: 'screenPageViews' }]
+              })
+            });
+            if (!res.ok) throw new Error('GA4 Data API error: ' + res.status + ' ' + await res.text());
+            const data = await res.json();
+            const row = (data.rows && data.rows[0] && data.rows[0].metricValues) || [];
+            return {
+              sessions: Number(row[0] && row[0].value || 0),
+              activeUsers: Number(row[1] && row[1].value || 0),
+              pageViews: Number(row[2] && row[2].value || 0)
+            };
+          }
+
+          // EduBoxCore.bumpGlobalCounter() w global-core.js już dziś, na żywo,
+          // liczy każde udane wygenerowanie (tekst i obrazek) na narzędziach
+          // korzystających ze wspólnego mechanizmu limitów. To pojedynczy,
+          // narastający licznik w Firestore - żeby dostać "ile w tym tygodniu",
+          // porównujemy z poprzednim odczytem zapisanym w automation-state.json.
+          async function fetchFirestoreCounterTotal(accessToken) {
+            const url = `https://firestore.googleapis.com/v1/projects/${FIRESTORE_PROJECT_ID}/databases/(default)/documents/${COUNTER_DOC_PATH}`;
+            const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+            if (res.status === 404) return 0;
+            if (!res.ok) throw new Error('Firestore API error: ' + res.status + ' ' + await res.text());
+            const data = await res.json();
+            const raw = data.fields && data.fields.total && data.fields.total.integerValue;
+            return raw !== undefined ? Number(raw) : 0;
+          }
+
+          function readState() {
+            try { return JSON.parse(fs.readFileSync(STATE_FILE, 'utf8')); } catch (e) { return {}; }
+          }
+          function writeState(state) {
+            fs.writeFileSync(STATE_FILE, JSON.stringify(state, null, 2) + '\n', 'utf8');
+          }
+
+          async function fetchOpenAIWeekCost() {
+            const now = new Date();
+            const todayStart = Math.floor(new Date(now.toISOString().slice(0, 10) + 'T00:00:00Z').getTime() / 1000);
+            const weekStart = todayStart - 6 * 24 * 3600;
+            const url = `https://api.openai.com/v1/organization/costs?start_time=${weekStart}&bucket_width=1d&limit=31`;
+            const res = await fetch(url, { headers: { Authorization: `Bearer ${process.env.OPENAI_ADMIN_KEY}` } });
+            if (!res.ok) throw new Error('OpenAI Costs API error: ' + res.status + ' ' + await res.text());
+            const data = await res.json();
+            let total = 0;
+            for (const bucket of data.data || []) {
+              for (const r of bucket.results || []) total += (r.amount && r.amount.value) || 0;
+            }
+            return total;
+          }
+
+          async function main() {
+            let openaiTotal = null, openaiError = null;
+            try { openaiTotal = await fetchOpenAIWeekCost(); } catch (e) { openaiError = e.message; }
+
+            let falBalance = null, falError = null;
+            try {
+              const res = await fetch('https://api.fal.ai/v1/account/billing?expand=credits', {
+                headers: { Authorization: `Key ${process.env.FAL_KEY}` }
+              });
+              if (!res.ok) throw new Error('Fal.ai Billing API error: ' + res.status + ' ' + await res.text());
+              const data = await res.json();
+              falBalance = data.credits && typeof data.credits.current_balance === 'number' ? data.credits.current_balance : null;
+            } catch (e) { falError = e.message; }
+
+            const googleKey = process.env.GOOGLE_SERVICE_ACCOUNT_KEY_BASE64;
+            let googleToken = null, googleTokenError = null;
+            if (googleKey) {
+              try {
+                const serviceAccountJson = Buffer.from(googleKey, 'base64').toString('utf8');
+                googleToken = await getGoogleAccessToken(serviceAccountJson);
+              } catch (e) { googleTokenError = e.message; }
+            }
+
+            let ga4 = null, ga4Error = null, ga4Configured = false;
+            const ga4PropertyId = process.env.GA4_PROPERTY_ID;
+            if (googleKey && ga4PropertyId) {
+              ga4Configured = true;
+              try {
+                if (googleTokenError) throw new Error(googleTokenError);
+                ga4 = await fetchGA4(ga4PropertyId, googleToken);
+              } catch (e) { ga4Error = e.message; }
+            }
+
+            let generations = null, generationsError = null, generationsConfigured = false, generationsFirstRun = false, generationsLifetimeTotal = null;
+            if (googleKey) {
+              generationsConfigured = true;
+              try {
+                if (googleTokenError) throw new Error(googleTokenError);
+                const currentTotal = await fetchFirestoreCounterTotal(googleToken);
+                const state = readState();
+                const previousTotal = typeof state.generationsCounterTotal === 'number' ? state.generationsCounterTotal : null;
+                generationsFirstRun = previousTotal === null;
+                generations = generationsFirstRun ? null : Math.max(0, currentTotal - previousTotal);
+                generationsLifetimeTotal = currentTotal;
+                state.generationsCounterTotal = currentTotal;
+                state.generationsCounterCapturedAt = new Date().toISOString().slice(0, 10);
+                writeState(state);
+              } catch (e) { generationsError = e.message; }
+            }
+
+            console.log('OpenAI 7 dni:', openaiTotal, openaiError);
+            console.log('Fal.ai saldo:', falBalance, falError);
+            console.log('GA4:', ga4Configured, ga4, ga4Error);
+            console.log('Materiały:', generationsConfigured, generations, 'lifetime:', generationsLifetimeTotal, generationsError);
+
+            const dateLabel = new Date().toLocaleDateString('pl-PL', { day: 'numeric', month: 'long', year: 'numeric' });
+
+            let trafficHtml;
+            if (ga4Configured && ga4) {
+              trafficHtml = `<li>Ruch (7 dni): ${ga4.sessions} sesji &bull; ${ga4.activeUsers} użytkowników &bull; ${ga4.pageViews} odsłon</li>`;
+            } else if (ga4Configured && ga4Error) {
+              trafficHtml = `<li>Ruch: błąd pobierania z GA4 (${ga4Error})</li>`;
+            } else {
+              trafficHtml = `<li>Ruch: GA4 jeszcze nie skonfigurowane - patrz instrukcja wdrożenia</li>`;
+            }
+
+            let materialsHtml;
+            if (!generationsConfigured) {
+              materialsHtml = `<li>Wygenerowane materiały: N/D - brak skonfigurowanego konta usługi Google (patrz instrukcja wdrożenia)</li>`;
+            } else if (generationsError) {
+              materialsHtml = `<li>Wygenerowane materiały: błąd pobierania z Firestore (${generationsError})</li>`;
+            } else if (generationsFirstRun) {
+              materialsHtml = `<li>Wygenerowane materiały: pierwszy raport - brak jeszcze punktu odniesienia z zeszłego tygodnia (licznik łącznie od startu: ${generationsLifetimeTotal}). Od przyszłego poniedziałku pojawi się liczba za tydzień.</li>`;
+            } else {
+              materialsHtml = `<li>Wygenerowane materiały w tym tygodniu: ${generations} (licznik łącznie od startu: ${generationsLifetimeTotal}; obejmuje narzędzia korzystające ze wspólnego mechanizmu limitów - nie wszystkie 56)</li>`;
+            }
+
+            const html = `
+              <h2>EduBox AI - raport tygodniowy (${dateLabel})</h2>
+              <ul>
+                <li>Koszt OpenAI (7 dni): ${openaiError ? 'błąd: ' + openaiError : '$' + openaiTotal.toFixed(2)}</li>
+                <li>Saldo Fal.ai (aktualne, nie wydatek z tygodnia): ${falError ? 'błąd: ' + falError : '$' + falBalance.toFixed(2)}</li>
+                ${trafficHtml}
+                ${materialsHtml}
+              </ul>
+              <p><a href="https://platform.openai.com/settings/organization/usage">Panel OpenAI</a> &bull; <a href="https://fal.ai/dashboard/billing">Panel Fal.ai</a></p>
+            `;
+
+            const emailRes = await fetch('https://api.resend.com/emails', {
+              method: 'POST',
+              headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                from: 'EduBox AI Raporty <onboarding@resend.dev>',
+                to: [process.env.REPORT_EMAIL_TO],
+                subject: 'Raport tygodniowy - EduBox AI',
+                html
+              })
+            });
+            if (!emailRes.ok) {
+              console.error('Błąd wysyłki e-maila:', emailRes.status, await emailRes.text());
+              process.exit(1);
+            }
+            console.log('Raport e-mail wysłany.');
+          }
+
+          main().catch(e => { console.error(e); process.exit(1); });
+          EOF
+
+      - name: Zapisz punkt odniesienia dla licznika materiałów (jeśli się zmienił)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add automation-state.json
+          git commit -m "Aktualizacja licznika materiałów (automat raportu tygodniowego)" || echo "Brak zmian do commitu"
+          git push

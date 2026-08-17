@@ -1,0 +1,118 @@
+name: Alert kosztowy (OpenAI + Fal.ai)
+
+on:
+  schedule:
+    - cron: '0 6 * * *'   # codziennie ok. 8:00 czasu polskiego (latem UTC+2)
+  workflow_dispatch: {}    # pozwala odpalić ręcznie z zakładki Actions, do testów
+
+jobs:
+  check-costs:
+    runs-on: ubuntu-latest
+    env:
+      OPENAI_ADMIN_KEY: ${{ secrets.OPENAI_ADMIN_KEY }}
+      FAL_KEY: ${{ secrets.FAL_KEY }}
+      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+      ALERT_EMAIL_TO: wmkraw@gmail.com
+      # Progi alertów - zmień śmiało wg potrzeb, nie trzeba nic innego edytować
+      DAILY_LIMIT_USD: "3"
+      WEEKLY_LIMIT_USD: "15"
+      FAL_MIN_BALANCE_USD: "5"
+    steps:
+      - name: Sprawdź koszty i wyślij alert, jeśli trzeba
+        run: |
+          node <<'EOF'
+          async function main() {
+            const now = new Date();
+            const todayStart = Math.floor(new Date(now.toISOString().slice(0, 10) + 'T00:00:00Z').getTime() / 1000);
+            const weekStart = todayStart - 6 * 24 * 3600;
+
+            async function fetchOpenAICost(startTime) {
+              const url = `https://api.openai.com/v1/organization/costs?start_time=${startTime}&bucket_width=1d&limit=31`;
+              const res = await fetch(url, { headers: { Authorization: `Bearer ${process.env.OPENAI_ADMIN_KEY}` } });
+              if (!res.ok) throw new Error('OpenAI Costs API error: ' + res.status + ' ' + await res.text());
+              const data = await res.json();
+              let total = 0;
+              for (const bucket of data.data || []) {
+                for (const r of bucket.results || []) {
+                  total += (r.amount && r.amount.value) || 0;
+                }
+              }
+              return total;
+            }
+
+            let todayCost = 0, weekCost = 0, openaiError = null;
+            try {
+              todayCost = await fetchOpenAICost(todayStart);
+              weekCost = await fetchOpenAICost(weekStart);
+            } catch (e) {
+              openaiError = e.message;
+            }
+
+            let falBalance = null, falError = null;
+            try {
+              const res = await fetch('https://api.fal.ai/v1/account/billing?expand=credits', {
+                headers: { Authorization: `Key ${process.env.FAL_KEY}` }
+              });
+              if (!res.ok) throw new Error('Fal.ai Billing API error: ' + res.status + ' ' + await res.text());
+              const data = await res.json();
+              falBalance = data.credits && typeof data.credits.current_balance === 'number' ? data.credits.current_balance : null;
+            } catch (e) {
+              falError = e.message;
+            }
+
+            const dailyLimit = parseFloat(process.env.DAILY_LIMIT_USD);
+            const weeklyLimit = parseFloat(process.env.WEEKLY_LIMIT_USD);
+            const falMin = parseFloat(process.env.FAL_MIN_BALANCE_USD);
+
+            const alerts = [];
+            if (!openaiError) {
+              if (todayCost >= dailyLimit) alerts.push(`Dzienny koszt OpenAI: $${todayCost.toFixed(2)} (limit: $${dailyLimit.toFixed(2)})`);
+              if (weekCost >= weeklyLimit) alerts.push(`Tygodniowy koszt OpenAI (7 dni): $${weekCost.toFixed(2)} (limit: $${weeklyLimit.toFixed(2)})`);
+            } else {
+              alerts.push(`Nie udało się pobrać kosztów OpenAI: ${openaiError}`);
+            }
+            if (!falError) {
+              if (falBalance !== null && falBalance <= falMin) alerts.push(`Niskie saldo Fal.ai: $${falBalance.toFixed(2)} (próg: $${falMin.toFixed(2)})`);
+            } else {
+              alerts.push(`Nie udało się pobrać salda Fal.ai: ${falError}`);
+            }
+
+            console.log('OpenAI dziś: $' + todayCost.toFixed(2) + ', 7 dni: $' + weekCost.toFixed(2));
+            console.log('Fal.ai saldo: ' + (falBalance !== null ? '$' + falBalance.toFixed(2) : 'brak danych'));
+            console.log('Alerty:', alerts);
+
+            if (alerts.length === 0) {
+              console.log('Wszystko w normie, e-mail nie jest wysyłany.');
+              return;
+            }
+
+            const html = `
+              <h2>EduBox AI - alert kosztowy</h2>
+              <ul>${alerts.map(a => `<li>${a}</li>`).join('')}</ul>
+              <p>OpenAI dziś: $${todayCost.toFixed(2)} &bull; OpenAI 7 dni: $${weekCost.toFixed(2)} &bull; Fal.ai saldo: ${falBalance !== null ? '$' + falBalance.toFixed(2) : 'b/d'}</p>
+              <p><a href="https://platform.openai.com/settings/organization/usage">Panel OpenAI</a> &bull; <a href="https://fal.ai/dashboard/billing">Panel Fal.ai</a></p>
+              <p style="color:#888;font-size:12px">Progi alertów ustawione w .github/workflows/cost-alert.yml (zmienne DAILY_LIMIT_USD / WEEKLY_LIMIT_USD / FAL_MIN_BALANCE_USD).</p>
+            `;
+
+            const emailRes = await fetch('https://api.resend.com/emails', {
+              method: 'POST',
+              headers: {
+                Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                from: 'EduBox AI Alerty <onboarding@resend.dev>',
+                to: [process.env.ALERT_EMAIL_TO],
+                subject: 'Alert kosztowy - EduBox AI',
+                html
+              })
+            });
+            if (!emailRes.ok) {
+              console.error('Błąd wysyłki e-maila:', emailRes.status, await emailRes.text());
+              process.exit(1);
+            }
+            console.log('Alert e-mail wysłany.');
+          }
+
+          main().catch(e => { console.error(e); process.exit(1); });
+          EOF
