@@ -315,8 +315,25 @@
                         try {
                             const chosenAnimal = pickAnimalFor(effectiveOccasion);
                             const prompt = `Stwórz kolorową, ciepłą ilustrację w stylu dziecięcej książki obrazkowej, przedstawiającą ${chosenAnimal} w scenie związanej z tematem: "${effectiveOccasion}". Odbiorcą jest dziecko w wieku ${ageGroup.sub}. Styl: przyjazny, ciepłe barwy, bajkowe oświetlenie, format pionowy. Na obrazku nie mogą znajdować się żadne napisy, litery ani cyfry, oraz żadni ludzie - tylko to jedno zwierzątko i pasująca do okazji sceneria.`;
-                            const res = await fetch('/api/generate-openai', {
-                                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt, size: '1024x1536' })
+
+                            // Tłumaczymy polecenie na angielski przed wysłaniem do Flux (Fal.ai) -
+                            // ten model daje wyraźnie lepsze rezultaty na angielskich promptach.
+                            let englishPrompt = prompt;
+                            try {
+                                const translateSystem = `You are an expert AI image prompt engineer. Translate and rewrite the user's Polish description into a detailed, vivid image prompt IN ENGLISH, for a warm children's picture-book illustration. Keep all constraints (no text, no letters, no digits, no people - only the one animal and matching scenery). Reply ONLY with the English prompt, nothing else.`;
+                                const resChat = await fetch('/api/chat', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ prompt, system: translateSystem, temperature: 0.6, model: 'gpt-4o-mini' })
+                                });
+                                if (resChat.ok) {
+                                    const dataChat = await resChat.json();
+                                    if (dataChat.text) englishPrompt = dataChat.text.trim();
+                                }
+                            } catch (e) { console.log('Tłumaczenie promptu nie powiodło się, używam oryginału.'); }
+
+                            const res = await fetch('/api/generate', {
+                                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt: englishPrompt, size: '1024x1536' })
                             });
                             if (!res.ok) throw new Error('Status API: ' + res.status);
                             const data = await res.json();

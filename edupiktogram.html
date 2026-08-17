@@ -238,40 +238,18 @@
                 }
             };
 
-            // LOGIKA GENEROWANIA OBRAZKÓW Z API
+            // LOGIKA GENEROWANIA OBRAZKÓW Z API (Fal.ai Flux Schnell - szybkie, tanie, bez osobnego klucza Stability)
             const secureApiCall = async (payload) => {
-                try {
-                    const res = await fetch('/api/gemini', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ payload, type: 'image' })
-                    });
-                    
-                    if (res.ok) return await res.json();
-                    
-                    if (res.status === 404 || res.status === 405) throw new Error("USE_FALLBACK");
-                    
-                    const errData = await res.json();
-                    throw new Error(errData.error || `Status API: ${res.status}`);
-                    
-                } catch (e) {
-                    if (e.message === "USE_FALLBACK" || e.message.includes("Failed to fetch") || e.message.includes("Unexpected token")) {
-                        const apiKey = ""; 
-                        const url = `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${apiKey}`;
-                        const previewPayload = {
-                            instances: { prompt: payload.instances.prompt },
-                            parameters: { sampleCount: 1 }
-                        };
-                        const fallbackRes = await fetch(url, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(previewPayload)
-                        });
-                        if (!fallbackRes.ok) throw new Error("Opublikuj plik na Vercel (Tryb podglądu zablokowany).");
-                        return await fallbackRes.json();
-                    }
-                    throw e;
+                const res = await fetch('/api/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt: payload.prompt, width: payload.width, height: payload.height })
+                });
+                if (!res.ok) {
+                    const errData = await res.json().catch(() => ({}));
+                    throw new Error(errData.message || `Status API: ${res.status}`);
                 }
+                return await res.json();
             };
 
             const handleGeneratePictogram = () => {
@@ -296,33 +274,27 @@
 
                 try {
                     let hiddenInstruction = "";
-                    let apiStylePreset = "digital-art";
 
+                    // Uwaga: Flux Schnell nie obsługuje negative_prompt (nie jest to model typu CFG jak
+                    // Stability SDXL) - wszystkie ograniczenia wpisujemy wprost w prompt pozytywny.
+                    const noiseConstraints = "no text, no words, no letters, not realistic, not 3d, no complex or detailed background, no shadows, no shading, not distorted, clean simple lines, no watermark.";
                     if (colorMode === 'bw') {
-                        hiddenInstruction = `A simple, minimalist black and white pictogram icon. MAIN SUBJECT: ${promptInput}. Style: thick black outlines, pure white background, no shading, line art, flat 2d, educational AAC symbol, clear visual schedule icon.`;
-                        apiStylePreset = "line-art";
+                        hiddenInstruction = `A simple, minimalist black and white pictogram icon. MAIN SUBJECT: ${promptInput}. Style: thick black outlines, pure white background, no shading, line art, flat 2d, educational AAC symbol, clear visual schedule icon. Constraints: ${noiseConstraints}`;
                     } else {
-                        hiddenInstruction = `A simple, minimalist flat color pictogram icon. MAIN SUBJECT: ${promptInput}. Style: flat vibrant colors, thick black outlines, pure white background, no gradients, no 3d, educational AAC symbol, clear visual schedule icon.`;
-                        apiStylePreset = "digital-art";
+                        hiddenInstruction = `A simple, minimalist flat color pictogram icon. MAIN SUBJECT: ${promptInput}. Style: flat vibrant colors, thick black outlines, pure white background, no gradients, no 3d, educational AAC symbol, clear visual schedule icon. Constraints: ${noiseConstraints}`;
                     }
-                    
-                    const negativePrompt = "text, words, letters, realistic, 3d, complex details, detailed background, shadows, shading, ugly, distorted, messy lines, watermark";
 
                     const payload = {
-                        prompt: hiddenInstruction, 
-                        negative_prompt: negativePrompt, 
-                        style_preset: apiStylePreset,
+                        prompt: hiddenInstruction,
                         width: 1024,
-                        height: 1024,
-                        instances: { prompt: hiddenInstruction }, 
-                        parameters: { sampleCount: 1 }
+                        height: 1024
                     };
 
                     const data = await secureApiCall(payload);
-                    const base64Image = data.predictions?.[0]?.bytesBase64Encoded || data.artifacts?.[0]?.base64 || data.image; 
-                    
-                    if (base64Image) {
-                        const finalImage = base64Image.startsWith('data:image') ? base64Image : `data:image/png;base64,${base64Image}`;
+                    const imageResult = data.imageUrl || data.predictions?.[0]?.bytesBase64Encoded || data.artifacts?.[0]?.base64 || data.image;
+
+                    if (imageResult) {
+                        const finalImage = imageResult.startsWith('http') || imageResult.startsWith('data:image') ? imageResult : `data:image/png;base64,${imageResult}`;
                         setGeneratedImage(finalImage);
                         
                         setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);

@@ -17,6 +17,15 @@
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <!-- Fonty -->
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800;900&family=Fredoka:wght@400;600;700;900&display=swap" rel="stylesheet">
+
+    <!-- Baza aplikacji EduBox (ładowana dynamicznie, jak w Katalogu) -->
+    <script>
+        const eduboxAppsScript = document.createElement('script');
+        eduboxAppsScript.src = './apps.js?v=' + new Date().getTime();
+        eduboxAppsScript.onerror = () => { window.appsJsError = true; };
+        document.head.appendChild(eduboxAppsScript);
+    </script>
+
     <script>
         tailwind.config = {
             darkMode: 'class',
@@ -36,7 +45,17 @@
 <body>
     <div id="root"></div>
     <script type="text/babel">
-        const { useState } = React;
+        const { useState, useEffect } = React;
+
+        const CAT_LABELS = {
+            'terapia': 'Terapia i SPE',
+            'biurokracja': 'Biurokracja i Dokumenty',
+            'zajecia': 'Zajęcia i Gry',
+            'grafika': 'Grafika i Kreatywne',
+            'inne': 'Pozostałe Aplikacje'
+        };
+        const SITE_ORIGIN = 'https://eduboxpro.pl';
+
         function App() {
             const [topic, setTopic] = useState('');
             const [platform, setPlatform] = useState('Facebook Grupy');
@@ -44,23 +63,73 @@
             const [postContent, setPostContent] = useState('');
             const [imageUrl, setImageUrl] = useState('');
             const [errorMsg, setErrorMsg] = useState('');
+
+            // Baza aplikacji (do linkowania w postach) + wybór promowanej aplikacji
+            const [apps, setApps] = useState([]);
+            const [appsError, setAppsError] = useState(false);
+            const [selectedAppIndex, setSelectedAppIndex] = useState('random');
+            const [promotedApp, setPromotedApp] = useState(null); // aplikacja faktycznie wypromowana w ostatnio wygenerowanym poście
+            const [linkCopied, setLinkCopied] = useState(false);
+
+            useEffect(() => {
+                let attempts = 0;
+                const checkData = setInterval(() => {
+                    if (window.appsJsError) {
+                        clearInterval(checkData);
+                        setAppsError(true);
+                        return;
+                    }
+                    if (window.EduBoxData && window.EduBoxData.APPS) {
+                        setApps(window.EduBoxData.APPS);
+                        clearInterval(checkData);
+                    } else {
+                        attempts++;
+                        if (attempts > 25) { // ok. 5 sekund
+                            clearInterval(checkData);
+                            setAppsError(true);
+                        }
+                    }
+                }, 200);
+                return () => clearInterval(checkData);
+            }, []);
+
+            const groupedApps = apps.reduce((acc, app, idx) => {
+                const cat = app.category || 'inne';
+                if (!acc[cat]) acc[cat] = [];
+                acc[cat].push({ ...app, idx });
+                return acc;
+            }, {});
             // Główna funkcja generująca post i zdjęcie Ewy
             const generateContent = async () => {
-                if (!topic.trim()) return;
+                if (!topic.trim() || apps.length === 0) return;
                 setLoading(true);
                 setErrorMsg('');
                 setPostContent('');
                 setImageUrl('');
+
+                // Wybór promowanej aplikacji: konkretna (z listy) albo losowa - przydatne przy
+                // hurtowym generowaniu treści na wiele dni z automatyzacji.
+                const app = selectedAppIndex === 'random'
+                    ? apps[Math.floor(Math.random() * apps.length)]
+                    : apps[Number(selectedAppIndex)];
+                const appFullUrl = `${SITE_ORIGIN}/${app.url}`;
+                setPromotedApp(app);
+                setLinkCopied(false);
+
                 try {
                     // 1. ZAPYTANIE DO GPT O TEKST POSTA
                     const systemPrompt = `Jesteś Ewą, 32-letnią pedagożką i ambasadorką platformy EduBox PRO.
                     Masz krótkie blond włosy i ubierasz się elegancko (szary garnitur, biała koszula).
                     Twoim celem jest pisanie postów na ${platform} dla innych nauczycieli.
-                    Piszesz empatycznie, profesjonalnie, używasz emotikon. Promujesz jedną z 60 aplikacji z EduBox.
+                    Piszesz empatycznie, profesjonalnie, używasz emotikon.
+
+                    Promujesz KONKRETNIE tę aplikację: "${app.title}" - ${app.desc}
+                    W treści posta naturalnie zachęć do jej wypróbowania (np. "Link w pierwszym komentarzu 👇" albo "Sprawdź -> link poniżej").
+                    WAŻNE: NIE wymyślaj i NIE wpisuj żadnego adresu URL w treści posta - prawdziwy link zostanie doklejony automatycznie pod postem przez system.
 
                     ZWRÓĆ ODPOWIEDŹ W FORMACIE JSON:
                     {
-                        "post_text": "Gotowa treść posta na social media. Pamiętaj o wezwaniu do działania (linku).",
+                        "post_text": "Gotowa treść posta na social media, z naturalnym wezwaniem do działania, BEZ wpisanego adresu URL.",
                         "image_prompt": "Krótki opis po angielsku do generatora obrazków opisujący co Ewa robi na zdjęciu pasującym do tego posta (np. Ewa siedzi przy biurku i trzyma sprawdzian, Ewa pije kawę w pokoju nauczycielskim). Pisz TYLKO samą akcję/tło."
                     }`;
                     const userPrompt = `Napisz post rozwiązujący problem: ${topic}`;
@@ -120,9 +189,17 @@
                     setLoading(false);
                 }
             };
+            const promotedAppUrl = promotedApp ? `${SITE_ORIGIN}/${promotedApp.url}` : '';
+
             const copyToClipboard = () => {
-                navigator.clipboard.writeText(postContent);
-                alert("Skopiowano tekst posta!");
+                const fullText = promotedAppUrl ? `${postContent}\n\n🔗 ${promotedAppUrl}` : postContent;
+                navigator.clipboard.writeText(fullText);
+                alert("Skopiowano post razem z linkiem!");
+            };
+            const copyLinkOnly = () => {
+                navigator.clipboard.writeText(promotedAppUrl);
+                setLinkCopied(true);
+                setTimeout(() => setLinkCopied(false), 2000);
             };
             return (
                 <div className="min-h-screen p-4 md:p-8 font-sans">
@@ -157,6 +234,23 @@
                                         <option>LinkedIn - Profil Profesjonalny</option>
                                         <option>Blog EduBoxPRO</option>
                                     </select>
+                                    <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Którą aplikację promujemy?</label>
+                                    <select
+                                        value={selectedAppIndex}
+                                        onChange={e => setSelectedAppIndex(e.target.value)}
+                                        className="w-full bg-slate-900 border border-slate-700 text-white p-3 rounded-xl mb-6 outline-none focus:border-pink-500"
+                                    >
+                                        <option value="random">🎲 Zaskocz mnie (losowa aplikacja)</option>
+                                        {Object.keys(CAT_LABELS).map(cat => (
+                                            groupedApps[cat] && groupedApps[cat].length > 0 && (
+                                                <optgroup key={cat} label={CAT_LABELS[cat]}>
+                                                    {groupedApps[cat].map(app => (
+                                                        <option key={app.idx} value={app.idx}>{app.title}</option>
+                                                    ))}
+                                                </optgroup>
+                                            )
+                                        ))}
+                                    </select>
                                     <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Jaki problem rozwiązujemy?</label>
                                     <textarea
                                         value={topic}
@@ -166,15 +260,20 @@
                                     ></textarea>
                                     <button
                                         onClick={generateContent}
-                                        disabled={loading || !topic.trim()}
+                                        disabled={loading || !topic.trim() || apps.length === 0}
                                         className="w-full bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-500 hover:to-rose-500 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         {loading ? <i className="ph-bold ph-spinner animate-spin text-xl"></i> : <i className="ph-bold ph-magic-wand text-xl"></i>}
-                                        {loading ? 'Ewa przygotowuje materiał...' : 'Wygeneruj Post i Zdjęcie'}
+                                        {loading ? 'Ewa przygotowuje materiał...' : apps.length === 0 && !appsError ? 'Ładowanie listy aplikacji...' : 'Wygeneruj Post i Zdjęcie'}
                                     </button>
                                     {errorMsg && (
                                         <div className="mt-4 p-3 bg-red-900/50 border border-red-500/50 text-red-300 rounded-xl text-sm">
                                             <i className="ph-fill ph-warning-circle"></i> {errorMsg}
+                                        </div>
+                                    )}
+                                    {appsError && (
+                                        <div className="mt-4 p-3 bg-amber-900/50 border border-amber-500/50 text-amber-300 rounded-xl text-sm">
+                                            <i className="ph-fill ph-warning-circle"></i> Nie udało się wczytać listy aplikacji (apps.js). Upewnij się, że plik jest w tym samym folderze co strona.
                                         </div>
                                     )}
                                 </div>
@@ -190,18 +289,21 @@
                                     )}
                                     {postContent && (
                                         <div className="animate-fade-in">
-                                            <div className="flex items-center justify-between mb-6">
+                                            <div className="flex items-center justify-between mb-2">
                                                 <h2 className="text-2xl font-display font-bold text-white flex items-center gap-2">
                                                     <i className="ph-fill ph-check-circle text-green-500"></i> Gotowe do publikacji
                                                 </h2>
                                                 <button onClick={copyToClipboard} className="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors border border-slate-700">
-                                                    <i className="ph-bold ph-copy"></i> Skopiuj tekst
+                                                    <i className="ph-bold ph-copy"></i> Skopiuj post + link
                                                 </button>
                                             </div>
+                                            {promotedApp && (
+                                                <p className="text-sm text-slate-400 mb-6">Promowana aplikacja: <span className="text-pink-400 font-bold">{promotedApp.title}</span></p>
+                                            )}
                                             <div className="flex flex-col md:flex-row gap-8">
-                                                {/* Wygenerowane zdjęcie (FAL AI) */}
+                                                {/* Wygenerowane zdjęcie (FAL AI) - format 4:5, pod Pinterest/Facebook */}
                                                 <div className="w-full md:w-1/2">
-                                                    <div className="aspect-square bg-slate-900 rounded-xl border-2 border-slate-700 overflow-hidden relative">
+                                                    <div className="aspect-[4/5] bg-slate-900 rounded-xl border-2 border-slate-700 overflow-hidden relative">
                                                         {imageUrl ? (
                                                             <img src={imageUrl} alt="Wygenerowana Ewa" className="w-full h-full object-cover" />
                                                         ) : (
@@ -213,12 +315,23 @@
                                                     <p className="text-xs text-slate-500 mt-2 text-center">Kliknij prawym przyciskiem myszy, aby zapisać zdjęcie Ewy.</p>
                                                 </div>
                                                 {/* Tekst posta */}
-                                                <div className="w-full md:w-1/2">
-                                                    <div className="bg-slate-900 border border-slate-700 rounded-xl p-5 h-full">
+                                                <div className="w-full md:w-1/2 flex flex-col gap-4">
+                                                    <div className="bg-slate-900 border border-slate-700 rounded-xl p-5 flex-1">
                                                         <p className="text-slate-200 whitespace-pre-wrap font-medium leading-relaxed">
                                                             {postContent}
                                                         </p>
                                                     </div>
+                                                    {promotedAppUrl && (
+                                                        <div className="bg-slate-900 border border-pink-500/40 rounded-xl p-4 flex items-center justify-between gap-3">
+                                                            <div className="min-w-0">
+                                                                <p className="text-xs text-slate-400 uppercase font-bold mb-1">Link do dołączenia w poście</p>
+                                                                <p className="text-pink-300 text-sm truncate">{promotedAppUrl}</p>
+                                                            </div>
+                                                            <button onClick={copyLinkOnly} className="shrink-0 bg-pink-600 hover:bg-pink-500 text-white px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors">
+                                                                <i className={linkCopied ? "ph-bold ph-check" : "ph-bold ph-link"}></i> {linkCopied ? 'Skopiowano' : 'Kopiuj'}
+                                                            </button>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
                                         </div>
