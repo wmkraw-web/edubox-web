@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Redaktor Ogłoszeń - EduBox AI</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { font-family: 'Segoe UI', system-ui, sans-serif; }
+</style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen">
+
+<div class="max-w-2xl mx-auto px-4 py-10">
+
+  <div class="mb-8">
+    <h1 class="text-2xl font-black text-white mb-1">📢 Redaktor Ogłoszeń</h1>
+    <p class="text-slate-400 text-sm">Zarządzaj wyskakującym ogłoszeniem i listą „Co nowego” na eduboxpro.pl — bez edytowania kodu.</p>
+  </div>
+
+  <!-- KROK 1: Połączenie z GitHub -->
+  <div id="connect-panel" class="bg-slate-900 border border-slate-800 rounded-2xl p-6 mb-6">
+    <label class="block text-sm font-bold text-slate-300 mb-2">GitHub Token (nie jest nigdzie zapisywany, wpisujesz go tylko na czas tej sesji)</label>
+    <div class="flex gap-2">
+      <input id="token-input" type="password" placeholder="ghp_..." class="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-sm outline-none focus:border-blue-500 transition-colors">
+      <button onclick="connect()" class="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-lg text-sm font-bold transition-colors whitespace-nowrap">Połącz</button>
+    </div>
+    <p id="connect-status" class="text-xs mt-2"></p>
+  </div>
+
+  <!-- KROK 2: Edycja (widoczne dopiero po połączeniu) -->
+  <div id="editor-panel" class="hidden">
+
+    <div id="current-status" class="rounded-2xl p-4 mb-6 border"></div>
+
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 mb-6 space-y-5">
+
+      <label class="flex items-center gap-3 cursor-pointer select-none">
+        <input id="f-active" type="checkbox" class="w-5 h-5 rounded accent-blue-600">
+        <span class="text-sm font-bold text-white">Ogłoszenie aktywne (widoczne dla odwiedzających)</span>
+      </label>
+
+      <div>
+        <label class="block text-sm font-bold text-slate-300 mb-1.5">Tytuł</label>
+        <input id="f-title" type="text" placeholder="np. Nowe narzędzie: EduTest!" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-sm outline-none focus:border-blue-500 transition-colors">
+      </div>
+
+      <div>
+        <label class="block text-sm font-bold text-slate-300 mb-1.5">Treść</label>
+        <textarea id="f-message" rows="3" placeholder="Krótki opis ogłoszenia..." class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-sm outline-none focus:border-blue-500 transition-colors resize-none"></textarea>
+      </div>
+
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-bold text-slate-300 mb-1.5">Tekst przycisku <span class="text-slate-500 font-normal">(opcjonalnie)</span></label>
+          <input id="f-linktext" type="text" placeholder="np. Zobacz" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-sm outline-none focus:border-blue-500 transition-colors">
+        </div>
+        <div>
+          <label class="block text-sm font-bold text-slate-300 mb-1.5">Link <span class="text-slate-500 font-normal">(opcjonalnie)</span></label>
+          <input id="f-linkurl" type="text" placeholder="np. edutest.html" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-sm outline-none focus:border-blue-500 transition-colors">
+        </div>
+      </div>
+
+      <p class="text-xs text-slate-500">Zostaw pola "Tekst przycisku" i "Link" puste, jeśli ogłoszenie ma być bez przycisku.</p>
+    </div>
+
+    <!-- PODGLĄD -->
+    <div class="mb-6">
+      <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Podgląd wyskakującego okienka</p>
+      <div class="bg-black/40 rounded-2xl p-8 flex items-center justify-center">
+        <div class="bg-slate-900 border border-slate-700 rounded-3xl max-w-md w-full p-8 relative shadow-2xl">
+          <div class="inline-flex items-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full mb-4">
+            🎉 Nowość
+          </div>
+          <h3 id="preview-title" class="text-xl font-black text-white mb-3">Tytuł ogłoszenia</h3>
+          <p id="preview-message" class="text-slate-300 text-sm leading-relaxed mb-6">Treść ogłoszenia pojawi się tutaj.</p>
+          <div id="preview-link-wrap" class="hidden">
+            <span class="inline-flex items-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-full text-sm font-bold">
+              <span id="preview-linktext"></span>
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="flex flex-col gap-3">
+      <button onclick="saveOgloszenie()" id="save-btn" class="w-full bg-blue-600 hover:bg-blue-500 text-white px-6 py-3.5 rounded-full text-sm font-bold transition-colors">
+        💾 Zapisz zmiany
+      </button>
+      <div class="flex gap-3">
+        <button onclick="quickActivate()" class="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-3 rounded-full text-sm font-bold transition-colors">
+          🟢 Włącz teraz
+        </button>
+        <button onclick="quickDeactivate()" class="flex-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 px-6 py-3 rounded-full text-sm font-bold transition-colors">
+          ⚪ Wyłącz teraz
+        </button>
+      </div>
+    </div>
+    <p class="text-xs text-slate-500 mt-2">"Włącz teraz" / "Wyłącz teraz" zapisują to co jest w polach powyżej, tylko od razu przełączają "Aktywne" — nie musisz osobno klikać checkboxa.</p>
+
+    <p id="save-status" class="text-sm mt-4"></p>
+
+    <!-- ============================================================ -->
+    <!-- SEKCJA: CO NOWEGO -->
+    <!-- ============================================================ -->
+    <div class="mt-12 pt-8 border-t border-slate-800">
+      <h2 class="text-xl font-black text-white mb-1">📰 Co nowego</h2>
+      <p class="text-slate-400 text-sm mb-6">Zarządzaj publiczną listą zmian widoczną na <span class="text-slate-300 font-medium">eduboxpro.pl/co-nowego.html</span></p>
+
+      <div id="zmiany-list" class="space-y-3 mb-6"></div>
+
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
+        <h3 class="text-sm font-bold text-white">Dodaj nowy wpis</h3>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-bold text-slate-400 mb-1.5">Tag</label>
+            <select id="z-tag" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-sm outline-none focus:border-blue-500 transition-colors">
+              <option>Nowość</option>
+              <option>Ulepszenie</option>
+              <option>Poprawka</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-400 mb-1.5">Data</label>
+            <input id="z-date" type="date" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-sm outline-none focus:border-blue-500 transition-colors">
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-400 mb-1.5">Tytuł</label>
+          <input id="z-title" type="text" placeholder="np. Nowy generator kart pracy" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-sm outline-none focus:border-blue-500 transition-colors">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-400 mb-1.5">Opis</label>
+          <textarea id="z-desc" rows="2" placeholder="Krótki opis dla nauczycieli..." class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-sm outline-none focus:border-blue-500 transition-colors resize-none"></textarea>
+        </div>
+        <button onclick="addZmiana()" id="add-zmiana-btn" class="w-full bg-blue-600 hover:bg-blue-500 text-white px-6 py-3 rounded-full text-sm font-bold transition-colors">
+          ➕ Dodaj wpis
+        </button>
+      </div>
+
+      <p id="zmiany-status" class="text-sm mt-4"></p>
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+  const REPO = 'wmkraw-web/edubox-web';
+  const FILE_PATH = 'ogloszenie.js';
+  const ZMIANY_FILE_PATH = 'zmiany.js';
+  let githubToken = null;
+  let currentSha = null;
+  let zmianySha = null;
+  let zmianyData = [];
+
+  function b64EncodeUnicode(str) {
+    const bytes = new TextEncoder().encode(str);
+    let binary = '';
+    bytes.forEach(b => binary += String.fromCharCode(b));
+    return btoa(binary);
+  }
+
+  function b64DecodeUnicode(b64) {
+    const binary = atob(b64.replace(/\n/g, ''));
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return new TextDecoder('utf-8').decode(bytes);
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.innerText = str == null ? '' : str;
+    return div.innerHTML;
+  }
+
+  // ---------- Generyczne pobieranie / zapisywanie plików z GitHuba ----------
+  async function fetchGithubFile(path) {
+    const res = await fetch(`https://api.github.com/repos/${REPO}/contents/${path}`, {
+      headers: { Authorization: `Bearer ${githubToken}`, Accept: 'application/vnd.github+json' }
+    });
+    if (!res.ok) throw new Error('Nie udało się pobrać pliku ' + path + ' (kod ' + res.status + ').');
+    const json = await res.json();
+    return { content: b64DecodeUnicode(json.content), sha: json.sha };
+  }
+
+  async function pushGithubFile(path, content, sha, commitMessage) {
+    const encoded = b64EncodeUnicode(content);
+    const res = await fetch(`https://api.github.com/repos/${REPO}/contents/${path}`, {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${githubToken}`,
+        Accept: 'application/vnd.github+json',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        message: commitMessage,
+        content: encoded,
+        sha: sha || undefined,
+        branch: 'main'
+      })
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error('Błąd zapisu ' + path + ' (kod ' + res.status + '): ' + (err.message || 'nieznany błąd'));
+    }
+    const result = await res.json();
+    return result.content.sha;
+  }
+
+  // ================================================================
+  // OGŁOSZENIE (popup)
+  // ================================================================
+  function parseOgloszenie(fileText) {
+    const fakeWindow = {};
+    try { new Function('window', fileText)(fakeWindow); } catch (e) {}
+    return fakeWindow.OGLOSZENIE || null;
+  }
+
+  function buildFileContent(data) {
+    return 'window.OGLOSZENIE = ' + JSON.stringify(data, null, 2) + ';\n';
+  }
+
+  function updatePreview() {
+    const title = document.getElementById('f-title').value || 'Tytuł ogłoszenia';
+    const message = document.getElementById('f-message').value || 'Treść ogłoszenia pojawi się tutaj.';
+    const linkText = document.getElementById('f-linktext').value;
+    const linkUrl = document.getElementById('f-linkurl').value;
+
+    document.getElementById('preview-title').innerText = title;
+    document.getElementById('preview-message').innerText = message;
+
+    const linkWrap = document.getElementById('preview-link-wrap');
+    if (linkText && linkUrl) {
+      document.getElementById('preview-linktext').innerText = linkText;
+      linkWrap.classList.remove('hidden');
+    } else {
+      linkWrap.classList.add('hidden');
+    }
+  }
+
+  ['f-title', 'f-message', 'f-linktext', 'f-linkurl'].forEach(id => {
+    document.getElementById(id).addEventListener('input', updatePreview);
+  });
+
+  function renderStatus(data) {
+    const box = document.getElementById('current-status');
+    if (data && data.active) {
+      box.className = 'rounded-2xl p-4 mb-6 border bg-emerald-500/10 border-emerald-500/30';
+      box.innerHTML = '<p class="text-sm font-bold text-emerald-400">🟢 Aktualnie AKTYWNE</p><p class="text-xs text-slate-400 mt-1">Odwiedzający, którzy jeszcze go nie widzieli, zobaczą je po wejściu na stronę.</p>';
+    } else {
+      box.className = 'rounded-2xl p-4 mb-6 border bg-slate-800/50 border-slate-700';
+      box.innerHTML = '<p class="text-sm font-bold text-slate-400">⚪ Aktualnie WYŁĄCZONE</p><p class="text-xs text-slate-500 mt-1">Nic się nie pokazuje odwiedzającym.</p>';
+    }
+  }
+
+  async function connect() {
+    const token = document.getElementById('token-input').value.trim();
+    const statusEl = document.getElementById('connect-status');
+    if (!token) {
+      statusEl.className = 'text-xs mt-2 text-red-400';
+      statusEl.innerText = 'Wklej token.';
+      return;
+    }
+    statusEl.className = 'text-xs mt-2 text-slate-400';
+    statusEl.innerText = 'Łączenie...';
+    githubToken = token;
+
+    try {
+      const ogloszenie = await fetchGithubFile(FILE_PATH);
+      const data = parseOgloszenie(ogloszenie.content);
+      if (!data) throw new Error('Nie udało się odczytać pliku ogloszenie.js — sprawdź czy istnieje w repozytorium.');
+      currentSha = ogloszenie.sha;
+
+      document.getElementById('f-active').checked = !!data.active;
+      document.getElementById('f-title').value = data.title || '';
+      document.getElementById('f-message').value = data.message || '';
+      document.getElementById('f-linktext').value = data.linkText || '';
+      document.getElementById('f-linkurl').value = data.linkUrl || '';
+      updatePreview();
+      renderStatus(data);
+
+      // Co nowego - jeśli plik jeszcze nie istnieje w repo, startujemy z pustą listą
+      // (pierwszy zapis go po prostu utworzy)
+      try {
+        const zmiany = await fetchGithubFile(ZMIANY_FILE_PATH);
+        zmianyData = parseZmiany(zmiany.content);
+        zmianySha = zmiany.sha;
+      } catch (e) {
+        zmianyData = [];
+        zmianySha = null;
+      }
+      document.getElementById('z-date').value = new Date().toISOString().split('T')[0];
+      renderZmianyList();
+
+      document.getElementById('connect-panel').classList.add('hidden');
+      document.getElementById('editor-panel').classList.remove('hidden');
+    } catch (err) {
+      githubToken = null;
+      statusEl.className = 'text-xs mt-2 text-red-400';
+      statusEl.innerText = '❌ ' + err.message;
+    }
+  }
+
+  async function pushToGithub(data) {
+    const content = buildFileContent(data);
+    currentSha = await pushGithubFile(FILE_PATH, content, currentSha, 'Aktualizacja ogłoszenia (Redaktor Ogłoszeń)');
+  }
+
+  async function saveOgloszenie() {
+    const statusEl = document.getElementById('save-status');
+    const btn = document.getElementById('save-btn');
+    btn.disabled = true;
+    btn.innerText = 'Zapisywanie...';
+    statusEl.className = 'text-sm mt-4 text-slate-400';
+    statusEl.innerText = '';
+
+    try {
+      const data = {
+        id: new Date().toISOString(),
+        active: document.getElementById('f-active').checked,
+        title: document.getElementById('f-title').value,
+        message: document.getElementById('f-message').value,
+        linkText: document.getElementById('f-linktext').value,
+        linkUrl: document.getElementById('f-linkurl').value
+      };
+      await pushToGithub(data);
+      renderStatus(data);
+      statusEl.className = 'text-sm mt-4 text-emerald-400';
+      statusEl.innerText = '✅ Zapisano! Zmiana pojawi się na stronie w ciągu kilku sekund - kilku minut.';
+    } catch (err) {
+      statusEl.className = 'text-sm mt-4 text-red-400';
+      statusEl.innerText = '❌ ' + err.message;
+    } finally {
+      btn.disabled = false;
+      btn.innerText = '💾 Zapisz zmiany';
+    }
+  }
+
+  async function quickDeactivate() {
+    document.getElementById('f-active').checked = false;
+    await saveOgloszenie();
+  }
+
+  async function quickActivate() {
+    document.getElementById('f-active').checked = true;
+    await saveOgloszenie();
+  }
+
+  // ================================================================
+  // CO NOWEGO (changelog)
+  // ================================================================
+  function parseZmiany(fileText) {
+    const fakeWindow = {};
+    try { new Function('window', fileText)(fakeWindow); } catch (e) {}
+    return fakeWindow.CO_NOWEGO || [];
+  }
+
+  function buildZmianyContent(data) {
+    return '// Plik danych "Co nowego" - historia zmian w EduBox AI.\n' +
+      '// Zarządzany przez Redaktor Ogłoszeń (sekcja "Co nowego") - nie edytuj ręcznie bez potrzeby.\n' +
+      '// Najnowsze wpisy na początku tablicy.\n' +
+      'window.CO_NOWEGO = ' + JSON.stringify(data, null, 4) + ';\n';
+  }
+
+  function tagColorClass(tag) {
+    if (tag === 'Nowość') return 'bg-blue-500/15 text-blue-400';
+    if (tag === 'Ulepszenie') return 'bg-emerald-500/15 text-emerald-400';
+    if (tag === 'Poprawka') return 'bg-amber-500/15 text-amber-400';
+    return 'bg-slate-700 text-slate-300';
+  }
+
+  function slugify(text) {
+    return text
+      .toLowerCase()
+      .normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '')
+      .slice(0, 40);
+  }
+
+  function renderZmianyList() {
+    const wrap = document.getElementById('zmiany-list');
+    if (!zmianyData.length) {
+      wrap.innerHTML = '<p class="text-sm text-slate-500 text-center py-6">Brak wpisów. Dodaj pierwszy poniżej.</p>';
+      return;
+    }
+    const sorted = zmianyData.slice().sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    wrap.innerHTML = sorted.map(z => {
+      const dateFmt = z.date
+        ? new Date(z.date + 'T00:00:00').toLocaleDateString('pl-PL', { day: 'numeric', month: 'long', year: 'numeric' })
+        : '';
+      return `<div class="flex items-start justify-between gap-3 bg-slate-900 border border-slate-800 rounded-xl p-4">
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${tagColorClass(z.tag)}">${escapeHtml(z.tag)}</span>
+            <span class="text-xs text-slate-500">${dateFmt}</span>
+          </div>
+          <p class="text-sm font-bold text-white">${escapeHtml(z.title)}</p>
+          <p class="text-xs text-slate-500 mt-0.5">${escapeHtml(z.description)}</p>
+        </div>
+        <button onclick="deleteZmiana('${z.id}')" class="shrink-0 text-slate-500 hover:text-red-400 transition-colors p-1" title="Usuń wpis">🗑️</button>
+      </div>`;
+    }).join('');
+  }
+
+  async function addZmiana() {
+    const tag = document.getElementById('z-tag').value;
+    const date = document.getElementById('z-date').value || new Date().toISOString().split('T')[0];
+    const title = document.getElementById('z-title').value.trim();
+    const description = document.getElementById('z-desc').value.trim();
+    const statusEl = document.getElementById('zmiany-status');
+
+    if (!title || !description) {
+      statusEl.className = 'text-sm mt-4 text-red-400';
+      statusEl.innerText = 'Uzupełnij tytuł i opis.';
+      return;
+    }
+
+    const btn = document.getElementById('add-zmiana-btn');
+    btn.disabled = true;
+    btn.innerText = 'Zapisywanie...';
+    statusEl.className = 'text-sm mt-4 text-slate-400';
+    statusEl.innerText = '';
+
+    const newEntry = { id: date + '-' + slugify(title), date, tag, title, description };
+    const updated = [newEntry, ...zmianyData];
+
+    try {
+      const newSha = await pushGithubFile(ZMIANY_FILE_PATH, buildZmianyContent(updated), zmianySha, 'Dodano wpis do Co nowego: ' + title);
+      zmianyData = updated;
+      zmianySha = newSha;
+      renderZmianyList();
+      document.getElementById('z-title').value = '';
+      document.getElementById('z-desc').value = '';
+      statusEl.className = 'text-sm mt-4 text-emerald-400';
+      statusEl.innerText = '✅ Dodano! Wpis pojawi się na /co-nowego.html w ciągu kilku sekund - kilku minut.';
+    } catch (err) {
+      statusEl.className = 'text-sm mt-4 text-red-400';
+      statusEl.innerText = '❌ ' + err.message;
+    } finally {
+      btn.disabled = false;
+      btn.innerText = '➕ Dodaj wpis';
+    }
+  }
+
+  async function deleteZmiana(id) {
+    if (!confirm('Na pewno usunąć ten wpis z listy „Co nowego”?')) return;
+    const statusEl = document.getElementById('zmiany-status');
+    statusEl.className = 'text-sm mt-4 text-slate-400';
+    statusEl.innerText = 'Usuwanie...';
+
+    const updated = zmianyData.filter(z => z.id !== id);
+
+    try {
+      const newSha = await pushGithubFile(ZMIANY_FILE_PATH, buildZmianyContent(updated), zmianySha, 'Usunięto wpis z Co nowego (' + id + ')');
+      zmianyData = updated;
+      zmianySha = newSha;
+      renderZmianyList();
+      statusEl.className = 'text-sm mt-4 text-emerald-400';
+      statusEl.innerText = '✅ Usunięto.';
+    } catch (err) {
+      statusEl.className = 'text-sm mt-4 text-red-400';
+      statusEl.innerText = '❌ ' + err.message;
+    }
+  }
+</script>
+</body>
+</html>
