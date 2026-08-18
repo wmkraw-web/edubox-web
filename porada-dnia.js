@@ -1,4 +1,4 @@
 window.PORADA_DNIA = {
-  "text": "Regularnie wprowadzaj krótkie, angażujące przerwy w trakcie lekcji, aby poprawić koncentrację uczniów i stworzyć bardziej dynamiczną atmosferę w klasie.",
-  "date": "2026-08-17"
+  "text": "Wprowadź system krótkich, regularnych ocenianych zadań, aby uczniowie mogli otrzymywać na bieżąco informację zwrotną i motywować się do dalszej pracy.",
+  "date": "2026-08-18"
 };
