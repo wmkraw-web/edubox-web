@@ -26,11 +26,26 @@ const getWeekKey = () => {
 let app, auth, db, currentUser = null;
 let isInitialized = false;
 
+// Sprawdza i czyści wygasły bonusowy dostęp PRO (np. nagroda za polecenie znajomego).
+// Dotyczy WYŁĄCZNIE kont, które dostały czasowy bonus (eduboxBonusUntil ustawione) —
+// nigdy nie rusza stałego, jednorazowo wykupionego dostępu PRO (ten nie ma tego klucza).
+const checkAndExpireBonusPro = () => {
+    try {
+        const bonusUntil = localStorage.getItem('eduboxBonusUntil');
+        if (!bonusUntil) return;
+        if (new Date(bonusUntil).getTime() < Date.now()) {
+            localStorage.removeItem('eduboxBonusUntil');
+            localStorage.removeItem('eduboxProStatus');
+        }
+    } catch (e) {}
+};
+
 // 2. GŁÓWNY OBIEKT EDUBOX CORE
 export const EduBoxCore = {
     
     // Inicjalizacja (logowanie + pobranie menu)
     init: (onUserLoad) => {
+        checkAndExpireBonusPro();
         if (!isInitialized) {
             app = initializeApp(FIREBASE_CONFIG);
             auth = getAuth(app);
@@ -142,7 +157,7 @@ export const EduBoxCore = {
         onSuccess(newCount);
     },
 
-    // Weryfikacja kodu premium
+    // Weryfikacja kodu premium (stały kod PREMIUM_CODE ORAZ czasowe kody bonusowe z polecenia)
     verifyPremiumCode: async (code) => {
         try {
             const res = await fetch('/api/verify-code', {
@@ -151,6 +166,16 @@ export const EduBoxCore = {
                 body: JSON.stringify({ code })
             });
             const data = await res.json();
+            if (data.valid === true) {
+                if (data.bonus === true && data.until) {
+                    // Kod bonusowy (z polecenia) — czasowy dostęp, wygasa samoczynnie.
+                    localStorage.setItem('eduboxBonusUntil', data.until);
+                } else {
+                    // Zwykły, stały kod (bezpośredni zakup) — usuwamy ewentualny stary
+                    // licznik bonusu, żeby nie wygasił w przyszłości permanentnego dostępu.
+                    localStorage.removeItem('eduboxBonusUntil');
+                }
+            }
             return data.valid === true;
         } catch (e) {
             return false;
