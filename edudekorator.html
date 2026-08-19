@@ -220,6 +220,8 @@
             const [isPublishing, setIsPublishing] = useState(false);
             const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
             const previewRef = useRef(null);
+            const printOnlyRef = useRef(null);
+            const actionsRef = useRef(null);
 
             useEffect(() => {
                 const initDb = () => {
@@ -376,7 +378,13 @@ WYMÓG JSON:
                         try { window.localStorage.setItem('edubox_eduwystroj_ai', newCount.toString()); } catch(e) {}
                     }
                     showMessage('Gotowe do druku!', 'success');
-                } catch (error) { 
+                    // Panel z przyciskami DRUKUJ/POBIERZ PDF/DODAJ DO BAZY bywa niżej niż widoczny
+                    // fragment ekranu (osobny scrollowalny panel) - dojeżdżamy do niego automatycznie,
+                    // żeby nikt nie musiał go szukać.
+                    setTimeout(() => {
+                        actionsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+                    }, 150);
+                } catch (error) {
                     showMessage(error.message, 'error'); 
                 } finally { 
                     setIsGenerating(false); 
@@ -385,10 +393,21 @@ WYMÓG JSON:
             };
 
             const downloadPDF = async () => {
-                if (!previewRef.current) return;
+                const printEl = printOnlyRef.current;
+                if (!printEl) return;
                 setIsDownloadingPdf(true);
+
+                // .print-only jest normalnie ukryte (display:none) na ekranie - html2canvas nie potrafi
+                // porządnie sfotografować czegoś niewidocznego, więc chwilowo "odsłaniamy" je poza kadrem,
+                // robimy zdjęcie DOKŁADNIE tego, co idzie na wydruk (więc PDF = wydruk 1:1), i chowamy z powrotem.
+                const prevCssText = printEl.style.cssText;
+                const pdfFontSize = printSize === 'large' ? '22px' : printSize === 'small' ? '12px' : '16px';
+                printEl.style.cssText = `display:block !important; position:fixed; left:-9999px; top:0; width:794px; background:#ffffff; z-index:-1; font-size:${pdfFontSize};`;
+
                 try {
-                    const canvas = await html2canvas(previewRef.current, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+                    // Krótka pauza, by przeglądarka zdążyła policzyć layout/obrazki przed zrzutem.
+                    await new Promise(r => setTimeout(r, 50));
+                    const canvas = await html2canvas(printEl, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
                     const imgData = canvas.toDataURL('image/jpeg', 0.95);
                     const { jsPDF } = window.jspdf;
                     const pdf = new jsPDF('p', 'mm', 'a4');
@@ -411,6 +430,7 @@ WYMÓG JSON:
                     console.error('Błąd generowania PDF:', error);
                     showMessage('Nie udało się pobrać PDF. Użyj przycisku "Drukuj" i wybierz "Zapisz jako PDF".', 'error');
                 } finally {
+                    printEl.style.cssText = prevCssText;
                     setIsDownloadingPdf(false);
                 }
             };
@@ -440,7 +460,7 @@ WYMÓG JSON:
             }, [appMode]);
 
             // --- INTELIGENTNE RENDEROWANIE SKALOWALNE ---
-            const renderLayout = () => {
+            const renderLayout = (isPrint = false) => {
                 if (!resultData || !resultData.data) return null;
                 const { type, data } = resultData;
 
@@ -461,13 +481,22 @@ WYMÓG JSON:
                                         <div className="flex-1 bg-slate-50/80 rounded-[1.25rem] border-2 border-dashed border-slate-300 relative flex items-center justify-center overflow-hidden transition-colors hover:bg-slate-100/80 focus-within:border-emerald-400">
                                             <div className="absolute top-2 right-3 text-xl opacity-30">⭐</div>
                                             <div className="absolute bottom-2 left-3 text-xl opacity-30">❤️</div>
-                                            <input
-                                                type="text"
-                                                value={labelNames[i] || ''}
-                                                onChange={(e) => setLabelNames(prev => ({ ...prev, [i]: e.target.value }))}
-                                                placeholder="Imię Dziecka"
-                                                className="w-full h-full bg-transparent text-center outline-none font-kids text-2xl md:text-3xl font-bold text-slate-800 placeholder-slate-300 px-4 z-10 print-input"
-                                            />
+                                            {isPrint ? (
+                                                /* W wersji do druku/PDF NIE używamy <input> - przeglądarki i html2canvas
+                                                   potrafią nie przenieść aktualnej wartości pola na wydruk/eksport,
+                                                   dlatego wypisujemy imię jako zwykły, "pewny" tekst. */
+                                                <div className="w-full h-full flex items-center justify-center text-center font-kids text-2xl md:text-3xl font-bold text-slate-800 px-4 z-10">
+                                                    {labelNames[i] || ''}
+                                                </div>
+                                            ) : (
+                                                <input
+                                                    type="text"
+                                                    value={labelNames[i] || ''}
+                                                    onChange={(e) => setLabelNames(prev => ({ ...prev, [i]: e.target.value }))}
+                                                    placeholder="Imię Dziecka"
+                                                    className="w-full h-full bg-transparent text-center outline-none font-kids text-2xl md:text-3xl font-bold text-slate-800 placeholder-slate-300 px-4 z-10 print-input"
+                                                />
+                                            )}
                                         </div>
                                     </div>
                                 ))}
@@ -648,9 +677,10 @@ WYMÓG JSON:
                         </div>
                     )}
 
-                    {/* Widok Drukowania - Uwolniony od ograniczeń */}
-                    <div className="print-only">
-                        {renderLayout()}
+                    {/* Widok Drukowania - Uwolniony od ograniczeń. Ten sam DOM służy też
+                        do generowania POBIERZ PDF, żeby wydruk i PDF były identyczne. */}
+                    <div className="print-only" ref={printOnlyRef}>
+                        {renderLayout(true)}
                     </div>
 
                     <aside className="w-80 flex-shrink-0 bg-white/90 backdrop-blur-xl border-r border-emerald-100 flex flex-col h-full z-10 no-print transition-all duration-300 shadow-xl">
@@ -794,15 +824,15 @@ WYMÓG JSON:
                                         </div>
                                         <div className="p-4 md:p-8 overflow-x-auto">
                                             <div ref={previewRef} className="preview-scale-wrap">
-                                                {renderLayout()}
+                                                {renderLayout(false)}
                                             </div>
                                         </div>
                                     </div>
 
                                     {/* AKCJE I ROZMIAR */}
-                                    <div className="mt-10 bg-white border border-slate-200 rounded-3xl p-8 text-center shadow-xl flex flex-col items-center">
-                                        <h3 className="text-2xl font-kids font-black text-slate-800 mb-6">Gotowe do druku! 🖨️</h3>
-                                        
+                                    <div ref={actionsRef} className="mt-10 bg-white border-4 border-emerald-300 rounded-3xl p-8 text-center shadow-2xl flex flex-col items-center scroll-mt-6">
+                                        <h3 className="text-2xl font-kids font-black text-slate-800 mb-6">Gotowe do druku! 🖨️ (przewiń w dół po przyciski)</h3>
+
                                         {/* PANEL WYBORU ROZMIARU WYDRUKU */}
                                         <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-6 w-full max-w-2xl mb-8 shadow-sm">
                                             <h4 className="text-sm font-bold text-emerald-800 mb-4 uppercase tracking-wider flex items-center justify-center gap-2">
