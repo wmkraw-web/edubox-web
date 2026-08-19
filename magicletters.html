@@ -250,9 +250,12 @@
 
             // Init
             useEffect(() => {
-                if (window.EduBoxCore) {
-                    window.EduBoxCore.onUserChange((u) => setUser(u));
-                }
+                const initCore = () => {
+                    if (window.EduBoxCore && window.EduBoxCore.init) {
+                        window.EduBoxCore.init((u) => setUser(u));
+                    } else { setTimeout(initCore, 100); }
+                };
+                initCore();
                 const savedGens = localStorage.getItem('edubox_magicletters_ai');
                 if (savedGens) setAiGenerations(parseInt(savedGens));
                 
@@ -276,7 +279,12 @@
                 const __data = await __res.json();
                 if (__data.valid) {
                     setIsPremium(true);
-                    localStorage.setItem('edubox_premium', 'unlocked');
+                    if (__data.bonus === true && __data.until) {
+                        localStorage.setItem('eduboxBonusUntil', __data.until);
+                        localStorage.setItem('eduboxProStatus', 'active');
+                    } else {
+                        localStorage.setItem('edubox_premium', 'unlocked');
+                    }
                     setPremiumCode('');
                     showMessage('Kod Premium zaakceptowany!', 'success');
                 } else {

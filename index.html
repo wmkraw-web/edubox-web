@@ -594,6 +594,29 @@
             const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
             const [announcement, setAnnouncement] = useState(null);
 
+            // Kod PRO (stały zakup / kod z polecenia / kod za kawę)
+            const [showProModal, setShowProModal] = useState(false);
+            const [proCode, setProCode] = useState('');
+            const [proChecking, setProChecking] = useState(false);
+            const handleVerifyProCode = async () => {
+                if (!proCode.trim()) return;
+                setProChecking(true);
+                try {
+                    const ok = await window.EduBoxCore.verifyPremiumCode(proCode.trim());
+                    if (ok) {
+                        localStorage.setItem('eduboxProStatus', 'PRO');
+                        setProCode('');
+                        setShowProModal(false);
+                        alert('Kod przyjęty! Wersja PRO odblokowana. Strona się odświeży.');
+                        window.location.reload();
+                    } else {
+                        alert('Nieprawidłowy kod PRO. Spróbuj ponownie.');
+                    }
+                } finally {
+                    setProChecking(false);
+                }
+            };
+
 useEffect(() => {
     let attempts = 0;
     const checkAnnouncement = () => {
@@ -752,6 +775,14 @@ const closeAnnouncement = () => {
                                     <i className={`ph-fill ${theme === 'dark' ? 'ph-sun' : 'ph-moon'} text-xl`}></i>
                                 </button>
                                 
+                                <button
+                                    onClick={() => setShowProModal(true)}
+                                    className="hidden md:flex items-center gap-1.5 text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors px-2"
+                                    title="Mam kod PRO"
+                                >
+                                    🔑 Mam kod PRO
+                                </button>
+
                                 <a href={BUY_COFFEE_LINK} target="_blank" className="hidden md:flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-full hover:bg-blue-500 transition-all shadow-[0_0_20px_rgba(59,130,246,0.4)] active:scale-95 group">
     Postaw Kawę <span className="group-hover:-translate-y-1 group-hover:rotate-12 transition-transform duration-300">☕</span>
 </a>
@@ -773,12 +804,52 @@ const closeAnnouncement = () => {
                                 <a href="co-nowego.html" className="py-3 text-sm font-bold text-slate-700 dark:text-slate-300 border-b border-slate-100 dark:border-slate-800">Co nowego</a>
                                 <a href="#wideo" onClick={() => setMobileMenuOpen(false)} className="py-3 text-sm font-bold text-slate-700 dark:text-slate-300 border-b border-slate-100 dark:border-slate-800">Galeria</a>
                                 <a href="oferta.pdf" target="_blank" className="py-3 text-sm font-bold text-emerald-600 dark:text-emerald-400 border-b border-slate-100 dark:border-slate-800">📄 Katalog</a>
+                                <button
+                                    onClick={() => { setMobileMenuOpen(false); setShowProModal(true); }}
+                                    className="py-3 text-sm font-bold text-slate-700 dark:text-slate-300 border-b border-slate-100 dark:border-slate-800 text-left"
+                                >
+                                    🔑 Mam kod PRO
+                                </button>
                                 <a href={BUY_COFFEE_LINK} target="_blank" className="mt-3 mb-1 flex items-center justify-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-full font-bold">
                                     Postaw Kawę ☕
                                 </a>
                             </div>
                         )}
                     </nav>
+
+                    {showProModal && (
+                        <div
+                            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[110] flex items-center justify-center p-4"
+                            onClick={(e) => { if (e.target === e.currentTarget) setShowProModal(false); }}
+                        >
+                            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-sm w-full p-8 relative shadow-2xl">
+                                <button
+                                    onClick={() => setShowProModal(false)}
+                                    className="absolute top-4 right-4 text-slate-400 hover:text-slate-700 dark:hover:text-white transition-colors"
+                                    aria-label="Zamknij"
+                                >
+                                    <i className="ph-bold ph-x text-xl"></i>
+                                </button>
+                                <h3 className="text-lg font-black text-slate-900 dark:text-white mb-2">Masz kod PRO?</h3>
+                                <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">Wpisz kod z zakupu, z polecenia lub za kawę — odblokujesz wersję PRO na tym urządzeniu.</p>
+                                <input
+                                    type="text"
+                                    value={proCode}
+                                    onChange={(e) => setProCode(e.target.value)}
+                                    onKeyDown={(e) => { if (e.key === 'Enter') handleVerifyProCode(); }}
+                                    placeholder="Wpisz kod PRO"
+                                    className="w-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-2.5 text-sm text-slate-900 dark:text-white outline-none focus:border-blue-500 uppercase mb-3"
+                                />
+                                <button
+                                    onClick={handleVerifyProCode}
+                                    disabled={proChecking}
+                                    className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-60 text-white px-5 py-2.5 rounded-full text-sm font-bold transition-all"
+                                >
+                                    {proChecking ? 'Sprawdzam...' : 'Odblokuj PRO'}
+                                </button>
+                            </div>
+                        </div>
+                    )}
 
                     {/* HERO & VIDEO ASSISTANT */}
                     <header className="relative pt-32 pb-20 md:pt-48 md:pb-24 px-6 z-10">
