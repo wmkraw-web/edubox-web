@@ -28,7 +28,7 @@
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin=""></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&amp;display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&family=Baloo+2:wght@600;700;800&family=Kalam:wght@700&amp;display=swap" rel="stylesheet">
     
     <!-- Ikony Phosphor (Standard V3 PRO MAX) -->
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
@@ -158,8 +158,6 @@
         window.dispatchEvent(new Event('EduBoxCoreReady'));
     </script>
 
-    <div id="root"></div>
-
 <script type="text/babel">
         const { useState, useEffect, useRef } = React;
 
@@ -179,11 +177,38 @@
             const [orientationOption, setOrientationOption] = useState('3:4'); // Proporcje
             
             const [generatedImage, setGeneratedImage] = useState(null);
-            const [generatingStatus, setGeneratingStatus] = useState(''); 
+            const [generatingStatus, setGeneratingStatus] = useState('');
             const [error, setError] = useState('');
             const [toastMessage, setToastMessage] = useState('');
+            const [textLayers, setTextLayers] = useState([]);
+            const [isExporting, setIsExporting] = useState(false);
 
             const resultRef = useRef(null);
+            const posterImgRef = useRef(null);
+
+            const TEXT_FONTS = {
+                jakarta: { label: 'Nowoczesna', css: "'Plus Jakarta Sans', sans-serif" },
+                baloo: { label: 'Zaokrąglona', css: "'Baloo 2', sans-serif" },
+                kalam: { label: 'Odręczna', css: "'Kalam', cursive" },
+            };
+            const TEXT_POSITIONS = { top: '6%', center: '46%', bottom: '82%' };
+
+            const addTextLayer = () => {
+                setTextLayers(prev => [...prev, {
+                    id: Date.now() + Math.random(),
+                    text: 'Twój tekst',
+                    position: 'bottom',
+                    fontSize: 44,
+                    color: '#ffffff',
+                    font: 'baloo'
+                }]);
+            };
+            const updateTextLayer = (id, patch) => {
+                setTextLayers(prev => prev.map(l => l.id === id ? { ...l, ...patch } : l));
+            };
+            const removeTextLayer = (id) => {
+                setTextLayers(prev => prev.filter(l => l.id !== id));
+            };
 
             // --- INICJALIZACJA EDUBOX CORE ---
             useEffect(() => {
@@ -240,7 +265,7 @@
                         setUsageCount(newCount);
                         try {
                             const name = `Plakat: ${promptInput.substring(0, 20)}...`;
-                            const config = { promptInput, styleOption, orientationOption, generatedImage };
+                            const config = { promptInput, styleOption, orientationOption, generatedImage, textLayers };
                             
                             await window.EduBoxCore.saveToGielda('gielda_wzorow_eduplakat', 'Plakat Szkolny', name, config);
                             showToast("✨ Udostępniono w Bazie Plakatów!");
@@ -261,6 +286,7 @@
                     if(c.orientationOption) setOrientationOption(c.orientationOption);
                     
                     setGeneratedImage(c.generatedImage);
+                    setTextLayers(Array.isArray(c.textLayers) ? c.textLayers : []);
                     setAppMode('editor');
                     showToast("✨ Załadowano Plakat z Bazy!");
                     setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
@@ -287,19 +313,22 @@
                 setGeneratingStatus('1/2 Wzbogacam Twój opis (AI)...');
                 setError('');
                 setGeneratedImage(null);
+                setTextLayers([]);
 
                 try {
                     // ETAP 1: GPT-4o-mini REŻYSERUJE SCENĘ
                     let enhancedPrompt = promptInput;
                     try {
-                        const systemPrompt = `You are an expert AI image prompt engineer. The user will give you a simple idea in Polish. 
-                        Your job is to rewrite it into a highly detailed, physically logical, and descriptive image prompt IN ENGLISH. 
+                        const systemPrompt = `You are an expert AI image prompt engineer specializing in children's educational posters. The user will give you a simple idea in Polish.
+                        Your job is to rewrite it into a highly detailed, physically logical, and descriptive image prompt IN ENGLISH.
                         CRITICAL RULES:
                         1. Define spatial relations clearly (e.g., 'A boy stands on the left holding a flower, handing it to his mother standing on the right').
-                        2. Prevent object merging (ensure hands hold correct items).
+                        2. Prevent object merging (ensure hands hold correct items, correct number of fingers, no floating limbs).
                         3. If there are people, clearly specify they are Caucasian/European.
-                        4. Keep it under 60 words.
-                        5. Reply ONLY with the English prompt, nothing else.`;
+                        4. Describe ONE clear, uncluttered focal composition — avoid busy backgrounds that would compete with text added later.
+                        5. Leave a calm, visually simple margin near the top and bottom edges of the frame (plain sky, wall, floor, or soft color) so a caption can be placed there later without covering important details.
+                        6. Keep it under 80 words.
+                        7. Reply ONLY with the English prompt, nothing else.`;
 
                         const resChat = await fetch('/api/chat', {
                             method: 'POST', 
@@ -334,8 +363,8 @@
                     let orientationText = orientationOption === '3:4' ? 'Vertical portrait format.' : (orientationOption === '4:3' ? 'Horizontal landscape format.' : 'Square format.');
 
                     // Łączymy ulepszony przez GPT prompt ze stylem i zakazami
-                    const fullPrompt = `${enhancedPrompt}. STYLE: ${styleModifier}. ${orientationText} ABSOLUTELY NO TEXT, no words, no letters. Perfect human anatomy.`;
-                    const negativePrompt = "text, words, letters, extra limbs, bad anatomy, deformed, missing fingers, extra fingers, ugly, poorly drawn";
+                    const fullPrompt = `${enhancedPrompt}. STYLE: ${styleModifier}. ${orientationText} ABSOLUTELY NO TEXT, no words, no letters, no signage, no captions, no watermarks. Perfect human anatomy, correct number of fingers.`;
+                    const negativePrompt = "text, words, letters, signage, captions, watermark, logo, extra limbs, bad anatomy, deformed, missing fingers, extra fingers, mutated hands, ugly, poorly drawn, blurry, low quality";
 
                     // Rozbudowujemy paczkę wymiarów
                     let sizeParam = '1024x1024';
@@ -389,8 +418,14 @@
                 }
             };
 
-            const handleDownload = () => {
-                if (generatedImage) {
+            // Buduje HTML nakładki tekstowej (używane zarówno w podglądzie na ekranie jak i przy drukowaniu)
+            const buildTextOverlayHtml = () => textLayers.map(l => `
+                <div style="position:absolute; left:5%; width:90%; top:${TEXT_POSITIONS[l.position] || TEXT_POSITIONS.bottom}; transform:translateY(-50%); text-align:center; font-family:${TEXT_FONTS[l.font]?.css || TEXT_FONTS.baloo.css}; font-size:${l.fontSize}px; font-weight:800; color:${l.color}; -webkit-text-stroke: 2px rgba(0,0,0,0.55); text-shadow: 0 2px 6px rgba(0,0,0,0.5); line-height:1.15; white-space:pre-wrap; word-break:break-word;">${(l.text || '').replace(/</g,'&lt;')}</div>
+            `).join('');
+
+            const handleDownload = async () => {
+                if (!generatedImage) return;
+                if (textLayers.length === 0) {
                     const a = document.createElement('a');
                     a.href = generatedImage;
                     a.download = `EduPlakat_${new Date().getTime()}.png`;
@@ -398,6 +433,54 @@
                     document.body.appendChild(a);
                     a.click();
                     document.body.removeChild(a);
+                    return;
+                }
+
+                setIsExporting(true);
+                try {
+                    const img = new Image();
+                    img.crossOrigin = 'anonymous';
+                    await new Promise((resolve, reject) => {
+                        img.onload = resolve;
+                        img.onerror = reject;
+                        img.src = generatedImage;
+                    });
+
+                    const canvas = document.createElement('canvas');
+                    canvas.width = img.naturalWidth;
+                    canvas.height = img.naturalHeight;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+                    textLayers.forEach(l => {
+                        const fontSizePx = (l.fontSize / 500) * canvas.width; // skalujemy względem szerokości obrazka
+                        ctx.font = `800 ${fontSizePx}px ${TEXT_FONTS[l.font]?.css || TEXT_FONTS.baloo.css}`;
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        const yPct = parseFloat(TEXT_POSITIONS[l.position] || TEXT_POSITIONS.bottom) / 100;
+                        const x = canvas.width / 2;
+                        const y = canvas.height * yPct;
+                        const maxWidth = canvas.width * 0.9;
+
+                        ctx.lineWidth = fontSizePx * 0.12;
+                        ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+                        ctx.strokeText(l.text, x, y, maxWidth);
+                        ctx.fillStyle = l.color;
+                        ctx.fillText(l.text, x, y, maxWidth);
+                    });
+
+                    const dataUrl = canvas.toDataURL('image/png');
+                    const a = document.createElement('a');
+                    a.href = dataUrl;
+                    a.download = `EduPlakat_${new Date().getTime()}.png`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                } catch (e) {
+                    console.error('Błąd eksportu z tekstem:', e);
+                    showToast('Nie udało się zapisać wersji z tekstem — spróbuj "Drukuj" zamiast pobierania.');
+                } finally {
+                    setIsExporting(false);
                 }
             };
 
@@ -411,13 +494,14 @@
                             <style>
                                 @page { margin: 0; }
                                 html, body { margin: 0; padding: 0; width: 100vw; height: 100vh; background-color: #fff; overflow: hidden; }
-                                .print-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
-                                img { width: 100%; height: 100%; object-fit: cover; object-position: center; }
+                                .print-container { position: relative; top: 0; left: 0; width: 100%; height: 100%; }
+                                img { width: 100%; height: 100%; object-fit: cover; object-position: center; display: block; }
                             </style>
                         </head>
                         <body>
                             <div class="print-container">
                                 <img src="${generatedImage}" />
+                                ${buildTextOverlayHtml()}
                             </div>
                         </body>
                         </html>
@@ -426,7 +510,7 @@
                     printWin.document.open();
                     printWin.document.write(windowContent);
                     printWin.document.close();
-                    
+
                     setTimeout(() => {
                         printWin.focus();
                         printWin.print();
@@ -654,8 +738,8 @@
                                     <div className="flex flex-col sm:flex-row items-center justify-between w-full mb-6 print-hidden gap-4">
                                         <h3 className="text-xl font-bold text-white text-center sm:text-left">Twój Gotowy Plakat</h3>
                                         <div className="flex gap-3 w-full sm:w-auto flex-col sm:flex-row">
-                                            <button onClick={handleDownload} className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-3 rounded-xl font-bold flex items-center gap-2 transition-all btn-bounce shadow-lg justify-center">
-                                                <i className="ph-bold ph-download-simple text-xl"></i> Pobierz
+                                            <button onClick={handleDownload} disabled={isExporting} className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-3 rounded-xl font-bold flex items-center gap-2 transition-all btn-bounce shadow-lg justify-center disabled:opacity-50">
+                                                {isExporting ? <i className="ph-bold ph-spinner animate-spin text-xl"></i> : <i className="ph-bold ph-download-simple text-xl"></i>} Pobierz
                                             </button>
                                             <button onClick={handlePrint} className="bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-3 rounded-xl font-bold flex items-center gap-2 transition-all btn-bounce shadow-lg justify-center">
                                                 <i className="ph-bold ph-printer text-xl"></i> Drukuj
@@ -663,8 +747,60 @@
                                         </div>
                                     </div>
 
-                                    <div className={`bg-white p-2 rounded-3xl magic-border shadow-2xl print:shadow-none print:p-0 w-full flex justify-center ${orientationOption === '3:4' ? 'max-w-[500px]' : (orientationOption === '4:3' ? 'max-w-[800px]' : 'max-w-[600px]')}`}>
-                                        <img src={generatedImage} alt="Plakat edukacyjny" className="w-full h-auto rounded-2xl print-only-image" />
+                                    <div className={`relative bg-white p-2 rounded-3xl magic-border shadow-2xl print:shadow-none print:p-0 w-full flex justify-center ${orientationOption === '3:4' ? 'max-w-[500px]' : (orientationOption === '4:3' ? 'max-w-[800px]' : 'max-w-[600px]')}`}>
+                                        <div className="relative w-full">
+                                            <img ref={posterImgRef} src={generatedImage} alt="Plakat edukacyjny" className="w-full h-auto rounded-2xl print-only-image" />
+                                            {textLayers.map(l => (
+                                                <div key={l.id} style={{
+                                                    position: 'absolute', left: '5%', width: '90%',
+                                                    top: TEXT_POSITIONS[l.position] || TEXT_POSITIONS.bottom,
+                                                    transform: 'translateY(-50%)', textAlign: 'center',
+                                                    fontFamily: TEXT_FONTS[l.font]?.css || TEXT_FONTS.baloo.css,
+                                                    fontSize: `${l.fontSize}px`, fontWeight: 800, color: l.color,
+                                                    WebkitTextStroke: '2px rgba(0,0,0,0.55)', textShadow: '0 2px 6px rgba(0,0,0,0.5)',
+                                                    lineHeight: 1.15, whiteSpace: 'pre-wrap', wordBreak: 'break-word', pointerEvents: 'none'
+                                                }}>{l.text}</div>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* EDYTOR TEKSTU NA PLAKACIE */}
+                                    <div className="w-full mt-8 glass-panel p-6 rounded-3xl border border-slate-700/50 print-hidden">
+                                        <div className="flex items-center justify-between mb-4">
+                                            <h4 className="text-white font-bold flex items-center gap-2"><i className="ph-bold ph-text-t text-xl text-cyan-400"></i> Tekst na plakacie</h4>
+                                            <button onClick={addTextLayer} className="bg-cyan-600 hover:bg-cyan-500 text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all btn-bounce">
+                                                <i className="ph-bold ph-plus"></i> Dodaj tekst
+                                            </button>
+                                        </div>
+                                        {textLayers.length === 0 ? (
+                                            <p className="text-slate-500 text-xs">Brak tekstu na plakacie. Kliknij "Dodaj tekst", żeby dopisać np. tytuł albo hasło.</p>
+                                        ) : (
+                                            <div className="space-y-4">
+                                                {textLayers.map(l => (
+                                                    <div key={l.id} className="bg-slate-900/60 border border-slate-700 rounded-2xl p-4 flex flex-col gap-3">
+                                                        <div className="flex gap-3 items-start">
+                                                            <input value={l.text} onChange={e => updateTextLayer(l.id, { text: e.target.value })} placeholder="Treść napisu..." className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-cyan-500" />
+                                                            <button onClick={() => removeTextLayer(l.id)} className="shrink-0 bg-red-900/40 hover:bg-red-900/70 text-red-300 w-9 h-9 rounded-lg flex items-center justify-center transition-all"><i className="ph-bold ph-trash"></i></button>
+                                                        </div>
+                                                        <div className="flex flex-wrap gap-3 items-center">
+                                                            <select value={l.position} onChange={e => updateTextLayer(l.id, { position: e.target.value })} className="bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white outline-none">
+                                                                <option value="top">Góra</option>
+                                                                <option value="center">Środek</option>
+                                                                <option value="bottom">Dół</option>
+                                                            </select>
+                                                            <select value={l.font} onChange={e => updateTextLayer(l.id, { font: e.target.value })} className="bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white outline-none">
+                                                                {Object.entries(TEXT_FONTS).map(([key, opt]) => <option key={key} value={key}>{opt.label}</option>)}
+                                                            </select>
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="text-[10px] text-slate-400 font-bold uppercase">Rozmiar</span>
+                                                                <input type="range" min="20" max="90" value={l.fontSize} onChange={e => updateTextLayer(l.id, { fontSize: Number(e.target.value) })} className="w-24" />
+                                                            </div>
+                                                            <input type="color" value={l.color} onChange={e => updateTextLayer(l.id, { color: e.target.value })} className="w-9 h-9 rounded-lg border border-slate-700 bg-slate-900 cursor-pointer" />
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
                                     </div>
 
                                 </div>
