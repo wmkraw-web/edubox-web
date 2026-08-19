@@ -1,4 +1,4 @@
 window.PORADA_DNIA = {
-  "text": "Wprowadź system krótkich, regularnych ocenianych zadań, aby uczniowie mogli otrzymywać na bieżąco informację zwrotną i motywować się do dalszej pracy.",
-  "date": "2026-08-18"
+  "text": "Regularnie zbieraj i analizuj feedback od uczniów, aby lepiej dostosować metody nauczania do ich potrzeb i zwiększyć zaangażowanie w procesie edukacji.",
+  "date": "2026-08-19"
 };
