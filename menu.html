@@ -59,6 +59,11 @@
                     </div>
                 </div>
 
+                <!-- Przycisk Poleć znajomym - tylko na komputerze, na telefonie jest w rozwijanym menu -->
+                <button onclick="openPolecOverlay()" class="hidden lg:flex bg-emerald-600 hover:bg-emerald-500 text-white px-3 sm:px-4 py-2 rounded-lg text-sm font-bold shadow-lg transition-all hover:-translate-y-0.5 items-center gap-2 flex-shrink-0">
+                    🎁 <span class="hidden xl:inline">Poleć i zyskaj PRO</span>
+                </button>
+
                 <!-- Przycisk Kawa - zwarty na telefonie -->
                 <a href="https://buycoffee.to/magiccolor" target="_blank" class="bg-amber-500 hover:bg-amber-400 text-slate-900 px-3 sm:px-4 py-2 rounded-lg text-sm font-bold shadow-lg transition-all hover:-translate-y-0.5 flex items-center gap-2 flex-shrink-0">
                     ☕ <span class="hidden xl:inline">Kawa (PRO)</span>
@@ -82,6 +87,10 @@
             <a href="edugry.html" class="block px-3 py-2.5 rounded-md text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-800">Gry &amp; Zabawy</a>
             <a href="blog.html" class="block px-3 py-2.5 rounded-md text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-800">Blog</a>
             <a href="co-nowego.html" class="block px-3 py-2.5 rounded-md text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-800">Co nowego</a>
+
+            <button onclick="openPolecOverlay()" class="mx-3 mt-3 bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-2.5 rounded-md text-sm font-bold text-center flex items-center justify-center gap-2">
+                🎁 Poleć i zyskaj PRO
+            </button>
 
             <div class="mt-2 pt-3 border-t border-slate-800 flex items-center justify-between px-3">
                 <span class="text-xs text-slate-400 font-medium">Pozostało użyć:</span>
@@ -111,6 +120,32 @@
                 <a id="ogloszenie-link" href="#" class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-full text-sm font-bold transition-all">
                     <span id="ogloszenie-link-text"></span>
                 </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- OKNO "POLEĆ ZNAJOMYM" -->
+    <div id="polec-overlay" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-[100] items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-700 rounded-3xl max-w-md w-full p-8 relative shadow-2xl">
+            <button onclick="closePolecOverlay()" class="absolute top-4 right-4 text-slate-400 hover:text-white transition-colors" aria-label="Zamknij">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+            <div id="polec-form-view">
+                <div class="inline-flex items-center gap-2 bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full mb-4">
+                    🎁 Poleć znajomym
+                </div>
+                <h3 class="text-xl font-black text-white mb-2">Poleć EduBox AI, zdobądź 7 dni PRO</h3>
+                <p class="text-slate-300 text-sm leading-relaxed mb-5">Podaj swój e-mail — wyślemy Ci unikalny kod. Przekaż go znajomej/znajomemu nauczycielowi: gdy go wykorzysta, Ty automatycznie dostaniesz kolejny kod na 7 dni PRO. Bez limitu poleceń!</p>
+                <div class="space-y-3">
+                    <input id="polec-name" type="text" placeholder="Imię (opcjonalnie)" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-sm text-white outline-none focus:border-emerald-500">
+                    <input id="polec-email" type="email" placeholder="Twój adres e-mail" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-sm text-white outline-none focus:border-emerald-500">
+                    <button onclick="submitPolec()" id="polec-submit-btn" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-2.5 rounded-full text-sm font-bold transition-all">Wyślij mi kod</button>
+                </div>
+            </div>
+            <div id="polec-success-view" class="hidden text-center">
+                <div class="text-4xl mb-3">✅</div>
+                <h3 class="text-xl font-black text-white mb-2">Sprawdź skrzynkę!</h3>
+                <p class="text-slate-300 text-sm leading-relaxed">Kod polecający wysłaliśmy na podany adres e-mail (może chwilę potrwać). Dzięki, że pomagasz nam docierać do innych nauczycieli!</p>
             </div>
         </div>
     </div>
@@ -224,7 +259,54 @@
         // Zamknięcie po kliknięciu w przyciemnione tło (poza okienkiem)
         document.addEventListener('click', function (e) {
             if (e.target && e.target.id === 'ogloszenie-overlay') closeOgloszenie();
+            if (e.target && e.target.id === 'polec-overlay') closePolecOverlay();
         });
+
+        // Okno "Poleć znajomym" - zapis do programu poleceń
+        function openPolecOverlay() {
+            document.getElementById('polec-form-view').classList.remove('hidden');
+            document.getElementById('polec-success-view').classList.add('hidden');
+            const overlay = document.getElementById('polec-overlay');
+            overlay.classList.remove('hidden');
+            overlay.classList.add('flex');
+        }
+
+        function closePolecOverlay() {
+            const overlay = document.getElementById('polec-overlay');
+            overlay.classList.add('hidden');
+            overlay.classList.remove('flex');
+        }
+
+        async function submitPolec() {
+            const name = document.getElementById('polec-name').value.trim();
+            const email = document.getElementById('polec-email').value.trim();
+            if (!email || !email.includes('@')) {
+                alert('Podaj prawidłowy adres e-mail.');
+                return;
+            }
+            const btn = document.getElementById('polec-submit-btn');
+            btn.disabled = true;
+            btn.innerText = 'Wysyłanie...';
+            try {
+                const res = await fetch('/api/referral-signup', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, email })
+                });
+                const data = await res.json();
+                if (data.ok) {
+                    document.getElementById('polec-form-view').classList.add('hidden');
+                    document.getElementById('polec-success-view').classList.remove('hidden');
+                } else {
+                    alert('Coś poszło nie tak. Spróbuj ponownie za chwilę.');
+                }
+            } catch (e) {
+                alert('Coś poszło nie tak. Spróbuj ponownie za chwilę.');
+            } finally {
+                btn.disabled = false;
+                btn.innerText = 'Wyślij mi kod';
+            }
+        }
 
         // Uruchomienie skryptu natychmiast po załadowaniu menu w dowolnej aplikacji
         initMenuLogic();
