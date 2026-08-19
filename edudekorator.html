@@ -22,6 +22,10 @@
     <script src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/@babel/standalone@7.23.6/babel.min.js"></script>
 
+    <!-- Do generowania prawdziwego pliku PDF z podglądu ("POBIERZ PDF") -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
@@ -118,6 +122,9 @@
   </script>
 </head>
 <body>
+    <a href="index.html" title="Strona główna EduBox AI" class="no-print" style="position:fixed;bottom:14px;left:14px;z-index:9999;width:46px;height:46px;border-radius:9999px;background:rgba(15,23,42,0.88);color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(0,0,0,0.3);text-decoration:none;font-size:22px;backdrop-filter:blur(4px);border:1px solid rgba(255,255,255,0.15);">
+        <i class="ph-bold ph-house"></i>
+    </a>
     <script>window.EDUBOX_IMAGE_APP = true;</script>
 
     <div id="wspolne-menu-kontener" class="print-hidden"></div>
@@ -125,7 +132,7 @@
     <div id="root" class="h-screen flex flex-col"></div>
 
     <script type="text/babel">
-        const { useState, useEffect } = React;
+        const { useState, useEffect, useRef } = React;
 
         const parseAIResponse = (aiOutput) => {
             let text = String(aiOutput?.text || aiOutput?.response || aiOutput?.content || aiOutput || "").trim();
@@ -206,6 +213,8 @@
             const [marketItems, setMarketItems] = useState([]);
             const [isFetchingMarket, setIsFetchingMarket] = useState(false);
             const [isPublishing, setIsPublishing] = useState(false);
+            const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
+            const previewRef = useRef(null);
 
             useEffect(() => {
                 const initDb = () => {
@@ -367,6 +376,37 @@ WYMÓG JSON:
                 } finally { 
                     setIsGenerating(false); 
                     setGenStatus('');
+                }
+            };
+
+            const downloadPDF = async () => {
+                if (!previewRef.current) return;
+                setIsDownloadingPdf(true);
+                try {
+                    const canvas = await html2canvas(previewRef.current, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+                    const imgData = canvas.toDataURL('image/jpeg', 0.95);
+                    const { jsPDF } = window.jspdf;
+                    const pdf = new jsPDF('p', 'mm', 'a4');
+                    const pdfWidth = pdf.internal.pageSize.getWidth();
+                    const pdfHeight = pdf.internal.pageSize.getHeight();
+                    const imgWidth = pdfWidth;
+                    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+                    let heightLeft = imgHeight;
+                    let position = 0;
+                    pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
+                    heightLeft -= pdfHeight;
+                    while (heightLeft > 0) {
+                        position = heightLeft - imgHeight;
+                        pdf.addPage();
+                        pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
+                        heightLeft -= pdfHeight;
+                    }
+                    pdf.save(`EduWystroj_${(theme || 'projekt').replace(/[^a-zA-Z0-9ąćęłńóśźżĄĆĘŁŃÓŚŹŻ ]/g, '')}.pdf`);
+                } catch (error) {
+                    console.error('Błąd generowania PDF:', error);
+                    showMessage('Nie udało się pobrać PDF. Użyj przycisku "Drukuj" i wybierz "Zapisz jako PDF".', 'error');
+                } finally {
+                    setIsDownloadingPdf(false);
                 }
             };
 
@@ -575,13 +615,18 @@ WYMÓG JSON:
                         }
                         
                         @media screen {
-                            /* Fallback kolumn na ekranie komputera */
+                            /* Podgląd na ekranie MUSI wyglądać identycznie jak wydruk, dlatego używamy
+                               tego samego printSize co w regule @media print powyżej (WYSIWYG). */
+                            .preview-scale-wrap {
+                                font-size: ${printSize === 'large' ? '22px' : printSize === 'small' ? '12px' : '16px'};
+                            }
                             .print-grid-dynamic {
                                 display: grid;
                                 grid-template-columns: repeat(${
-                                    layoutType === 'drzwi' ? 1 :
-                                    layoutType === 'kodeks' ? 3 : 2
+                                    printSize === 'large' ? 1 :
+                                    printSize === 'medium' ? 2 : 3
                                 }, minmax(0, 1fr));
+                                gap: 1.5rem;
                             }
                             @media (max-width: 768px) {
                                 .print-grid-dynamic { grid-template-columns: 1fr; }
@@ -743,7 +788,9 @@ WYMÓG JSON:
                                             <span className="flex gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-red-500"></div><div className="w-2.5 h-2.5 rounded-full bg-yellow-500"></div><div className="w-2.5 h-2.5 rounded-full bg-green-500"></div></span>
                                         </div>
                                         <div className="p-4 md:p-8 overflow-x-auto">
-                                            {renderLayout()}
+                                            <div ref={previewRef} className="preview-scale-wrap">
+                                                {renderLayout()}
+                                            </div>
                                         </div>
                                     </div>
 
@@ -779,12 +826,15 @@ WYMÓG JSON:
 
                                         <p className="text-slate-500 text-sm mb-6 max-w-md mx-auto">Wciśnij Drukuj i upewnij się, że w oknie drukarki zaznaczona jest opcja <strong>"Drukuj grafiki tła" (Background graphics)</strong>.</p>
                                         
-                                        <div className="flex flex-col sm:flex-row gap-4">
+                                        <div className="flex flex-col sm:flex-row gap-4 flex-wrap justify-center">
                                             <button onClick={() => window.print()} className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 px-8 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/30">
-                                                <i className="ph-bold ph-printer text-xl"></i> Otwórz Drukarkę
+                                                <i className="ph-bold ph-printer text-xl"></i> DRUKUJ
+                                            </button>
+                                            <button onClick={downloadPDF} disabled={isDownloadingPdf} className="bg-rose-500 hover:bg-rose-600 text-white font-bold py-3 px-8 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-rose-500/30 disabled:opacity-50">
+                                                {isDownloadingPdf ? <i className="ph-bold ph-spinner animate-spin text-xl"></i> : <i className="ph-bold ph-file-pdf text-xl"></i>} POBIERZ PDF
                                             </button>
                                             <button onClick={publishToMarket} disabled={isPublishing} className="bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200 font-bold py-3 px-8 rounded-xl transition-all flex items-center justify-center gap-2 disabled:opacity-50">
-                                                {isPublishing ? <i className="ph-bold ph-spinner animate-spin text-xl"></i> : <i className="ph-bold ph-cloud-arrow-up text-xl"></i>} Do Bazy Wzorów
+                                                {isPublishing ? <i className="ph-bold ph-spinner animate-spin text-xl"></i> : <i className="ph-bold ph-cloud-arrow-up text-xl"></i>} DODAJ DO BAZY
                                             </button>
                                         </div>
                                     </div>
