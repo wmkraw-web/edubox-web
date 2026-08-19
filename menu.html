@@ -155,7 +155,16 @@
     <script>
         function initMenuLogic() {
             // Sprawdź w przeglądarce czy uzytkownik wpisał już kiedyś kod PRO
-            const isPro = localStorage.getItem('eduboxProStatus') === 'active' || localStorage.getItem('eduAwansPremium') === 'active';
+            const proStatusRaw = localStorage.getItem('eduboxProStatus');
+            const isPro = proStatusRaw === 'active' || proStatusRaw === 'PRO' || localStorage.getItem('eduAwansPremium') === 'active';
+
+            // Jeśli to bonus czasowy (polecenie/kawa), wyliczamy ile dni PRO jeszcze zostało
+            let bonusDaysLeft = null;
+            const bonusUntil = localStorage.getItem('eduboxBonusUntil');
+            if (bonusUntil) {
+                const msLeft = new Date(bonusUntil).getTime() - Date.now();
+                if (msLeft > 0) bonusDaysLeft = Math.max(1, Math.ceil(msLeft / 86400000));
+            }
 
             const displayElements = document.querySelectorAll('.js-limit-display');
             const proForms = document.querySelectorAll('.js-pro-form');
@@ -163,7 +172,9 @@
             if (isPro) {
                 // Jeśli ma PRO, zmieniamy napis i chowamy pole na wpisywanie kodu (wszędzie: desktop i telefon)
                 displayElements.forEach((el) => {
-                    el.innerText = "KONTO PRO 👑";
+                    el.innerText = bonusDaysLeft !== null
+                        ? `PRO 👑 (jeszcze ${bonusDaysLeft} ${bonusDaysLeft === 1 ? 'dzień' : 'dni'})`
+                        : "KONTO PRO 👑";
                     el.className = "js-limit-display text-sm font-black text-amber-500 drop-shadow-[0_0_5px_rgba(245,158,11,0.5)]";
                 });
                 proForms.forEach((el) => { el.style.display = 'none'; });
