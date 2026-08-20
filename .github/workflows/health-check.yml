@@ -25,6 +25,10 @@ jobs:
 
           const BASE = process.env.BASE_URL;
 
+          // ewamarketing.html jest CELOWO chroniona hasłem/logowaniem (Deployment
+          // Protection w Vercel) - 401 tam jest oczekiwany, nie błąd.
+          const EXPECTED_401_PAGES = new Set(['ewamarketing.html']);
+
           // Sprawdzamy KAŻDĄ stronę .html w repo (na żywo, przez sieć) - powinna
           // odpowiadać 200. Wykrywa m.in. literówki w linkach, zepsute wdrożenie,
           // usunięty plik.
@@ -34,6 +38,7 @@ jobs:
             for (const f of files) {
               try {
                 const res = await fetch(`${BASE}/${f}`, { method: 'GET' });
+                if (EXPECTED_401_PAGES.has(f) && res.status === 401) continue;
                 if (!res.ok) failures.push(`Strona ${f}: HTTP ${res.status}`);
               } catch (e) {
                 failures.push(`Strona ${f}: ${e.message}`);
