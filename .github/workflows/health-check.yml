@@ -1,0 +1,108 @@
+name: Sprawdzanie zdrowia portfolio (strony + API)
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'   # co 6 godzin, całą dobę
+  workflow_dispatch: {}      # pozwala odpalić ręcznie z zakładki Actions, do testów
+
+jobs:
+  health-check:
+    runs-on: ubuntu-latest
+    env:
+      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+      ALERT_EMAIL_TO: wmkraw@gmail.com
+      BASE_URL: https://eduboxpro.pl
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Sprawdź wszystkie strony i endpointy API, wyślij alert jeśli coś nie działa
+        run: |
+          node <<'EOF'
+          const fs = require('fs');
+
+          const BASE = process.env.BASE_URL;
+
+          // Sprawdzamy KAŻDĄ stronę .html w repo (na żywo, przez sieć) - powinna
+          // odpowiadać 200. Wykrywa m.in. literówki w linkach, zepsute wdrożenie,
+          // usunięty plik.
+          async function checkPages() {
+            const files = fs.readdirSync('.').filter(f => f.endsWith('.html')).sort();
+            const failures = [];
+            for (const f of files) {
+              try {
+                const res = await fetch(`${BASE}/${f}`, { method: 'GET' });
+                if (!res.ok) failures.push(`Strona ${f}: HTTP ${res.status}`);
+              } catch (e) {
+                failures.push(`Strona ${f}: ${e.message}`);
+              }
+            }
+            return { checked: files.length, failures };
+          }
+
+          // Sprawdzamy KAŻDY endpoint /api/*.js - wszystkie sprawdzają req.method
+          // jako pierwszą linijkę kodu, więc zwykłe GET (bez body/autoryzacji)
+          // bezpiecznie i bez kosztów (żadne wywołanie OpenAI/Fal.ai/IMAP się NIE
+          // uruchamia) trafia w 405 "Method not allowed" - to dowód, że funkcja
+          // żyje i nasz kod się wykonuje. Alarmujemy tylko na 5xx (crash funkcji)
+          // albo brak odpowiedzi w ogóle (funkcja niewdrożona/martwa).
+          async function checkApis() {
+            const apiFiles = fs.readdirSync('api').filter(f => f.endsWith('.js')).sort();
+            const failures = [];
+            for (const f of apiFiles) {
+              const name = f.replace(/\.js$/, '');
+              try {
+                const res = await fetch(`${BASE}/api/${name}`, { method: 'GET' });
+                if (res.status >= 500) failures.push(`/api/${name}: HTTP ${res.status} (błąd serwera)`);
+              } catch (e) {
+                failures.push(`/api/${name}: ${e.message}`);
+              }
+            }
+            return { checked: apiFiles.length, failures };
+          }
+
+          async function main() {
+            const pages = await checkPages();
+            const apis = await checkApis();
+            const allFailures = [...pages.failures, ...apis.failures];
+
+            console.log(`Sprawdzono ${pages.checked} stron, ${apis.checked} endpointów API.`);
+            console.log('Problemy:', allFailures);
+
+            if (allFailures.length === 0) {
+              console.log('Wszystko działa poprawnie.');
+              return;
+            }
+
+            const dateLabel = new Date().toLocaleString('pl-PL', { dateStyle: 'long', timeStyle: 'short' });
+            const html = `
+              <h2>EduBox AI - alert: problem z portfolio (${dateLabel})</h2>
+              <p>Sprawdzono ${pages.checked} stron i ${apis.checked} endpointów API. Znaleziono ${allFailures.length} problem(ów):</p>
+              <ul>${allFailures.map(a => `<li>${a}</li>`).join('')}</ul>
+              <p style="color:#888;font-size:12px">Automatyczne sprawdzanie co 6 godzin - .github/workflows/health-check.yml</p>
+            `;
+
+            const emailRes = await fetch('https://api.resend.com/emails', {
+              method: 'POST',
+              headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                from: 'EduBox AI Alerty <onboarding@resend.dev>',
+                to: [process.env.ALERT_EMAIL_TO],
+                subject: `Alert: ${allFailures.length} problem(ów) z portfolio EduBox AI`,
+                html
+              })
+            });
+            if (!emailRes.ok) {
+              console.error('Błąd wysyłki e-maila:', emailRes.status, await emailRes.text());
+              process.exit(1);
+            }
+            console.log('Alert e-mail wysłany.');
+            // Nie kończymy joba błędem (exit 1) - to jest ALERT, nie awaria samego
+            // workflowu. Kod błędu w Actions rezerwujemy dla sytuacji, gdy sam
+            // health-check nie zadziałał (np. wysyłka e-maila się nie udała, patrz wyżej).
+          }
+
+          main().catch(e => { console.error(e); process.exit(1); });
+          EOF
