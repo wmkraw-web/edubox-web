@@ -193,7 +193,7 @@
             // --- GENEROWANIE NA PODSTAWIE WZORU (upload obrazka jako inspiracji) ---
             const [refImage, setRefImage] = useState(null); // data:URL wgranego wzoru/przykładu
             const [refImageName, setRefImageName] = useState('');
-            const [refImageMode, setRefImageMode] = useState('creative'); // 'close' = trzymaj się wzoru, 'creative' = tylko inspiracja
+            const [refImageMode, setRefImageMode] = useState('creative'); // 'close'/'creative' = SDXL image-to-image (trzyma się zdjęcia), 'describe' = pełny styl przez opis AI
 
             const resultRef = useRef(null);
             const posterImgRef = useRef(null);
@@ -338,7 +338,7 @@
             };
 
             const generatePoster = async () => {
-                setGeneratingStatus('1/2 Wzbogacam Twój opis (AI)...');
+                setGeneratingStatus('Startuję...');
                 setError('');
                 setGeneratedImage(null);
                 setHiResImage(null);
@@ -347,9 +347,34 @@
                 try {
                     // Jeśli użytkownik nie wpisał opisu, a wgrał tylko wzór/zdjęcie - dajemy sensowny
                     // opis zastępczy, żeby krok "wzbogacania opisu przez AI" miał czym pracować.
-                    const effectivePrompt = promptInput.trim() || 'A beautiful, harmonious children\'s educational poster illustration inspired by the uploaded reference image';
+                    let effectivePrompt = promptInput.trim() || 'A beautiful, harmonious children\'s educational poster illustration inspired by the uploaded reference image';
+
+                    // Tryb "Pełny styl (opis AI)": zamiast wklejać zdjęcie bezpośrednio do generatora
+                    // (co blokuje zastosowanie wybranego stylu - SDXL image-to-image mocno trzyma się
+                    // oryginalnych pikseli), najpierw prosimy AI o opisanie tego, co widzi na zdjęciu.
+                    // Ten opis idzie dalej jak zwykły tekstowy pomysł - style artystyczne (Akwarela/3D/
+                    // Wektor) będą działać w pełni, kosztem dosłownej wierności pikselom zdjęcia.
+                    const useDescribeMode = refImage && refImageMode === 'describe';
+                    if (useDescribeMode) {
+                        setGeneratingStatus('1/3 Analizuję wgrany wzór (AI)...');
+                        try {
+                            const descRes = await fetch('/api/describe-image', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ image_url: refImage })
+                            });
+                            const descData = await descRes.json().catch(() => ({}));
+                            if (!descRes.ok || !descData.description) throw new Error(descData.error || 'Nie udało się przeanalizować wzoru.');
+                            effectivePrompt = promptInput.trim()
+                                ? `${promptInput.trim()}. Inspired by this reference: ${descData.description}`
+                                : descData.description;
+                        } catch (e) {
+                            throw new Error(`Analiza wzoru nie powiodła się: ${e.message}`);
+                        }
+                    }
 
                     // ETAP 1: GPT-4o-mini REŻYSERUJE SCENĘ
+                    setGeneratingStatus(useDescribeMode ? '2/3 Wzbogacam opis (AI)...' : '1/2 Wzbogacam Twój opis (AI)...');
                     let enhancedPrompt = effectivePrompt;
                     try {
                         const systemPrompt = `You are an expert AI image prompt engineer specializing in children's educational posters. The user will give you a simple idea in Polish.
@@ -381,7 +406,7 @@
                     } catch(e) { console.log("GPT Enhancer failed, using original prompt."); }
 
                     // ETAP 2: GENEROWANIE OBRAZU
-                    setGeneratingStatus('2/2 Malowanie arcydzieła...');
+                    setGeneratingStatus(useDescribeMode ? '3/3 Malowanie arcydzieła...' : '2/2 Malowanie arcydzieła...');
 
                     // Modyfikatory stylu
                     let styleModifier = "";
@@ -424,10 +449,12 @@
                         sizeParam = '1440x1080'; widthParam = 1440; heightParam = 1080;
                     }
 
-                    // Jeśli użytkownik wgrał wzór/przykład - dokładamy go jako obraz startowy (image-to-image).
-                    // "close" = niska siła zmiany (obraz ma zostać blisko wzoru), "creative" = wysoka siła
-                    // zmiany (wzór to tylko inspiracja stylem/kompozycją, AI ma więcej swobody).
-                    const extraParams = refImage
+                    // Jeśli użytkownik wgrał wzór/przykład i wybrał "Podobne do wzoru"/"Tylko inspiracja" -
+                    // dokładamy go jako obraz startowy (image-to-image; "close" = niska siła zmiany,
+                    // "creative" = wysoka siła zmiany). W trybie "Pełny styl (opis AI)" NIE wysyłamy
+                    // init_image - poszliśmy inną drogą (opis słowny wyżej), więc to jest zwykłe
+                    // generowanie z tekstu, dzięki czemu wybrany styl faktycznie ma pełny wpływ.
+                    const extraParams = (refImage && !useDescribeMode)
                         ? { init_image: refImage, image_strength: refImageMode === 'close' ? 0.4 : 0.75 }
                         : {};
 
@@ -814,10 +841,16 @@
                                                 <span className="flex-1 text-xs text-slate-400 truncate">{refImageName}</span>
                                                 <button onClick={() => { setRefImage(null); setRefImageName(''); }} className="text-slate-500 hover:text-red-400 shrink-0 p-1"><i className="ph-bold ph-x text-lg"></i></button>
                                             </div>
-                                            <div className="flex gap-2">
+                                            <div className="flex flex-wrap gap-2">
                                                 <button onClick={() => setRefImageMode('close')} className={`flex-1 py-2 px-3 rounded-lg border-2 text-xs font-bold transition-all ${refImageMode === 'close' ? 'bg-indigo-600/20 border-indigo-500 text-indigo-400' : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:border-slate-500'}`}>Podobne do wzoru</button>
                                                 <button onClick={() => setRefImageMode('creative')} className={`flex-1 py-2 px-3 rounded-lg border-2 text-xs font-bold transition-all ${refImageMode === 'creative' ? 'bg-indigo-600/20 border-indigo-500 text-indigo-400' : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:border-slate-500'}`}>Tylko inspiracja</button>
+                                                <button onClick={() => setRefImageMode('describe')} className={`flex-1 py-2 px-3 rounded-lg border-2 text-xs font-bold transition-all ${refImageMode === 'describe' ? 'bg-purple-600/20 border-purple-500 text-purple-400' : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:border-slate-500'}`}>Pełny styl (opis AI)</button>
                                             </div>
+                                            <p className="text-slate-500 text-[11px] leading-snug">
+                                                {refImageMode === 'close' && 'Obraz zostanie blisko wzoru - wybrany styl (Krok 1) ma ograniczony wpływ.'}
+                                                {refImageMode === 'creative' && 'Wzór to tylko inspiracja - więcej swobody dla AI, ale nadal ograniczony wpływ stylu z Kroku 1.'}
+                                                {refImageMode === 'describe' && 'AI opisze wzór słowami i narysuje od nowa - traci dosłowną wierność zdjęciu, ale wybrany styl (Krok 1) zadziała w pełni.'}
+                                            </p>
                                         </div>
                                     )}
                                 </div>
