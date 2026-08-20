@@ -3,7 +3,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { prompt, style, format, customText } = req.body;
+  const { prompt, style, format, customText, init_image, image_strength } = req.body;
   const falKey = process.env.FAL_KEY;
 
   if (!falKey) {
@@ -44,18 +44,39 @@ export default async function handler(req, res) {
 
   const finalPrompt = `Subject: ${prompt}. ${textModifier} ${styleModifier}. ${formatModifier}. High quality, professional educational material for kindergarten.`;
 
+  // TRYB "WŁASNE ZDJĘCIE": jeśli przyszło init_image (zdjęcie/rysunek wgrane przez użytkownika),
+  // zamiast czystego generowania z tekstu (Flux) używamy SDXL image-to-image, żeby AI przemalowało
+  // DOKŁADNIE ten obrazek w wybranym stylu, zamiast wymyślać coś od zera.
+  // UWAGA: celowo NIE wysyłamy tu "style_preset" (wcześniej było na sztywno "line-art" niezależnie
+  // od wyboru użytkownika, co ignorowało np. styl Disney/akwarela) - opis stylu jest już w finalPrompt
+  // (styleModifier), tak samo jak w trybie tekstowym, więc SDXL trzyma się wybranego stylu poprawnie.
+  const endpointUrl = init_image
+    ? "https://fal.run/fal-ai/fast-sdxl/image-to-image"
+    : "https://fal.run/fal-ai/flux/schnell";
+
+  const payload = init_image
+    ? {
+        prompt: finalPrompt,
+        image_url: init_image,
+        strength: typeof image_strength === 'number' ? image_strength : 0.65,
+        image_size: imageSize,
+        num_inference_steps: 30,
+        enable_safety_checker: true
+      }
+    : {
+        prompt: finalPrompt,
+        image_size: imageSize,
+        num_inference_steps: 4
+      };
+
   try {
-    const response = await fetch("https://fal.run/fal-ai/flux/schnell", {
+    const response = await fetch(endpointUrl, {
       method: "POST",
       headers: {
         "Authorization": `Key ${falKey}`,
         "Content-Type": "application/json"
       },
-      body: JSON.stringify({
-        prompt: finalPrompt,
-        image_size: imageSize,
-        num_inference_steps: 4
-      })
+      body: JSON.stringify(payload)
     });
 
     if (!response.ok) {

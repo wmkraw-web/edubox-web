@@ -50,7 +50,7 @@ export default async function handler(req, res) {
   }
 
   // Odczytujemy wszystkie parametry, w tym nowe (init_image dla zdjęć, size/width/height dla wymiarów)
-  const { prompt, aspect_ratio, init_image, image_strength, size, width, height } = req.body;
+  const { prompt, negative_prompt, aspect_ratio, init_image, image_strength, size, width, height } = req.body;
 
   if (!prompt) {
     return res.status(400).json({ message: 'Brak polecenia (promptu)' });
@@ -76,17 +76,22 @@ export default async function handler(req, res) {
     // TRYB 2: GENEROWANIE ZE ZDJĘCIA (Model: FAST SDXL)
     // ---------------------------------------------------------
     if (init_image) {
-      // SDXL jest znacznie lepszy w trzymaniu się stylu line-art bez niszczenia twarzy
+      // SDXL jest znacznie lepszy w trzymaniu się kompozycji wzoru bez niszczenia twarzy/proporcji.
+      // UWAGA: "strength" honoruje teraz to, co faktycznie przyjdzie z frontendu (image_strength) -
+      // wcześniej był tu na sztywno 0.65, więc suwak/wybór "trzymaj się wzoru" vs "tylko inspiracja"
+      // w UI nic by nie zmieniał. Usunięto też sztywne "style_preset: line-art" - opis stylu jest już
+      // w samym prompcie (patrz styleModifier wyżej na froncie), więc SDXL trzyma się wybranego stylu,
+      // a nie zawsze rysunku kreskowego.
       endpointUrl = 'https://fal.run/fal-ai/fast-sdxl/image-to-image';
       payload = {
         prompt: prompt,
         image_url: init_image,
-        strength: 0.65, // 65% to idealny balans dla SDXL (trzyma twarz, ale zmienia styl)
+        strength: typeof image_strength === 'number' ? image_strength : 0.65,
         image_size: falImageSize,
-        style_preset: "line-art", // Parametr, którego Flux nie obsługuje, a SDXL tak!
         num_inference_steps: 30, // Większa precyzja
         enable_safety_checker: true
       };
+      if (negative_prompt) payload.negative_prompt = negative_prompt;
     }
 
     // Wysłanie zapytania do chmury FAL
