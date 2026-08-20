@@ -221,7 +221,6 @@
             const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
             const previewRef = useRef(null);
             const printOnlyRef = useRef(null);
-            const actionsRef = useRef(null);
 
             useEffect(() => {
                 const initDb = () => {
@@ -383,12 +382,6 @@ WYMÓG JSON:
                         try { window.localStorage.setItem('edubox_eduwystroj_ai', newCount.toString()); } catch(e) {}
                     }
                     showMessage('Gotowe do druku!', 'success');
-                    // Panel z przyciskami DRUKUJ/POBIERZ PDF/DODAJ DO BAZY bywa niżej niż widoczny
-                    // fragment ekranu (osobny scrollowalny panel) - dojeżdżamy do niego automatycznie,
-                    // żeby nikt nie musiał go szukać.
-                    setTimeout(() => {
-                        actionsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-                    }, 150);
                 } catch (error) {
                     showMessage(error.message, 'error'); 
                 } finally { 
@@ -484,23 +477,29 @@ WYMÓG JSON:
                                             <img src={item.imgUrl} className="max-w-full max-h-full object-contain p-1" />
                                         </div>
                                         <div className="flex-1 bg-slate-50/80 rounded-[1.25rem] border-2 border-dashed border-slate-300 relative flex items-center justify-center overflow-hidden transition-colors hover:bg-slate-100/80 focus-within:border-emerald-400">
-                                            <div className="absolute top-2 right-3 text-xl opacity-30">⭐</div>
-                                            <div className="absolute bottom-2 left-3 text-xl opacity-30">❤️</div>
                                             {isPrint ? (
-                                                /* W wersji do druku/PDF NIE używamy <input> - przeglądarki i html2canvas
-                                                   potrafią nie przenieść aktualnej wartości pola na wydruk/eksport,
-                                                   dlatego wypisujemy imię jako zwykły, "pewny" tekst. */
-                                                <div className="w-full h-full flex items-center justify-center text-center font-kids text-2xl md:text-3xl font-bold text-slate-800 px-4 z-10">
-                                                    {labelNames[i] || ''}
+                                                /* WERSJA DO DRUKU/PDF: żadnego <input> (przeglądarki i html2canvas
+                                                   potrafią nie przenieść wpisanej wartości) ANI position:absolute
+                                                   (przy druku wielostronicowym Chrome potrafi "gubić" elementy
+                                                   absolute na kartach, które trafiają na kolejną stronę wydruku)
+                                                   - całość układamy zwykłym flexem od góry do dołu. */
+                                                <div className="w-full h-full flex flex-col items-center justify-between py-1.5 px-3">
+                                                    <span className="self-end text-lg opacity-30">⭐</span>
+                                                    <span className="text-center font-kids text-2xl md:text-3xl font-bold text-slate-800 leading-tight">{labelNames[i] || ''}</span>
+                                                    <span className="self-start text-lg opacity-30">❤️</span>
                                                 </div>
                                             ) : (
-                                                <input
-                                                    type="text"
-                                                    value={labelNames[i] || ''}
-                                                    onChange={(e) => setLabelNames(prev => ({ ...prev, [i]: e.target.value }))}
-                                                    placeholder="Imię Dziecka"
-                                                    className="w-full h-full bg-transparent text-center outline-none font-kids text-2xl md:text-3xl font-bold text-slate-800 placeholder-slate-300 px-4 z-10 print-input"
-                                                />
+                                                <>
+                                                    <div className="absolute top-2 right-3 text-xl opacity-30">⭐</div>
+                                                    <div className="absolute bottom-2 left-3 text-xl opacity-30">❤️</div>
+                                                    <input
+                                                        type="text"
+                                                        value={labelNames[i] || ''}
+                                                        onChange={(e) => setLabelNames(prev => ({ ...prev, [i]: e.target.value }))}
+                                                        placeholder="Imię Dziecka"
+                                                        className="w-full h-full bg-transparent text-center outline-none font-kids text-2xl md:text-3xl font-bold text-slate-800 placeholder-slate-300 px-4 z-10 print-input"
+                                                    />
+                                                </>
                                             )}
                                         </div>
                                     </div>
@@ -835,8 +834,8 @@ WYMÓG JSON:
                                     </div>
 
                                     {/* AKCJE I ROZMIAR */}
-                                    <div ref={actionsRef} className="mt-10 bg-white border-4 border-emerald-300 rounded-3xl p-8 text-center shadow-2xl flex flex-col items-center scroll-mt-6">
-                                        <h3 className="text-2xl font-kids font-black text-slate-800 mb-6">Gotowe do druku! 🖨️ (przewiń w dół po przyciski)</h3>
+                                    <div className="mt-10 bg-white border-4 border-emerald-300 rounded-3xl p-8 text-center shadow-2xl flex flex-col items-center mb-32">
+                                        <h3 className="text-2xl font-kids font-black text-slate-800 mb-6">Gotowe do druku! 🖨️</h3>
 
                                         {/* PANEL WYBORU ROZMIARU WYDRUKU */}
                                         <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-6 w-full max-w-2xl mb-8 shadow-sm">
@@ -864,24 +863,27 @@ WYMÓG JSON:
                                             </div>
                                         </div>
 
-                                        <p className="text-slate-500 text-sm mb-6 max-w-md mx-auto">Wciśnij Drukuj i upewnij się, że w oknie drukarki zaznaczona jest opcja <strong>"Drukuj grafiki tła" (Background graphics)</strong>.</p>
-                                        
-                                        <div className="flex flex-col sm:flex-row gap-4 flex-wrap justify-center">
-                                            <button onClick={() => window.print()} className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 px-8 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/30">
-                                                <i className="ph-bold ph-printer text-xl"></i> DRUKUJ
-                                            </button>
-                                            <button onClick={downloadPDF} disabled={isDownloadingPdf} className="bg-rose-500 hover:bg-rose-600 text-white font-bold py-3 px-8 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-rose-500/30 disabled:opacity-50">
-                                                {isDownloadingPdf ? <i className="ph-bold ph-spinner animate-spin text-xl"></i> : <i className="ph-bold ph-file-pdf text-xl"></i>} POBIERZ PDF
-                                            </button>
-                                            <button onClick={publishToMarket} disabled={isPublishing} className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-8 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-500/30 disabled:opacity-50">
-                                                {isPublishing ? <i className="ph-bold ph-spinner animate-spin text-xl"></i> : <i className="ph-bold ph-cloud-arrow-up text-xl"></i>} DODAJ DO BAZY
-                                            </button>
-                                        </div>
+                                        <p className="text-slate-500 text-sm max-w-md mx-auto">Wciśnij Drukuj i upewnij się, że w oknie drukarki zaznaczona jest opcja <strong>"Drukuj grafiki tła" (Background graphics)</strong>. Przyciski DRUKUJ / POBIERZ PDF / DODAJ DO BAZY są zawsze widoczne na dole ekranu ⬇️</p>
                                     </div>
                                 </div>
                             )}
 
                         </div>
+
+                        {/* PASEK AKCJI - PRZYPIĘTY NA STAŁE NA DOLE, ZAWSZE WIDOCZNY (nie trzeba przewijać) */}
+                        {resultData && (
+                            <div className="no-print border-t-4 border-emerald-400 bg-white/95 backdrop-blur-md px-4 py-4 flex items-center justify-center gap-3 flex-wrap shadow-[0_-8px_24px_rgba(0,0,0,0.15)] shrink-0">
+                                <button onClick={() => window.print()} className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 px-6 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/30">
+                                    <i className="ph-bold ph-printer text-xl"></i> DRUKUJ
+                                </button>
+                                <button onClick={downloadPDF} disabled={isDownloadingPdf} className="bg-rose-500 hover:bg-rose-600 text-white font-bold py-3 px-6 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-rose-500/30 disabled:opacity-50">
+                                    {isDownloadingPdf ? <i className="ph-bold ph-spinner animate-spin text-xl"></i> : <i className="ph-bold ph-file-pdf text-xl"></i>} POBIERZ PDF
+                                </button>
+                                <button onClick={publishToMarket} disabled={isPublishing} className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-500/30 disabled:opacity-50">
+                                    {isPublishing ? <i className="ph-bold ph-spinner animate-spin text-xl"></i> : <i className="ph-bold ph-cloud-arrow-up text-xl"></i>} DODAJ DO BAZY
+                                </button>
+                            </div>
+                        )}
                     </main>
                 </div>
             );
