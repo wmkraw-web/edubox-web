@@ -360,8 +360,9 @@
                         3. If there are people, clearly specify they are Caucasian/European.
                         4. Describe ONE clear, uncluttered focal composition — avoid busy backgrounds that would compete with text added later.
                         5. Leave a calm, visually simple margin near the top and bottom edges of the frame (plain sky, wall, floor, or soft color) so a caption can be placed there later without covering important details.
-                        6. Keep it under 80 words.
-                        7. Reply ONLY with the English prompt, nothing else.`;
+                        6. If the subject includes any INSECT (bee, ladybug, butterfly, ant, etc.), image models strongly default to drawing BIRDS instead when several small flying creatures appear in a row - actively counter this. Explicitly spell out the insect's specific anatomy every time it is mentioned (e.g. for a bee: "round fuzzy body with black-and-yellow stripes, two pairs of small transparent wings, thin curved antennae with tiny round tips, no beak, no feathers") and add an explicit negation like "(insect, not a bird)" right after naming it.
+                        7. Keep it under 90 words.
+                        8. Reply ONLY with the English prompt, nothing else.`;
 
                         const resChat = await fetch('/api/chat', {
                             method: 'POST', 
@@ -395,8 +396,18 @@
                     // Informacja o orientacji
                     let orientationText = orientationOption === '3:4' ? 'Vertical portrait format.' : (orientationOption === '4:3' ? 'Horizontal landscape format.' : 'Square format.');
 
+                    // Zabezpieczenie awaryjne NIEZALEŻNE od kroku GPT: modele obrazkowe mają silną
+                    // skłonność do rysowania PTAKÓW zamiast owadów, gdy w scenie jest kilka małych
+                    // lecących stworzeń. Jeśli oryginalny opis (w promptInput, po polsku) wspomina
+                    // owada, dopisujemy jawną instrukcję anatomiczną - działa nawet, gdyby krok
+                    // wzbogacania promptu przez GPT po cichu zawiódł (patrz catch niżej).
+                    const insectHints = { 'pszczo': 'bee(s): round fuzzy body with black-and-yellow stripes, two pairs of small transparent wings, thin curved antennae, no beak, no feathers (insect, not a bird)', 'biedron': 'ladybug(s): round red shell with black spots, no beak, no feathers (insect, not a bird)', 'motyl': 'butterfly(-ies): large colorful patterned wings, thin body, no beak, no feathers (insect, not a bird)', 'mrówk': 'ant(s): segmented body, six legs, no wings, no beak, no feathers (insect, not a bird)' };
+                    const lowerInput = promptInput.toLowerCase();
+                    const insectNote = Object.keys(insectHints).find(key => lowerInput.includes(key));
+                    const insectSafety = insectNote ? ` The flying creatures are ${insectHints[insectNote]}.` : '';
+
                     // Łączymy ulepszony przez GPT prompt ze stylem i zakazami
-                    const fullPrompt = `${enhancedPrompt}. STYLE: ${styleModifier}. ${orientationText} ABSOLUTELY NO TEXT, no words, no letters, no signage, no captions, no watermarks. Perfect human anatomy, correct number of fingers.`;
+                    const fullPrompt = `${enhancedPrompt}. STYLE: ${styleModifier}. ${orientationText}${insectSafety} ABSOLUTELY NO TEXT, no words, no letters, no signage, no captions, no watermarks. Perfect human anatomy, correct number of fingers.`;
                     const negativePrompt = "text, words, letters, signage, captions, watermark, logo, extra limbs, bad anatomy, deformed, missing fingers, extra fingers, mutated hands, ugly, poorly drawn, blurry, low quality";
 
                     // Rozbudowujemy paczkę wymiarów. UWAGA: 1440px to praktyczny sufit rozdzielczości,
