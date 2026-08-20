@@ -182,6 +182,8 @@
             const [orientationOption, setOrientationOption] = useState('3:4'); // Proporcje
             
             const [generatedImage, setGeneratedImage] = useState(null);
+            const [hiResImage, setHiResImage] = useState(null); // wersja po AI-upscale (do druku A4/A3)
+            const [isUpscaling, setIsUpscaling] = useState(false);
             const [generatingStatus, setGeneratingStatus] = useState('');
             const [error, setError] = useState('');
             const [toastMessage, setToastMessage] = useState('');
@@ -339,6 +341,7 @@
                 setGeneratingStatus('1/2 Wzbogacam Twój opis (AI)...');
                 setError('');
                 setGeneratedImage(null);
+                setHiResImage(null);
                 setTextLayers([]);
 
                 try {
@@ -396,15 +399,18 @@
                     const fullPrompt = `${enhancedPrompt}. STYLE: ${styleModifier}. ${orientationText} ABSOLUTELY NO TEXT, no words, no letters, no signage, no captions, no watermarks. Perfect human anatomy, correct number of fingers.`;
                     const negativePrompt = "text, words, letters, signage, captions, watermark, logo, extra limbs, bad anatomy, deformed, missing fingers, extra fingers, mutated hands, ugly, poorly drawn, blurry, low quality";
 
-                    // Rozbudowujemy paczkę wymiarów
-                    let sizeParam = '1024x1024';
-                    let widthParam = 1024;
-                    let heightParam = 1024;
-                    
+                    // Rozbudowujemy paczkę wymiarów. UWAGA: 1440px to praktyczny sufit rozdzielczości,
+                    // jaki model generuje w rozsądnym czasie bez utraty spójności kompozycji - to i tak
+                    // wciąż za mało na pełnostronicowy wydruk A4/A3, dlatego przed pobraniem/drukiem
+                    // (patrz ensureHiResImage niżej) dokładamy osobny krok AI-upscale x4.
+                    let sizeParam = '1440x1440';
+                    let widthParam = 1440;
+                    let heightParam = 1440;
+
                     if (orientationOption === '3:4') {
-                        sizeParam = '1024x1792'; widthParam = 768; heightParam = 1024;
+                        sizeParam = '1080x1440'; widthParam = 1080; heightParam = 1440;
                     } else if (orientationOption === '4:3') {
-                        sizeParam = '1792x1024'; widthParam = 1024; heightParam = 768;
+                        sizeParam = '1440x1080'; widthParam = 1440; heightParam = 1080;
                     }
 
                     // Jeśli użytkownik wgrał wzór/przykład - dokładamy go jako obraz startowy (image-to-image).
@@ -461,11 +467,40 @@
                 <div style="position:absolute; left:5%; width:90%; top:${TEXT_POSITIONS[l.position] || TEXT_POSITIONS.bottom}; transform:translateY(-50%); text-align:center; font-family:${TEXT_FONTS[l.font]?.css || TEXT_FONTS.baloo.css}; font-size:${l.fontSize}px; font-weight:800; color:${l.color}; -webkit-text-stroke: 2px rgba(0,0,0,0.55); text-shadow: 0 2px 6px rgba(0,0,0,0.5); line-height:1.15; white-space:pre-wrap; word-break:break-word;">${(l.text || '').replace(/</g,'&lt;')}</div>
             `).join('');
 
+            // Generator (Flux/SDXL) zwraca obrazek ok. 1440px (~2 MPix) - świetnie na ekran, ale za mało
+            // na pełnostronicowy wydruk A4/A3. Ten krok dokłada AI-upscale x4 (do ok. 5760px) TYLKO przy
+            // pobieraniu/drukowaniu (nie przy każdym podglądzie - to kosztowna i wolniejsza operacja).
+            // Wynik jest cache'owany w hiResImage, więc druga próba pobrania/druku tego samego plakatu
+            // nie generuje kolejnego zapytania do AI.
+            const ensureHiResImage = async () => {
+                if (hiResImage) return hiResImage;
+                setIsUpscaling(true);
+                try {
+                    const res = await fetch('/api/upscale', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ image_url: generatedImage, scale: 4 })
+                    });
+                    const data = await res.json().catch(() => ({}));
+                    if (!res.ok || !data.url) throw new Error(data.error || 'Nie udało się przygotować wersji do druku.');
+                    setHiResImage(data.url);
+                    return data.url;
+                } catch (e) {
+                    console.error('Błąd upscalowania:', e);
+                    showToast('Nie udało się podbić rozdzielczości - pobieram w standardowej jakości.');
+                    return generatedImage; // awaryjnie - lepszy plik w niższej jakości niż żaden
+                } finally {
+                    setIsUpscaling(false);
+                }
+            };
+
             const handleDownload = async () => {
                 if (!generatedImage) return;
+                const sourceImage = await ensureHiResImage();
+
                 if (textLayers.length === 0) {
                     const a = document.createElement('a');
-                    a.href = generatedImage;
+                    a.href = sourceImage;
                     a.download = `EduPlakat_${new Date().getTime()}.png`;
                     a.target = '_blank';
                     document.body.appendChild(a);
@@ -481,7 +516,7 @@
                     await new Promise((resolve, reject) => {
                         img.onload = resolve;
                         img.onerror = reject;
-                        img.src = generatedImage;
+                        img.src = sourceImage;
                     });
 
                     const canvas = document.createElement('canvas');
@@ -522,8 +557,9 @@
                 }
             };
 
-            const handlePrint = () => {
+            const handlePrint = async () => {
                 if (generatedImage) {
+                    const sourceImage = await ensureHiResImage();
                     const windowContent = `
                         <!DOCTYPE html>
                         <html>
@@ -538,7 +574,7 @@
                         </head>
                         <body>
                             <div class="print-container">
-                                <img src="${generatedImage}" />
+                                <img src="${sourceImage}" />
                                 ${buildTextOverlayHtml()}
                             </div>
                         </body>
@@ -797,13 +833,16 @@
                                 <div ref={resultRef} className="mt-12 fade-in print:mt-0 flex flex-col items-center">
                                     
                                     <div className="flex flex-col sm:flex-row items-center justify-between w-full mb-6 print-hidden gap-4">
-                                        <h3 className="text-xl font-bold text-white text-center sm:text-left">Twój Gotowy Plakat</h3>
+                                        <div>
+                                            <h3 className="text-xl font-bold text-white text-center sm:text-left">Twój Gotowy Plakat</h3>
+                                            {isUpscaling && <p className="text-xs text-cyan-400 font-bold mt-1 flex items-center gap-1"><i className="ph-bold ph-spinner animate-spin"></i> Przygotowuję wersję w wysokiej rozdzielczości do druku (A4/A3)...</p>}
+                                        </div>
                                         <div className="flex gap-3 w-full sm:w-auto flex-col sm:flex-row">
-                                            <button onClick={handleDownload} disabled={isExporting} className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-3 rounded-xl font-bold flex items-center gap-2 transition-all btn-bounce shadow-lg justify-center disabled:opacity-50">
-                                                {isExporting ? <i className="ph-bold ph-spinner animate-spin text-xl"></i> : <i className="ph-bold ph-download-simple text-xl"></i>} Pobierz
+                                            <button onClick={handleDownload} disabled={isExporting || isUpscaling} className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-3 rounded-xl font-bold flex items-center gap-2 transition-all btn-bounce shadow-lg justify-center disabled:opacity-50">
+                                                {(isExporting || isUpscaling) ? <i className="ph-bold ph-spinner animate-spin text-xl"></i> : <i className="ph-bold ph-download-simple text-xl"></i>} Pobierz (do druku)
                                             </button>
-                                            <button onClick={handlePrint} className="bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-3 rounded-xl font-bold flex items-center gap-2 transition-all btn-bounce shadow-lg justify-center">
-                                                <i className="ph-bold ph-printer text-xl"></i> Drukuj
+                                            <button onClick={handlePrint} disabled={isUpscaling} className="bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-3 rounded-xl font-bold flex items-center gap-2 transition-all btn-bounce shadow-lg justify-center disabled:opacity-50">
+                                                {isUpscaling ? <i className="ph-bold ph-spinner animate-spin text-xl"></i> : <i className="ph-bold ph-printer text-xl"></i>} Drukuj
                                             </button>
                                         </div>
                                     </div>
