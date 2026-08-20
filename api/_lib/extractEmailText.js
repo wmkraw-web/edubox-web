@@ -1,83 +1,109 @@
-// Wyciąga czysty tekst (text/plain) z surowej wiadomości e-mail (format RFC822/MIME), pobranej przez
-// IMAP. Napisane ręcznie (zamiast biblioteki "mailparser") celowo - mailparser ciągnie za sobą
-// zależności z aktualnie znanymi podatnościami bezpieczeństwa. Obsługuje to, czego faktycznie
-// potrzebujemy: proste wiadomości oraz multipart/alternative z quoted-printable (typowe dla maili
-// transakcyjnych, w tym z Buycoffee.to) - NIE jest to pełny, zgodny z RFC parser MIME.
-
+// Wyciąga czysty tekst (plain text) z surowej wiadomości e-mail w formacie RFC822 (nagłówki + treść),
+// takiej jaką zwraca IMAP przy pobieraniu pełnej wiadomości. Obsługuje zarówno proste wiadomości
+// tekstowe, jak i wieloczęściowe (multipart) - w tym zagnieżdżone multipart/alternative.
+// CZYSTA funkcja (brak zależności od sieci) - w pełni testowalna lokalnie, patrz
+// extractEmailText.test.js.
 function decodeQuotedPrintable(str) {
-    // Miękkie złamania linii ("=" na końcu linii) oznaczają "kontynuacja bez prawdziwego \n" - usuwamy je.
-    const joined = str.replace(/=\r?\n/g, '');
-    // Zamieniamy sekwencje "=XX" (szesnastkowe) na bajty, potem dekodujemy całość jako UTF-8.
-    const bytes = [];
-    for (let i = 0; i < joined.length; i++) {
-        if (joined[i] === '=' && /^[0-9A-Fa-f]{2}$/.test(joined.slice(i + 1, i + 3))) {
-            bytes.push(parseInt(joined.slice(i + 1, i + 3), 16));
-            i += 2;
-        } else {
-            bytes.push(joined.charCodeAt(i));
+    return str
+        .replace(/=\r?\n/g, '') // znak "miękkiego" złamania linii - usuwamy
+        .replace(/=([0-9A-Fa-f]{2})/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
+}
+
+function decodeBody(body, encoding) {
+    const enc = (encoding || '').toLowerCase().trim();
+    if (enc === 'base64') {
+        try {
+            return Buffer.from(body.replace(/\s/g, ''), 'base64').toString('utf-8');
+        } catch (e) {
+            return body;
         }
     }
-    return Buffer.from(bytes).toString('utf-8');
+    if (enc === 'quoted-printable') {
+        return Buffer.from(decodeQuotedPrintable(body), 'latin1').toString('utf-8');
+    }
+    return body;
 }
 
-function decodePart(headers, body) {
-    const encodingMatch = headers.match(/Content-Transfer-Encoding:\s*(\S+)/i);
-    const encoding = encodingMatch ? encodingMatch[1].toLowerCase() : '7bit';
-
-    if (encoding === 'quoted-printable') return decodeQuotedPrintable(body);
-    if (encoding === 'base64') return Buffer.from(body.replace(/\s+/g, ''), 'base64').toString('utf-8');
-    return body; // 7bit / 8bit / brak - już czysty tekst
-}
-
-function splitHeadersAndBody(chunk) {
-    const idx = chunk.search(/\r?\n\r?\n/);
-    if (idx === -1) return { headers: '', body: chunk };
-    const sep = chunk.slice(idx).match(/\r?\n\r?\n/)[0];
-    return { headers: chunk.slice(0, idx), body: chunk.slice(idx + sep.length) };
-}
-
-function stripHtmlTags(html) {
+function stripHtml(html) {
     return html
-        .replace(/<style[\s\S]*?<\/style>/gi, ' ')
-        .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+        .replace(/<style[\s\S]*?<\/style>/gi, '')
+        .replace(/<script[\s\S]*?<\/script>/gi, '')
         .replace(/<br\s*\/?>/gi, '\n')
         .replace(/<\/p>/gi, '\n')
-        .replace(/<[^>]+>/g, ' ')
+        .replace(/<[^>]+>/g, '')
         .replace(/&nbsp;/gi, ' ')
         .replace(/&amp;/gi, '&')
-        .replace(/[ \t]+/g, ' ')
-        .trim();
+        .replace(/&lt;/gi, '<')
+        .replace(/&gt;/gi, '>')
+        .replace(/&quot;/gi, '"')
+        .replace(/&#39;/gi, "'");
+}
+
+function parseHeaders(block) {
+    const headers = {};
+    // Nagłówki mogą się zawijać na kolejne linie zaczynające się spacją/tabem - łączymy je z powrotem.
+    const unfolded = block.replace(/\r?\n[ \t]+/g, ' ');
+    unfolded.split(/\r?\n/).forEach(line => {
+        const idx = line.indexOf(':');
+        if (idx === -1) return;
+        const name = line.slice(0, idx).trim().toLowerCase();
+        const value = line.slice(idx + 1).trim();
+        headers[name] = value;
+    });
+    return headers;
+}
+
+function splitHeadersAndBody(raw) {
+    const idx = raw.search(/\r?\n\r?\n/);
+    if (idx === -1) return { headers: parseHeaders(raw), body: '' };
+    const headerBlock = raw.slice(0, idx);
+    const body = raw.slice(idx).replace(/^\r?\n\r?\n/, '');
+    return { headers: parseHeaders(headerBlock), body };
+}
+
+function getBoundary(contentType) {
+    const match = /boundary="?([^";]+)"?/i.exec(contentType || '');
+    return match ? match[1] : null;
+}
+
+// Rekurencyjnie przeszukuje część MIME (i jej pod-części, jeśli sama jest multipart) w poszukiwaniu
+// najlepszego tekstu do wyciągnięcia: text/plain ma pierwszeństwo, text/html jako fallback.
+function findBestText(headers, body) {
+    const contentType = headers['content-type'] || 'text/plain';
+
+    if (/multipart\//i.test(contentType)) {
+        const boundary = getBoundary(contentType);
+        if (!boundary) return null;
+        const parts = body.split(`--${boundary}`).slice(1, -1); // pierwszy i ostatni fragment to preambuła/epilog
+        let plainResult = null;
+        let htmlResult = null;
+        for (const part of parts) {
+            const { headers: partHeaders, body: partBody } = splitHeadersAndBody(part);
+            const result = findBestText(partHeaders, partBody);
+            if (!result) continue;
+            if (result.isHtml && !htmlResult) htmlResult = result;
+            if (!result.isHtml && !plainResult) plainResult = result;
+        }
+        return plainResult || htmlResult;
+    }
+
+    if (/text\/plain/i.test(contentType)) {
+        const encoding = headers['content-transfer-encoding'];
+        return { text: decodeBody(body, encoding), isHtml: false };
+    }
+    if (/text\/html/i.test(contentType)) {
+        const encoding = headers['content-transfer-encoding'];
+        return { text: stripHtml(decodeBody(body, encoding)), isHtml: true };
+    }
+    return null;
 }
 
 function extractEmailText(rawSource) {
-    const full = Buffer.isBuffer(rawSource) ? rawSource.toString('utf-8') : String(rawSource || '');
-    const { headers: topHeaders, body: topBody } = splitHeadersAndBody(full);
-
-    const contentTypeMatch = topHeaders.match(/Content-Type:\s*([^\r\n]+(?:\r?\n[ \t][^\r\n]+)*)/i);
-    const contentType = contentTypeMatch ? contentTypeMatch[1].replace(/\r?\n[ \t]/g, ' ') : 'text/plain';
-
-    if (!/multipart\//i.test(contentType)) {
-        // Wiadomość jednoczęściowa - cała treść to jedna część.
-        return decodePart(topHeaders, topBody).trim();
-    }
-
-    const boundaryMatch = contentType.match(/boundary="?([^";\r\n]+)"?/i);
-    if (!boundaryMatch) return topBody.trim();
-    const boundary = boundaryMatch[1];
-    const escaped = boundary.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const rawParts = topBody.split(new RegExp(`--${escaped}(?:--)?\\r?\\n?`)).filter(p => p.trim());
-
-    let htmlFallback = null;
-    for (const rawPart of rawParts) {
-        const { headers, body } = splitHeadersAndBody(rawPart);
-        if (/Content-Type:\s*text\/plain/i.test(headers)) {
-            return decodePart(headers, body).trim();
-        }
-        if (/Content-Type:\s*text\/html/i.test(headers) && htmlFallback === null) {
-            htmlFallback = stripHtmlTags(decodePart(headers, body));
-        }
-    }
-    return htmlFallback || '';
+    if (!rawSource) return '';
+    const raw = typeof rawSource === 'string' ? rawSource : rawSource.toString('utf-8');
+    const { headers, body } = splitHeadersAndBody(raw);
+    const result = findBestText(headers, body);
+    return result ? result.text.trim() : '';
 }
 
 module.exports = { extractEmailText };
