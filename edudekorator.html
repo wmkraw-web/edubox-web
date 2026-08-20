@@ -224,6 +224,12 @@
             const [printSize, setPrintSize] = useState('medium');
             const [labelNames, setLabelNames] = useState({});
             const [fontChoice, setFontChoice] = useState('baloo');
+
+            // --- WŁASNA ETYKIETA ZE ZDJĘCIA (upload + AI restyle) ---
+            const [refImage, setRefImage] = useState(null); // data:URL wgranego zdjęcia/rysunku
+            const [refImageName, setRefImageName] = useState('');
+            const [isAddingOwnLabel, setIsAddingOwnLabel] = useState(false);
+            const OWN_LABEL_COLORS = ['border-yellow-400', 'border-pink-400', 'border-sky-400', 'border-emerald-400', 'border-purple-400'];
             
             const [marketItems, setMarketItems] = useState([]);
             const [isFetchingMarket, setIsFetchingMarket] = useState(false);
@@ -275,6 +281,78 @@
                     showMessage('Kod Premium zaakceptowany!', 'success');
                 } else {
                     showMessage('Nieprawidłowy kod', 'error');
+                }
+            };
+
+            const handleRefImageUpload = (e) => {
+                const file = e.target.files && e.target.files[0];
+                if (!file) return;
+                if (file.size > 4 * 1024 * 1024) {
+                    showMessage('Plik jest za duży (max 4MB). Wybierz mniejsze zdjęcie.', 'error');
+                    e.target.value = '';
+                    return;
+                }
+                const reader = new FileReader();
+                reader.onload = (ev) => { setRefImage(ev.target.result); setRefImageName(file.name); };
+                reader.readAsDataURL(file);
+                e.target.value = '';
+            };
+
+            // Przerabia WŁASNE wgrane zdjęcie/rysunek na etykietę w stylu 3D (image-to-image) i dokłada
+            // ją jako kolejny element do bieżącego zestawu etykiet (albo zakłada nowy, jeśli jeszcze
+            // nic nie było wygenerowane). W przeciwieństwie do "Wygeneruj Zestaw" (który wymyśla 10 nowych
+            // motywów od zera), tutaj AI ma się trzymać KONKRETNIE tego, co użytkownik wgrał.
+            const addOwnLabelFromImage = async () => {
+                if (!refImage) return;
+                const imgProStatus = localStorage.getItem('eduboxProStatus');
+                const imgIsPro = imgProStatus === 'PRO' || imgProStatus === 'active' || isPremium;
+                if (!imgIsPro && window.EduBoxCore.getImageUsageCount() >= 2) { showMessage('⚠️ Dzienny limit darmowych obrazków (2/2) wyczerpany. Wpisz kod odblokowujący!', 'error'); return; }
+
+                setIsAddingOwnLabel(true);
+                try {
+                    const stylePrompt = theme.trim()
+                        ? `Cute 3D Pixar Disney style illustration based on the uploaded reference image, matching the theme "${theme}", white background, isolated subject`
+                        : `Cute 3D Pixar Disney style illustration based on the uploaded reference image, white background, isolated subject`;
+
+                    const res = await fetch('/api/malarz', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            prompt: stylePrompt,
+                            style: 'disney',
+                            format: 'naklejka',
+                            customText: '',
+                            init_image: refImage,
+                            image_strength: 0.55
+                        })
+                    });
+                    if (!res.ok) throw new Error('Błąd generowania obrazka.');
+                    const data = await res.json();
+                    if (!data.url) throw new Error('Brak wygenerowanego obrazka.');
+
+                    const newItem = { imgUrl: data.url, borderColor: OWN_LABEL_COLORS[Math.floor(Math.random() * OWN_LABEL_COLORS.length)] };
+
+                    setResultData(prev => {
+                        if (prev && prev.type === 'etykiety' && prev.data && prev.data.items) {
+                            return { ...prev, data: { ...prev.data, items: [...prev.data.items, newItem] } };
+                        }
+                        return { type: 'etykiety', data: { title: 'Etykiety na szafki', items: [newItem] }, params: { theme, groupAge } };
+                    });
+                    setLayoutType('etykiety');
+                    setPrintSize('medium');
+
+                    if (!imgIsPro) {
+                        const today = new Date().toISOString().split('T')[0];
+                        const newImgCount = window.EduBoxCore.getImageUsageCount() + 1;
+                        localStorage.setItem('eduboxImageUsage', JSON.stringify({ date: today, count: newImgCount }));
+                    }
+                    setRefImage(null);
+                    setRefImageName('');
+                    showMessage('Dodano Twoją etykietę do zestawu!', 'success');
+                } catch (error) {
+                    showMessage(error.message, 'error');
+                } finally {
+                    setIsAddingOwnLabel(false);
                 }
             };
 
@@ -754,6 +832,30 @@ WYMÓG JSON:
                                             />
                                         </div>
                                     </div>
+
+                                    {layoutType === 'etykiety' && (
+                                        <div className="space-y-3 bg-indigo-50 border border-indigo-200 rounded-2xl p-4 shadow-sm">
+                                            <label className="text-[10px] font-bold text-indigo-700 uppercase flex items-center gap-1">
+                                                <i className="ph-bold ph-camera"></i> Własna etykieta ze zdjęcia (opcjonalnie)
+                                            </label>
+                                            <p className="text-[10px] text-indigo-600 leading-snug">Wgraj zdjęcie zabawki, maskotki albo rysunek dziecka - AI narysuje je w tym samym stylu 3D i doda jako dodatkową etykietę do zestawu.</p>
+                                            {!refImage ? (
+                                                <label className="flex items-center justify-center gap-2 border-2 border-dashed border-indigo-300 rounded-xl p-3 text-xs font-bold text-indigo-600 cursor-pointer hover:bg-indigo-100 transition-colors">
+                                                    <i className="ph-bold ph-upload-simple"></i> Wybierz plik
+                                                    <input type="file" accept="image/*" className="hidden" onChange={handleRefImageUpload} />
+                                                </label>
+                                            ) : (
+                                                <div className="flex items-center gap-3 bg-white rounded-xl p-2 border border-indigo-200">
+                                                    <img src={refImage} className="w-12 h-12 object-cover rounded-lg shrink-0" />
+                                                    <span className="flex-1 text-[10px] text-slate-500 truncate">{refImageName}</span>
+                                                    <button onClick={() => { setRefImage(null); setRefImageName(''); }} className="text-slate-400 hover:text-red-500 shrink-0"><i className="ph-bold ph-x"></i></button>
+                                                </div>
+                                            )}
+                                            <button onClick={addOwnLabelFromImage} disabled={!refImage || isAddingOwnLabel} className="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-2.5 rounded-xl text-xs flex items-center justify-center gap-2 disabled:opacity-50 transition-all">
+                                                {isAddingOwnLabel ? (<><i className="ph-bold ph-spinner animate-spin"></i> Przerabiam zdjęcie...</>) : (<><i className="ph-bold ph-magic-wand"></i> Dodaj jako etykietę do zestawu</>)}
+                                            </button>
+                                        </div>
+                                    )}
 
                                     <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-[10px] font-bold text-amber-700 flex flex-col gap-2 shadow-inner">
                                         <div className="flex gap-2 items-center"><i className="ph-fill ph-magic-wand text-xl shrink-0"></i> <span>Aplikacja użyje potężnego silnika 3D (Pixar Style) z systemu Fal.ai.</span></div>
