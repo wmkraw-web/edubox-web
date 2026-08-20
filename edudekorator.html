@@ -73,6 +73,12 @@
             .print-only { display: none !important; }
         }
 
+        /* Pasek DRUKUJ/POBIERZ PDF/DODAJ DO BAZY - na wąskich ekranach panel boczny (20rem) zajmowałby
+           za dużo miejsca, więc pasek rozciąga się na całą szerokość. */
+        @media (max-width: 768px) {
+            .action-bar-fixed { left: 0 !important; }
+        }
+
         @media print {
             @page { margin: 10mm; size: A4 portrait; }
             
@@ -97,10 +103,14 @@
             .print-only { display: block !important; width: 100% !important; height: auto !important; background: white !important; }
             * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
             
-            .print-break-inside-avoid { 
-                break-inside: avoid !important; 
-                page-break-inside: avoid !important; 
-                display: block !important; 
+            /* UWAGA: BEZ "display:block !important" tutaj - karty etykiet/kodeksu/itd. używają
+               .print-break-inside-avoid RAZEM z .flex (obrazek obok tekstu). display:block!important
+               bije flex (bo Tailwindowe .flex nie ma !important), więc każda taka karta zamieniała się
+               w drukowanym/PDF-owym widoku w pionowy stos (obrazek NAD tekstem zamiast OBOK) - to była
+               prawdziwa przyczyna "inny wydruk niż podgląd". break-inside:avoid działa też na flexboksie. */
+            .print-break-inside-avoid {
+                break-inside: avoid !important;
+                page-break-inside: avoid !important;
             }
         }
     </style>
@@ -870,9 +880,11 @@ WYMÓG JSON:
 
                         </div>
 
-                        {/* PASEK AKCJI - PRZYPIĘTY NA STAŁE NA DOLE, ZAWSZE WIDOCZNY (nie trzeba przewijać) */}
+                        {/* PASEK AKCJI - position:fixed do samego viewportu (NIE zależy od tego, czy
+                            zagnieżdżony flex/overflow-y-auto łańcuch się prawidłowo domknie do 100vh -
+                            to okazało się zawodne w praktyce), więc jest gwarantowanie zawsze widoczny. */}
                         {resultData && (
-                            <div className="no-print border-t-4 border-emerald-400 bg-white/95 backdrop-blur-md px-4 py-4 flex items-center justify-center gap-3 flex-wrap shadow-[0_-8px_24px_rgba(0,0,0,0.15)] shrink-0">
+                            <div className="no-print action-bar-fixed border-t-4 border-emerald-400 bg-white/95 backdrop-blur-md px-4 py-3 flex items-center justify-center gap-3 flex-wrap shadow-[0_-8px_24px_rgba(0,0,0,0.25)]" style={{ position: 'fixed', bottom: 0, left: '20rem', right: 0, zIndex: 200 }}>
                                 <button onClick={() => window.print()} className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 px-6 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/30">
                                     <i className="ph-bold ph-printer text-xl"></i> DRUKUJ
                                 </button>
