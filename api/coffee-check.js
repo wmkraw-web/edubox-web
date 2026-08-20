@@ -20,22 +20,27 @@
 import crypto from 'crypto';
 import { ImapFlow } from 'imapflow';
 import nodemailer from 'nodemailer';
-import { google } from 'googleapis';
 import { parseCoffeePayment } from './_lib/parseCoffeePayment.js';
 import { extractEmailText } from './_lib/extractEmailText.js';
+import { getServiceAccountAccessToken } from './_lib/googleServiceAccountAuth.js';
 
 async function sendEmail(transporter, { to, subject, text }) {
     await transporter.sendMail({ from: process.env.GMAIL_ADDRESS, to, subject, text });
 }
 
-async function appendSheetRow(sheets, spreadsheetId, values) {
-    await sheets.spreadsheets.values.append({
-        spreadsheetId,
-        range: 'Coffee_Codes!A:F',
-        valueInputOption: 'USER_ENTERED',
-        insertDataOption: 'INSERT_ROWS',
-        requestBody: { values: [values] }
-    });
+async function appendSheetRow(accessToken, spreadsheetId, values) {
+    const res = await fetch(
+        `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/Coffee_Codes!A:F:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,
+        {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ values: [values] })
+        }
+    );
+    if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(`Błąd zapisu do arkusza: ${data.error?.message || res.status}`);
+    }
 }
 
 export default async function handler(req, res) {
@@ -70,11 +75,10 @@ export default async function handler(req, res) {
             auth: { user: process.env.GMAIL_ADDRESS, pass: process.env.GMAIL_APP_PASSWORD }
         });
 
-        const sheetsAuth = new google.auth.GoogleAuth({
-            credentials: serviceAccountCredentials,
-            scopes: ['https://www.googleapis.com/auth/spreadsheets']
-        });
-        const sheets = google.sheets({ version: 'v4', auth: sheetsAuth });
+        const sheetsAccessToken = await getServiceAccountAccessToken(
+            serviceAccountCredentials,
+            'https://www.googleapis.com/auth/spreadsheets'
+        );
 
         client = new ImapFlow({
             host: 'imap.gmail.com',
@@ -107,7 +111,7 @@ export default async function handler(req, res) {
                         });
                     } else {
                         const code = `KAWA-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
-                        await appendSheetRow(sheets, process.env.SHEETS_SPREADSHEET_ID, [
+                        await appendSheetRow(sheetsAccessToken, process.env.SHEETS_SPREADSHEET_ID, [
                             code, parsed.payerEmail, parsed.payerName, parsed.amount, 'unused', new Date().toISOString()
                         ]);
                         await sendEmail(transporter, {
