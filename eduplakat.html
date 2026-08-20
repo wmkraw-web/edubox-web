@@ -319,8 +319,10 @@
 
             // GŁÓWNA FUNKCJA GENERUJĄCA
             const handleGeneratePoster = () => {
-                if (!promptInput.trim()) {
-                    setError('Wpisz co ma być na plakacie!'); 
+                // Opis tekstowy jest wymagany TYLKO jeśli nie ma wzoru - z samym wgranym zdjęciem
+                // (image-to-image) AI ma już czym się kierować.
+                if (!promptInput.trim() && !refImage) {
+                    setError('Wpisz co ma być na plakacie, albo wgraj wzór/przykład w Kroku 4!');
                     return;
                 }
                 window.EduBoxCore.executeImageLimitCheck(isPremium,
@@ -340,8 +342,12 @@
                 setTextLayers([]);
 
                 try {
+                    // Jeśli użytkownik nie wpisał opisu, a wgrał tylko wzór/zdjęcie - dajemy sensowny
+                    // opis zastępczy, żeby krok "wzbogacania opisu przez AI" miał czym pracować.
+                    const effectivePrompt = promptInput.trim() || 'A beautiful, harmonious children\'s educational poster illustration inspired by the uploaded reference image';
+
                     // ETAP 1: GPT-4o-mini REŻYSERUJE SCENĘ
-                    let enhancedPrompt = promptInput;
+                    let enhancedPrompt = effectivePrompt;
                     try {
                         const systemPrompt = `You are an expert AI image prompt engineer specializing in children's educational posters. The user will give you a simple idea in Polish.
                         Your job is to rewrite it into a highly detailed, physically logical, and descriptive image prompt IN ENGLISH.
@@ -357,9 +363,9 @@
                         const resChat = await fetch('/api/chat', {
                             method: 'POST', 
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ 
-                                prompt: promptInput, 
-                                system: systemPrompt, 
+                            body: JSON.stringify({
+                                prompt: effectivePrompt,
+                                system: systemPrompt,
                                 temperature: 0.7, 
                                 model: "gpt-4o-mini" 
                             })
@@ -723,7 +729,7 @@
                                     </div>
                                 </div>
 
-                                <label className="block text-white font-bold mb-4 text-lg">Krok 3: Co mam dzisiaj narysować?</label>
+                                <label className="block text-white font-bold mb-4 text-lg">Krok 3: Co mam dzisiaj narysować? <span className="text-slate-500 font-normal text-sm">(opcjonalnie, jeśli wgrywasz wzór w Kroku 4)</span></label>
                                 
                                 <div className="relative">
                                     <input 
@@ -774,7 +780,7 @@
                                 <div className="mt-10 flex justify-center">
                                     <button 
                                         onClick={handleGeneratePoster}
-                                        disabled={generatingStatus !== '' || !promptInput}
+                                        disabled={generatingStatus !== '' || (!promptInput && !refImage)}
                                         className={`w-full sm:w-auto px-12 py-5 rounded-2xl font-black text-white text-lg transition-all flex items-center justify-center gap-3 shadow-[0_0_20px_rgba(168,85,247,0.3)] btn-bounce uppercase tracking-widest
                                             ${generatingStatus !== '' ? 'bg-slate-700 cursor-not-allowed' : 'bg-gradient-to-r from-purple-600 to-cyan-500 hover:scale-105'}`}
                                     >
