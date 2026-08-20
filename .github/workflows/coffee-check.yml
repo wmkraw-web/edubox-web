@@ -1,0 +1,23 @@
+name: Sprawdzaj wpłaty kawa (Buycoffee)
+
+# Uruchamia się co 5 minut i woła nasz endpoint na Vercelu, który sprawdza skrzynkę Gmail
+# i wysyła kody PRO. Zastępuje wcześniejszy scenariusz Make (przeniesione, bo logikę dało się
+# w pełni przetestować lokalnie przed wdrożeniem - patrz api/_lib/parseCoffeePayment.test.js).
+on:
+  # Harmonogram (co 5 minut) jest CELOWO zakomentowany - odkomentować dopiero po skonfigurowaniu
+  # sekretów (GMAIL_CLIENT_ID/SECRET/REFRESH_TOKEN, SHEETS_SPREADSHEET_ID, COFFEE_CHECK_SECRET) na
+  # Vercelu i w ustawieniach repo (Settings → Secrets → Actions), inaczej będzie odpytywać endpoint
+  # co 5 minut i zawsze dostawać 401 (brak autoryzacji).
+  # schedule:
+  #   - cron: '*/5 * * * *'
+  workflow_dispatch: {} # pozwala odpalić ręcznie z zakładki "Actions" na GitHubie, do testów
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wywołaj /api/coffee-check na eduboxpro.pl
+        run: |
+          curl -sS -X POST "https://eduboxpro.pl/api/coffee-check" \
+            -H "Authorization: Bearer ${{ secrets.COFFEE_CHECK_SECRET }}" \
+            --fail-with-body
