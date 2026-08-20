@@ -47,27 +47,43 @@ export default async function handler(req, res) {
     }
 
     const results = { checked: 0, processed: 0, unrecognized: 0, errors: [] };
-
-    const transporter = nodemailer.createTransport({
-        service: 'gmail',
-        auth: { user: process.env.GMAIL_ADDRESS, pass: process.env.GMAIL_APP_PASSWORD }
-    });
-
-    const sheetsAuth = new google.auth.GoogleAuth({
-        credentials: JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_KEY),
-        scopes: ['https://www.googleapis.com/auth/spreadsheets']
-    });
-    const sheets = google.sheets({ version: 'v4', auth: sheetsAuth });
-
-    const client = new ImapFlow({
-        host: 'imap.gmail.com',
-        port: 993,
-        secure: true,
-        auth: { user: process.env.GMAIL_ADDRESS, pass: process.env.GMAIL_APP_PASSWORD },
-        logger: false
-    });
+    let client;
 
     try {
+        // WAŻNE: cała konfiguracja (nie tylko sama praca z pocztą/arkuszem) jest wewnątrz try/catch -
+        // wcześniej JSON.parse klucza konta usługi był POZA blokiem try, więc zły/uszkodzony klucz
+        // powodował twardą awarię funkcji (nieczytelne "FUNCTION_INVOCATION_FAILED" od Vercela)
+        // zamiast zrozumiałego komunikatu błędu w odpowiedzi JSON.
+        for (const key of ['GMAIL_ADDRESS', 'GMAIL_APP_PASSWORD', 'GOOGLE_SERVICE_ACCOUNT_KEY', 'SHEETS_SPREADSHEET_ID']) {
+            if (!process.env[key]) throw new Error(`Brak zmiennej środowiskowej ${key} na Vercelu.`);
+        }
+
+        let serviceAccountCredentials;
+        try {
+            serviceAccountCredentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_KEY);
+        } catch (e) {
+            throw new Error(`GOOGLE_SERVICE_ACCOUNT_KEY nie jest poprawnym JSON-em (${e.message}). Sprawdź, czy cała zawartość pliku .json została wklejona bez zmian.`);
+        }
+
+        const transporter = nodemailer.createTransport({
+            service: 'gmail',
+            auth: { user: process.env.GMAIL_ADDRESS, pass: process.env.GMAIL_APP_PASSWORD }
+        });
+
+        const sheetsAuth = new google.auth.GoogleAuth({
+            credentials: serviceAccountCredentials,
+            scopes: ['https://www.googleapis.com/auth/spreadsheets']
+        });
+        const sheets = google.sheets({ version: 'v4', auth: sheetsAuth });
+
+        client = new ImapFlow({
+            host: 'imap.gmail.com',
+            port: 993,
+            secure: true,
+            auth: { user: process.env.GMAIL_ADDRESS, pass: process.env.GMAIL_APP_PASSWORD },
+            logger: false
+        });
+
         await client.connect();
         const lock = await client.getMailboxLock('INBOX');
 
@@ -126,7 +142,11 @@ export default async function handler(req, res) {
         res.status(200).json(results);
     } catch (error) {
         console.error('Błąd coffee-check:', error);
-        try { await client.logout(); } catch (e) { /* połączenie mogło już nie istnieć */ }
+        // "client" może nie istnieć, jeśli błąd wystąpił wcześniej (np. brak zmiennej środowiskowej,
+        // zanim zdążyliśmy w ogóle utworzyć połączenie IMAP).
+        if (client) {
+            try { await client.logout(); } catch (e) { /* połączenie mogło już nie istnieć */ }
+        }
         res.status(500).json({ error: error.message, ...results });
     }
 }
