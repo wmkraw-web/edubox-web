@@ -229,6 +229,7 @@
             const [refImage, setRefImage] = useState(null); // data:URL wgranego zdjęcia/rysunku
             const [refImageName, setRefImageName] = useState('');
             const [refImageCaption, setRefImageCaption] = useState(''); // podpis - potrzebny wszędzie poza "etykiety"
+            const [refImageMode, setRefImageMode] = useState('close'); // 'close'/'creative' = SDXL image-to-image (trzyma się zdjęcia), 'describe' = pełny styl 3D przez opis AI
             const [isAddingOwnLabel, setIsAddingOwnLabel] = useState(false);
             const OWN_ITEM_PALETTE = [
                 { bgColor: 'bg-blue-50', textColor: 'text-blue-800', headerColor: 'bg-blue-500', borderColor: 'border-blue-400' },
@@ -328,21 +329,36 @@
 
                 setIsAddingOwnLabel(true);
                 try {
-                    const stylePrompt = theme.trim()
-                        ? `Cute 3D Pixar Disney style illustration based on the uploaded reference image, matching the theme "${theme}", white background, isolated subject`
-                        : `Cute 3D Pixar Disney style illustration based on the uploaded reference image, white background, isolated subject`;
+                    // Tryb "Pełny styl (opis AI)": zamiast wklejać zdjęcie bezpośrednio do generatora
+                    // (co blokuje styl 3D Pixar - SDXL image-to-image mocno trzyma się oryginalnych
+                    // pikseli), najpierw prosimy AI o opisanie tego, co widzi na zdjęciu, i rysujemy
+                    // od nowa na podstawie tego opisu. Traci się dosłowną wierność zdjęciu, ale styl
+                    // 3D Pixar zadziała w pełni - dokładnie ten sam mechanizm co w EduPlakat.
+                    const useDescribeMode = refImageMode === 'describe';
+                    let bodyParams;
+                    if (useDescribeMode) {
+                        const descRes = await fetch('/api/describe-image', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ image_url: refImage })
+                        });
+                        const descData = await descRes.json().catch(() => ({}));
+                        if (!descRes.ok || !descData.description) throw new Error(descData.error || 'Nie udało się przeanalizować wzoru.');
+                        const stylePrompt = theme.trim()
+                            ? `Cute 3D Pixar Disney style illustration of: ${descData.description}. Matching the theme "${theme}", white background, isolated subject`
+                            : `Cute 3D Pixar Disney style illustration of: ${descData.description}. White background, isolated subject`;
+                        bodyParams = { prompt: stylePrompt, style: 'disney', format: 'naklejka', customText: '' };
+                    } else {
+                        const stylePrompt = theme.trim()
+                            ? `Cute 3D Pixar Disney style illustration based on the uploaded reference image, matching the theme "${theme}", white background, isolated subject`
+                            : `Cute 3D Pixar Disney style illustration based on the uploaded reference image, white background, isolated subject`;
+                        bodyParams = { prompt: stylePrompt, style: 'disney', format: 'naklejka', customText: '', init_image: refImage, image_strength: refImageMode === 'close' ? 0.35 : 0.6 };
+                    }
 
                     const res = await fetch('/api/malarz', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            prompt: stylePrompt,
-                            style: 'disney',
-                            format: 'naklejka',
-                            customText: '',
-                            init_image: refImage,
-                            image_strength: 0.55
-                        })
+                        body: JSON.stringify(bodyParams)
                     });
                     // WAŻNE: czytamy body PRZED sprawdzeniem res.ok, żeby konkretny komunikat backendu
                     // (np. o zablokowaniu zdjęcia przez filtr bezpieczeństwa AI) faktycznie dotarł do
@@ -884,6 +900,16 @@ WYMÓG JSON:
                                                     <span className="flex-1 text-[10px] text-slate-500 truncate">{refImageName}</span>
                                                     <button onClick={() => { setRefImage(null); setRefImageName(''); }} className="text-slate-400 hover:text-red-500 shrink-0"><i className="ph-bold ph-x"></i></button>
                                                 </div>
+                                                <div className="flex gap-1.5">
+                                                    <button onClick={() => setRefImageMode('close')} className={`flex-1 py-2 px-2 rounded-lg border-2 text-[10px] font-bold transition-all ${refImageMode === 'close' ? 'bg-indigo-100 border-indigo-500 text-indigo-700' : 'bg-white border-slate-200 text-slate-500 hover:border-slate-400'}`}>Podobne do wzoru</button>
+                                                    <button onClick={() => setRefImageMode('creative')} className={`flex-1 py-2 px-2 rounded-lg border-2 text-[10px] font-bold transition-all ${refImageMode === 'creative' ? 'bg-indigo-100 border-indigo-500 text-indigo-700' : 'bg-white border-slate-200 text-slate-500 hover:border-slate-400'}`}>Tylko inspiracja</button>
+                                                    <button onClick={() => setRefImageMode('describe')} className={`flex-1 py-2 px-2 rounded-lg border-2 text-[10px] font-bold transition-all ${refImageMode === 'describe' ? 'bg-purple-100 border-purple-500 text-purple-700' : 'bg-white border-slate-200 text-slate-500 hover:border-slate-400'}`}>Pełny styl (opis AI)</button>
+                                                </div>
+                                                <p className="text-[9px] text-indigo-500 leading-snug px-0.5">
+                                                    {refImageMode === 'close' && 'Obraz zostanie blisko wzoru - styl 3D Pixar ma ograniczony wpływ.'}
+                                                    {refImageMode === 'creative' && 'Wzór to tylko inspiracja - więcej swobody dla AI, nadal ograniczony wpływ stylu.'}
+                                                    {refImageMode === 'describe' && 'AI opisze wzór słowami i narysuje od nowa w pełnym stylu 3D Pixar - traci dosłowną wierność zdjęciu.'}
+                                                </p>
                                                 {layoutType !== 'etykiety' && (
                                                     <input
                                                         type="text"
