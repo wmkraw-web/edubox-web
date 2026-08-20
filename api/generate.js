@@ -61,13 +61,18 @@ export default async function handler(req, res) {
 
   try {
     // ---------------------------------------------------------
-    // TRYB 1: GENEROWANIE Z TEKSTU (Model: FLUX Schnell)
+    // TRYB 1: GENEROWANIE Z TEKSTU (Model: FLUX Dev)
     // ---------------------------------------------------------
-    let endpointUrl = 'https://fal.run/fal-ai/flux/schnell';
+    // UWAGA: wcześniej flux/schnell (4 kroki, bardzo szybki i tani, ale słabiej trzyma się opisu
+    // i częściej psuje anatomię/kadrowanie - np. "pszczółki" wychodziły jako ptaki, a dziecko niesione
+    // na barana wychodziło ucięte w połowie). flux/dev generuje wolniej (kilkanaście sekund zamiast
+    // kilku) i kosztuje więcej za obrazek u Fal.ai, ale znacznie wierniej trzyma się promptu.
+    let endpointUrl = 'https://fal.run/fal-ai/flux/dev';
     let payload = {
       prompt: prompt,
       image_size: falImageSize,
-      num_inference_steps: 4,
+      num_inference_steps: 28,
+      guidance_scale: 3.5,
       num_images: 1,
       enable_safety_checker: true
     };
