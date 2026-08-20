@@ -225,11 +225,18 @@
             const [labelNames, setLabelNames] = useState({});
             const [fontChoice, setFontChoice] = useState('baloo');
 
-            // --- WŁASNA ETYKIETA ZE ZDJĘCIA (upload + AI restyle) ---
+            // --- WŁASNY ELEMENT ZE ZDJĘCIA (upload + AI restyle), działa dla KAŻDEGO układu ---
             const [refImage, setRefImage] = useState(null); // data:URL wgranego zdjęcia/rysunku
             const [refImageName, setRefImageName] = useState('');
+            const [refImageCaption, setRefImageCaption] = useState(''); // podpis - potrzebny wszędzie poza "etykiety"
             const [isAddingOwnLabel, setIsAddingOwnLabel] = useState(false);
-            const OWN_LABEL_COLORS = ['border-yellow-400', 'border-pink-400', 'border-sky-400', 'border-emerald-400', 'border-purple-400'];
+            const OWN_ITEM_PALETTE = [
+                { bgColor: 'bg-blue-50', textColor: 'text-blue-800', headerColor: 'bg-blue-500', borderColor: 'border-blue-400' },
+                { bgColor: 'bg-amber-100', textColor: 'text-amber-800', headerColor: 'bg-amber-500', borderColor: 'border-amber-400' },
+                { bgColor: 'bg-emerald-50', textColor: 'text-emerald-700', headerColor: 'bg-emerald-500', borderColor: 'border-emerald-400' },
+                { bgColor: 'bg-pink-50', textColor: 'text-pink-700', headerColor: 'bg-pink-500', borderColor: 'border-pink-400' },
+                { bgColor: 'bg-sky-50', textColor: 'text-sky-800', headerColor: 'bg-sky-500', borderColor: 'border-sky-400' },
+            ];
             
             const [marketItems, setMarketItems] = useState([]);
             const [isFetchingMarket, setIsFetchingMarket] = useState(false);
@@ -298,10 +305,21 @@
                 e.target.value = '';
             };
 
-            // Przerabia WŁASNE wgrane zdjęcie/rysunek na etykietę w stylu 3D (image-to-image) i dokłada
-            // ją jako kolejny element do bieżącego zestawu etykiet (albo zakłada nowy, jeśli jeszcze
-            // nic nie było wygenerowane). W przeciwieństwie do "Wygeneruj Zestaw" (który wymyśla 10 nowych
-            // motywów od zera), tutaj AI ma się trzymać KONKRETNIE tego, co użytkownik wgrał.
+            // Domyślne tytuły/podpisy używane, gdy dodajemy WŁASNE zdjęcie jako pierwszy element
+            // danego układu (czyli jeszcze nic nie zostało wcześniej wygenerowane przez AI).
+            const OWN_ITEM_DEFAULTS = {
+                etykiety: { title: 'Etykiety na szafki' },
+                drzwi: { title: 'W naszej sali dzieci są:' },
+                kodeks: { title: 'Nasz Kodeks' },
+                kaciki: { title: 'Nasze Kąciki' },
+                plakat_choroba: { title: 'Zostaw dziecko w domu, gdy:', subtitle: 'Dbajmy wspólnie o zdrowie!', footer: 'DZIĘKUJEMY ZA WSPÓŁPRACĘ!' }
+            };
+
+            // Przerabia WŁASNE wgrane zdjęcie/rysunek (image-to-image) i dokłada je jako kolejny element
+            // do BIEŻĄCEGO układu (etykiety, drzwi, kodeks, kąciki albo plakat) - albo zakłada nowy zestaw
+            // z tym jednym elementem, jeśli jeszcze nic nie było wygenerowane. W przeciwieństwie do
+            // "Wygeneruj Zestaw" (który wymyśla treść od zera), tutaj AI ma się trzymać KONKRETNIE tego,
+            // co użytkownik wgrał.
             const addOwnLabelFromImage = async () => {
                 if (!refImage) return;
                 const imgProStatus = localStorage.getItem('eduboxProStatus');
@@ -326,19 +344,34 @@
                             image_strength: 0.55
                         })
                     });
-                    if (!res.ok) throw new Error('Błąd generowania obrazka.');
-                    const data = await res.json();
+                    // WAŻNE: czytamy body PRZED sprawdzeniem res.ok, żeby konkretny komunikat backendu
+                    // (np. o zablokowaniu zdjęcia przez filtr bezpieczeństwa AI) faktycznie dotarł do
+                    // użytkownika, zamiast być zastąpiony ogólnikowym "Błąd generowania obrazka".
+                    const data = await res.json().catch(() => ({}));
+                    if (!res.ok) throw new Error(data.error || 'Błąd generowania obrazka.');
                     if (!data.url) throw new Error('Brak wygenerowanego obrazka.');
 
-                    const newItem = { imgUrl: data.url, borderColor: OWN_LABEL_COLORS[Math.floor(Math.random() * OWN_LABEL_COLORS.length)] };
+                    const palette = OWN_ITEM_PALETTE[Math.floor(Math.random() * OWN_ITEM_PALETTE.length)];
+                    const currentType = (resultData && resultData.type) || layoutType;
+                    const caption = refImageCaption.trim();
+
+                    let newItem;
+                    if (currentType === 'etykiety') {
+                        newItem = { imgUrl: data.url, borderColor: palette.borderColor };
+                    } else if (currentType === 'plakat_choroba') {
+                        newItem = { title: caption || 'Dodane ręcznie', desc: 'Element dodany przez nauczyciela.', imgUrl: data.url, bgColor: palette.bgColor, headerColor: palette.headerColor };
+                    } else {
+                        // drzwi, kodeks, kaciki mają identyczny kształt elementu: {text, imgUrl, bgColor, textColor}
+                        newItem = { text: caption || 'Mój wpis', imgUrl: data.url, bgColor: palette.bgColor, textColor: palette.textColor };
+                    }
 
                     setResultData(prev => {
-                        if (prev && prev.type === 'etykiety' && prev.data && prev.data.items) {
+                        if (prev && prev.type === currentType && prev.data && prev.data.items) {
                             return { ...prev, data: { ...prev.data, items: [...prev.data.items, newItem] } };
                         }
-                        return { type: 'etykiety', data: { title: 'Etykiety na szafki', items: [newItem] }, params: { theme, groupAge } };
+                        return { type: currentType, data: { ...OWN_ITEM_DEFAULTS[currentType], items: [newItem] }, params: { theme, groupAge } };
                     });
-                    setLayoutType('etykiety');
+                    setLayoutType(currentType);
                     setPrintSize('medium');
 
                     if (!imgIsPro) {
@@ -348,7 +381,8 @@
                     }
                     setRefImage(null);
                     setRefImageName('');
-                    showMessage('Dodano Twoją etykietę do zestawu!', 'success');
+                    setRefImageCaption('');
+                    showMessage('Dodano do zestawu!', 'success');
                 } catch (error) {
                     showMessage(error.message, 'error');
                 } finally {
@@ -833,29 +867,38 @@ WYMÓG JSON:
                                         </div>
                                     </div>
 
-                                    {layoutType === 'etykiety' && (
-                                        <div className="space-y-3 bg-indigo-50 border border-indigo-200 rounded-2xl p-4 shadow-sm">
-                                            <label className="text-[10px] font-bold text-indigo-700 uppercase flex items-center gap-1">
-                                                <i className="ph-bold ph-camera"></i> Własna etykieta ze zdjęcia (opcjonalnie)
+                                    <div className="space-y-3 bg-indigo-50 border border-indigo-200 rounded-2xl p-4 shadow-sm">
+                                        <label className="text-[10px] font-bold text-indigo-700 uppercase flex items-center gap-1">
+                                            <i className="ph-bold ph-camera"></i> Własny element ze zdjęcia (opcjonalnie)
+                                        </label>
+                                        <p className="text-[10px] text-indigo-600 leading-snug">Wgraj zdjęcie zabawki, maskotki albo rysunek dziecka - AI narysuje je w wybranym stylu i doda jako kolejny element do bieżącego układu (etykiety, drzwi, kodeks, kąciki albo plakat).</p>
+                                        {!refImage ? (
+                                            <label className="flex items-center justify-center gap-2 border-2 border-dashed border-indigo-300 rounded-xl p-3 text-xs font-bold text-indigo-600 cursor-pointer hover:bg-indigo-100 transition-colors">
+                                                <i className="ph-bold ph-upload-simple"></i> Wybierz plik
+                                                <input type="file" accept="image/*" className="hidden" onChange={handleRefImageUpload} />
                                             </label>
-                                            <p className="text-[10px] text-indigo-600 leading-snug">Wgraj zdjęcie zabawki, maskotki albo rysunek dziecka - AI narysuje je w tym samym stylu 3D i doda jako dodatkową etykietę do zestawu.</p>
-                                            {!refImage ? (
-                                                <label className="flex items-center justify-center gap-2 border-2 border-dashed border-indigo-300 rounded-xl p-3 text-xs font-bold text-indigo-600 cursor-pointer hover:bg-indigo-100 transition-colors">
-                                                    <i className="ph-bold ph-upload-simple"></i> Wybierz plik
-                                                    <input type="file" accept="image/*" className="hidden" onChange={handleRefImageUpload} />
-                                                </label>
-                                            ) : (
+                                        ) : (
+                                            <div className="space-y-2">
                                                 <div className="flex items-center gap-3 bg-white rounded-xl p-2 border border-indigo-200">
                                                     <img src={refImage} className="w-12 h-12 object-cover rounded-lg shrink-0" />
                                                     <span className="flex-1 text-[10px] text-slate-500 truncate">{refImageName}</span>
                                                     <button onClick={() => { setRefImage(null); setRefImageName(''); }} className="text-slate-400 hover:text-red-500 shrink-0"><i className="ph-bold ph-x"></i></button>
                                                 </div>
-                                            )}
-                                            <button onClick={addOwnLabelFromImage} disabled={!refImage || isAddingOwnLabel} className="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-2.5 rounded-xl text-xs flex items-center justify-center gap-2 disabled:opacity-50 transition-all">
-                                                {isAddingOwnLabel ? (<><i className="ph-bold ph-spinner animate-spin"></i> Przerabiam zdjęcie...</>) : (<><i className="ph-bold ph-magic-wand"></i> Dodaj jako etykietę do zestawu</>)}
-                                            </button>
-                                        </div>
-                                    )}
+                                                {layoutType !== 'etykiety' && (
+                                                    <input
+                                                        type="text"
+                                                        value={refImageCaption}
+                                                        onChange={e => setRefImageCaption(e.target.value)}
+                                                        placeholder="Podpis (np. Dbamy o rośliny)"
+                                                        className="w-full bg-white border border-indigo-200 rounded-lg p-2 text-xs text-slate-800 focus:border-indigo-500 outline-none"
+                                                    />
+                                                )}
+                                            </div>
+                                        )}
+                                        <button onClick={addOwnLabelFromImage} disabled={!refImage || isAddingOwnLabel} className="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-2.5 rounded-xl text-xs flex items-center justify-center gap-2 disabled:opacity-50 transition-all">
+                                            {isAddingOwnLabel ? (<><i className="ph-bold ph-spinner animate-spin"></i> Przerabiam zdjęcie...</>) : (<><i className="ph-bold ph-magic-wand"></i> Dodaj do zestawu</>)}
+                                        </button>
+                                    </div>
 
                                     <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-[10px] font-bold text-amber-700 flex flex-col gap-2 shadow-inner">
                                         <div className="flex gap-2 items-center"><i className="ph-fill ph-magic-wand text-xl shrink-0"></i> <span>Aplikacja użyje potężnego silnika 3D (Pixar Style) z systemu Fal.ai.</span></div>

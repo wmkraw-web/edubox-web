@@ -85,7 +85,17 @@ export default async function handler(req, res) {
     }
 
     const data = await response.json();
-    
+
+    // WAŻNE: model SDXL (używany w trybie ze zdjęciem) w razie wykrycia "niebezpiecznej" treści
+    // NIE zwraca błędu - podmienia obrazek na całkowicie czarny i ustawia has_nsfw_concepts[0]=true.
+    // Bez tego sprawdzenia taki czarny obrazek wyglądał jak poprawny wynik. To częsty "fałszywy alarm"
+    // przy zdjęciach realnych osób/dzieci, dlatego dajemy użytkownikowi zrozumiały komunikat zamiast
+    // po cichu wstawiać czarny kwadrat.
+    const flagged = Array.isArray(data.has_nsfw_concepts) && data.has_nsfw_concepts[0];
+    if (flagged) {
+      return res.status(422).json({ error: 'Zdjęcie zostało zablokowane przez automatyczny filtr bezpieczeństwa AI (to częsty "fałszywy alarm" przy zdjęciach osób/dzieci). Spróbuj: użyć rysunku zamiast zdjęcia, przyciąć kadr do samej zabawki/maskotki, albo wybrać inne zdjęcie.' });
+    }
+
     if (data.images && data.images.length > 0) {
       res.status(200).json({ url: data.images[0].url });
     } else {

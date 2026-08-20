@@ -123,6 +123,15 @@ export default async function handler(req, res) {
 
     const data = await response.json();
 
+    // Zabezpieczenie przed "czarnym obrazkiem" - modele SDXL/Flux w razie wykrycia potencjalnie
+    // niebezpiecznej treści (częsty "fałszywy alarm" przy zdjęciach osób/dzieci w trybie image-to-image)
+    // nie zwracają błędu, tylko podmieniają wynik na całkowicie czarny obrazek i ustawiają flagę
+    // has_nsfw_concepts. Bez tej kontroli taki czarny obrazek wyglądałby jak poprawny wynik.
+    const flagged = Array.isArray(data.has_nsfw_concepts) && data.has_nsfw_concepts[0];
+    if (flagged) {
+        return res.status(422).json({ error: 'Obrazek został zablokowany przez automatyczny filtr bezpieczeństwa AI (częsty "fałszywy alarm" przy zdjęciach osób/dzieci). Spróbuj innego zdjęcia albo mniej dosłownego opisu.' });
+    }
+
     // Zwracamy adres URL wygenerowanego obrazka do frontendu
     if (data.images && data.images.length > 0) {
         res.status(200).json({ imageUrl: data.images[0].url });
