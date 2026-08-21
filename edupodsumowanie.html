@@ -86,7 +86,17 @@
             'np. Nauczyliśmy się liczyć do 100 po angielsku'
         ];
 
-        const ACCENT_COLORS = ['#FF5DA2', '#FFC145', '#57E6C4'];
+        // Cztery gotowe "nastroje" wideo - AI wybiera jeden na podstawie tego, co nauczyciel napisał
+        // (opis + fakty), a nastrój steruje kolorami aur, akcentów kart i tempem animacji. To jest
+        // realna personalizacja napędzana przez AI, ale zero ryzyka generowania obrazków - wszystko
+        // dalej renderuje się w Canvasie, po prostu innymi paletami/tempem.
+        const MOOD_THEMES = {
+            energetic: { aura: ['251,146,60', '236,72,153', '250,204,21'], accent: ['#FF7A45', '#FFC145', '#FF5DA2'], speed: 1.25 },
+            cozy: { aura: ['245,158,11', '244,114,182', '168,85,247'], accent: ['#FBBF24', '#FB7185', '#C084FC'], speed: 0.8 },
+            proud: { aura: ['59,130,246', '234,179,8', '124,58,237'], accent: ['#FFD166', '#7B8CFF', '#60A5FA'], speed: 0.85 },
+            playful: { aura: ['59,130,246', '168,85,247', '16,185,129'], accent: ['#FF5DA2', '#FFC145', '#57E6C4'], speed: 1 }
+        };
+        const DEFAULT_MOOD = 'playful';
 
         function App() {
             const [user, setUser] = useState(null);
@@ -95,6 +105,7 @@
             const [toastMessage, setToastMessage] = useState(null);
 
             const [className, setClassName] = useState('');
+            const [description, setDescription] = useState('');
             const [facts, setFacts] = useState(['', '', '']);
 
             const [stage, setStage] = useState('form');
@@ -107,6 +118,10 @@
             const chunksRef = useRef([]);
             const particlesRef = useRef([]);
             const punchyFactsRef = useRef(['', '', '']);
+            const hookRef = useRef('');
+            const closingLineRef = useRef('Dziękujemy za wspólny czas!');
+            const iconsRef = useRef(['✨', '✨', '✨']);
+            const themeRef = useRef(MOOD_THEMES[DEFAULT_MOOD]);
 
             useEffect(() => {
                 const initCore = () => {
@@ -127,8 +142,6 @@
                 else showToast('Nieprawidłowy kod dostępu!');
             };
 
-            const PARTICLE_COLORS = ['#FF5DA2', '#FFC145', '#57E6C4', '#7B5CFF', '#FFFFFF'];
-
             function ease(t) { return 1 - Math.pow(1 - t, 3); }
             function easeBounce(t) {
                 const n1 = 7.5625, d1 = 2.75;
@@ -139,6 +152,8 @@
             }
 
             function initParticles(W, H) {
+                // Kolory konfetti dopasowane do wybranego przez AI nastroju wideo
+                const particleColors = [...themeRef.current.accent, '#FFFFFF'];
                 const arr = [];
                 for (let i = 0; i < 40; i++) {
                     arr.push({
@@ -146,7 +161,7 @@
                         size: 6 + Math.random() * 10, speed: 1.2 + Math.random() * 2,
                         drift: (Math.random() - 0.5) * 1.4, rot: Math.random() * 7,
                         rotSpeed: (Math.random() - 0.5) * 0.07,
-                        color: PARTICLE_COLORS[Math.floor(Math.random() * PARTICLE_COLORS.length)]
+                        color: particleColors[Math.floor(Math.random() * particleColors.length)]
                     });
                 }
                 particlesRef.current = arr;
@@ -267,25 +282,30 @@
 
             // Tło: ciemna baza + 3 miękkie, animowane gradientowe "aury" (dokładnie styl .aura-blob
             // z index.html) zamiast wygenerowanej przez AI ilustracji - spójne z resztą portfolio,
-            // zawsze eleganckie, zero ryzyka "generycznego" wyglądu AI-clipartu.
-            const AURA_BLOBS = [
-                { color: '59,130,246', baseX: 0.18, baseY: 0.15, r: 0.55, speed: 0.00018, phase: 0 },
-                { color: '168,85,247', baseX: 0.82, baseY: 0.35, r: 0.48, speed: 0.00021, phase: 2.1 },
-                { color: '16,185,129', baseX: 0.35, baseY: 0.85, r: 0.62, speed: 0.00015, phase: 4.2 }
+            // zawsze eleganckie, zero ryzyka "generycznego" wyglądu AI-clipartu. Same pozycje/tempo
+            // za każdym razem, ale KOLORY pochodzą z nastroju wybranego przez AI (themeRef) - to
+            // realna personalizacja bez ryzyka generowania obrazków.
+            const AURA_POSITIONS = [
+                { baseX: 0.18, baseY: 0.15, r: 0.55, speed: 0.00018, phase: 0 },
+                { baseX: 0.82, baseY: 0.35, r: 0.48, speed: 0.00021, phase: 2.1 },
+                { baseX: 0.35, baseY: 0.85, r: 0.62, speed: 0.00015, phase: 4.2 }
             ];
 
             function renderFrame(ctx, W, H, t, timeline) {
+                const theme = themeRef.current;
                 ctx.fillStyle = '#0f0a2e';
                 ctx.fillRect(0, 0, W, H);
 
-                AURA_BLOBS.forEach(b => {
+                AURA_POSITIONS.forEach((b, i) => {
+                    const color = theme.aura[i % theme.aura.length];
+                    const spd = b.speed * theme.speed;
                     const drift = 0.04;
-                    const x = (b.baseX + Math.sin(t * b.speed + b.phase) * drift) * W;
-                    const y = (b.baseY + Math.cos(t * b.speed * 0.8 + b.phase) * drift) * H;
-                    const r = b.r * W * (0.9 + Math.sin(t * b.speed * 1.4 + b.phase) * 0.1);
+                    const x = (b.baseX + Math.sin(t * spd + b.phase) * drift) * W;
+                    const y = (b.baseY + Math.cos(t * spd * 0.8 + b.phase) * drift) * H;
+                    const r = b.r * W * (0.9 + Math.sin(t * spd * 1.4 + b.phase) * 0.1);
                     const grad = ctx.createRadialGradient(x, y, 0, x, y, r);
-                    grad.addColorStop(0, `rgba(${b.color},0.55)`);
-                    grad.addColorStop(1, `rgba(${b.color},0)`);
+                    grad.addColorStop(0, `rgba(${color},0.55)`);
+                    grad.addColorStop(1, `rgba(${color},0)`);
                     ctx.fillStyle = grad;
                     ctx.fillRect(0, 0, W, H);
                 });
@@ -298,16 +318,21 @@
                     ctx.restore();
                 });
 
-                // Tytuł klasy - odznaka wjeżdża z odbiciem, nazwa klasy odsłania się słowo po słowie
+                // Tytuł klasy - odznaka wjeżdża z odbiciem, nazwa klasy i hasło AI odsłaniają się słowo po słowie
                 const titleP = prog(timeline.title, t);
                 if (titleP > 0) {
                     const s = easeBounce(Math.min(1, titleP * 1.8));
                     ctx.save();
-                    ctx.translate(W / 2, H * 0.14);
+                    ctx.translate(W / 2, H * 0.13);
                     ctx.scale(0.3 + s * 0.7, 0.3 + s * 0.7);
                     drawPill(ctx, 0, -34, '🎬 PODSUMOWANIE ROKU', "800 24px 'Baloo 2'", 20, 12, 'rgba(255,255,255,0.14)', '#FFC145', Math.min(1, s * 1.4));
                     ctx.restore();
-                    drawKineticText(ctx, className || 'Nasza klasa', W / 2, H * 0.27, "800 62px 'Baloo 2'", '#FFFFFF', Math.min(1, titleP * 1.3), W * 0.86, 66);
+                    drawKineticText(ctx, className || 'Nasza klasa', W / 2, H * 0.25, "800 56px 'Baloo 2'", '#FFFFFF', Math.min(1, titleP * 1.4), W * 0.86, 60);
+                    // Hasło dopasowane przez AI do treści - startuje odrobinę później niż nazwa klasy
+                    const hookP = Math.max(0, Math.min(1, (titleP - 0.25) / 0.7));
+                    if (hookP > 0 && hookRef.current) {
+                        drawKineticText(ctx, hookRef.current, W / 2, H * 0.33, "700 26px 'Nunito'", theme.accent[0], hookP, W * 0.78, 32);
+                    }
                 }
 
                 // Trzy szklane karty faktów, każda z gigantyczną cyfrą w tle i innym kierunkiem wjazdu
@@ -325,7 +350,7 @@
                     const cardY = H * 0.55 + (1 - p) * 18;
                     const xOffset = (1 - p) * SLIDE_FROM[idx] * 90;
                     const alpha = Math.min(1, raw * 4) * (raw > 0.93 ? Math.max(0, (1 - raw) * 14) : 1);
-                    const accent = ACCENT_COLORS[idx % ACCENT_COLORS.length];
+                    const accent = theme.accent[idx % theme.accent.length];
 
                     ctx.save();
                     ctx.globalAlpha = alpha;
@@ -351,7 +376,8 @@
 
                     ctx.fillStyle = accent;
                     ctx.font = "800 20px 'Baloo 2'"; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
-                    ctx.fillText(`✨ MOMENT ${idx + 1}`, cx + 26, cardY + 46);
+                    const icon = iconsRef.current[idx] || '✨';
+                    ctx.fillText(`${icon} MOMENT ${idx + 1}`, cx + 26, cardY + 46);
 
                     ctx.fillStyle = '#FFFFFF'; ctx.font = "800 34px 'Nunito'"; ctx.textAlign = 'left';
                     const factText = punchyFactsRef.current[idx] || facts[idx] || '';
@@ -359,12 +385,12 @@
                     ctx.restore();
                 });
 
-                // Zamknięcie z brandingiem - "Dziękujemy" słowo po słowie, potem duży wordmark
+                // Zamknięcie z brandingiem - linia zamknięcia od AI słowo po słowie, potem duży wordmark
                 const closeRaw = prog(timeline.closing, t);
                 if (closeRaw > 0) {
-                    drawKineticText(ctx, 'Dziękujemy za wspólny czas!', W / 2, H * 0.42, "800 42px 'Baloo 2'", '#FFFFFF', Math.min(1, closeRaw * 1.6), W * 0.86, 48);
+                    drawKineticText(ctx, closingLineRef.current, W / 2, H * 0.42, "800 42px 'Baloo 2'", '#FFFFFF', Math.min(1, closeRaw * 1.6), W * 0.86, 48);
                     const brandP = ease(Math.max(0, Math.min(1, (closeRaw - 0.35) / 0.5)));
-                    if (brandP > 0) drawPill(ctx, W / 2, H * 0.855, 'eduboxpro.pl', "800 46px 'Baloo 2'", 30, 16, 'rgba(20,15,50,0.75)', '#57E6C4', brandP);
+                    if (brandP > 0) drawPill(ctx, W / 2, H * 0.855, 'eduboxpro.pl', "800 46px 'Baloo 2'", 30, 16, 'rgba(20,15,50,0.75)', theme.accent[2], brandP);
                 }
 
                 timeline.stars.forEach((se, idx) => {
@@ -425,30 +451,61 @@
                 window.EduBoxCore.executeWithLimitCheck(isPremium,
                     async () => {
                         setStage('generating');
-                        setStatusText('Dopracowuję Wasze wydarzenia...');
+                        setStatusText('AI analizuje Waszą klasę...');
                         setProgressPct(0);
                         try {
-                            // AI "punchuje" surowe fakty na krótkie, mocne hasła w stylu "Wrapped".
-                            // Tło wideo jest rysowane od razu w Canvasie (animowane gradienty, patrz
-                            // renderFrame) - bez generowania obrazka przez AI, więc to jedyne wywołanie API.
-                            const factsSystem = `Jesteś copywriterem tworzącym krótkie, mocne hasła "Wrapped" (jak podsumowanie roku ze Spotify) dla nauczycieli podsumowujących rok szkolny klasy. Dostajesz do 3 surowych faktów/wydarzeń z klasy. Dla KAŻDEGO z podanych (pomijając puste) napisz jedno, maksymalnie 8-słowowe, chwytliwe zdanie po polsku, bez cudzysłowów i dwukropków. Zwróć WYŁĄCZNIE czysty obiekt JSON: {"facts": ["...", "...", "..."]} z dokładnie tyloma elementami ile podano niepustych faktów, w tej samej kolejności.`;
-                            const factsUser = facts.filter(f => f.trim()).map((f, i) => `${i + 1}. ${f.trim()}`).join('\n');
+                            // JEDNO wywołanie AI, które analizuje CAŁOŚĆ (opis + fakty) holistycznie i
+                            // personalizuje wideo bez ryzykownego generowania obrazków: pisze spójny hook,
+                            // dopracowuje fakty, dobiera zamknięcie, WYBIERA NASTRÓJ (który realnie zmienia
+                            // kolory/tempo animacji w renderFrame) i ikony do każdej karty. Tło i tak dalej
+                            // rysuje się w 100% w Canvasie - to jedyne wywołanie API w całym narzędziu.
+                            const combinedSystem = `Jesteś kreatywnym dyrektorem tworzącym krótkie wideo "Wrapped" (jak roczne podsumowanie Spotify) podsumowujące rok szkolny klasy, na podstawie informacji od nauczyciela.
+Dostajesz nazwę/opis klasy, opcjonalny dłuższy opis roku oraz do 3 faktów/wydarzeń. Na tej podstawie:
+1. "hook" - jedno krótkie, chwytliwe zdanie (max 10 słów) pod nazwą klasy, oddające charakter/ducha tego roku.
+2. "facts" - dla KAŻDEGO podanego faktu (pomijając puste, w tej samej kolejności) mocniejsza, max 8-słowowa wersja.
+3. "closing" - krótkie (max 8 słów), ciepłe zdanie zamykające wideo, dopasowane do charakteru roku (nie musi być ogólnikiem typu "dziękujemy za wspólny czas" - dopasuj do treści).
+4. "mood" - DOKŁADNIE jedno słowo z: energetic, cozy, proud, playful - to, które najlepiej pasuje do charakteru opisu/faktów (energetic = żywiołowa/sportowa/pełna energii klasa, cozy = ciepła/kameralna/spokojna, proud = osiągnięcia/sukcesy/duma, playful = zabawa/kreatywność/humor).
+5. "icons" - dla KAŻDEGO podanego faktu (ta sama kolejność co "facts") jedno pasujące pojedyncze emoji.
+Zwróć WYŁĄCZNIE czysty obiekt JSON, bez żadnego dodatkowego tekstu: {"hook": "...", "facts": ["...", "..."], "closing": "...", "mood": "...", "icons": ["...", "..."]}
+Wszystko po polsku (poza wartością "mood"), bez cudzysłowów i dwukropków w treściach tekstowych.`;
+
+                            let contextUser = `Nazwa/opis klasy: ${className.trim() || 'brak nazwy'}\n`;
+                            if (description.trim()) contextUser += `Dodatkowy opis roku od nauczyciela: ${description.trim()}\n`;
+                            contextUser += `Fakty:\n` + facts.filter(f => f.trim()).map((f, i) => `${i + 1}. ${f.trim()}`).join('\n');
+
                             let punchy = facts.map(f => f.trim());
+                            let hook = '';
+                            let closing = 'Dziękujemy za wspólny czas!';
+                            let mood = DEFAULT_MOOD;
+                            let icons = ['✨', '✨', '✨'];
                             try {
-                                const resFacts = await fetch('/api/chat', {
+                                const resCombined = await fetch('/api/chat', {
                                     method: 'POST', headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ prompt: factsUser, system: factsSystem, temperature: 0.8, format: 'json', model: 'gpt-4o-mini' })
+                                    body: JSON.stringify({ prompt: contextUser, system: combinedSystem, temperature: 0.85, format: 'json', model: 'gpt-4o-mini' })
                                 });
-                                if (resFacts.ok) {
-                                    const dataFacts = await resFacts.json();
-                                    const parsed = JSON.parse(dataFacts.text);
+                                if (resCombined.ok) {
+                                    const dataCombined = await resCombined.json();
+                                    const parsed = JSON.parse(dataCombined.text);
                                     if (Array.isArray(parsed.facts)) {
                                         let j = 0;
                                         punchy = facts.map(f => f.trim() ? (parsed.facts[j++] || f.trim()) : '');
                                     }
+                                    if (typeof parsed.hook === 'string' && parsed.hook.trim()) hook = parsed.hook.trim();
+                                    if (typeof parsed.closing === 'string' && parsed.closing.trim()) closing = parsed.closing.trim();
+                                    if (MOOD_THEMES[parsed.mood]) mood = parsed.mood;
+                                    if (Array.isArray(parsed.icons)) {
+                                        let k = 0;
+                                        const defaultIcons = icons;
+                                        icons = facts.map((f, idx) => f.trim() ? (parsed.icons[k++] || defaultIcons[idx]) : defaultIcons[idx]);
+                                    }
                                 }
-                            } catch (e) { console.log('Nie udało się dopracować faktów, używam oryginałów.'); }
+                            } catch (e) { console.log('Nie udało się spersonalizować przez AI, używam wersji domyślnej.'); }
+
                             punchyFactsRef.current = punchy;
+                            hookRef.current = hook;
+                            closingLineRef.current = closing;
+                            themeRef.current = MOOD_THEMES[mood] || MOOD_THEMES[DEFAULT_MOOD];
+                            iconsRef.current = icons;
 
                             setStage('recording');
                             setStatusText('Nagrywam wideo...');
@@ -479,7 +536,7 @@
                                 <i className="ph-bold ph-film-strip"></i> EduPodsumowanie
                             </div>
                             <h1 className="display-font text-3xl font-extrabold text-white mb-2">Roczne podsumowanie klasy</h1>
-                            <p className="text-sm text-[#A79FE0]">Podaj 3 fakty z roku, AI zrobi z nich efektowne wideo w stylu "Wrapped".</p>
+                            <p className="text-sm text-[#A79FE0]">Podaj fakty (i opcjonalnie opis roku) - AI naprawdę je analizuje i personalizuje wideo: dobiera nastrój, kolory i ton.</p>
                         </div>
 
                         {!isPremium && (
@@ -494,6 +551,12 @@
                                 <div>
                                     <label className="text-xs font-black uppercase text-[#A79FE0] mb-2 block">Nazwa/opis klasy</label>
                                     <input type="text" value={className} onChange={(e) => setClassName(e.target.value)} maxLength="40" placeholder="np. Klasa 4B" className="w-full fact-input" />
+                                </div>
+
+                                <div>
+                                    <label className="text-xs font-black uppercase text-[#A79FE0] mb-2 block">Opisz swoją klasę/rok (opcjonalnie)</label>
+                                    <textarea value={description} onChange={(e) => setDescription(e.target.value)} maxLength="400" rows="3" placeholder="np. Byliśmy bardzo aktywni sportowo, dużo razem świętowaliśmy, klasa pełna energii i pomysłów..." className="w-full fact-input resize-none" />
+                                    <p className="text-[10px] text-[#8981C2] mt-1">AI przeanalizuje to razem z faktami i dobierze nastrój, kolory i ton całego wideo.</p>
                                 </div>
 
                                 {[0, 1, 2].map(i => (
@@ -539,7 +602,7 @@
                             </div>
                         )}
 
-                        <p className="text-center text-[11px] text-[#A79FE0] mt-6 leading-relaxed">Nagrywanie tworzy prawdziwy plik wideo (WebM) w Twojej przeglądarce - wysyłamy tylko tekst faktów, żeby AI dopracowało treść.</p>
+                        <p className="text-center text-[11px] text-[#A79FE0] mt-6 leading-relaxed">Nagrywanie tworzy prawdziwy plik wideo (WebM) w Twojej przeglądarce - do AI wysyłamy tylko wpisany tekst (fakty i opis), żeby dopracować treść i dobrać nastrój wideo.</p>
                     </main>
 
                     {toastMessage && (
