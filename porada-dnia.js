@@ -1,4 +1,4 @@
 window.PORADA_DNIA = {
-  "text": "Zaplanuj codziennie 5 minut na refleksję po zajęciach, aby ocenić, co się udało, a co można poprawić, co wpłynie na Twoją pracę i samopoczucie.",
-  "date": "2026-08-20"
+  "text": "Regularnie zbieraj feedback od uczniów na temat swoich metod nauczania – to pomoże dostosować podejście i zwiększyć zaangażowanie w klasie.",
+  "date": "2026-08-21"
 };
