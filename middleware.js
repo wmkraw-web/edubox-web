@@ -3,7 +3,7 @@
 // (wszystkie narzędzia, blog, strona główna) działa bez żadnych zmian.
 
 export const config = {
-  matcher: ['/ewamarketing.html', '/api/ewa-chat', '/api/ewa-generate'],
+  matcher: ['/ewamarketing.html', '/api/ewa-generate'],
 };
 
 export default function middleware(request) {
