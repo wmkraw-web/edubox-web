@@ -184,6 +184,74 @@
                 return lines.length;
             }
 
+            // Ziarno filmowe (grain) - generowane RAZ jako mały kafelek z losowym szumem, potem
+            // powtarzane (pattern) na całej klatce z niską przezroczystością. Daje kinowe, "drogie"
+            // wykończenie zamiast płaskiego, cyfrowego gradientu.
+            let grainPatternCache = null;
+            function getGrainPattern(ctx) {
+                if (grainPatternCache) return grainPatternCache;
+                const tile = document.createElement('canvas');
+                tile.width = 140; tile.height = 140;
+                const tctx = tile.getContext('2d');
+                const imgData = tctx.createImageData(140, 140);
+                for (let i = 0; i < imgData.data.length; i += 4) {
+                    const v = Math.random() * 255;
+                    imgData.data[i] = v; imgData.data[i + 1] = v; imgData.data[i + 2] = v;
+                    imgData.data[i + 3] = Math.random() * 40;
+                }
+                tctx.putImageData(imgData, 0, 0);
+                grainPatternCache = ctx.createPattern(tile, 'repeat');
+                return grainPatternCache;
+            }
+
+            // Dzieli tekst na linie (jak wrapText), ale zwraca słowa z ich pozycjami x/y, żeby
+            // móc odsłaniać tekst słowo-po-słowie (kinetic typography) zamiast całym blokiem naraz.
+            function layoutWords(ctx, text, font, maxWidth, lineHeight) {
+                ctx.font = font;
+                const spaceW = ctx.measureText(' ').width;
+                const words = text.split(' ').filter(Boolean);
+                const lines = [[]];
+                let lineWidth = 0;
+                words.forEach(w => {
+                    const ww = ctx.measureText(w).width;
+                    if (lineWidth + ww > maxWidth && lines[lines.length - 1].length) {
+                        lines.push([]); lineWidth = 0;
+                    }
+                    lines[lines.length - 1].push({ text: w, w: ww });
+                    lineWidth += ww + spaceW;
+                });
+                const placed = [];
+                lines.forEach((line, li) => {
+                    const lineW = line.reduce((s, w) => s + w.w, 0) + spaceW * (line.length - 1);
+                    let x = -lineW / 2;
+                    line.forEach(word => {
+                        placed.push({ text: word.text, x: x + word.w / 2, y: li * lineHeight, w: word.w });
+                        x += word.w + spaceW;
+                    });
+                });
+                return { words: placed, lineCount: lines.length };
+            }
+
+            // Odsłania tekst słowo po słowie (fade + lekkie uniesienie), z przesunięciem czasowym
+            // między słowami - dużo bardziej "żywe" niż wspólny fade całej linii naraz.
+            function drawKineticText(ctx, text, cx, topY, font, color, progress, maxWidth, lineHeight) {
+                const { words } = layoutWords(ctx, text, font, maxWidth, lineHeight);
+                const n = Math.max(1, words.length);
+                ctx.font = font; ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+                words.forEach((word, i) => {
+                    const wordStart = i / n;
+                    const wordEnd = wordStart + (1.6 / n);
+                    const wp = Math.max(0, Math.min(1, (progress - wordStart) / (wordEnd - wordStart)));
+                    if (wp <= 0) return;
+                    const eased = ease(wp);
+                    ctx.save();
+                    ctx.globalAlpha = eased;
+                    ctx.fillStyle = color;
+                    ctx.fillText(word.text, cx + word.x, topY + word.y - (1 - eased) * 16);
+                    ctx.restore();
+                });
+            }
+
             // Cztery odsłony: tytuł klasy -> fakt 1 -> fakt 2 -> fakt 3 -> zamknięcie (eduboxpro.pl)
             function buildTimeline() {
                 return {
@@ -230,23 +298,20 @@
                     ctx.restore();
                 });
 
-                // Tytuł klasy
+                // Tytuł klasy - odznaka wjeżdża z odbiciem, nazwa klasy odsłania się słowo po słowie
                 const titleP = prog(timeline.title, t);
                 if (titleP > 0) {
-                    const s = easeBounce(titleP);
+                    const s = easeBounce(Math.min(1, titleP * 1.8));
                     ctx.save();
-                    ctx.translate(W / 2, H * 0.16);
+                    ctx.translate(W / 2, H * 0.14);
                     ctx.scale(0.3 + s * 0.7, 0.3 + s * 0.7);
-                    drawPill(ctx, 0, -34, '🎬 PODSUMOWANIE ROKU', "800 26px 'Baloo 2'", 20, 12, 'rgba(255,255,255,0.14)', '#FFC145', Math.min(1, s * 1.4));
+                    drawPill(ctx, 0, -34, '🎬 PODSUMOWANIE ROKU', "800 24px 'Baloo 2'", 20, 12, 'rgba(255,255,255,0.14)', '#FFC145', Math.min(1, s * 1.4));
                     ctx.restore();
-                    const nameAlpha = ease(Math.min(1, titleP * 1.3));
-                    ctx.save(); ctx.globalAlpha = nameAlpha;
-                    ctx.font = "800 58px 'Baloo 2'"; ctx.fillStyle = '#FFFFFF'; ctx.textAlign = 'center';
-                    wrapText(ctx, className || 'Nasza klasa', W / 2, H * 0.28, W * 0.82, 62);
-                    ctx.restore();
+                    drawKineticText(ctx, className || 'Nasza klasa', W / 2, H * 0.27, "800 62px 'Baloo 2'", '#FFFFFF', Math.min(1, titleP * 1.3), W * 0.86, 66);
                 }
 
-                // Trzy karty faktów, każda w tym samym miejscu na ekranie, jeden po drugim
+                // Trzy szklane karty faktów, każda z gigantyczną cyfrą w tle i innym kierunkiem wjazdu
+                const SLIDE_FROM = [-1, 0, 1]; // karta 1 z lewej, 2 z dołu (bez przesunięcia X), 3 z prawej
                 const factDefs = [
                     { key: 'fact1', idx: 0 },
                     { key: 'fact2', idx: 1 },
@@ -257,28 +322,49 @@
                     const raw = prog(el, t);
                     if (raw <= 0) return;
                     const p = ease(Math.min(1, raw * 3));
-                    const cardY = H * 0.55 + (1 - p) * 24;
-                    ctx.save(); ctx.globalAlpha = Math.min(1, raw * 4) * (raw > 0.93 ? Math.max(0, (1 - raw) * 14) : 1);
-                    const cw = W * 0.84, ch = 220, cx = W / 2 - cw / 2;
-                    ctx.fillStyle = 'rgba(255,255,255,0.97)';
+                    const cardY = H * 0.55 + (1 - p) * 18;
+                    const xOffset = (1 - p) * SLIDE_FROM[idx] * 90;
+                    const alpha = Math.min(1, raw * 4) * (raw > 0.93 ? Math.max(0, (1 - raw) * 14) : 1);
+                    const accent = ACCENT_COLORS[idx % ACCENT_COLORS.length];
+
+                    ctx.save();
+                    ctx.globalAlpha = alpha;
+                    ctx.translate(xOffset, 0);
+                    const cw = W * 0.84, ch = 230, cx = W / 2 - cw / 2;
+
+                    // Karta w stylu "szkła": ciemna, półprzezroczysta, delikatna obwódka + pasek akcentu
                     ctx.beginPath();
                     ctx.moveTo(cx + 28, cardY); ctx.arcTo(cx + cw, cardY, cx + cw, cardY + ch, 28); ctx.arcTo(cx + cw, cardY + ch, cx, cardY + ch, 28); ctx.arcTo(cx, cardY + ch, cx, cardY, 28); ctx.arcTo(cx, cardY, cx + cw, cardY, 28);
-                    ctx.closePath(); ctx.fill();
+                    ctx.closePath();
+                    ctx.save();
+                    ctx.clip();
+                    ctx.fillStyle = 'rgba(20,15,55,0.62)';
+                    ctx.fillRect(cx, cardY, cw, ch);
+                    // Gigantyczna cyfra w tle karty (stat/wrapped-owy akcent)
+                    ctx.font = "800 210px 'Baloo 2'";
+                    ctx.fillStyle = `${accent}22`;
+                    ctx.textAlign = 'right'; ctx.textBaseline = 'alphabetic';
+                    ctx.fillText(String(idx + 1).padStart(2, '0'), cx + cw + 30, cardY + ch - 6);
+                    ctx.restore();
+                    ctx.lineWidth = 1.5; ctx.strokeStyle = 'rgba(255,255,255,0.18)'; ctx.stroke();
+                    ctx.fillStyle = accent; ctx.fillRect(cx, cardY, cw, 5);
 
-                    ctx.fillStyle = ACCENT_COLORS[idx % ACCENT_COLORS.length];
-                    ctx.font = "800 22px 'Baloo 2'"; ctx.textAlign = 'center';
-                    ctx.fillText(`✨ MOMENT ${idx + 1}`, W / 2, cardY + 40);
+                    ctx.fillStyle = accent;
+                    ctx.font = "800 20px 'Baloo 2'"; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+                    ctx.fillText(`✨ MOMENT ${idx + 1}`, cx + 26, cardY + 46);
 
-                    ctx.fillStyle = '#221A5C'; ctx.font = "800 36px 'Nunito'";
-                    wrapText(ctx, punchyFactsRef.current[idx] || facts[idx] || '', W / 2, cardY + 92, cw * 0.86, 44);
+                    ctx.fillStyle = '#FFFFFF'; ctx.font = "800 34px 'Nunito'"; ctx.textAlign = 'left';
+                    const factText = punchyFactsRef.current[idx] || facts[idx] || '';
+                    wrapText(ctx, factText, cx + 26, cardY + 96, cw - 52, 42);
                     ctx.restore();
                 });
 
-                // Zamknięcie z brandingiem
-                const closeP = prog(timeline.closing, t) > 0 ? ease(Math.min(1, prog(timeline.closing, t) * 3)) : 0;
-                if (closeP > 0) {
-                    drawPill(ctx, W / 2, H * 0.42, 'Dziękujemy za wspólny czas!', "800 40px 'Baloo 2'", 26, 16, 'rgba(20,15,50,0.75)', '#FFFFFF', closeP);
-                    drawPill(ctx, W / 2, H * 0.855, 'eduboxpro.pl', "800 44px 'Baloo 2'", 30, 16, 'rgba(20,15,50,0.75)', '#57E6C4', closeP);
+                // Zamknięcie z brandingiem - "Dziękujemy" słowo po słowie, potem duży wordmark
+                const closeRaw = prog(timeline.closing, t);
+                if (closeRaw > 0) {
+                    drawKineticText(ctx, 'Dziękujemy za wspólny czas!', W / 2, H * 0.42, "800 42px 'Baloo 2'", '#FFFFFF', Math.min(1, closeRaw * 1.6), W * 0.86, 48);
+                    const brandP = ease(Math.max(0, Math.min(1, (closeRaw - 0.35) / 0.5)));
+                    if (brandP > 0) drawPill(ctx, W / 2, H * 0.855, 'eduboxpro.pl', "800 46px 'Baloo 2'", 30, 16, 'rgba(20,15,50,0.75)', '#57E6C4', brandP);
                 }
 
                 timeline.stars.forEach((se, idx) => {
@@ -290,6 +376,14 @@
                         ctx.restore();
                     }
                 });
+
+                // Ziarno filmowe na samej górze - subtelna tekstura zamiast płaskiego cyfrowego gradientu
+                ctx.save();
+                ctx.globalAlpha = 0.5;
+                ctx.globalCompositeOperation = 'overlay';
+                ctx.fillStyle = getGrainPattern(ctx);
+                ctx.fillRect(0, 0, W, H);
+                ctx.restore();
             }
 
             function playAndRecord() {
