@@ -1,0 +1,488 @@
+<!DOCTYPE html><html lang="pl" translate="no" class="notranslate"><head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduPodsumowanie - Roczne Podsumowanie Klasy Wideo</title>
+    <meta property="og:title" content="EduPodsumowanie - Roczne Podsumowanie Klasy Wideo">
+    <meta property="og:description" content="Wygeneruj efektowne wideo-podsumowanie roku/semestru dla swojej klasy w stylu 'Wrapped'. Podaj 3 fakty, AI zrobi resztę.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://eduboxpro.pl/edupodsumowanie.html">
+    <meta property="og:image" content="https://eduboxpro.pl/okladka.jpg">
+    <meta property="og:locale" content="pl_PL">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="EduPodsumowanie - Roczne Podsumowanie Klasy Wideo">
+    <meta name="twitter:description" content="Wygeneruj efektowne wideo-podsumowanie roku/semestru dla swojej klasy w stylu 'Wrapped'.">
+
+    <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-3RQ9R0N0K8"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-3RQ9R0N0K8');
+    </script>
+
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin=""></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin=""></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <script src="apps.js"></script>
+
+    <style>
+        body { font-family: 'Nunito', sans-serif; background-color: #0f0a2e; color: #ECE9FF; min-height: 100vh; }
+        .display-font { font-family: 'Baloo 2', sans-serif; }
+        .card-panel { background: #1b1447; border-radius: 22px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35); border: 1px solid rgba(255,255,255,0.08); }
+        .fact-input { background: #14103a; border: 2px solid rgba(255,255,255,0.1); border-radius: 14px; padding: 10px 14px; color: #ECE9FF; }
+        .fact-input::placeholder { color: #8981C2; }
+        .fact-input:focus { outline: none; border-color: #FF5DA2; }
+        .generate-btn { background: linear-gradient(135deg, #FF5DA2, #7B5CFF); box-shadow: 0 6px 0 #4E37B0; }
+        .generate-btn:active { transform: translateY(4px); box-shadow: 0 2px 0 #4E37B0; }
+        .generate-btn:disabled { opacity: 0.55; box-shadow: 0 6px 0 #33306e; cursor: default; }
+        #wspolne-menu-kontener { print-hidden: none; }
+    </style>
+
+  <link rel="canonical" href="https://eduboxpro.pl/edupodsumowanie.html">
+  <meta name="description" content="Wygeneruj efektowne wideo-podsumowanie roku/semestru dla swojej klasy w stylu 'Wrapped'. Podaj 3 fakty, AI zrobi resztę.">
+  <link rel="icon" href="/icon-96.png" type="image/png">
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "EduPodsumowanie - Roczne Podsumowanie Klasy Wideo",
+  "description": "Wygeneruj efektowne wideo-podsumowanie roku/semestru dla swojej klasy w stylu 'Wrapped'.",
+  "url": "https://eduboxpro.pl/edupodsumowanie.html",
+  "applicationCategory": "EducationalApplication",
+  "operatingSystem": "Web",
+  "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "PLN"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "EduBox AI",
+    "url": "https://eduboxpro.pl/"
+  }
+}
+  </script>
+</head>
+<body>
+    <script>window.EDUBOX_IMAGE_APP = true;</script>
+    <div id="wspolne-menu-kontener"></div>
+
+    <script type="module">
+        import { EduBoxCore } from './global-core.js';
+        window.EduBoxCore = EduBoxCore;
+        window.dispatchEvent(new Event('EduBoxCoreReady'));
+    </script>
+
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        const FACT_PLACEHOLDERS = [
+            'np. Przeczytaliśmy razem 12 książek',
+            'np. Wygraliśmy konkurs recytatorski',
+            'np. Nauczyliśmy się liczyć do 100 po angielsku'
+        ];
+
+        const ACCENT_COLORS = ['#FF5DA2', '#FFC145', '#57E6C4'];
+
+        function App() {
+            const [user, setUser] = useState(null);
+            const [isPremium, setIsPremium] = useState(false);
+            const [accessCode, setAccessCode] = useState('');
+            const [toastMessage, setToastMessage] = useState(null);
+
+            const [className, setClassName] = useState('');
+            const [facts, setFacts] = useState(['', '', '']);
+
+            const [stage, setStage] = useState('form');
+            const [statusText, setStatusText] = useState('');
+            const [progressPct, setProgressPct] = useState(0);
+            const [downloadUrl, setDownloadUrl] = useState(null);
+
+            const canvasRef = useRef(null);
+            const generatedImgRef = useRef(null);
+            const mediaRecorderRef = useRef(null);
+            const chunksRef = useRef([]);
+            const particlesRef = useRef([]);
+            const punchyFactsRef = useRef(['', '', '']);
+
+            useEffect(() => {
+                const initCore = () => {
+                    if (window.EduBoxCore && window.EduBoxCore.init) {
+                        window.EduBoxCore.init((u) => setUser(u));
+                        const status = localStorage.getItem('eduboxProStatus');
+                        if (status === 'PRO' || status === 'active') setIsPremium(true);
+                    } else { setTimeout(initCore, 100); }
+                };
+                initCore();
+            }, []);
+
+            const showToast = (text) => { setToastMessage(text); setTimeout(() => setToastMessage(null), 4000); };
+
+            const handleVerifyCode = async () => {
+                const isValid = await window.EduBoxCore.verifyPremiumCode(accessCode);
+                if (isValid) { setIsPremium(true); setAccessCode(''); localStorage.setItem('eduboxProStatus', 'active'); showToast('Kod aktywny! Witamy w Premium 🌟'); }
+                else showToast('Nieprawidłowy kod dostępu!');
+            };
+
+            const PARTICLE_COLORS = ['#FF5DA2', '#FFC145', '#57E6C4', '#7B5CFF', '#FFFFFF'];
+
+            function ease(t) { return 1 - Math.pow(1 - t, 3); }
+            function easeBounce(t) {
+                const n1 = 7.5625, d1 = 2.75;
+                if (t < 1 / d1) return n1 * t * t;
+                if (t < 2 / d1) return n1 * (t -= 1.5 / d1) * t + 0.75;
+                if (t < 2.5 / d1) return n1 * (t -= 2.25 / d1) * t + 0.9375;
+                return n1 * (t -= 2.625 / d1) * t + 0.984375;
+            }
+
+            function initParticles(W, H) {
+                const arr = [];
+                for (let i = 0; i < 40; i++) {
+                    arr.push({
+                        x: Math.random() * W, y: Math.random() * H,
+                        size: 6 + Math.random() * 10, speed: 1.2 + Math.random() * 2,
+                        drift: (Math.random() - 0.5) * 1.4, rot: Math.random() * 7,
+                        rotSpeed: (Math.random() - 0.5) * 0.07,
+                        color: PARTICLE_COLORS[Math.floor(Math.random() * PARTICLE_COLORS.length)]
+                    });
+                }
+                particlesRef.current = arr;
+            }
+
+            function drawPill(ctx, cx, topY, text, font, padX, padY, bg, fg, alpha) {
+                ctx.save();
+                ctx.globalAlpha = alpha;
+                ctx.font = font;
+                const w = ctx.measureText(text).width + padX * 2;
+                const h = parseInt(font.match(/(\d+)px/)[1]) + padY * 2;
+                ctx.fillStyle = bg;
+                const x = cx - w / 2, y = topY;
+                const r = h / 2;
+                ctx.beginPath();
+                ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r);
+                ctx.closePath(); ctx.fill();
+                ctx.fillStyle = fg;
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText(text, cx, y + h / 2 + 2);
+                ctx.restore();
+                return h;
+            }
+
+            function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
+                const words = text.split(' ');
+                let line = '', lines = [];
+                for (const w of words) {
+                    const test = line + w + ' ';
+                    if (ctx.measureText(test).width > maxWidth && line) { lines.push(line); line = w + ' '; }
+                    else line = test;
+                }
+                lines.push(line);
+                lines.forEach((l, i) => ctx.fillText(l.trim(), x, y + i * lineHeight));
+                return lines.length;
+            }
+
+            // Cztery odsłony: tytuł klasy -> fakt 1 -> fakt 2 -> fakt 3 -> zamknięcie (eduboxpro.pl)
+            function buildTimeline() {
+                return {
+                    title: { start: 300, end: 3200 },
+                    fact1: { start: 3400, end: 7200 },
+                    fact2: { start: 7400, end: 11200 },
+                    fact3: { start: 11400, end: 15200 },
+                    closing: { start: 15400, end: 18500 },
+                    stars: [{ start: 18700, end: 19400 }, { start: 19400, end: 20100 }, { start: 20100, end: 20800 }]
+                };
+            }
+            function prog(el, t) { if (t < el.start) return 0; if (t > el.end) return 1; return (t - el.start) / (el.end - el.start); }
+
+            function renderFrame(ctx, W, H, t, img, timeline) {
+                ctx.save();
+                const zoom = 1 + Math.min(0.1, t / 21000 * 0.1);
+                const dw = W * zoom, dh = H * zoom;
+                ctx.drawImage(img, (W - dw) / 2, (H - dh) / 2, dw, dh);
+                ctx.restore();
+
+                ctx.fillStyle = 'rgba(15,10,46,0.45)';
+                ctx.fillRect(0, 0, W, H);
+
+                particlesRef.current.forEach(p => {
+                    p.y += p.speed; p.x += p.drift; p.rot += p.rotSpeed;
+                    if (p.y > H + 20) { p.y = -20; p.x = Math.random() * W; }
+                    ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot);
+                    ctx.fillStyle = p.color; ctx.fillRect(-p.size / 2, -p.size / 3, p.size, p.size * 0.6);
+                    ctx.restore();
+                });
+
+                // Tytuł klasy
+                const titleP = prog(timeline.title, t);
+                if (titleP > 0) {
+                    const s = easeBounce(titleP);
+                    ctx.save();
+                    ctx.translate(W / 2, H * 0.16);
+                    ctx.scale(0.3 + s * 0.7, 0.3 + s * 0.7);
+                    drawPill(ctx, 0, -34, '🎬 PODSUMOWANIE ROKU', "800 26px 'Baloo 2'", 20, 12, 'rgba(255,255,255,0.14)', '#FFC145', Math.min(1, s * 1.4));
+                    ctx.restore();
+                    const nameAlpha = ease(Math.min(1, titleP * 1.3));
+                    ctx.save(); ctx.globalAlpha = nameAlpha;
+                    ctx.font = "800 58px 'Baloo 2'"; ctx.fillStyle = '#FFFFFF'; ctx.textAlign = 'center';
+                    wrapText(ctx, className || 'Nasza klasa', W / 2, H * 0.28, W * 0.82, 62);
+                    ctx.restore();
+                }
+
+                // Trzy karty faktów, każda w tym samym miejscu na ekranie, jeden po drugim
+                const factDefs = [
+                    { key: 'fact1', idx: 0 },
+                    { key: 'fact2', idx: 1 },
+                    { key: 'fact3', idx: 2 }
+                ];
+                factDefs.forEach(({ key, idx }) => {
+                    const el = timeline[key];
+                    const raw = prog(el, t);
+                    if (raw <= 0) return;
+                    const p = ease(Math.min(1, raw * 3));
+                    const cardY = H * 0.55 + (1 - p) * 24;
+                    ctx.save(); ctx.globalAlpha = Math.min(1, raw * 4) * (raw > 0.93 ? Math.max(0, (1 - raw) * 14) : 1);
+                    const cw = W * 0.84, ch = 220, cx = W / 2 - cw / 2;
+                    ctx.fillStyle = 'rgba(255,255,255,0.97)';
+                    ctx.beginPath();
+                    ctx.moveTo(cx + 28, cardY); ctx.arcTo(cx + cw, cardY, cx + cw, cardY + ch, 28); ctx.arcTo(cx + cw, cardY + ch, cx, cardY + ch, 28); ctx.arcTo(cx, cardY + ch, cx, cardY, 28); ctx.arcTo(cx, cardY, cx + cw, cardY, 28);
+                    ctx.closePath(); ctx.fill();
+
+                    ctx.fillStyle = ACCENT_COLORS[idx % ACCENT_COLORS.length];
+                    ctx.font = "800 22px 'Baloo 2'"; ctx.textAlign = 'center';
+                    ctx.fillText(`✨ MOMENT ${idx + 1}`, W / 2, cardY + 40);
+
+                    ctx.fillStyle = '#221A5C'; ctx.font = "800 36px 'Nunito'";
+                    wrapText(ctx, punchyFactsRef.current[idx] || facts[idx] || '', W / 2, cardY + 92, cw * 0.86, 44);
+                    ctx.restore();
+                });
+
+                // Zamknięcie z brandingiem
+                const closeP = prog(timeline.closing, t) > 0 ? ease(Math.min(1, prog(timeline.closing, t) * 3)) : 0;
+                if (closeP > 0) {
+                    drawPill(ctx, W / 2, H * 0.42, 'Dziękujemy za wspólny czas!', "800 40px 'Baloo 2'", 26, 16, 'rgba(20,15,50,0.75)', '#FFFFFF', closeP);
+                    drawPill(ctx, W / 2, H * 0.855, 'eduboxpro.pl', "800 44px 'Baloo 2'", 30, 16, 'rgba(20,15,50,0.75)', '#57E6C4', closeP);
+                }
+
+                timeline.stars.forEach((se, idx) => {
+                    const sp = prog(se, t);
+                    if (sp > 0) {
+                        const s = easeBounce(sp);
+                        ctx.save(); ctx.translate(W / 2 + (idx - 1) * 100, H * 0.93); ctx.scale(s, s);
+                        ctx.font = '64px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('⭐', 0, 0);
+                        ctx.restore();
+                    }
+                });
+            }
+
+            function playAndRecord(img) {
+                const canvas = canvasRef.current;
+                const W = 720, H = 1280;
+                canvas.width = W; canvas.height = H;
+                const ctx = canvas.getContext('2d');
+                initParticles(W, H);
+                const timeline = buildTimeline();
+                const duration = 21000;
+
+                const stream = canvas.captureStream(30);
+                const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9' : 'video/webm';
+                const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 4000000 });
+                chunksRef.current = [];
+                recorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
+                recorder.onstop = () => {
+                    const blob = new Blob(chunksRef.current, { type: 'video/webm' });
+                    setDownloadUrl(URL.createObjectURL(blob));
+                    setStage('done');
+                    setStatusText('');
+                };
+                mediaRecorderRef.current = recorder;
+                recorder.start();
+
+                const startTime = performance.now();
+                function loop(now) {
+                    const t = now - startTime;
+                    renderFrame(ctx, W, H, t, img, timeline);
+                    setProgressPct(Math.min(100, (t / duration) * 100));
+                    if (t < duration) requestAnimationFrame(loop);
+                    else if (recorder.state !== 'inactive') recorder.stop();
+                }
+                requestAnimationFrame(loop);
+            }
+
+            const handleGenerate = () => {
+                if (facts.every(f => !f.trim())) { showToast('Wpisz przynajmniej jeden fakt/wydarzenie!'); return; }
+                window.EduBoxCore.executeImageLimitCheck(isPremium,
+                    async () => {
+                        setStage('generating');
+                        setStatusText('Dopracowuję Wasze wydarzenia...');
+                        setProgressPct(0);
+                        try {
+                            // 1) AI "punchuje" surowe fakty na krótkie, mocne hasła w stylu "Wrapped"
+                            const factsSystem = `Jesteś copywriterem tworzącym krótkie, mocne hasła "Wrapped" (jak podsumowanie roku ze Spotify) dla nauczycieli podsumowujących rok szkolny klasy. Dostajesz do 3 surowych faktów/wydarzeń z klasy. Dla KAŻDEGO z podanych (pomijając puste) napisz jedno, maksymalnie 8-słowowe, chwytliwe zdanie po polsku, bez cudzysłowów i dwukropków. Zwróć WYŁĄCZNIE czysty obiekt JSON: {"facts": ["...", "...", "..."]} z dokładnie tyloma elementami ile podano niepustych faktów, w tej samej kolejności.`;
+                            const factsUser = facts.filter(f => f.trim()).map((f, i) => `${i + 1}. ${f.trim()}`).join('\n');
+                            let punchy = facts.map(f => f.trim());
+                            try {
+                                const resFacts = await fetch('/api/chat', {
+                                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ prompt: factsUser, system: factsSystem, temperature: 0.8, format: 'json', model: 'gpt-4o-mini' })
+                                });
+                                if (resFacts.ok) {
+                                    const dataFacts = await resFacts.json();
+                                    const parsed = JSON.parse(dataFacts.text);
+                                    if (Array.isArray(parsed.facts)) {
+                                        let j = 0;
+                                        punchy = facts.map(f => f.trim() ? (parsed.facts[j++] || f.trim()) : '');
+                                    }
+                                }
+                            } catch (e) { console.log('Nie udało się dopracować faktów, używam oryginałów.'); }
+                            punchyFactsRef.current = punchy;
+
+                            // 2) Obrazek tła - ciepła, energetyczna scena klasowa dopasowana do nazwy klasy
+                            setStatusText('Tworzę obrazek tła...');
+                            const prompt = `Stwórz energetyczną, kolorową ilustrację w stylu nowoczesnego, płaskiego designu (flat design), przedstawiającą radosną scenę szkolną/klasową pasującą do podsumowania roku szkolnego dla klasy "${className || 'szkolnej'}" - np. confetti, elementy szkolne, abstrakcyjne kształty w żywych barwach (róż, fiolet, turkus, żółty). Format pionowy. Bez żadnego tekstu, liter ani cyfr na obrazku, bez twarzy konkretnych osób - tylko nastrojowe, abstrakcyjno-ilustracyjne tło.`;
+
+                            let englishPrompt = prompt;
+                            try {
+                                const translateSystem = `You are an expert AI image prompt engineer. Translate and rewrite the user's Polish description into a detailed, vivid image prompt IN ENGLISH, for an energetic flat-design illustration background. Keep all constraints (no text, no letters, no digits, no specific human faces). Reply ONLY with the English prompt, nothing else.`;
+                                const resChat = await fetch('/api/chat', {
+                                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ prompt, system: translateSystem, temperature: 0.6, model: 'gpt-4o-mini' })
+                                });
+                                if (resChat.ok) {
+                                    const dataChat = await resChat.json();
+                                    if (dataChat.text) englishPrompt = dataChat.text.trim();
+                                }
+                            } catch (e) { console.log('Tłumaczenie promptu nie powiodło się, używam oryginału.'); }
+
+                            const res = await fetch('/api/generate', {
+                                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt: englishPrompt, size: '1024x1536' })
+                            });
+                            if (!res.ok) throw new Error('Status API: ' + res.status);
+                            const data = await res.json();
+                            const raw = data.imageUrl || data.image || data.url;
+                            if (!raw) throw new Error('Brak danych obrazu');
+                            const finalSrc = raw.startsWith('http') || raw.startsWith('data:image') ? raw : `data:image/png;base64,${raw}`;
+
+                            const img = new Image();
+                            img.crossOrigin = 'anonymous';
+                            img.onload = () => {
+                                generatedImgRef.current = img;
+                                setStage('recording');
+                                setStatusText('Nagrywam wideo...');
+                                playAndRecord(img);
+                            };
+                            img.onerror = () => { showToast('Błąd wczytywania wygenerowanego obrazka.'); setStage('form'); };
+                            img.src = finalSrc;
+                        } catch (err) {
+                            showToast('Błąd: ' + err.message);
+                            setStage('form');
+                        }
+                    },
+                    (limitMsg) => { showToast(limitMsg); },
+                    (toastMsg) => { showToast(toastMsg); }
+                );
+            };
+
+            const handleReplay = () => {
+                if (generatedImgRef.current) { setStage('recording'); setStatusText('Nagrywam wideo...'); playAndRecord(generatedImgRef.current); }
+            };
+
+            const updateFact = (i, val) => {
+                const next = [...facts]; next[i] = val; setFacts(next);
+            };
+
+            return (
+                <div className="min-h-screen">
+                    <main className="max-w-md mx-auto px-4 py-10">
+                        <div className="text-center mb-8">
+                            <div className="inline-flex items-center gap-2 bg-[#2A2170] text-[#FFC145] text-xs font-black uppercase tracking-widest px-4 py-2 rounded-full mb-4">
+                                <i className="ph-bold ph-film-strip"></i> EduPodsumowanie
+                            </div>
+                            <h1 className="display-font text-3xl font-extrabold text-white mb-2">Roczne podsumowanie klasy</h1>
+                            <p className="text-sm text-[#A79FE0]">Podaj 3 fakty z roku, AI zrobi z nich efektowne wideo w stylu "Wrapped".</p>
+                        </div>
+
+                        {!isPremium && (
+                            <div className="max-w-sm mx-auto mb-6 flex items-center gap-2 bg-[#1b1447] border-2 border-[#3A2F8C] rounded-2xl p-2">
+                                <input type="text" value={accessCode} onChange={(e) => setAccessCode(e.target.value)} placeholder="Masz kod PRO? Wpisz tutaj..." className="flex-1 bg-transparent text-sm px-3 py-2 outline-none text-white placeholder-[#8981C2]" />
+                                <button onClick={handleVerifyCode} className="bg-[#FF5DA2] text-white text-xs font-bold px-4 py-2.5 rounded-xl">Odblokuj</button>
+                            </div>
+                        )}
+
+                        {stage === 'form' && (
+                            <div className="card-panel p-5 space-y-5">
+                                <div>
+                                    <label className="text-xs font-black uppercase text-[#A79FE0] mb-2 block">Nazwa/opis klasy</label>
+                                    <input type="text" value={className} onChange={(e) => setClassName(e.target.value)} maxLength="40" placeholder="np. Klasa 4B" className="w-full fact-input" />
+                                </div>
+
+                                {[0, 1, 2].map(i => (
+                                    <div key={i}>
+                                        <label className="text-xs font-black uppercase text-[#A79FE0] mb-2 block">Fakt / wydarzenie {i + 1}</label>
+                                        <input type="text" value={facts[i]} onChange={(e) => updateFact(i, e.target.value)} maxLength="120" placeholder={FACT_PLACEHOLDERS[i]} className="w-full fact-input" />
+                                    </div>
+                                ))}
+
+                                <button onClick={handleGenerate} className="generate-btn w-full text-white display-font font-bold text-lg py-4 rounded-2xl">
+                                    Wygeneruj wideo-podsumowanie
+                                </button>
+                            </div>
+                        )}
+
+                        {(stage === 'generating' || stage === 'recording' || stage === 'done') && (
+                            <div className="card-panel p-5">
+                                <div className="relative w-full max-w-[300px] mx-auto rounded-3xl overflow-hidden shadow-lg" style={{ aspectRatio: '9/16' }}>
+                                    <canvas ref={canvasRef} className="w-full h-full block bg-[#1b1447]"></canvas>
+                                    {stage === 'generating' && (
+                                        <div className="absolute inset-0 flex items-center justify-center bg-[#1b1447]">
+                                            <i className="ph-bold ph-sparkle text-5xl text-[#FF5DA2] animate-pulse"></i>
+                                        </div>
+                                    )}
+                                </div>
+                                {stage !== 'done' && (
+                                    <React.Fragment>
+                                        <div className="h-1.5 bg-[#2A2170] rounded-full overflow-hidden mt-4 max-w-[300px] mx-auto">
+                                            <div className="h-full bg-gradient-to-r from-[#FF5DA2] to-[#7B5CFF] transition-all" style={{ width: progressPct + '%' }}></div>
+                                        </div>
+                                        <p className="text-center text-xs text-[#A79FE0] mt-2">{statusText}</p>
+                                    </React.Fragment>
+                                )}
+                                {stage === 'done' && (
+                                    <div className="flex gap-2 mt-4 max-w-[300px] mx-auto">
+                                        <a href={downloadUrl} download="edupodsumowanie.webm" className="flex-1 bg-[#57E6C4] text-[#0f0a2e] text-center font-bold text-sm py-3 rounded-xl">⬇ Pobierz wideo</a>
+                                        <button onClick={handleReplay} className="flex-1 bg-transparent border-2 border-[#3A2F8C] text-[#ECE9FF] font-bold text-sm py-3 rounded-xl">↻ Podgląd</button>
+                                    </div>
+                                )}
+                                {stage === 'done' && (
+                                    <button onClick={() => { setStage('form'); setDownloadUrl(null); }} className="w-full text-center text-xs text-[#A79FE0] font-bold mt-4 underline">Zrób kolejne podsumowanie</button>
+                                )}
+                            </div>
+                        )}
+
+                        <p className="text-center text-[11px] text-[#A79FE0] mt-6 leading-relaxed">Nagrywanie tworzy prawdziwy plik wideo (WebM) w Twojej przeglądarce - nic nie wysyłamy poza obrazem tła i tekstem faktów do wygenerowania treści.</p>
+                    </main>
+
+                    {toastMessage && (
+                        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-[#1b1447] border border-[#3A2F8C] text-white px-6 py-3 rounded-full text-sm font-bold shadow-2xl">{toastMessage}</div>
+                    )}
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/service-worker.js').catch(() => {});
+            });
+        }
+    </script>
+
+</body></html>
