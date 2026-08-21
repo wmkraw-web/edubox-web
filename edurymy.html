@@ -234,17 +234,60 @@
                                 return parseJson(data.text);
                             };
 
+                            // Sprawdza w Wikisłowniku (prawdziwym, darmowym słowniku PL - nie AI),
+                            // czy dane słowa mają hasło. To twardy filtr niezależny od LLM-a:
+                            // AI zgaduje wzorce (i myli się na rzadszych końcówkach), słownik po
+                            // prostu wie, czy strona istnieje. Przy błędzie sieci "przepuszczamy"
+                            // słowa dalej (fail-open) - słownik to dodatkowa siatka bezpieczeństwa,
+                            // a nie jedyna linia obrony (krok AI-weryfikacji i tak jest po nim).
+                            const checkWordsExistPL = async (words) => {
+                                const unique = [...new Set(words.map(x => x.trim()).filter(Boolean))];
+                                if (!unique.length) return new Set();
+                                try {
+                                    const url = `https://pl.wiktionary.org/w/api.php?action=query&titles=${encodeURIComponent(unique.join('|'))}&format=json&origin=*&redirects=1`;
+                                    const controller = new AbortController();
+                                    const timeoutId = setTimeout(() => controller.abort(), 6000);
+                                    const res = await fetch(url, { signal: controller.signal });
+                                    clearTimeout(timeoutId);
+                                    if (!res.ok) return new Set(unique.map(x => x.toLowerCase()));
+                                    const data = await res.json();
+                                    const pages = data?.query?.pages || {};
+                                    const found = new Set();
+                                    Object.values(pages).forEach(p => {
+                                        if (p && p.missing === undefined && p.title) found.add(p.title.toLowerCase());
+                                    });
+                                    return found;
+                                } catch (e) {
+                                    return new Set(unique.map(x => x.toLowerCase())); // fail-open
+                                }
+                            };
+
                             // KROK 1: KANDYDACI - łagodniejszy, kreatywny etap. Może zaproponować za dużo,
-                            // od tego jest krok 2.
-                            const genSys = `Jesteś polskim logopedą, ekspertem od rymów dla dzieci. Zaproponuj KANDYDATÓW na rymy do podanego słowa - kolejny, niezależny etap je surowo zweryfikuje, więc staraj się podawać prawdziwe polskie słowa, ale nie musisz być stuprocentowo pewny każdego.
+                            // od tego są kolejne kroki.
+                            const genSys = `Jesteś polskim logopedą, ekspertem od rymów dla dzieci. Zaproponuj KANDYDATÓW na rymy do podanego słowa - kolejne, niezależne etapy je surowo zweryfikują, więc staraj się podawać prawdziwe polskie słowa, ale nie musisz być stuprocentowo pewny każdego.
 Dla podanego słowa zaproponuj do 8 kandydatów na rym dokładny (niemal identyczna końcówka fonetyczna) i do 6 kandydatów na rym przybliżony (podobne brzmienie). Dopasuj trudność słownictwa do grupy wiekowej: ${audienceMeta[audience].desc}.
 Zwróć WYŁĄCZNIE poprawny JSON: {"exact": ["..."], "near": ["..."]}`;
                             const candidates = await askAI(genSys, `Podaj kandydatów na rymy do słowa: "${w}".`);
 
+                            setGenStep('dictionary');
+
+                            // KROK 2: SŁOWNIK - nie AI, tylko realny Wikisłownik. Odsiewa zmyślone
+                            // słowa (np. "fasa", "basa" dla "klasa") zanim jeszcze trafią do AI.
+                            const rawExact = candidates.exact || [];
+                            const rawNear = candidates.near || [];
+                            const existingSet = await checkWordsExistPL([...rawExact, ...rawNear]);
+                            const dictExact = rawExact.filter(x => existingSet.has(x.toLowerCase()));
+                            const dictNear = rawNear.filter(x => existingSet.has(x.toLowerCase()));
+
+                            if (!dictExact.length && !dictNear.length) {
+                                throw new Error('Nie znaleziono w słowniku żadnych pewnych rymów dla tego słowa. Spróbuj innego słowa.');
+                            }
+
                             setGenStep('verify');
 
-                            // KROK 2: WERYFIKACJA - osobne, surowe zapytanie widzi TYLKO listę słów
-                            // (nie wie już, że mają się "ładnie rymować") i ocenia każde z osobna.
+                            // KROK 3: WERYFIKACJA AI - osobne, surowe zapytanie widzi TYLKO listę słów,
+                            // które już przeszły filtr słownikowy (nie wie, że mają się "ładnie rymować")
+                            // i dodatkowo ocenia sam RYM (słownik potwierdza istnienie, nie rym).
                             const verifySys = `Jesteś rygorystycznym korektorem języka polskiego. Dostajesz listę słów-kandydatów zaproponowanych przez inny, mniej dokładny system jako rymy do pewnego słowa bazowego. Część kandydatów może być ZMYŚLONA (nieistniejąca, fonetycznie tylko podobna forma, np. "bole" zamiast prawdziwego "boli", albo wymyślone "wot", "mot", "fot"), a część może być prawdziwym słowem, które mimo to WCALE SIĘ NIE RYMUJE ze słowem bazowym (np. "stołek" jako "rym" do "przedszkole" - to prawdziwe słowo, ale kończy się na "-ołek", a nie na "-ole/-edszkole", więc się nie rymuje i musi zostać odrzucone).
 TWOJE ZADANIE: dla każdego kandydata sprawdź DWA niezależne warunki, oba muszą być spełnione:
 1. ISTNIENIE: czy to NAPRAWDĘ istniejące, powszechnie znane słowo/forma języka polskiego? W razie najmniejszej wątpliwości - ODRZUĆ. Nie odrzucaj tylko dlatego, że to rzadsza, ale prawdziwa forma odmiany.
@@ -257,7 +300,7 @@ TWOJE ZADANIE: dla każdego kandydata sprawdź DWA niezależne warunki, oba musz
    Jeśli obie grupy po weryfikacji są puste, zwróć oba pola jako pusty string.
 5. Zaproponuj JEDNO konkretne ćwiczenie/zabawę z rymami dla grupy wiekowej: ${audienceMeta[audience].desc} (1-2 zdania, bez ogólników) - użyj w przykładzie WYŁĄCZNIE słów ze zweryfikowanej listy, nigdy przypadkowej pary spoza niej.
 Zwróć WYŁĄCZNIE poprawny JSON: {"exact": ["..."], "near": ["..."], "coupletLine1": "...", "coupletLine2": "...", "activity": "..."}`;
-                            const verifyPrompt = `Słowo bazowe: "${w}". Kandydaci - rym dokładny: [${(candidates.exact || []).join(', ')}]. Kandydaci - rym przybliżony: [${(candidates.near || []).join(', ')}].`;
+                            const verifyPrompt = `Słowo bazowe: "${w}". Kandydaci - rym dokładny: [${dictExact.join(', ')}]. Kandydaci - rym przybliżony: [${dictNear.join(', ')}].`;
                             const parsed = await askAI(verifySys, verifyPrompt);
 
                             if ((!parsed.exact || !parsed.exact.length) && (!parsed.near || !parsed.near.length)) {
@@ -358,7 +401,7 @@ Zwróć WYŁĄCZNIE poprawny JSON: {"exact": ["..."], "near": ["..."], "coupletL
                                         className="px-8 py-4 rounded-xl font-bold text-white transition-all flex items-center justify-center gap-2 shadow-lg btn-bounce bg-gradient-to-r from-emerald-600 to-amber-500 hover:from-emerald-500 hover:to-amber-400 disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         {isGenerating ? (
-                                            <><i className="ph-bold ph-spinner-gap animate-spin text-xl"></i> {genStep === 'verify' ? 'Sprawdzam...' : 'Szukam...'}</>
+                                            <><i className="ph-bold ph-spinner-gap animate-spin text-xl"></i> {genStep === 'dictionary' ? 'Sprawdzam w słowniku...' : genStep === 'verify' ? 'Sprawdzam sens...' : 'Szukam...'}</>
                                         ) : (
                                             <><Icon name="Search" size={20} /> Znajdź rymy</>
                                         )}
