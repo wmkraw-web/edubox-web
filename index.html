@@ -264,28 +264,27 @@
         // ==========================================
         // OMNI-BOT AI (Prawy Dolny Róg - Mini Karty i Szybkie Prompty)
         // ==========================================
-        const OmniBot = ({ appsData }) => {
-            const [isOpen, setIsOpen] = useState(false);
+        const OmniBot = ({ appsData, isOpen, setIsOpen, openQuiz }) => {
             const [inputText, setInputText] = useState('');
             const [messages, setMessages] = useState([
-                { sender: 'ai', text: 'Cześć! Rozwiązuję nauczycielskie problemy. W czym Ci dzisiaj pomóc?' }
+                { sender: 'ai', text: 'Cześć! Rozwiązuję nauczycielskie problemy. Opisz swoimi słowami, w czym Ci dzisiaj pomóc.' }
             ]);
+            const [isThinking, setIsThinking] = useState(false);
             const messagesEndRef = useRef(null);
 
             const QUICK_PROMPTS = ["📄 Dokumenty i IPET", "🎲 Gra na zastępstwo", "🧩 Uczeń z autyzmem", "📝 Szybki sprawdzian"];
 
-            useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, isOpen]);
+            useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, isOpen, isThinking]);
 
-            const findApps = (query) => {
+            // Stary mechanizm - dopasowywanie słów-kluczy do wbudowanego słownika synonimów.
+            // Zostaje jako AWARYJNY fallback, gdyby wywołanie AI zawiodło (np. brak sieci) - żeby
+            // bot nigdy nie zamilkł całkowicie, tylko wtedy "spadał" na słabszy, ale działający tryb.
+            const findAppsKeyword = (query) => {
                 const normalizedQuery = query.toLowerCase();
-                
-                // NLP Krok 1: Wyłapanie pojedynczych słów z całego zdania
                 const words = normalizedQuery.match(/[a-ząćęłńóśźż]+/g) || [];
                 const searchWords = words.filter(w => w.length > 2 && !['jak', 'coś', 'dla', 'czy', 'masz', 'potrzebuje', 'szukam', 'jest'].includes(w));
-
                 if (searchWords.length === 0) return [];
 
-                // NLP Krok 2: Wbudowany słownik intencji
                 const intentMap = {
                     'krzyczy': 'trudne zachowania', 'bije': 'trudne zachowania', 'agresja': 'sos', 'problem': 'sos', 'wyciszenie': 'terapia',
                     'oceny': 'ocena', 'ocenianie': 'ocena', 'świadectwo': 'ocena', 'świadectwa': 'ocena', 'półrocze': 'sprawozdanie',
@@ -298,50 +297,78 @@
                     'awans': 'awans', 'dorobek': 'awans', 'sprawozdanie': 'sprawozdanie'
                 };
 
-                // NLP Krok 3: Ocena (Scoring)
                 const scoredApps = appsData.map(app => {
                     let score = 0;
                     const appContent = (app.title + " " + app.desc + " " + app.tags.join(" ")).toLowerCase();
-                    
                     searchWords.forEach(word => {
                         if (appContent.includes(word)) score += 2;
                         const mappedTag = intentMap[word];
                         if (mappedTag && appContent.includes(mappedTag)) score += 3;
                         if (word.length > 4) {
-                            const rootWord = word.substring(0, word.length - 2); 
+                            const rootWord = word.substring(0, word.length - 2);
                             if (appContent.includes(rootWord)) score += 1;
                         }
                     });
-
                     return { ...app, score };
                 });
 
                 return scoredApps.filter(app => app.score > 0).sort((a, b) => b.score - a.score).slice(0, 3);
             };
 
-            const processUserMessage = (userMsg) => {
+            // Nowy mechanizm - prawdziwe rozumienie zapytania przez AI, zamiast dopasowywania
+            // słów-kluczy. Dostaje pełny katalog (tytuł/opis/tagi/url) i samo zdanie nauczyciela,
+            // i wybiera do 3 NAJTRAFNIEJSZYCH narzędzi rozumiejąc sens, nie tylko wspólne słowa
+            // (np. "nie mówi, komunikuje się gestami" -> AAC, mimo że nigdzie nie pada słowo "AAC").
+            const findAppsAI = async (query) => {
+                const catalog = appsData.map(a => ({ url: a.url, title: a.title, desc: a.desc, tags: a.tags }));
+                const system = `Jesteś systemem dopasowującym narzędzia edukacyjne z katalogu do problemu opisanego przez nauczyciela. Dostajesz katalog narzędzi (JSON: url, title, desc, tags) oraz wiadomość nauczyciela. Wybierz maksymalnie 3 narzędzia NAJLEPIEJ pasujące do SENSU wiadomości, nie tylko wspólnych słów (np. "dziecko się bije/kłóci/gryzie" to trudne zachowanie, "nie mówi, komunikuje się gestami" to AAC/komunikacja alternatywna). Zwróć WYŁĄCZNIE czysty obiekt JSON: {"urls": ["dokladny_url_z_katalogu", "..."]}, w kolejności od najlepszego dopasowania. Jeśli naprawdę nic sensownie nie pasuje, zwróć {"urls": []}.`;
+                const res = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        prompt: `Katalog narzędzi:\n${JSON.stringify(catalog)}\n\nWiadomość nauczyciela: ${query}`,
+                        system, temperature: 0.3, format: 'json', model: 'gpt-4o-mini'
+                    })
+                });
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                const data = await res.json();
+                const parsed = JSON.parse(data.text);
+                if (!Array.isArray(parsed.urls)) return [];
+                return parsed.urls.map(u => appsData.find(a => a.url === u)).filter(Boolean).slice(0, 3);
+            };
+
+            const processUserMessage = async (userMsg) => {
                 setMessages(prev => [...prev, { sender: 'user', text: userMsg }]);
                 setInputText('');
 
-                setTimeout(() => {
-                    const matchedApps = findApps(userMsg);
-                    
-                    if (matchedApps.length > 0) {
-                        setMessages(prev => [...prev, { 
-                            sender: 'ai', 
-                            text: 'Znalazłem idealne narzędzia, które rozwiążą ten problem! Wybierz jedno z poniższych:',
-                            apps: matchedApps 
-                        }]);
-                    } else if (userMsg.toLowerCase().includes('kawa') || userMsg.toLowerCase().includes('premium')) {
-                         setMessages(prev => [...prev, { sender: 'ai', text: 'Możesz mnie wesprzeć stawiając wirtualną kawę ☕ – w podziękowaniu dostaniesz kod, który wyłącza dzienne limity we wszystkich narzędziach!' }]);
-                    } else {
-                        setMessages(prev => [...prev, { sender: 'ai', text: 'Nie znalazłem dokładnie tego czego szukasz, ale polecam sprawdzić sekcję "Kategorie" na naszej stronie!' }]);
-                    }
-                }, 600);
+                if (userMsg.toLowerCase().includes('kawa') || userMsg.toLowerCase().includes('premium')) {
+                    setMessages(prev => [...prev, { sender: 'ai', text: 'Możesz mnie wesprzeć stawiając wirtualną kawę ☕ – w podziękowaniu dostaniesz kod, który wyłącza dzienne limity we wszystkich narzędziach!' }]);
+                    return;
+                }
+
+                setIsThinking(true);
+                let matchedApps = [];
+                try {
+                    matchedApps = await findAppsAI(userMsg);
+                } catch (e) {
+                    console.log('EduBot: wywołanie AI nie powiodło się, wracam do dopasowania słów-kluczy.', e);
+                    matchedApps = findAppsKeyword(userMsg);
+                }
+                setIsThinking(false);
+
+                if (matchedApps.length > 0) {
+                    setMessages(prev => [...prev, {
+                        sender: 'ai',
+                        text: 'Znalazłem narzędzia, które powinny rozwiązać ten problem! Wybierz jedno z poniższych:',
+                        apps: matchedApps
+                    }]);
+                } else {
+                    setMessages(prev => [...prev, { sender: 'ai', text: 'Nie znalazłem dokładnie tego czego szukasz - spróbuj opisać to prościej, albo odpowiedz na 2 szybkie pytania niżej.' }]);
+                }
             };
 
             const handleSend = () => {
-                if (!inputText.trim()) return;
+                if (!inputText.trim() || isThinking) return;
                 processUserMessage(inputText.trim());
             };
 
@@ -360,7 +387,7 @@
                                 </div>
                                 <button onClick={() => setIsOpen(false)} className="text-blue-200 hover:text-white p-1 text-2xl transition-colors"><i className="ph-bold ph-x"></i></button>
                             </div>
-                            
+
                             {/* Chat Area */}
                             <div className="flex-1 p-4 overflow-y-auto custom-scrollbar flex flex-col gap-4 bg-slate-50 dark:bg-slate-900/50">
                                 {messages.map((msg, i) => (
@@ -368,7 +395,7 @@
                                         <div className={`max-w-[85%] p-3 rounded-2xl text-sm shadow-sm ${msg.sender === 'ai' ? 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 self-start rounded-tl-sm' : 'bg-blue-600 text-white self-end rounded-tr-sm'}`}>
                                             {msg.text}
                                         </div>
-                                        
+
                                         {/* Wyświetlanie Mini-Kart Aplikacji */}
                                         {msg.apps && msg.apps.length > 0 && (
                                             <div className="flex flex-col gap-2 w-[85%] self-start mt-1">
@@ -388,36 +415,54 @@
                                         )}
                                     </div>
                                 ))}
+
+                                {/* Wskaźnik "myślę..." podczas wywołania AI */}
+                                {isThinking && (
+                                    <div className="max-w-[85%] p-3 rounded-2xl text-sm shadow-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 self-start rounded-tl-sm flex items-center gap-1.5">
+                                        <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                                        <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
+                                        <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
+                                    </div>
+                                )}
                                 <div ref={messagesEndRef} />
                             </div>
-                            
-                            {/* Pigułki szybkiego wyboru */}
-                            <div className="bg-slate-50 dark:bg-slate-900/50 px-3 pb-2 flex gap-2 overflow-x-auto custom-scrollbar whitespace-nowrap">
+
+                            {/* Pigułki szybkiego wyboru + alternatywa (quiz) */}
+                            <div className="bg-slate-50 dark:bg-slate-900/50 px-3 pt-2 pb-1 flex gap-2 overflow-x-auto custom-scrollbar whitespace-nowrap">
                                 {QUICK_PROMPTS.map((prompt, idx) => (
-                                    <button 
-                                        key={idx} 
-                                        onClick={() => processUserMessage(prompt)}
+                                    <button
+                                        key={idx}
+                                        onClick={() => !isThinking && processUserMessage(prompt)}
                                         className="text-[10px] md:text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 px-3 py-1.5 rounded-full hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors shrink-0"
                                     >
                                         {prompt}
                                     </button>
                                 ))}
                             </div>
+                            <button onClick={openQuiz} className="mx-3 mb-2 text-[10px] text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 font-bold flex items-center gap-1.5 transition-colors">
+                                <i className="ph-bold ph-compass"></i> Wolisz odpowiedzieć na 2 szybkie pytania zamiast pisać?
+                            </button>
 
-                            {/* Input Area */}
-                            <div className="p-3 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 flex gap-2">
-                                <input 
-                                    type="text" value={inputText} onChange={e => setInputText(e.target.value)} onKeyPress={e => e.key === 'Enter' && handleSend()} 
-                                    placeholder="Napisz swój problem..." 
-                                    className="flex-1 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl px-4 py-3 outline-none text-sm focus:border-blue-500 dark:focus:border-blue-500 transition-colors" 
+                            {/* Input Area - awatar bota obok pola, żeby wyraźnie zaznaczyć że to AI odpowiada */}
+                            <div className="p-3 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 flex items-center gap-2">
+                                <div className="relative shrink-0">
+                                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-md">
+                                        <i className="ph-fill ph-robot text-white text-lg"></i>
+                                    </div>
+                                    <span className="absolute -inset-1 rounded-full border-2 border-blue-400/50 animate-ping"></span>
+                                </div>
+                                <input
+                                    type="text" value={inputText} onChange={e => setInputText(e.target.value)} onKeyPress={e => e.key === 'Enter' && handleSend()}
+                                    placeholder="Napisz swój problem..." disabled={isThinking}
+                                    className="flex-1 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl px-4 py-3 outline-none text-sm focus:border-blue-500 dark:focus:border-blue-500 transition-colors disabled:opacity-60"
                                 />
-                                <button onClick={handleSend} className="bg-blue-600 hover:bg-blue-500 text-white w-12 rounded-xl flex items-center justify-center transition-all shadow-md active:scale-95">
+                                <button onClick={handleSend} disabled={isThinking} className="bg-blue-600 hover:bg-blue-500 text-white w-12 h-12 rounded-xl flex items-center justify-center transition-all shadow-md active:scale-95 disabled:opacity-60 shrink-0">
                                     <i className="ph-bold ph-paper-plane-right text-lg"></i>
                                 </button>
                             </div>
                         </div>
                     )}
-                    
+
                     {/* Bot Toggle Button */}
                     <button onClick={() => setIsOpen(!isOpen)} className="bg-gradient-to-br from-blue-500 to-purple-600 w-16 h-16 rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(59,130,246,0.5)] hover:shadow-[0_0_30px_rgba(59,130,246,0.8)] hover:scale-105 transition-all relative z-50 group border-2 border-white/20">
                         {isOpen ? <i className="ph-bold ph-x text-white text-2xl"></i> : <i className="ph-fill ph-robot text-white text-3xl animate-float"></i>}
@@ -431,7 +476,7 @@
         // ==========================================
         // GŁÓWNA ASYSTENTKA WIDEO ("Blondynka" w Hero)
         // ==========================================
-        const HeroVideoAssistant = () => {
+        const HeroVideoAssistant = ({ onAskBot }) => {
             const [isMuted, setIsMuted] = useState(true);
             const videoRef = useRef(null);
 
@@ -442,24 +487,30 @@
                     if (isMuted) { videoRef.current.currentTime = 0; videoRef.current.play(); }
                 }
             };
-            
+
+            // Dymek ma WŁASNĄ akcję (otwiera bota) - stopPropagation, żeby klik w dymek
+            // nie odpalał też toggleMute z rodzica.
+            const handleAskBot = (e) => {
+                e.stopPropagation();
+                if (onAskBot) onAskBot();
+            };
 
             return (
                 <div className="relative group w-full max-w-[280px] mx-auto md:mx-0 rounded-[2rem] overflow-hidden shadow-2xl border-4 border-blue-500/50 hover:border-blue-500 transition-colors cursor-pointer bg-slate-900" onClick={toggleMute}>
-                    <video 
-                        ref={videoRef} src="powitanie.mp4" autoPlay loop={isMuted} muted={isMuted} playsInline 
+                    <video
+                        ref={videoRef} src="powitanie.mp4" autoPlay loop={isMuted} muted={isMuted} playsInline
                         className="w-full h-[450px] object-cover"
                         poster="okladka.jpg"
                     />
-                    
+
                     <div className="absolute top-4 left-4 bg-black/50 backdrop-blur px-3 py-1.5 rounded-full text-white text-xs font-bold flex items-center gap-2">
                         {isMuted ? <><i className="ph-bold ph-speaker-slash"></i> Kliknij by posłuchać</> : <><i className="ph-bold ph-speaker-high animate-pulse"></i> Odtwarzanie...</>}
                     </div>
 
-                    <div className="absolute bottom-4 right-4 bg-blue-600 text-white p-3 rounded-2xl rounded-br-sm shadow-xl flex items-center gap-2 animate-bounce">
+                    <button onClick={handleAskBot} className="absolute bottom-4 right-4 bg-blue-600 hover:bg-blue-500 text-white p-3 rounded-2xl rounded-br-sm shadow-xl flex items-center gap-2 animate-bounce transition-colors">
                         <span className="text-xs font-bold">Zapytaj Bota!</span>
                         <i className="ph-bold ph-arrow-right"></i>
-                    </div>
+                    </button>
                 </div>
             );
         };
@@ -581,6 +632,10 @@
         // ==========================================
         function App() {
             const [showQuiz, setShowQuiz] = React.useState(false);
+            // Wspólny stan otwarcia asystenta (OmniBot) - podniesiony tutaj, żeby zarówno
+            // dymek na wideo w Hero, jak i sam panel bota, mogły go otwierać/zamykać. Wcześniej
+            // dymek "Zapytaj Bota!" nie był podpięty do niczego (martwy element).
+            const [botOpen, setBotOpen] = React.useState(false);
             React.useEffect(() => {
               if (!localStorage.getItem('edubox_quiz_done')) {
                 setShowQuiz(true);
@@ -887,7 +942,7 @@ const closeAnnouncement = () => {
 
                            {/* Prawa Strona - Asystentka Wideo */}
 <div className="flex-1 flex justify-center md:justify-end reveal w-full relative" style={{transitionDelay: '200ms'}}>
-    <HeroVideoAssistant />
+    <HeroVideoAssistant onAskBot={() => setBotOpen(true)} />
     <LiveMagicPreview />
 </div>
 
@@ -1187,13 +1242,11 @@ const closeAnnouncement = () => {
                         </div>
                     </footer>
 
-                    {/* ZINTEGROWANY OMNI-BOT PO PRAWEJ */}
-                    <OmniBot appsData={APPS} />
+                    {/* ZINTEGROWANY OMNI-BOT PO PRAWEJ - jedyny pływający punkt wejścia (scalone z
+                        dawnym osobnym przyciskiem "Zacznij tutaj" - quiz jest teraz dostępny jako
+                        opcja WEWNĄTRZ panelu bota, patrz komponent OmniBot) */}
+                    <OmniBot appsData={APPS} isOpen={botOpen} setIsOpen={setBotOpen} openQuiz={() => { setBotOpen(false); setShowQuiz(true); }} />
 
-                    <button onClick={() => setShowQuiz(true)}
-                      className="fixed bottom-24 right-6 z-40 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-5 py-3 rounded-full font-bold text-xs shadow-lg flex items-center gap-2">
-                      <i className="ph-bold ph-compass"></i> Zacznij tutaj
-                    </button>
                     {showQuiz && <OnboardingQuiz apps={APPS} onClose={() => setShowQuiz(false)} />}
                 </div>
             );
