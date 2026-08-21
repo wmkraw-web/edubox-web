@@ -164,6 +164,7 @@
             const [word, setWord] = useState('');
             const [audience, setAudience] = useState('przedszkole');
             const [isGenerating, setIsGenerating] = useState(false);
+            const [genStep, setGenStep] = useState(null); // 'candidates' | 'verify'
             const [result, setResult] = useState(null);
             const [error, setError] = useState('');
             const [toastMessage, setToastMessage] = useState('');
@@ -211,50 +212,51 @@
                     isPro,
                     async (newCount) => {
                         setIsGenerating(true);
+                        setGenStep('candidates');
                         setResult(null);
                         try {
-                            const sysPrompt = `Jesteś polskim logopedą i nauczycielem języka polskiego, ekspertem od rymów i zabaw fonologicznych dla dzieci.
-Zadanie: dla podanego przez nauczyciela słowa znajdź PRAWDZIWE, istniejące polskie słowa, które się z nim rymują, dopasowane do wskazanej grupy wiekowej.
+                            const parseJson = (raw) => {
+                                let jsonStr = raw.replace(/```json/gi, '').replace(/```/g, '').trim();
+                                const startIdx = jsonStr.indexOf('{');
+                                const endIdx = jsonStr.lastIndexOf('}');
+                                if (startIdx !== -1 && endIdx !== -1) jsonStr = jsonStr.substring(startIdx, endIdx + 1);
+                                return JSON.parse(jsonStr);
+                            };
 
-ABSOLUTNIE KRYTYCZNA ZASADA: Zanim wypiszesz jakiekolwiek słowo, sprawdź w pamięci, czy NAPRAWDĘ istnieje w języku polskim i czy naprawdę je znasz z codziennego użycia - a nie tylko "brzmi jakby mogło istnieć". Słowa typu "wot", "mot", "fot", "dot", "not", "rot" NIE ISTNIEJĄ w języku polskim i nigdy nie mogą się pojawić w odpowiedzi, nawet jeśli fonetycznie pasują. Angielskie zapożyczenia typu "hot" też się nie liczą, chyba że są w pełni spolszczone i powszechnie używane.
+                            const askAI = async (system, prompt) => {
+                                const res = await fetch('/api/chat', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ prompt, system, temperature: 0.2, format: 'json', model: 'gpt-4o' })
+                                });
+                                if (!res.ok) throw new Error(`Serwer główny: HTTP ${res.status}`);
+                                const data = await res.json();
+                                return parseJson(data.text);
+                            };
 
-PRZYKŁAD POPRAWNEGO WYNIKU dla słowa "kot" (dla grupy szkolnej): exact: ["lot", "plot", "knot", "grot"], near: ["most", "koszt"]. Zwróć uwagę, że NIE MA tu słów "mot", "wot", "not", "dot", "rot", "hot" - bo to nie są prawdziwe polskie słowa, tylko fonetycznie podobne wymysły. Właśnie tego masz unikać.
+                            // KROK 1: KANDYDACI - łagodniejszy, kreatywny etap. Może zaproponować za dużo,
+                            // od tego jest krok 2.
+                            const genSys = `Jesteś polskim logopedą, ekspertem od rymów dla dzieci. Zaproponuj KANDYDATÓW na rymy do podanego słowa - kolejny, niezależny etap je surowo zweryfikuje, więc staraj się podawać prawdziwe polskie słowa, ale nie musisz być stuprocentowo pewny każdego.
+Dla podanego słowa zaproponuj do 8 kandydatów na rym dokładny (niemal identyczna końcówka fonetyczna) i do 6 kandydatów na rym przybliżony (podobne brzmienie). Dopasuj trudność słownictwa do grupy wiekowej: ${audienceMeta[audience].desc}.
+Zwróć WYŁĄCZNIE poprawny JSON: {"exact": ["..."], "near": ["..."]}`;
+                            const candidates = await askAI(genSys, `Podaj kandydatów na rymy do słowa: "${w}".`);
 
-ZASADY:
-1. Używaj WYŁĄCZNIE prawdziwych, powszechnie znanych słów języka polskiego (rzeczowniki, czasowniki, przymiotniki, popularne imiona). Zero neologizmów, zero słów "brzmiących nieźle".
-2. Rym musi być słyszalny na głos (końcówka fonetyczna), nie tylko podobna pisownia.
-3. Dostosuj dobór słów do grupy wiekowej: ${audienceMeta[audience].desc}.
-4. Podziel wyniki na dwie grupy: "exact" (rym dokładny, niemal identyczna końcówka) i "near" (rym przybliżony, podobne brzmienie).
-5. exact: maksymalnie 6 słów, near: maksymalnie 4 słowa. POPRAWNOŚĆ JEST WAŻNIEJSZA NIŻ LICZBA - jeśli istnieją tylko 2-3 prawdziwe rymy, podaj tylko tyle, albo nawet mniej. Krótsza, w 100% poprawna lista to dobry wynik. Zmyślone słowo to zawsze zły wynik.
-6. Napisz JEDEN krótki, zabawny dwuwiersz (dokładnie 2 linijki, rym AA), który wykorzystuje podane słowo oraz jeden z rymów z listy "exact".
-7. Zaproponuj JEDNO konkretne, wykonalne ćwiczenie lub zabawę z rymami do wykorzystania na zajęciach z tą grupą wiekową (1-2 zdania, bez ogólników).
-Zwróć WYŁĄCZNIE poprawny JSON, dokładnie w formacie: {"exact": ["..."], "near": ["..."], "couplet": "...", "activity": "..."}`;
+                            setGenStep('verify');
 
-                            const usrPrompt = `Znajdź rymy do słowa: "${w}". Grupa wiekowa: ${audienceMeta[audience].label}. Pamiętaj: tylko prawdziwe, istniejące polskie słowa - w razie wątpliwości pomiń słowo zamiast je zmyślać.`;
+                            // KROK 2: WERYFIKACJA - osobne, surowe zapytanie widzi TYLKO listę słów
+                            // (nie wie już, że mają się "ładnie rymować") i ocenia każde z osobna.
+                            const verifySys = `Jesteś rygorystycznym korektorem języka polskiego. Dostajesz listę słów-kandydatów zaproponowanych przez inny, mniej dokładny system jako rymy do pewnego słowa bazowego. Część kandydatów może być ZMYŚLONA albo być nieistniejącą, fonetycznie tylko podobną formą (np. "bole" zamiast prawdziwego "boli", albo wymyślone "wot", "mot", "fot").
+TWOJE ZADANIE:
+1. Dla każdego kandydata oceń surowo: czy to NAPRAWDĘ istniejące, powszechnie znane słowo/forma języka polskiego? W razie najmniejszej wątpliwości - ODRZUĆ. Nie odrzucaj tylko dlatego, że to rzadsza, ale prawdziwa forma odmiany.
+2. Zwróć wyłącznie kandydatów, co do których masz pewność - możesz zwrócić mniej niż dostałeś, a nawet zero. To lepszy wynik niż przepuszczenie zmyślonego słowa.
+3. Spośród zweryfikowanych słów z grupy "exact" (a jeśli pusta - z "near") ułóż JEDEN krótki, zabawny dwuwiersz (2 linijki, rym AA) ze słowem bazowym. Jeśli obie grupy po weryfikacji są puste, zwróć pusty string.
+4. Zaproponuj JEDNO konkretne ćwiczenie/zabawę z rymami dla grupy wiekowej: ${audienceMeta[audience].desc} (1-2 zdania, bez ogólników).
+Zwróć WYŁĄCZNIE poprawny JSON: {"exact": ["..."], "near": ["..."], "couplet": "...", "activity": "..."}`;
+                            const verifyPrompt = `Słowo bazowe: "${w}". Kandydaci - rym dokładny: [${(candidates.exact || []).join(', ')}]. Kandydaci - rym przybliżony: [${(candidates.near || []).join(', ')}].`;
+                            const parsed = await askAI(verifySys, verifyPrompt);
 
-                            const res = await fetch('/api/chat', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                    prompt: usrPrompt,
-                                    system: sysPrompt,
-                                    temperature: 0.2,
-                                    format: 'json',
-                                    model: 'gpt-4o'
-                                })
-                            });
-
-                            if (!res.ok) throw new Error(`Serwer główny: HTTP ${res.status}`);
-                            const data = await res.json();
-
-                            let jsonStr = data.text.replace(/```json/gi, '').replace(/```/g, '').trim();
-                            const startIdx = jsonStr.indexOf('{');
-                            const endIdx = jsonStr.lastIndexOf('}');
-                            if (startIdx !== -1 && endIdx !== -1) jsonStr = jsonStr.substring(startIdx, endIdx + 1);
-                            const parsed = JSON.parse(jsonStr);
-
-                            if (!parsed.exact || !parsed.exact.length) {
-                                throw new Error('Nie znaleziono rymów dla tego słowa. Spróbuj innego.');
+                            if ((!parsed.exact || !parsed.exact.length) && (!parsed.near || !parsed.near.length)) {
+                                throw new Error('Po weryfikacji nie zostały żadne pewne rymy dla tego słowa. Spróbuj innego słowa.');
                             }
 
                             setResult({ word: w, ...parsed });
@@ -265,6 +267,7 @@ Zwróć WYŁĄCZNIE poprawny JSON, dokładnie w formacie: {"exact": ["..."], "ne
                             setError(`Błąd: ${err.message}. Spróbuj ponownie.`);
                         } finally {
                             setIsGenerating(false);
+                            setGenStep(null);
                         }
                     },
                     (errMsg) => showToast(errMsg),
@@ -350,7 +353,7 @@ Zwróć WYŁĄCZNIE poprawny JSON, dokładnie w formacie: {"exact": ["..."], "ne
                                         className="px-8 py-4 rounded-xl font-bold text-white transition-all flex items-center justify-center gap-2 shadow-lg btn-bounce bg-gradient-to-r from-emerald-600 to-amber-500 hover:from-emerald-500 hover:to-amber-400 disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         {isGenerating ? (
-                                            <><i className="ph-bold ph-spinner-gap animate-spin text-xl"></i> Szukam...</>
+                                            <><i className="ph-bold ph-spinner-gap animate-spin text-xl"></i> {genStep === 'verify' ? 'Sprawdzam...' : 'Szukam...'}</>
                                         ) : (
                                             <><Icon name="Search" size={20} /> Znajdź rymy</>
                                         )}
