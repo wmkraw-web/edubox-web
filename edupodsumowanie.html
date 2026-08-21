@@ -67,7 +67,6 @@
   </script>
 </head>
 <body>
-    <script>window.EDUBOX_IMAGE_APP = true;</script>
     <div id="wspolne-menu-kontener"></div>
 
     <script type="module">
@@ -104,7 +103,6 @@
             const [downloadUrl, setDownloadUrl] = useState(null);
 
             const canvasRef = useRef(null);
-            const generatedImgRef = useRef(null);
             const mediaRecorderRef = useRef(null);
             const chunksRef = useRef([]);
             const particlesRef = useRef([]);
@@ -199,15 +197,30 @@
             }
             function prog(el, t) { if (t < el.start) return 0; if (t > el.end) return 1; return (t - el.start) / (el.end - el.start); }
 
-            function renderFrame(ctx, W, H, t, img, timeline) {
-                ctx.save();
-                const zoom = 1 + Math.min(0.1, t / 21000 * 0.1);
-                const dw = W * zoom, dh = H * zoom;
-                ctx.drawImage(img, (W - dw) / 2, (H - dh) / 2, dw, dh);
-                ctx.restore();
+            // Tło: ciemna baza + 3 miękkie, animowane gradientowe "aury" (dokładnie styl .aura-blob
+            // z index.html) zamiast wygenerowanej przez AI ilustracji - spójne z resztą portfolio,
+            // zawsze eleganckie, zero ryzyka "generycznego" wyglądu AI-clipartu.
+            const AURA_BLOBS = [
+                { color: '59,130,246', baseX: 0.18, baseY: 0.15, r: 0.55, speed: 0.00018, phase: 0 },
+                { color: '168,85,247', baseX: 0.82, baseY: 0.35, r: 0.48, speed: 0.00021, phase: 2.1 },
+                { color: '16,185,129', baseX: 0.35, baseY: 0.85, r: 0.62, speed: 0.00015, phase: 4.2 }
+            ];
 
-                ctx.fillStyle = 'rgba(15,10,46,0.45)';
+            function renderFrame(ctx, W, H, t, timeline) {
+                ctx.fillStyle = '#0f0a2e';
                 ctx.fillRect(0, 0, W, H);
+
+                AURA_BLOBS.forEach(b => {
+                    const drift = 0.04;
+                    const x = (b.baseX + Math.sin(t * b.speed + b.phase) * drift) * W;
+                    const y = (b.baseY + Math.cos(t * b.speed * 0.8 + b.phase) * drift) * H;
+                    const r = b.r * W * (0.9 + Math.sin(t * b.speed * 1.4 + b.phase) * 0.1);
+                    const grad = ctx.createRadialGradient(x, y, 0, x, y, r);
+                    grad.addColorStop(0, `rgba(${b.color},0.55)`);
+                    grad.addColorStop(1, `rgba(${b.color},0)`);
+                    ctx.fillStyle = grad;
+                    ctx.fillRect(0, 0, W, H);
+                });
 
                 particlesRef.current.forEach(p => {
                     p.y += p.speed; p.x += p.drift; p.rot += p.rotSpeed;
@@ -279,7 +292,7 @@
                 });
             }
 
-            function playAndRecord(img) {
+            function playAndRecord() {
                 const canvas = canvasRef.current;
                 const W = 720, H = 1280;
                 canvas.width = W; canvas.height = H;
@@ -305,7 +318,7 @@
                 const startTime = performance.now();
                 function loop(now) {
                     const t = now - startTime;
-                    renderFrame(ctx, W, H, t, img, timeline);
+                    renderFrame(ctx, W, H, t, timeline);
                     setProgressPct(Math.min(100, (t / duration) * 100));
                     if (t < duration) requestAnimationFrame(loop);
                     else if (recorder.state !== 'inactive') recorder.stop();
@@ -315,13 +328,15 @@
 
             const handleGenerate = () => {
                 if (facts.every(f => !f.trim())) { showToast('Wpisz przynajmniej jeden fakt/wydarzenie!'); return; }
-                window.EduBoxCore.executeImageLimitCheck(isPremium,
+                window.EduBoxCore.executeWithLimitCheck(isPremium,
                     async () => {
                         setStage('generating');
                         setStatusText('Dopracowuję Wasze wydarzenia...');
                         setProgressPct(0);
                         try {
-                            // 1) AI "punchuje" surowe fakty na krótkie, mocne hasła w stylu "Wrapped"
+                            // AI "punchuje" surowe fakty na krótkie, mocne hasła w stylu "Wrapped".
+                            // Tło wideo jest rysowane od razu w Canvasie (animowane gradienty, patrz
+                            // renderFrame) - bez generowania obrazka przez AI, więc to jedyne wywołanie API.
                             const factsSystem = `Jesteś copywriterem tworzącym krótkie, mocne hasła "Wrapped" (jak podsumowanie roku ze Spotify) dla nauczycieli podsumowujących rok szkolny klasy. Dostajesz do 3 surowych faktów/wydarzeń z klasy. Dla KAŻDEGO z podanych (pomijając puste) napisz jedno, maksymalnie 8-słowowe, chwytliwe zdanie po polsku, bez cudzysłowów i dwukropków. Zwróć WYŁĄCZNIE czysty obiekt JSON: {"facts": ["...", "...", "..."]} z dokładnie tyloma elementami ile podano niepustych faktów, w tej samej kolejności.`;
                             const factsUser = facts.filter(f => f.trim()).map((f, i) => `${i + 1}. ${f.trim()}`).join('\n');
                             let punchy = facts.map(f => f.trim());
@@ -341,42 +356,9 @@
                             } catch (e) { console.log('Nie udało się dopracować faktów, używam oryginałów.'); }
                             punchyFactsRef.current = punchy;
 
-                            // 2) Obrazek tła - ciepła, energetyczna scena klasowa dopasowana do nazwy klasy
-                            setStatusText('Tworzę obrazek tła...');
-                            const prompt = `Stwórz energetyczną, kolorową ilustrację w stylu nowoczesnego, płaskiego designu (flat design), przedstawiającą radosną scenę szkolną/klasową pasującą do podsumowania roku szkolnego dla klasy "${className || 'szkolnej'}" - np. confetti, elementy szkolne, abstrakcyjne kształty w żywych barwach (róż, fiolet, turkus, żółty). Format pionowy. Bez żadnego tekstu, liter ani cyfr na obrazku, bez twarzy konkretnych osób - tylko nastrojowe, abstrakcyjno-ilustracyjne tło.`;
-
-                            let englishPrompt = prompt;
-                            try {
-                                const translateSystem = `You are an expert AI image prompt engineer. Translate and rewrite the user's Polish description into a detailed, vivid image prompt IN ENGLISH, for an energetic flat-design illustration background. Keep all constraints (no text, no letters, no digits, no specific human faces). Reply ONLY with the English prompt, nothing else.`;
-                                const resChat = await fetch('/api/chat', {
-                                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ prompt, system: translateSystem, temperature: 0.6, model: 'gpt-4o-mini' })
-                                });
-                                if (resChat.ok) {
-                                    const dataChat = await resChat.json();
-                                    if (dataChat.text) englishPrompt = dataChat.text.trim();
-                                }
-                            } catch (e) { console.log('Tłumaczenie promptu nie powiodło się, używam oryginału.'); }
-
-                            const res = await fetch('/api/generate', {
-                                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt: englishPrompt, size: '1024x1536' })
-                            });
-                            if (!res.ok) throw new Error('Status API: ' + res.status);
-                            const data = await res.json();
-                            const raw = data.imageUrl || data.image || data.url;
-                            if (!raw) throw new Error('Brak danych obrazu');
-                            const finalSrc = raw.startsWith('http') || raw.startsWith('data:image') ? raw : `data:image/png;base64,${raw}`;
-
-                            const img = new Image();
-                            img.crossOrigin = 'anonymous';
-                            img.onload = () => {
-                                generatedImgRef.current = img;
-                                setStage('recording');
-                                setStatusText('Nagrywam wideo...');
-                                playAndRecord(img);
-                            };
-                            img.onerror = () => { showToast('Błąd wczytywania wygenerowanego obrazka.'); setStage('form'); };
-                            img.src = finalSrc;
+                            setStage('recording');
+                            setStatusText('Nagrywam wideo...');
+                            playAndRecord();
                         } catch (err) {
                             showToast('Błąd: ' + err.message);
                             setStage('form');
@@ -388,7 +370,7 @@
             };
 
             const handleReplay = () => {
-                if (generatedImgRef.current) { setStage('recording'); setStatusText('Nagrywam wideo...'); playAndRecord(generatedImgRef.current); }
+                setStage('recording'); setStatusText('Nagrywam wideo...'); playAndRecord();
             };
 
             const updateFact = (i, val) => {
@@ -463,7 +445,7 @@
                             </div>
                         )}
 
-                        <p className="text-center text-[11px] text-[#A79FE0] mt-6 leading-relaxed">Nagrywanie tworzy prawdziwy plik wideo (WebM) w Twojej przeglądarce - nic nie wysyłamy poza obrazem tła i tekstem faktów do wygenerowania treści.</p>
+                        <p className="text-center text-[11px] text-[#A79FE0] mt-6 leading-relaxed">Nagrywanie tworzy prawdziwy plik wideo (WebM) w Twojej przeglądarce - wysyłamy tylko tekst faktów, żeby AI dopracowało treść.</p>
                     </main>
 
                     {toastMessage && (
