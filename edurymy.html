@@ -250,9 +250,12 @@ TWOJE ZADANIE: dla każdego kandydata sprawdź DWA niezależne warunki, oba musz
 1. ISTNIENIE: czy to NAPRAWDĘ istniejące, powszechnie znane słowo/forma języka polskiego? W razie najmniejszej wątpliwości - ODRZUĆ. Nie odrzucaj tylko dlatego, że to rzadsza, ale prawdziwa forma odmiany.
 2. RYM: czy jego zakończenie fonetyczne NAPRAWDĘ pasuje do zakończenia słowa bazowego "${w}" - przeczytaj oba słowa na głos i porównaj ostatnią akcentowaną sylabę (lub więcej). Jeśli brzmią wyraźnie inaczej na końcu, to NIE jest rym, nawet jeśli słowo istnieje - ODRZUĆ je z tej listy (niezależnie czy było w grupie "exact" czy "near").
 3. Zwróć wyłącznie kandydatów spełniających OBA warunki - możesz zwrócić mniej niż dostałeś, a nawet zero. To lepszy wynik niż przepuszczenie złego kandydata.
-4. Spośród zweryfikowanych słów z grupy "exact" (a jeśli pusta - z "near") ułóż JEDEN krótki, zabawny dwuwiersz (2 linijki, rym AA) ze słowem bazowym. Jeśli obie grupy po weryfikacji są puste, zwróć pusty string.
+4. Napisz dwuwiersz o słowie bazowym "${w}" jako DWIE OSOBNE, PEŁNE linijki (pola "coupletLine1" i "coupletLine2") - nie jedno zdanie połamane przecinkami. Ostatnie słowo linijki 2 musi się rymować z ostatnim słowem linijki 1 (rym AA), a oba te słowa muszą pochodzić ze zweryfikowanej listy "exact" (a jeśli jest pusta - z "near"). NAJWAŻNIEJSZE: całość musi mieć SENS - to ma być prosta, konkretna, zrozumiała dla dziecka scenka (np. co robi/gdzie jest/jak wygląda "${w}"), a nie zdanie na siłę sklejone z przypadkowych rymów. Jeśli któryś zweryfikowany rym nie daje się sensownie użyć, wybierz inny z listy - nie każdy rym musi trafić do dwuwiersza.
+   Przykład DOBRZE (dla słowa "kot", lista zawiera m.in. "koc" i "noc"): coupletLine1: "Szary kotek śpi pod kocem,", coupletLine2: "Cichą, ciepłą, długą nocą." - sensowna scenka, dwie osobne linijki, czysty rym.
+   Przykład ŹLE (unikaj takiej formy): "Kot na płocie siedzi, patrzy na lot, a w sercu ma miot." - to jedno zdanie, nie dwuwiersz, a "w sercu ma miot" nie ma sensu - taki wynik jest niedopuszczalny.
+   Jeśli obie grupy po weryfikacji są puste, zwróć oba pola jako pusty string.
 5. Zaproponuj JEDNO konkretne ćwiczenie/zabawę z rymami dla grupy wiekowej: ${audienceMeta[audience].desc} (1-2 zdania, bez ogólników) - użyj w przykładzie WYŁĄCZNIE słów ze zweryfikowanej listy, nigdy przypadkowej pary spoza niej.
-Zwróć WYŁĄCZNIE poprawny JSON: {"exact": ["..."], "near": ["..."], "couplet": "...", "activity": "..."}`;
+Zwróć WYŁĄCZNIE poprawny JSON: {"exact": ["..."], "near": ["..."], "coupletLine1": "...", "coupletLine2": "...", "activity": "..."}`;
                             const verifyPrompt = `Słowo bazowe: "${w}". Kandydaci - rym dokładny: [${(candidates.exact || []).join(', ')}]. Kandydaci - rym przybliżony: [${(candidates.near || []).join(', ')}].`;
                             const parsed = await askAI(verifySys, verifyPrompt);
 
@@ -292,7 +295,7 @@ Zwróć WYŁĄCZNIE poprawny JSON: {"exact": ["..."], "near": ["..."], "couplet"
                     `Słowo: ${result.word}`,
                     `Rymy dokładne: ${result.exact.join(', ')}`,
                     result.near?.length ? `Rymy przybliżone: ${result.near.join(', ')}` : null,
-                    `Dwuwiersz: ${result.couplet}`
+                    result.coupletLine1 ? `Dwuwiersz: ${result.coupletLine1} ${result.coupletLine2}` : null
                 ].filter(Boolean).join('\n');
                 copyToClipboard(lines);
             };
@@ -426,10 +429,11 @@ Zwróć WYŁĄCZNIE poprawny JSON: {"exact": ["..."], "near": ["..."], "couplet"
                                         </div>
                                     )}
 
-                                    {result.couplet && (
+                                    {result.coupletLine1 && (
                                         <div className="mb-6 bg-slate-950/40 border border-slate-700/50 rounded-2xl p-5">
                                             <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Przykładowy dwuwiersz</h3>
-                                            <p className="font-baloo text-xl text-white leading-relaxed whitespace-pre-line">{result.couplet}</p>
+                                            <p className="font-baloo text-xl text-white leading-relaxed">{result.coupletLine1}</p>
+                                            <p className="font-baloo text-xl text-white leading-relaxed">{result.coupletLine2}</p>
                                         </div>
                                     )}
 
