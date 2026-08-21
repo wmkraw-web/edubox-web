@@ -21,6 +21,11 @@ jobs:
       # sekcje po prostu pokazują "jeszcze nie skonfigurowane".
       GOOGLE_SERVICE_ACCOUNT_KEY_BASE64: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_KEY_BASE64 }}
       GA4_PROPERTY_ID: ${{ secrets.GA4_PROPERTY_ID }}
+      # "Postaw kawę" / "Poleć i zyskaj PRO" - nowe kody z ostatnich 7 dni, czytane z arkuszy Google
+      # przez osobny endpoint api/weekly-report.js (ten sam mechanizm konta usługi co coffee-check.js,
+      # bez potrzeby duplikowania klucza konta usługi w sekretach GitHub).
+      WEEKLY_REPORT_SECRET: ${{ secrets.WEEKLY_REPORT_SECRET }}
+      BASE_URL: https://eduboxpro.pl
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -123,6 +128,18 @@ jobs:
             return total;
           }
 
+          // Nowe kody "Postaw kawę" / "Poleć i zyskaj PRO" z ostatnich 7 dni - liczone wprost
+          // z arkuszy Google przez osobny endpoint (patrz komentarz przy WEEKLY_REPORT_SECRET wyżej).
+          async function fetchSheetStats() {
+            const res = await fetch(`${process.env.BASE_URL}/api/weekly-report`, {
+              method: 'POST',
+              headers: { Authorization: `Bearer ${process.env.WEEKLY_REPORT_SECRET}` }
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+            return data;
+          }
+
           async function main() {
             let openaiTotal = null, openaiError = null;
             try { openaiTotal = await fetchOpenAIWeekCost(); } catch (e) { openaiError = e.message; }
@@ -173,10 +190,16 @@ jobs:
               } catch (e) { generationsError = e.message; }
             }
 
+            let sheetStats = null, sheetStatsError = null, sheetStatsConfigured = !!process.env.WEEKLY_REPORT_SECRET;
+            if (sheetStatsConfigured) {
+              try { sheetStats = await fetchSheetStats(); } catch (e) { sheetStatsError = e.message; }
+            }
+
             console.log('OpenAI 7 dni:', openaiTotal, openaiError);
             console.log('Fal.ai saldo:', falBalance, falError);
             console.log('GA4:', ga4Configured, ga4, ga4Error);
             console.log('Materiały:', generationsConfigured, generations, 'lifetime:', generationsLifetimeTotal, generationsError);
+            console.log('Kawa/Polecenia:', sheetStatsConfigured, sheetStats, sheetStatsError);
 
             const dateLabel = new Date().toLocaleDateString('pl-PL', { day: 'numeric', month: 'long', year: 'numeric' });
 
@@ -200,6 +223,18 @@ jobs:
               materialsHtml = `<li>Wygenerowane materiały w tym tygodniu: ${generations} (licznik łącznie od startu: ${generationsLifetimeTotal}; obejmuje narzędzia korzystające ze wspólnego mechanizmu limitów - nie wszystkie 56)</li>`;
             }
 
+            let coffeeReferralHtml;
+            if (!sheetStatsConfigured) {
+              coffeeReferralHtml = `<li>Kawa / Polecenia: N/D - brak WEEKLY_REPORT_SECRET w Secrets (patrz instrukcja wdrożenia)</li>`;
+            } else if (sheetStatsError) {
+              coffeeReferralHtml = `<li>Kawa / Polecenia: błąd pobierania (${sheetStatsError})</li>`;
+            } else {
+              coffeeReferralHtml = `
+                <li>Postaw kawę - nowych kodów w tym tygodniu: ${sheetStats.coffee.newCodesThisWeek} (łącznie ${sheetStats.coffee.totalAmountThisWeek} zł)</li>
+                <li>Poleć i zyskaj PRO - nowych kodów nagrody: ${sheetStats.referral.newCodesThisWeek}, wykorzystanych poleceń: ${sheetStats.referral.usedThisWeek}</li>
+              `;
+            }
+
             const html = `
               <h2>EduBox AI - raport tygodniowy (${dateLabel})</h2>
               <ul>
@@ -207,6 +242,7 @@ jobs:
                 <li>Saldo Fal.ai (aktualne, nie wydatek z tygodnia): ${falError ? 'błąd: ' + falError : '$' + falBalance.toFixed(2)}</li>
                 ${trafficHtml}
                 ${materialsHtml}
+                ${coffeeReferralHtml}
               </ul>
               <p><a href="https://platform.openai.com/settings/organization/usage">Panel OpenAI</a> &bull; <a href="https://fal.ai/dashboard/billing">Panel Fal.ai</a></p>
             `;
