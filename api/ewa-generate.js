@@ -106,7 +106,9 @@ async function handleVideoCreate(req, res) {
         input: script,
         provider: { type: 'microsoft', voice_id: voiceId || 'pl-PL-AgnieszkaNeural' }
       },
-      config: { fluent: true }
+      // stitch: true - "zszywa" animowaną twarz z powrotem na pełne zdjęcie zamiast
+      // zwracać sam ciasno przycięty kwadrat twarzy (mocno powiększony, zgłoszony problem).
+      config: { fluent: true, stitch: true }
     })
   });
 
