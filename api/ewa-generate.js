@@ -43,10 +43,79 @@ function computeImageSize({ width, height, size, aspect_ratio }) {
   return 'square_hd';
 }
 
+// ---------------------------------------------------------
+// WIDEO: D-ID (talking-head avatar) - osobna gałąź, nie dotyka logiki zdjęć powyżej.
+// Dwie akcje pod wspólnym endpointem (żeby nie przekroczyć limitu 12 funkcji na Vercel
+// Hobby - patrz historia z api/ewa-chat.js): 'video-create' tworzy zlecenie u D-ID,
+// 'video-status' odpytuje o jego stan. Klucz D-ID ma już wbudowaną parę user:pass -
+// wysyłamy go zakodowany w Base64 jako nagłówek Basic, zgodnie z ich API.
+// ---------------------------------------------------------
+async function handleVideoCreate(req, res) {
+  const { photoDataUrl, script, voiceId } = req.body;
+
+  if (!photoDataUrl) return res.status(400).json({ message: 'Brak zdjęcia referencyjnego.' });
+  if (!script || !script.trim()) return res.status(400).json({ message: 'Brak tekstu do nagrania.' });
+  if (!process.env.DID_API_KEY) return res.status(500).json({ message: 'Brak skonfigurowanego klucza DID_API_KEY na serwerze.' });
+
+  const authHeader = 'Basic ' + Buffer.from(process.env.DID_API_KEY).toString('base64');
+
+  const response = await fetch('https://api.d-id.com/talks', {
+    method: 'POST',
+    headers: { 'Authorization': authHeader, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      source_url: photoDataUrl,
+      script: {
+        type: 'text',
+        input: script,
+        provider: { type: 'microsoft', voice_id: voiceId || 'pl-PL-AgnieszkaNeural' }
+      },
+      config: { fluent: true }
+    })
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data.description || data.message || `D-ID odrzucił zlecenie (HTTP ${response.status}).`);
+  }
+  return res.status(200).json({ talkId: data.id, status: data.status });
+}
+
+async function handleVideoStatus(req, res) {
+  const { talkId } = req.body;
+  if (!talkId) return res.status(400).json({ message: 'Brak identyfikatora zlecenia (talkId).' });
+  if (!process.env.DID_API_KEY) return res.status(500).json({ message: 'Brak skonfigurowanego klucza DID_API_KEY na serwerze.' });
+
+  const authHeader = 'Basic ' + Buffer.from(process.env.DID_API_KEY).toString('base64');
+
+  const response = await fetch(`https://api.d-id.com/talks/${talkId}`, {
+    headers: { 'Authorization': authHeader }
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data.description || data.message || `Nie udało się sprawdzić statusu (HTTP ${response.status}).`);
+  }
+
+  return res.status(200).json({
+    status: data.status, // 'created' | 'started' | 'done' | 'error'
+    resultUrl: data.result_url || null,
+    error: data.status === 'error' ? (data.error?.description || 'Nieznany błąd renderowania.') : null
+  });
+}
+
 export default async function handler(req, res) {
   // Akceptujemy tylko zapytania POST
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Metoda niedozwolona' });
+  }
+
+  // Rozgałęzienie do wideo (D-ID) - zanim jeszcze wejdziemy w logikę obrazków fal.ai poniżej.
+  if (req.body?.type === 'video-create') {
+    try { return await handleVideoCreate(req, res); }
+    catch (error) { console.error('Błąd D-ID (create):', error); return res.status(500).json({ message: error.message }); }
+  }
+  if (req.body?.type === 'video-status') {
+    try { return await handleVideoStatus(req, res); }
+    catch (error) { console.error('Błąd D-ID (status):', error); return res.status(500).json({ message: error.message }); }
   }
 
   // Odczytujemy wszystkie parametry, w tym nowe (init_image dla zdjęć, size/width/height dla wymiarów)
