@@ -50,6 +50,40 @@ function computeImageSize({ width, height, size, aspect_ratio }) {
 // 'video-status' odpytuje o jego stan. Klucz D-ID ma już wbudowaną parę user:pass -
 // wysyłamy go zakodowany w Base64 jako nagłówek Basic, zgodnie z ich API.
 // ---------------------------------------------------------
+// Wyciąga jak najwięcej sensu z odpowiedzi błędu D-ID - ich API czasem zwraca sam
+// ogólnik "validation failed" w "description", a prawdziwy powód siedzi w "details".
+function extractDidError(data, response) {
+  if (data?.details) {
+    const details = Array.isArray(data.details) ? data.details : [data.details];
+    const parts = details.map(d => (d?.description || d?.message || JSON.stringify(d)));
+    return `${data.description || data.kind || 'Błąd walidacji'}: ${parts.join('; ')}`;
+  }
+  return data?.description || data?.message || `D-ID zwrócił błąd (HTTP ${response.status}).`;
+}
+
+// D-ID nie przyjmuje zdjęcia jako base64 wprost w "source_url" - trzeba je najpierw
+// wgrać przez ich własny endpoint /images, który zwraca prawdziwy, hostowany adres URL.
+async function uploadImageToDID(dataUrl, authHeader) {
+  const match = /^data:(image\/\w+);base64,(.+)$/.exec(dataUrl);
+  if (!match) throw new Error('Nieprawidłowy format zdjęcia (oczekiwano data URL).');
+  const [, mimeType, base64Data] = match;
+  const buffer = Buffer.from(base64Data, 'base64');
+  const ext = mimeType.split('/')[1] || 'jpg';
+
+  const form = new FormData();
+  form.append('image', new Blob([buffer], { type: mimeType }), `ania.${ext}`);
+
+  const response = await fetch('https://api.d-id.com/images', {
+    method: 'POST',
+    headers: { 'Authorization': authHeader },
+    body: form
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error('Wgrywanie zdjęcia do D-ID nie powiodło się: ' + extractDidError(data, response));
+  if (!data.url) throw new Error('D-ID nie zwrócił adresu wgranego zdjęcia.');
+  return data.url;
+}
+
 async function handleVideoCreate(req, res) {
   const { photoDataUrl, script, voiceId } = req.body;
 
@@ -59,11 +93,14 @@ async function handleVideoCreate(req, res) {
 
   const authHeader = 'Basic ' + Buffer.from(process.env.DID_API_KEY).toString('base64');
 
+  // Krok 1: wgrywamy zdjęcie do D-ID, żeby dostać prawdziwy URL zamiast base64.
+  const hostedImageUrl = await uploadImageToDID(photoDataUrl, authHeader);
+
   const response = await fetch('https://api.d-id.com/talks', {
     method: 'POST',
     headers: { 'Authorization': authHeader, 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      source_url: photoDataUrl,
+      source_url: hostedImageUrl,
       script: {
         type: 'text',
         input: script,
@@ -75,7 +112,7 @@ async function handleVideoCreate(req, res) {
 
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(data.description || data.message || `D-ID odrzucił zlecenie (HTTP ${response.status}).`);
+    throw new Error(extractDidError(data, response));
   }
   return res.status(200).json({ talkId: data.id, status: data.status });
 }
@@ -92,7 +129,7 @@ async function handleVideoStatus(req, res) {
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(data.description || data.message || `Nie udało się sprawdzić statusu (HTTP ${response.status}).`);
+    throw new Error(extractDidError(data, response));
   }
 
   return res.status(200).json({
