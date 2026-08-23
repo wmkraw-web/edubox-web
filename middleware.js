@@ -4,7 +4,7 @@
 // główna) działa bez żadnych zmian.
 
 export const config = {
-  matcher: ['/ewamarketing.html', '/aniawideo.html', '/api/ewa-generate'],
+  matcher: ['/ewamarketing.html', '/ewa-marketing.html', '/aniawideo.html', '/api/ewa-generate'],
 };
 
 export default function middleware(request) {
@@ -20,6 +20,14 @@ export default function middleware(request) {
         const pass = decoded.slice(separatorIndex + 1);
 
         if (user === process.env.EWA_AUTH_USER && pass === process.env.EWA_AUTH_PASS) {
+          // Stary adres z myślnikiem był zapisany w zakładkach i pamięci przeglądarki.
+          // Po poprawnym logowaniu przekierowujemy go do aktualnej wersji aplikacji.
+          const url = new URL(request.url);
+          if (url.pathname === '/ewa-marketing.html') {
+            url.pathname = '/ewamarketing.html';
+            return Response.redirect(url, 307);
+          }
+
           return; // Dane poprawne - przepuszczamy dalej, do zwykłej strony/API
         }
       } catch (e) {
