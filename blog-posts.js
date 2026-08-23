@@ -1,5 +1,16 @@
 // Plik z wpisami bloga EduBox AI. Aby dodać nowy wpis, dopisz kolejny obiekt do tablicy poniżej.
 window.BLOG_POSTS = [
+{
+    "slug": "zmiany-w-przepisach-nadzoru-nad-zachowaniem-uczniow-2026-2027",
+    "title": "Zmiany w przepisach dotyczących nadzoru nad zachowaniem uczniów w roku szkolnym 2026/2027",
+    "excerpt": "Rok szkolny 2026/2027 przynosi istotne zmiany w przepisach dotyczących nadzoru nad zachowaniem uczniów. Dowiedz się, co to oznacza dla Ciebie jako nauczyciela.",
+    "date": "2026-08-23",
+    "category": "Prawo oświatowe",
+    "readTime": "5 min",
+    "icon": "ph-shield-check",
+    "color": "text-rose-500",
+    "content": "<p>Rok szkolny 2026/2027 to czas, w którym w polskim systemie oświaty wprowadzane są istotne zmiany dotyczące nadzoru nad zachowaniem uczniów. Te nowelizacje mają na celu zwiększenie bezpieczeństwa w szkołach oraz poprawę atmosfery w klasie. Nauczyciele, jako kluczowe osoby wpływające na wychowanie młodego pokolenia, muszą być świadomi nowych regulacji, które mogą wpłynąć na ich codzienną pracę.</p><h2>Nowe zasady dotyczące monitorowania zachowania</h2><p>Wprowadzone zmiany w przepisach zakładają, że nauczyciele będą zobowiązani do bardziej szczegółowego monitorowania zachowania uczniów. Ważne będą nie tylko incydenty dyscyplinarne, ale także sytuacje, które mogą wskazywać na problemy emocjonalne uczniów. W praktyce oznacza to konieczność prowadzenia dokumentacji dotyczącej zachowań, które mogą wykraczać poza normę. Warto przygotować się na to, że nowa forma raportowania będzie istotna nie tylko dla samych nauczycieli, ale również dla rodziców i specjalistów.</p><h2>Wzmocnienie roli pedagoga szkolnego</h2><p>Zgodnie z nowymi przepisami, rola pedagoga szkolnego zostanie wzmocniona. To on będzie odpowiadał za koordynację działań podejmowanych w zakresie monitorowania zachowań uczniów oraz wspierania nauczycieli w rozwiązywaniu problemów. Współpraca między nauczycielami a pedagogami stanie się kluczowa w procesie wsparcia uczniów. Dzięki temu, w sytuacjach kryzysowych, pedagog szkolny będzie w stanie szybko reagować i podejmować właściwe kroki.</p><h2>Szkolenia i wsparcie dla nauczycieli</h2><p>W związku z wprowadzeniem nowych regulacji, przewidziane są także liczne szkolenia dla nauczycieli, które pomogą w adaptacji do zmieniającego się otoczenia prawnego. Umożliwi to nauczycielom zdobycie umiejętności niezbędnych do efektywnego monitorowania zachowań uczniów oraz współpracy z pedagogiem. Warto zainwestować w własny rozwój, aby być na bieżąco z wymaganiami i najnowszymi trendami w edukacji.</p><p>Zmiany te mają na celu nie tylko poprawę bezpieczeństwa w szkołach, ale także wsparcie studentów w ich rozwoju emocjonalnym i społecznym. Jako nauczyciele mamy okazję przyczynić się do kształtowania lepszej przyszłości dla naszych uczniów, dlatego warto podejmować nowe wyzwania i z otwartym umysłem podejść do nadchodzących reform.</p>"
+},
   {
     slug: "jak-napisac-skuteczny-plan-pracy-nauczyciela",
     title: "Jak napisać skuteczny plan pracy nauczyciela klasy na nowy rok szkolny",
