@@ -1,6 +1,17 @@
 // Plik z wpisami bloga EduBox AI. Aby dodać nowy wpis, dopisz kolejny obiekt do tablicy poniżej.
 window.BLOG_POSTS = [
 {
+    slug: 'jak-napisac-skuteczny-plan-pracy-nauczyciela-klasy',
+    title: "Jak napisać skuteczny plan pracy nauczyciela klasy na nowy rok szkolny",
+    excerpt: "Sprawdź, jak krok po kroku stworzyć plan pracy, który pomoże Ci w organizacji nowego roku szkolnego.",
+    date: '2026-08-23',
+    category: 'Poradnik',
+    readTime: '5 min',
+    icon: 'ph-briefcase',
+    color: 'text-blue-500',
+    content: `<p>Rok szkolny to czas wielu wyzwań, także organizacyjnych. Przygotowanie skutecznego planu pracy nauczyciela klasy jest kluczowe dla efektywnego prowadzenia zajęć. Dobrze przemyślany plan nie tylko ułatwi Ci pracę, ale także pomoże uczniom lepiej zrozumieć cele nauczania. W tym artykule przedstawimy krok po kroku, jak stworzyć taki plan.</p><h2>1. Określenie celów edukacyjnych</h2><p>Pierwszym krokiem w tworzeniu planu pracy jest zdefiniowanie celów, które chcesz osiągnąć w danym roku szkolnym. Cele mogą być różnorodne - od umiejętności praktycznych, przez wiedzę teoretyczną, po rozwój społeczny uczniów. Warto uwzględnić również kompetencje kluczowe, zgodne z podstawą programową. Pamiętaj, by cele były mierzalne i realistyczne, co ułatwi późniejsze monitorowanie postępów uczniów.</p><h2>2. Zaplanowanie treści lekcji</h2><p>Na podstawie określonych celów ustal, jakie tematy będziesz omawiać w poszczególnych miesiącach. Zróżnicowanie treści pomoże podtrzymać zainteresowanie uczniów. Dobrym pomysłem jest stworzenie harmonogramu zajęć, który zawiera nie tylko daty, ale również formy pracy (wykład, praca w grupach, projekty). Upewnij się, że uwzględniasz różne style uczenia się swoich uczniów.</p><h2>3. Dostosowanie metod i form pracy</h2><p>Każda klasa ma swoją specyfikę i potrzeby. Warto pomyśleć o tym, jakie metody nauczania przyniosą najlepsze rezultaty. Mieszanie różnych form pracy (indywidualna, grupowa, projektowa) zwiększa zaangażowanie uczniów. Dobrze też pomyśleć o wprowadzeniu narzędzi edukacyjnych, które ułatwią i umilą naukę, takich jak gry edukacyjne czy aplikacje mobilne.</p><h2>4. Ocenianie i ewaluacja</h2><p>Ważnym elementem planu pracy jest także sposób oceniania uczniów. Pamiętaj, by stosować różnorodne metody oceniania, np. oceny cząstkowe, projekty czy samoocenę uczniów. Regularna ewaluacja pomoże ci śledzić postępy uczniów i wprowadzać ewentualne zmiany w planie, jeśli zajdzie taka potrzeba. Bądź otwarty na feedback od uczniów – to także pomoże w dostosowywaniu planu do ich potrzeb.</p><p>Podsumowując, skuteczny plan pracy nauczyciela to klucz do udanego roku szkolnego. Regularna analiza i dostosowywanie działań do potrzeb uczniów sprawią, że nauka stanie się bardziej efektywna. Jeśli szukasz narzędzi, które pomogą Ci w tym procesie, sprawdź <a href="narzedzia-dla-nauczycieli.html" class="text-blue-600 dark:text-blue-400 font-bold hover:underline">Narzędzia AI EduBox</a>, które mogą znacznie ułatwić planowanie zajęć.</p>`
+},
+{
     "slug": "zmiany-w-przepisach-nadzoru-nad-zachowaniem-uczniow-2026-2027",
     "title": "Zmiany w przepisach dotyczących nadzoru nad zachowaniem uczniów w roku szkolnym 2026/2027",
     "excerpt": "Rok szkolny 2026/2027 przynosi istotne zmiany w przepisach dotyczących nadzoru nad zachowaniem uczniów. Dowiedz się, co to oznacza dla Ciebie jako nauczyciela.",
