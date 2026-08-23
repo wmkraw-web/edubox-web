@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Redaktor Bloga — EduBox</title>
+<style>
+  :root{
+    --bg:#f6f7f9; --panel:#ffffff; --border:#e3e6ea; --text:#1f2430; --muted:#6b7280;
+    --accent:#2563eb; --accent-hover:#1d4ed8; --danger:#dc2626; --danger-hover:#b91c1c;
+    --ok:#059669; --radius:12px;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:var(--bg); color:var(--text);
+  }
+  header{
+    background:var(--panel); border-bottom:1px solid var(--border);
+    padding:18px 28px; display:flex; align-items:center; justify-content:space-between;
+  }
+  header h1{font-size:18px; margin:0; font-weight:600}
+  header .status{font-size:13px; color:var(--muted)}
+  header .status.connected{color:var(--ok)}
+  .wrap{max-width:900px; margin:0 auto; padding:28px 20px 80px}
+  .panel{background:var(--panel); border:1px solid var(--border); border-radius:var(--radius); padding:24px}
+  .field{margin-bottom:16px}
+  .field label{display:block; font-size:13px; font-weight:600; margin-bottom:6px; color:var(--text)}
+  .field .hint{font-size:12px; color:var(--muted); margin-top:4px}
+  input[type=text], input[type=password], input[type=date], textarea, select{
+    width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:8px;
+    font-size:14px; font-family:inherit; background:#fff; color:var(--text);
+  }
+  input:focus, textarea:focus, select:focus{outline:2px solid var(--accent); outline-offset:1px}
+  button{
+    font-family:inherit; font-size:14px; font-weight:600; border-radius:8px; padding:10px 16px;
+    border:1px solid transparent; cursor:pointer; transition:background .15s;
+  }
+  .btn-primary{background:var(--accent); color:#fff}
+  .btn-primary:hover{background:var(--accent-hover)}
+  .btn-secondary{background:#fff; color:var(--text); border-color:var(--border)}
+  .btn-secondary:hover{background:#f3f4f6}
+  .btn-danger{background:#fff; color:var(--danger); border-color:#fca5a5}
+  .btn-danger:hover{background:#fef2f2}
+  .btn-small{padding:6px 10px; font-size:13px}
+  .row{display:flex; gap:10px; align-items:center}
+  .row.between{justify-content:space-between}
+  .toolbar{display:flex; gap:16px; margin-bottom:20px; align-items:center}
+  .post-card{
+    background:var(--panel); border:1px solid var(--border); border-radius:var(--radius);
+    padding:16px 18px; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; gap:12px;
+  }
+  .post-card .meta{font-size:13px; color:var(--muted); margin-top:4px}
+  .post-card .title{font-weight:600; font-size:15px}
+  .post-card .badge{
+    display:inline-block; background:#eef2ff; color:#4338ca; font-size:11px; font-weight:600;
+    padding:2px 8px; border-radius:999px; margin-right:6px;
+  }
+  .actions{display:flex; gap:8px; flex-shrink:0}
+  .empty{text-align:center; color:var(--muted); padding:60px 20px}
+  .modal-overlay{
+    position:fixed; inset:0; background:rgba(15,20,30,.45); display:none;
+    align-items:flex-start; justify-content:center; padding:40px 16px; overflow:auto; z-index:50;
+  }
+  .modal-overlay.open{display:flex}
+  .modal{
+    background:var(--panel); border-radius:var(--radius); width:100%; max-width:720px;
+    padding:28px; box-shadow:0 20px 60px rgba(0,0,0,.25);
+  }
+  .modal h2{margin-top:0; font-size:18px}
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:14px}
+  .rte-toolbar{
+    display:flex; gap:4px; border:1px solid var(--border); border-bottom:none;
+    border-radius:8px 8px 0 0; padding:6px; background:#fafafa; flex-wrap:wrap;
+  }
+  .rte-toolbar button{
+    padding:6px 10px; font-size:13px; background:#fff; border:1px solid var(--border); font-weight:500;
+  }
+  .rte-toolbar button:hover{background:#eef2ff}
+  .rte-content{
+    border:1px solid var(--border); border-radius:0 0 8px 8px; padding:12px 14px; min-height:220px;
+    max-height:400px; overflow:auto; font-size:14px; line-height:1.55;
+  }
+  .rte-content:focus{outline:none; box-shadow:inset 0 0 0 2px var(--accent)}
+  .rte-content p{margin:0 0 10px}
+  .rte-content h2{font-size:16px; margin:16px 0 8px}
+  .modal-footer{display:flex; justify-content:space-between; margin-top:22px}
+  .toast{
+    position:fixed; bottom:24px; left:50%; transform:translateX(-50%);
+    background:#1f2430; color:#fff; padding:12px 20px; border-radius:8px; font-size:14px;
+    box-shadow:0 8px 24px rgba(0,0,0,.25); display:none; z-index:100; max-width:520px;
+  }
+  .toast.show{display:block}
+  .toast.error{background:var(--danger)}
+  .toast.ok{background:var(--ok)}
+  .spinner{display:inline-block; width:14px; height:14px; border:2px solid #ffffff55; border-top-color:#fff; border-radius:50%; animation:spin .7s linear infinite; vertical-align:-2px}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .note{font-size:12px; color:var(--muted); line-height:1.5}
+  .lock-icon{font-size:13px}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>📝 Redaktor Bloga — EduBox</h1>
+  <div class="status" id="statusText">niepołączono</div>
+</header>
+
+<div class="wrap">
+
+  <!-- LOGIN PANEL -->
+  <div class="panel" id="loginPanel">
+    <div class="field">
+      <label>Token GitHub (Personal Access Token)</label>
+      <input type="password" id="tokenInput" placeholder="github_pat_..." autocomplete="off">
+      <div class="hint note">
+        Token nie jest nigdzie zapisywany — jest tylko w pamięci przeglądarki na czas tej sesji.
+        Po zamknięciu karty trzeba go wpisać ponownie. Może to być ten sam token, którego używasz w Make
+        (musi mieć uprawnienie <b>Contents: Read and write</b> dla repozytorium <b>wmkraw-web/edubox-web</b>).
+      </div>
+    </div>
+    <button class="btn-primary" id="connectBtn">Połącz i wczytaj wpisy</button>
+  </div>
+
+  <!-- MAIN APP -->
+  <div id="appPanel" style="display:none">
+    <div class="toolbar row between">
+      <button class="btn-primary" id="addBtn">+ Dodaj nowy wpis</button>
+      <div class="row">
+        <button class="btn-secondary btn-small" id="refreshBtn">↻ Odśwież</button>
+      </div>
+    </div>
+    <div id="postsList"></div>
+  </div>
+
+</div>
+
+<!-- EDIT MODAL -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <h2 id="modalTitle">Nowy wpis</h2>
+
+    <div class="field">
+      <label>Tytuł</label>
+      <input type="text" id="f_title" placeholder="Tytuł wpisu">
+    </div>
+
+    <div class="grid2">
+      <div class="field">
+        <label>Adres (slug)</label>
+        <input type="text" id="f_slug" placeholder="np. jak-pisac-oceny">
+      </div>
+      <div class="field">
+        <label>Data</label>
+        <input type="date" id="f_date">
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Krótki opis (excerpt)</label>
+      <textarea id="f_excerpt" rows="2" placeholder="1-2 zdania zachęty, do 160 znaków"></textarea>
+    </div>
+
+    <div class="grid2">
+      <div class="field">
+        <label>Kategoria</label>
+        <input type="text" id="f_category" list="categoryList" placeholder="np. Poradnik">
+        <datalist id="categoryList"></datalist>
+      </div>
+      <div class="field">
+        <label>Czas czytania</label>
+        <input type="text" id="f_readTime" placeholder="5 min">
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Ikona i kolor</label>
+      <select id="f_iconColor">
+        <option value="ph-compass|text-teal-500">Kompas (teal)</option>
+        <option value="ph-shield-check|text-rose-500">Tarcza (róż)</option>
+        <option value="ph-briefcase|text-blue-500">Teczka (niebieski)</option>
+        <option value="ph-lightbulb|text-amber-500">Żarówka (bursztyn)</option>
+        <option value="ph-sparkle|text-emerald-500">Iskra (zielony)</option>
+        <option value="ph-heart|text-pink-500">Serce (różowy)</option>
+        <option value="ph-books|text-purple-500">Książki (fiolet)</option>
+        <option value="ph-chalkboard-teacher|text-indigo-500">Tablica (indygo)</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label>Treść wpisu</label>
+      <div class="rte-toolbar">
+        <button type="button" data-cmd="bold"><b>B</b></button>
+        <button type="button" data-cmd="italic"><i>I</i></button>
+        <button type="button" data-cmd="formatBlock" data-val="H2">Śródtytuł</button>
+        <button type="button" data-cmd="formatBlock" data-val="P">Akapit</button>
+        <button type="button" data-cmd="createLink">Link</button>
+        <button type="button" data-cmd="unlink">Usuń link</button>
+      </div>
+      <div class="rte-content" id="f_content" contenteditable="true"></div>
+      <div class="hint note">Zaznacz tekst i kliknij np. „Śródtytuł”, żeby zmienić jego styl. „Link” zapyta o adres URL.</div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn-danger" id="deleteBtn" style="display:none">Usuń wpis</button>
+      <div class="row" style="margin-left:auto">
+        <button class="btn-secondary" id="cancelBtn">Anuluj</button>
+        <button class="btn-primary" id="saveBtn">Zapisz</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const OWNER = "wmkraw-web";
+const REPO = "edubox-web";
+const FILE_PATH = "blog-posts.js";
+const API_BASE = `https://api.github.com/repos/${OWNER}/${REPO}/contents/${FILE_PATH}`;
+
+let state = { token: "", sha: "", posts: [], editingIndex: null };
+
+const $ = (id) => document.getElementById(id);
+
+function toast(msg, type){
+  const t = $("toast");
+  t.textContent = msg;
+  t.className = "toast show" + (type ? " " + type : "");
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => t.classList.remove("show"), 4000);
+}
+
+function slugify(str){
+  const map = {ą:'a',ć:'c',ę:'e',ł:'l',ń:'n',ó:'o',ś:'s',ź:'z',ż:'z',
+               Ą:'a',Ć:'c',Ę:'e',Ł:'l',Ń:'n',Ó:'o',Ś:'s',Ź:'z',Ż:'z'};
+  return str.split('').map(ch => map[ch] || ch).join('')
+    .toLowerCase().trim()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+}
+
+function b64DecodeUnicode(b64){
+  const clean = b64.replace(/\n/g, '');
+  const binary = atob(clean);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return new TextDecoder('utf-8').decode(bytes);
+}
+
+function b64EncodeUnicode(str){
+  const bytes = new TextEncoder().encode(str);
+  let binary = '';
+  bytes.forEach(b => binary += String.fromCharCode(b));
+  return btoa(binary);
+}
+
+function parsePosts(fileText){
+  const fakeWindow = {};
+  const fn = new Function('window', fileText + '\nreturn window.BLOG_POSTS;');
+  const posts = fn(fakeWindow);
+  if (!Array.isArray(posts)) throw new Error('Nie udało się odczytać tablicy BLOG_POSTS z pliku.');
+  return posts;
+}
+
+function serializePosts(posts){
+  const header = "// Plik z wpisami bloga EduBox AI. Aby dodać nowy wpis, dopisz kolejny obiekt do tablicy poniżej.\n";
+  const body = posts.map(p => (
+    "  {\n" +
+    `    slug: ${JSON.stringify(p.slug)},\n` +
+    `    title: ${JSON.stringify(p.title)},\n` +
+    `    excerpt: ${JSON.stringify(p.excerpt)},\n` +
+    `    date: ${JSON.stringify(p.date)},\n` +
+    `    category: ${JSON.stringify(p.category)},\n` +
+    `    readTime: ${JSON.stringify(p.readTime)},\n` +
+    `    icon: ${JSON.stringify(p.icon)},\n` +
+    `    color: ${JSON.stringify(p.color)},\n` +
+    `    content: ${JSON.stringify(p.content)}\n` +
+    "  }"
+  )).join(",\n");
+  return header + "window.BLOG_POSTS = [\n" + body + "\n];\n";
+}
+
+async function ghGet(){
+  const res = await fetch(API_BASE + "?ref=main", {
+    headers: {
+      "Authorization": `Bearer ${state.token}`,
+      "Accept": "application/vnd.github+json"
+    }
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`GitHub GET błąd ${res.status}: ${body}`);
+  }
+  return res.json();
+}
+
+async function ghPut(newFileText, commitMessage){
+  const res = await fetch(API_BASE, {
+    method: "PUT",
+    headers: {
+      "Authorization": `Bearer ${state.token}`,
+      "Accept": "application/vnd.github+json",
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      message: commitMessage,
+      content: b64EncodeUnicode(newFileText),
+      sha: state.sha,
+      branch: "main"
+    })
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`GitHub PUT błąd ${res.status}: ${body}`);
+  }
+  return res.json();
+}
+
+async function loadPosts(){
+  $("statusText").textContent = "wczytywanie…";
+  const data = await ghGet();
+  state.sha = data.sha;
+  const fileText = b64DecodeUnicode(data.content);
+  state.posts = parsePosts(fileText);
+  renderList();
+  $("statusText").textContent = "połączono";
+  $("statusText").classList.add("connected");
+}
+
+function renderList(){
+  const list = $("postsList");
+  list.innerHTML = "";
+  if (!state.posts.length){
+    list.innerHTML = '<div class="empty">Brak wpisów. Kliknij „Dodaj nowy wpis”.</div>';
+    return;
+  }
+  state.posts.forEach((p, i) => {
+    const card = document.createElement("div");
+    card.className = "post-card";
+    card.innerHTML = `
+      <div>
+        <div class="title">${escapeHtml(p.title)}</div>
+        <div class="meta"><span class="badge">${escapeHtml(p.category || '')}</span>${escapeHtml(p.date || '')} · ${escapeHtml(p.readTime || '')}</div>
+      </div>
+      <div class="actions">
+        <button class="btn-secondary btn-small" data-edit="${i}">Edytuj</button>
+      </div>
+    `;
+    list.appendChild(card);
+  });
+  list.querySelectorAll("[data-edit]").forEach(btn => {
+    btn.addEventListener("click", () => openEditor(parseInt(btn.dataset.edit)));
+  });
+  refreshCategoryList();
+}
+
+function refreshCategoryList(){
+  const dl = $("categoryList");
+  const cats = [...new Set(state.posts.map(p => p.category).filter(Boolean))];
+  dl.innerHTML = cats.map(c => `<option value="${escapeHtml(c)}">`).join("");
+}
+
+function escapeHtml(str){
+  const d = document.createElement("div");
+  d.textContent = str == null ? "" : String(str);
+  return d.innerHTML;
+}
+
+function openEditor(index){
+  state.editingIndex = index;
+  const isNew = index === null;
+  $("modalTitle").textContent = isNew ? "Nowy wpis" : "Edytuj wpis";
+  $("deleteBtn").style.display = isNew ? "none" : "inline-block";
+
+  const p = isNew ? {
+    title: "", slug: "", excerpt: "", date: new Date().toISOString().slice(0,10),
+    category: "", readTime: "5 min", icon: "ph-lightbulb", color: "text-amber-500", content: ""
+  } : state.posts[index];
+
+  $("f_title").value = p.title || "";
+  $("f_slug").value = p.slug || "";
+  $("f_date").value = p.date || "";
+  $("f_excerpt").value = p.excerpt || "";
+  $("f_category").value = p.category || "";
+  $("f_readTime").value = p.readTime || "";
+  $("f_iconColor").value = `${p.icon}|${p.color}`;
+  $("f_content").innerHTML = p.content || "";
+
+  $("modalOverlay").classList.add("open");
+}
+
+function closeEditor(){
+  $("modalOverlay").classList.remove("open");
+  state.editingIndex = null;
+}
+
+$("f_title").addEventListener("input", () => {
+  if (state.editingIndex === null && !$("f_slug")._touched) {
+    $("f_slug").value = slugify($("f_title").value);
+  }
+});
+$("f_slug").addEventListener("input", () => { $("f_slug")._touched = true; });
+
+document.querySelectorAll(".rte-toolbar button").forEach(btn => {
+  btn.addEventListener("click", () => {
+    $("f_content").focus();
+    const cmd = btn.dataset.cmd;
+    if (cmd === "createLink") {
+      const url = prompt("Adres linku (https://...)");
+      if (url) document.execCommand(cmd, false, url);
+    } else if (cmd === "formatBlock") {
+      document.execCommand(cmd, false, btn.dataset.val);
+    } else {
+      document.execCommand(cmd, false, null);
+    }
+  });
+});
+
+async function saveCurrentPost(){
+  const [icon, color] = $("f_iconColor").value.split("|");
+  const post = {
+    title: $("f_title").value.trim(),
+    slug: $("f_slug").value.trim() || slugify($("f_title").value),
+    excerpt: $("f_excerpt").value.trim(),
+    date: $("f_date").value,
+    category: $("f_category").value.trim(),
+    readTime: $("f_readTime").value.trim(),
+    icon, color,
+    content: $("f_content").innerHTML.trim()
+  };
+  if (!post.title || !post.slug) { toast("Podaj przynajmniej tytuł.", "error"); return; }
+
+  const newPosts = [...state.posts];
+  if (state.editingIndex === null) {
+    newPosts.unshift(post);
+  } else {
+    newPosts[state.editingIndex] = post;
+  }
+
+  await persist(newPosts, state.editingIndex === null ? `Nowy wpis: ${post.title}` : `Edycja wpisu: ${post.title}`);
+}
+
+async function deleteCurrentPost(){
+  if (state.editingIndex === null) return;
+  const p = state.posts[state.editingIndex];
+  if (!confirm(`Na pewno usunąć wpis „${p.title}”? Tej operacji nie da się cofnąć z poziomu aplikacji.`)) return;
+  const newPosts = state.posts.filter((_, i) => i !== state.editingIndex);
+  await persist(newPosts, `Usunięcie wpisu: ${p.title}`);
+}
+
+async function persist(newPosts, commitMessage){
+  const saveBtn = $("saveBtn");
+  saveBtn.disabled = true;
+  saveBtn.innerHTML = '<span class="spinner"></span> Zapisywanie…';
+  try {
+    const fileText = serializePosts(newPosts);
+    const result = await ghPut(fileText, commitMessage);
+    state.sha = result.content.sha;
+    state.posts = newPosts;
+    renderList();
+    closeEditor();
+    toast("Zapisano na GitHubie ✓", "ok");
+  } catch (err) {
+    console.error(err);
+    toast("Błąd zapisu: " + err.message, "error");
+  } finally {
+    saveBtn.disabled = false;
+    saveBtn.textContent = "Zapisz";
+  }
+}
+
+$("connectBtn").addEventListener("click", async () => {
+  const token = $("tokenInput").value.trim();
+  if (!token) { toast("Wklej token GitHub.", "error"); return; }
+  state.token = token;
+  $("connectBtn").disabled = true;
+  $("connectBtn").innerHTML = '<span class="spinner"></span> Łączenie…';
+  try {
+    await loadPosts();
+    $("loginPanel").style.display = "none";
+    $("appPanel").style.display = "block";
+  } catch (err) {
+    console.error(err);
+    toast("Nie udało się połączyć: " + err.message, "error");
+    $("statusText").textContent = "niepołączono";
+  } finally {
+    $("connectBtn").disabled = false;
+    $("connectBtn").textContent = "Połącz i wczytaj wpisy";
+  }
+});
+
+$("refreshBtn").addEventListener("click", async () => {
+  try { await loadPosts(); toast("Odświeżono.", "ok"); }
+  catch (err) { toast("Błąd odświeżania: " + err.message, "error"); }
+});
+
+$("addBtn").addEventListener("click", () => openEditor(null));
+$("cancelBtn").addEventListener("click", closeEditor);
+$("saveBtn").addEventListener("click", saveCurrentPost);
+$("deleteBtn").addEventListener("click", deleteCurrentPost);
+$("modalOverlay").addEventListener("click", (e) => { if (e.target.id === "modalOverlay") closeEditor(); });
+</script>
+
+</body>
+</html>
