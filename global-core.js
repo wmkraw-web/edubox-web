@@ -13,6 +13,122 @@ const FIREBASE_CONFIG = {
 };
 
 const APP_ID = "eduboxpro";
+const TEXT_TRIAL_LIMIT = 3;
+const IMAGE_TRIAL_LIMIT = 1;
+const TEXT_TRIAL_KEY = 'eduboxTrialTextV1';
+const IMAGE_TRIAL_KEY = 'eduboxTrialImageV1';
+
+const readTrialCount = (key) => {
+    try {
+        const stored = localStorage.getItem(key);
+        if (!stored) return 0;
+        const parsed = JSON.parse(stored);
+        const count = Number(typeof parsed === 'number' ? parsed : parsed.count);
+        return Number.isFinite(count) && count > 0 ? Math.floor(count) : 0;
+    } catch (e) {
+        return 0;
+    }
+};
+
+const saveTrialCount = (key, count) => {
+    localStorage.setItem(key, JSON.stringify({ count }));
+};
+
+// Starsze aplikacje zapisują liczniki pod własnymi nazwami albo w formacie
+// { date, count }. Mostek poniżej kieruje je do tej samej, jednorazowej puli.
+// Dzięki temu nie trzeba ryzykownie przebudowywać działających generatorów.
+const LEGACY_TEXT_COUNTER_OFFSETS = new Map([
+    ['edubox_edudetox_ai', 0],
+    ['edubox_edukalendarz_ai', 0],
+    ['edubox_edunotariusz_ai', 0],
+    ['edubox_eduraport_ai', 0],
+    ['edubox_eduwakacje_ai', 0],
+    ['edubox_eduwpisy_ai', 2]
+]);
+const LEGACY_IMAGE_COUNTER_OFFSETS = new Map([
+    ['edubox_edubajka_ai', 1],
+    ['edubox_eduwystroj_ai', 2],
+    ['edubox_edumalarz_ai', 2]
+]);
+const LEGACY_DAILY_TEXT_PAGES = new Set([
+    'asystent-pedagoga.html', 'awans.html', 'eduawans.html', 'edubiurokrata.html',
+    'edubystrzak.html', 'edudialog.html', 'edudostosowania.html', 'edudyplomy.html',
+    'eduescape.html', 'edufiszki.html', 'edugazetka.html', 'edusprawozdania.html',
+    'test-edubiurokrata.html'
+]);
+const LEGACY_IMAGE_DATE_PAGES = new Set([
+    'asystent-pedagoga.html', 'edubajka.html', 'edugazetka.html'
+]);
+const LEGACY_IMAGE_CORE_LIMIT_2_PAGES = new Set([
+    'edudekorator.html', 'edugenerator.html', 'edumalarz.html',
+    'eduprezentacja.html', 'eduterapia.html'
+]);
+
+const installLegacyTrialBridge = () => {
+    try {
+        if (typeof Storage === 'undefined') return;
+        const storagePrototype = Storage.prototype;
+        if (storagePrototype.__eduboxTrialBridgeV1) return;
+
+        const nativeGetItem = storagePrototype.getItem;
+        const nativeSetItem = storagePrototype.setItem;
+        const currentDate = () => new Date().toISOString().split('T')[0];
+        const currentPage = () => (typeof location === 'undefined' ? '' : location.pathname.split('/').pop());
+
+        storagePrototype.getItem = function(key) {
+            if (key === 'eduboxUsage') {
+                return JSON.stringify({ date: currentDate(), count: Math.min(5, readTrialCount(TEXT_TRIAL_KEY) + 2) });
+            }
+            if (key === 'eduboxImageUsage') {
+                return JSON.stringify({ date: currentDate(), count: Math.min(2, readTrialCount(IMAGE_TRIAL_KEY) + 1) });
+            }
+            if (LEGACY_TEXT_COUNTER_OFFSETS.has(key)) {
+                return String(readTrialCount(TEXT_TRIAL_KEY) + LEGACY_TEXT_COUNTER_OFFSETS.get(key));
+            }
+            if (LEGACY_IMAGE_COUNTER_OFFSETS.has(key)) {
+                return String(readTrialCount(IMAGE_TRIAL_KEY) + LEGACY_IMAGE_COUNTER_OFFSETS.get(key));
+            }
+            return nativeGetItem.call(this, key);
+        };
+
+        storagePrototype.setItem = function(key, value) {
+            let trialKey = null;
+            let count = null;
+
+            if (key === 'eduboxUsage' || key === 'eduboxImageUsage') {
+                const parsed = JSON.parse(value || '{}');
+                count = Number(parsed.count);
+                trialKey = key === 'eduboxUsage' ? TEXT_TRIAL_KEY : IMAGE_TRIAL_KEY;
+                if (key === 'eduboxUsage' && (LEGACY_DAILY_TEXT_PAGES.has(currentPage()) || currentPage() === 'eduwpisy.html')) {
+                    count -= 2;
+                }
+                if (key === 'eduboxImageUsage' && LEGACY_IMAGE_DATE_PAGES.has(currentPage())) {
+                    count -= 1;
+                }
+            } else if (LEGACY_TEXT_COUNTER_OFFSETS.has(key) || LEGACY_IMAGE_COUNTER_OFFSETS.has(key)) {
+                count = Number(value);
+                if (LEGACY_TEXT_COUNTER_OFFSETS.has(key)) {
+                    count -= LEGACY_TEXT_COUNTER_OFFSETS.get(key);
+                    trialKey = TEXT_TRIAL_KEY;
+                } else {
+                    count -= LEGACY_IMAGE_COUNTER_OFFSETS.get(key);
+                    trialKey = IMAGE_TRIAL_KEY;
+                }
+            }
+
+            if (trialKey && Number.isFinite(count)) {
+                nativeSetItem.call(this, trialKey, JSON.stringify({ count: Math.max(0, Math.floor(count)) }));
+            }
+            return nativeSetItem.call(this, key, value);
+        };
+
+        Object.defineProperty(storagePrototype, '__eduboxTrialBridgeV1', { value: true });
+    } catch (error) {
+        console.warn('Nie udało się uruchomić mostka limitów EduBox.', error);
+    }
+};
+
+installLegacyTrialBridge();
 
 // Wyznacza klucz aktualnego tygodnia (np. "2026-W33") - do statystyk "najpopularniejsze w tym tygodniu"
 const getWeekKey = () => {
@@ -42,6 +158,8 @@ const checkAndExpireBonusPro = () => {
 
 // 2. GŁÓWNY OBIEKT EDUBOX CORE
 export const EduBoxCore = {
+    TEXT_TRIAL_LIMIT,
+    IMAGE_TRIAL_LIMIT,
     
     // Inicjalizacja (logowanie + pobranie menu)
     init: (onUserLoad) => {
@@ -83,18 +201,9 @@ export const EduBoxCore = {
         }
     },
 
-    // Sprawdzanie i aktualizacja liczników
-    getUsageCount: () => {
-        const today = new Date().toISOString().split('T')[0];
-        let usageStr = localStorage.getItem('eduboxUsage');
-        if (usageStr) {
-            try {
-                const parsed = JSON.parse(usageStr);
-                if (parsed.date === today) return parsed.count;
-            } catch(e) {}
-        }
-        return 0;
-    },
+    // Jednorazowa, wspólna pula próbna dla wszystkich aplikacji tekstowych EduBox.
+    // Klucz wersjonowany daje każdemu użytkownikowi uczciwy, świeży start po wdrożeniu nowego modelu.
+    getUsageCount: () => readTrialCount(TEXT_TRIAL_KEY),
 
     // Mechanizm blokady limitów (do użycia pod przyciskiem 'Drukuj' itp.)
     executeWithLimitCheck: (isPremium, onSuccess, onLimitReached, onToastUpdate) => {
@@ -107,52 +216,46 @@ export const EduBoxCore = {
         }
         
         let currentCount = EduBoxCore.getUsageCount();
-        if (currentCount >= 5) {
-            onLimitReached("⚠️ Dzienny limit użyć (5/5) wyczerpany. Wpisz kod odblokowujący na górze!");
+        if (currentCount >= TEXT_TRIAL_LIMIT) {
+            onLimitReached(`⚠️ Darmowa pula startowa (${TEXT_TRIAL_LIMIT}/${TEXT_TRIAL_LIMIT}) została wykorzystana. Odblokuj PRO, aby korzystać dalej.`);
             return;
         }
         
         const newCount = currentCount + 1;
-        const today = new Date().toISOString().split('T')[0];
-        localStorage.setItem('eduboxUsage', JSON.stringify({ date: today, count: newCount }));
+        saveTrialCount(TEXT_TRIAL_KEY, newCount);
         
-        onToastUpdate(`Wykorzystano ${newCount}/5 darmowych działań`);
+        onToastUpdate(`Darmowy start: wykorzystano ${newCount}/${TEXT_TRIAL_LIMIT} generowań tekstowych`);
         EduBoxCore.bumpGlobalCounter();
         onSuccess(newCount);
     },
 
-    // Osobny, niższy licznik TYLKO dla kosztownego generowania obrazków AI (Fal.ai)
+    // Osobna, jednorazowa pula próbna dla kosztownego generowania obrazków AI.
     getImageUsageCount: () => {
-        const today = new Date().toISOString().split('T')[0];
-        let usageStr = localStorage.getItem('eduboxImageUsage');
-        if (usageStr) {
-            try {
-                const parsed = JSON.parse(usageStr);
-                if (parsed.date === today) return parsed.count;
-            } catch(e) {}
-        }
-        return 0;
+        const actualCount = readTrialCount(IMAGE_TRIAL_KEY);
+        const page = typeof location === 'undefined' ? '' : location.pathname.split('/').pop();
+        return LEGACY_IMAGE_CORE_LIMIT_2_PAGES.has(page) && actualCount >= IMAGE_TRIAL_LIMIT
+            ? 2
+            : actualCount;
     },
 
     executeImageLimitCheck: (isPremium, onSuccess, onLimitReached, onToastUpdate) => {
         const status = localStorage.getItem('eduboxProStatus');
         if (status === 'PRO' || status === 'active' || isPremium) {
             EduBoxCore.bumpGlobalCounter();
-            onSuccess(EduBoxCore.getImageUsageCount());
+            onSuccess(readTrialCount(IMAGE_TRIAL_KEY));
             return;
         }
 
-        let currentCount = EduBoxCore.getImageUsageCount();
-        if (currentCount >= 2) {
-            onLimitReached("⚠️ Dzienny limit darmowych obrazków (2/2) wyczerpany. Wpisz kod odblokowujący, by generować dalej!");
+        let currentCount = readTrialCount(IMAGE_TRIAL_KEY);
+        if (currentCount >= IMAGE_TRIAL_LIMIT) {
+            onLimitReached(`⚠️ Darmowa grafika na start (${IMAGE_TRIAL_LIMIT}/${IMAGE_TRIAL_LIMIT}) została wykorzystana. Odblokuj PRO, aby tworzyć kolejne.`);
             return;
         }
 
         const newCount = currentCount + 1;
-        const today = new Date().toISOString().split('T')[0];
-        localStorage.setItem('eduboxImageUsage', JSON.stringify({ date: today, count: newCount }));
+        saveTrialCount(IMAGE_TRIAL_KEY, newCount);
 
-        onToastUpdate(`Wykorzystano ${newCount}/2 darmowych obrazków dzisiaj`);
+        onToastUpdate(`Darmowy start: wykorzystano ${newCount}/${IMAGE_TRIAL_LIMIT} grafiki AI`);
         EduBoxCore.bumpGlobalCounter();
         onSuccess(newCount);
     },
