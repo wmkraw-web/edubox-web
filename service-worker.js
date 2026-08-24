@@ -1,5 +1,6 @@
-const CACHE_NAME = 'edubox-cache-v1';
+const CACHE_NAME = 'edubox-cache-v2';
 const CORE_ASSETS = ['/index.html', '/apps.js', '/global-core.js', '/menu.html', '/manifest.json'];
+const NETWORK_FIRST_ASSETS = new Set(['/', '/index.html', '/apps.js', '/menu.html']);
 
 self.addEventListener('install', (event) => {
     event.waitUntil(
@@ -19,6 +20,7 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
     const url = event.request.url;
+    const pathname = new URL(url).pathname;
 
     // Wywołania do /api/ ZAWSZE świeże z sieci - nigdy z cache (dane, limity, generowanie AI)
     if (url.includes('/api/')) {
@@ -27,6 +29,21 @@ self.addEventListener('fetch', (event) => {
 
     // Tylko zapytania GET nadają się do cache'owania
     if (event.request.method !== 'GET') {
+        return;
+    }
+
+    // Strona główna, katalog i menu zmieniają się często. Najpierw pytamy sieć,
+    // a cache jest tylko planem awaryjnym na wypadek braku połączenia.
+    if (NETWORK_FIRST_ASSETS.has(pathname)) {
+        event.respondWith(
+            fetch(event.request).then((networkResponse) => {
+                if (networkResponse && networkResponse.status === 200) {
+                    const responseClone = networkResponse.clone();
+                    caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseClone));
+                }
+                return networkResponse;
+            }).catch(() => caches.match(event.request))
+        );
         return;
     }
 
