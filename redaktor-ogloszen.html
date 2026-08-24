@@ -62,6 +62,25 @@
       </div>
 
       <p class="text-xs text-slate-500">Zostaw pola "Tekst przycisku" i "Link" puste, jeśli ogłoszenie ma być bez przycisku.</p>
+
+      <div class="bg-blue-500/10 border border-blue-500/25 rounded-xl p-4">
+        <label class="flex items-start gap-3 cursor-pointer select-none">
+          <input id="f-add-to-zmiany" type="checkbox" class="w-5 h-5 mt-0.5 rounded accent-blue-600 shrink-0">
+          <span>
+            <span class="block text-sm font-bold text-white">Dodaj również do „Co nowego”</span>
+            <span class="block text-xs text-slate-400 mt-1">Ten sam tytuł i opis pojawią się jako nowa pozycja w publicznej historii zmian.</span>
+          </span>
+        </label>
+        <div id="f-zmiany-options" class="hidden mt-4 pt-4 border-t border-blue-500/20">
+          <label class="block text-xs font-bold text-slate-400 mb-1.5">Rodzaj wpisu</label>
+          <select id="f-zmiany-tag" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-sm outline-none focus:border-blue-500 transition-colors">
+            <option>Nowość</option>
+            <option>Ulepszenie</option>
+            <option>Poprawka</option>
+          </select>
+          <p class="text-xs text-slate-500 mt-2">Data ustawi się automatycznie. Ponowny zapis tego samego tytułu tego samego dnia zaktualizuje wpis zamiast tworzyć duplikat.</p>
+        </div>
+      </div>
     </div>
 
     <!-- PODGLĄD -->
@@ -243,6 +262,10 @@
     document.getElementById(id).addEventListener('input', updatePreview);
   });
 
+  document.getElementById('f-add-to-zmiany').addEventListener('change', (event) => {
+    document.getElementById('f-zmiany-options').classList.toggle('hidden', !event.target.checked);
+  });
+
   function renderStatus(data) {
     const box = document.getElementById('current-status');
     if (data && data.active) {
@@ -310,6 +333,8 @@
   async function saveOgloszenie() {
     const statusEl = document.getElementById('save-status');
     const btn = document.getElementById('save-btn');
+    const addToZmiany = document.getElementById('f-add-to-zmiany').checked;
+    let ogloszenieSaved = false;
     btn.disabled = true;
     btn.innerText = 'Zapisywanie...';
     statusEl.className = 'text-sm mt-4 text-slate-400';
@@ -325,12 +350,26 @@
         linkUrl: document.getElementById('f-linkurl').value
       };
       await pushToGithub(data);
+      ogloszenieSaved = true;
+
+      if (addToZmiany) {
+        await upsertOgloszenieInZmiany(data, document.getElementById('f-zmiany-tag').value);
+        document.getElementById('f-add-to-zmiany').checked = false;
+        document.getElementById('f-zmiany-options').classList.add('hidden');
+      }
+
       renderStatus(data);
       statusEl.className = 'text-sm mt-4 text-emerald-400';
-      statusEl.innerText = '✅ Zapisano! Zmiana pojawi się na stronie w ciągu kilku sekund - kilku minut.';
+      statusEl.innerText = addToZmiany
+        ? '✅ Ogłoszenie zapisane i dodane do „Co nowego”. Zmiany pojawią się w ciągu kilku sekund - kilku minut.'
+        : '✅ Zapisano! Zmiana pojawi się na stronie w ciągu kilku sekund - kilku minut.';
     } catch (err) {
-      statusEl.className = 'text-sm mt-4 text-red-400';
-      statusEl.innerText = '❌ ' + err.message;
+      statusEl.className = ogloszenieSaved
+        ? 'text-sm mt-4 text-amber-400'
+        : 'text-sm mt-4 text-red-400';
+      statusEl.innerText = ogloszenieSaved
+        ? '⚠️ Ogłoszenie zostało zapisane, ale nie udało się dodać wpisu do „Co nowego”: ' + err.message
+        : '❌ ' + err.message;
     } finally {
       btn.disabled = false;
       btn.innerText = '💾 Zapisz zmiany';
@@ -379,6 +418,25 @@
       .slice(0, 40);
   }
 
+  async function upsertOgloszenieInZmiany(data, tag) {
+    const date = new Date().toISOString().split('T')[0];
+    const title = (data.title || '').trim() || 'Nowość w EduBox AI';
+    const description = (data.message || '').trim() || 'W EduBox AI pojawiła się nowa informacja.';
+    const id = date + '-' + slugify(title);
+    const newEntry = { id, date, tag: tag || 'Nowość', title, description };
+    const updated = [newEntry, ...zmianyData.filter(z => z.id !== id)];
+
+    const newSha = await pushGithubFile(
+      ZMIANY_FILE_PATH,
+      buildZmianyContent(updated),
+      zmianySha,
+      'Ogłoszenie dodane do Co nowego: ' + title
+    );
+    zmianyData = updated;
+    zmianySha = newSha;
+    renderZmianyList();
+  }
+
   function renderZmianyList() {
     const wrap = document.getElementById('zmiany-list');
     if (!zmianyData.length) {
@@ -424,7 +482,7 @@
     statusEl.innerText = '';
 
     const newEntry = { id: date + '-' + slugify(title), date, tag, title, description };
-    const updated = [newEntry, ...zmianyData];
+    const updated = [newEntry, ...zmianyData.filter(z => z.id !== newEntry.id)];
 
     try {
       const newSha = await pushGithubFile(ZMIANY_FILE_PATH, buildZmianyContent(updated), zmianySha, 'Dodano wpis do Co nowego: ' + title);
