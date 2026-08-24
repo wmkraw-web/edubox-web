@@ -9,6 +9,9 @@ window.EduBoxData = {
     ],
 
     APPS: [
+        // --- GŁÓWNE CENTRUM DOWODZENIA ---
+        { title: 'EduLekcja 360', desc: 'Centrum dowodzenia lekcją. Tworzy plan, zadania, quiz, notatkę, kartę wyjścia i dostosowania, a potem łączy z aplikacjami EduBox.', url: 'edulekcja360.html', badge: 'NOWOŚĆ 360°', badgeColor: 'bg-gradient-to-r from-indigo-600 to-cyan-500', icon: 'ph-chalkboard-teacher', color: 'text-indigo-500', category: 'zajecia', tags: ['lekcja', 'scenariusz', 'quiz', 'zadania', 'prezentacja', 'spe', 'kompletny pakiet'], featured: true },
+
         // --- TERAPIA I SPE ---
         { title: 'EduKasia PRO', desc: 'Asystent przedszkolny. Porady SOS, mówik AAC, dziennik sukcesów i bajki!', url: 'edukasia.html', badge: 'DLA KASI ❤️', badgeColor: 'bg-rose-600', icon: 'ph-heart', color: 'text-rose-500', category: 'terapia', tags: ['przedszkole', 'bajki', 'aac'] },
         { title: 'Asystent Dostosowań', desc: 'Dobiera formy dostosowania wymagań pod zadaną diagnozę ucznia.', url: 'edudostosowania.html', icon: 'ph-shield-check', color: 'text-blue-500', category: 'terapia', tags: ['dostosowania', 'wymagania', 'diagnoza'] , verified2026: true },
@@ -46,7 +49,6 @@ window.EduBoxData = {
         { title: "EduNotariusz AI", desc: "Twoja urzędowa tarcza. Przekształca chaotyczne notatki z trudnych rozmów z rodzicami w profesjonalne, obiektywne dokumenty i protokoły.", url: "edunotariusz.html",icon: "ph-scales",color: "text-amber-500",category: "biurokracja",tags: ["prawo", "notatka służbowa", "protokół", "trudne sytuacje", "rodzice", "ochrona", "urzędowe"],badge: "NOWOŚĆ",badgeColor: "bg-red-500"},
 
         // --- ZAJĘCIA I GRY ---
-        { title: 'EduLekcja 360', desc: 'Centrum dowodzenia lekcją. Tworzy plan, zadania, quiz, notatkę, kartę wyjścia i dostosowania, a potem łączy z aplikacjami EduBox.', url: 'edulekcja360.html', badge: 'NOWOŚĆ 360°', badgeColor: 'bg-indigo-600', icon: 'ph-orbit', color: 'text-indigo-500', category: 'zajecia', tags: ['lekcja', 'scenariusz', 'quiz', 'zadania', 'prezentacja', 'spe', 'kompletny pakiet'] },
         { title: 'Scenariusz AI PRO', desc: 'Tworzy 45-minutowe konspekty ze skryptem dialogowym dla nauczyciela.', url: 'eduscenariusz.html', badge: 'HIT! PRO', badgeColor: 'bg-emerald-600', icon: 'ph-book-open', color: 'text-emerald-500', category: 'zajecia', tags: ['konspekt', 'scenariusz', 'lekcja'] },
         { title: 'Edukacja 2025 AI', desc: 'Debaty i symulacje pod nową Edukację Obywatelską i Zdrowotną.', url: 'edukacja2025.html', badge: 'NOWOŚĆ', badgeColor: 'bg-emerald-600', icon: 'ph-sparkle', color: 'text-emerald-500', category: 'zajecia', tags: ['obywatelska', 'zdrowotna', 'debaty'] , verified2026: true },
         { title: 'EduZadania AI', desc: 'Generuje matematyczne zadania tekstowe z ulubionymi postaciami dzieci.', url: 'eduzadania.html', badge: 'GRYWALIZACJA', badgeColor: 'bg-sky-500', icon: 'ph-calculator', color: 'text-sky-500', category: 'zajecia', tags: ['matematyka', 'zadania', 'grywalizacja'] },
