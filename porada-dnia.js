@@ -1,4 +1,4 @@
 window.PORADA_DNIA = {
-  "text": "Wprowadź codzienny krótki rytuał pozytywnej komunikacji z uczniami, aby budować zaufanie i atmosferę otwartości w klasie.",
-  "date": "2026-08-23"
+  "text": "Zarezerwuj 10 minut dziennie na refleksję nad swoją pracą i potrzebami uczniów; regularne przemyślenia pomogą poprawić jakość nauczania i zbudować lepszą relację z klasą.",
+  "date": "2026-08-24"
 };
