@@ -279,7 +279,7 @@
         const RECOMMENDATIONS = window.EduBoxData.RECOMMENDATIONS;
 
         // --- Utils ---
-        const Reveal = ({ children, delay = 0 }) => {
+        const Reveal = ({ children, delay = 0, className = '' }) => {
             const [isVisible, setIsVisible] = useState(false);
             const ref = useRef();
             useEffect(() => {
@@ -287,7 +287,7 @@
                 if (ref.current) observer.observe(ref.current);
                 return () => observer.disconnect();
             }, []);
-            return <div ref={ref} className={`transition-all duration-1000 ease-out ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-12'}`} style={{ transitionDelay: `${delay}ms` }}>{children}</div>;
+            return <div ref={ref} className={`${className} transition-all duration-1000 ease-out ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-12'}`} style={{ transitionDelay: `${delay}ms` }}>{children}</div>;
         };
 
         const Counter = ({ target, duration = 2000 }) => {
@@ -636,7 +636,9 @@
         // ==========================================
         const AppCard = ({ app, isFavorite, onToggleFavorite, onClick }) => (
             <div className="relative group h-full">
-                <a href={app.url} onClick={() => onClick && onClick(app)} target={app.url.startsWith('http') ? "_blank" : "_self"} className="block h-full bg-white dark:bg-slate-900/50 rounded-[2.5rem] p-8 flex flex-col relative overflow-hidden border border-slate-200 dark:border-slate-800 shadow-lg hover:shadow-2xl hover:-translate-y-2 transition-all duration-300">
+                <a href={app.url} onClick={() => onClick && onClick(app)} target={app.url.startsWith('http') ? "_blank" : "_self"} className={`block h-full rounded-[2.5rem] p-8 flex flex-col relative overflow-hidden border shadow-lg hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 ${app.featured ? 'bg-gradient-to-br from-indigo-50 via-white to-cyan-50 dark:from-indigo-950/80 dark:via-slate-900 dark:to-cyan-950/60 border-indigo-300 dark:border-indigo-500/60 ring-2 ring-indigo-500/10 shadow-indigo-500/15' : 'bg-white dark:bg-slate-900/50 border-slate-200 dark:border-slate-800'}`}>
+
+                    {app.featured && <div className="absolute -left-16 -bottom-20 w-56 h-56 rounded-full bg-indigo-500/10 blur-3xl pointer-events-none"></div>}
                     
                     {app.badge && <div className={`absolute top-0 right-0 ${app.badgeColor} text-white text-[10px] font-black px-4 py-2 rounded-bl-2xl uppercase tracking-widest z-10 shadow-md`}>{app.badge}</div>}
 
@@ -646,12 +648,12 @@
                         </div>
                     )}
                     
-                    <div className={`w-16 h-16 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 ${app.color} rounded-2xl flex items-center justify-center mb-8 group-hover:scale-110 transition-transform shadow-sm shrink-0`}>
-                        <i className={`ph-bold ${app.icon} text-3xl`}></i>
+                    <div className={`${app.featured ? 'w-20 h-20 bg-gradient-to-br from-indigo-600 to-cyan-500 border-indigo-300 text-white shadow-lg shadow-indigo-500/30' : `w-16 h-16 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 ${app.color}`} border rounded-2xl flex items-center justify-center mb-8 group-hover:scale-110 transition-transform shadow-sm shrink-0`}>
+                        <i className={`ph-bold ${app.icon} ${app.featured ? 'text-4xl' : 'text-3xl'}`}></i>
                     </div>
                     
-                    <h3 className="text-xl md:text-2xl font-bold text-slate-900 dark:text-white mb-3 tracking-tight pr-6 leading-tight">{app.title}</h3>
-                    <p className="text-slate-600 dark:text-slate-400 text-sm leading-relaxed mb-5 flex-grow">{app.desc}</p>
+                    <h3 className={`${app.featured ? 'text-2xl md:text-3xl' : 'text-xl md:text-2xl'} font-bold text-slate-900 dark:text-white mb-3 tracking-tight pr-6 leading-tight`}>{app.title}</h3>
+                    <p className={`text-slate-600 dark:text-slate-400 ${app.featured ? 'text-base max-w-2xl' : 'text-sm'} leading-relaxed mb-5 flex-grow`}>{app.desc}</p>
 
                     <div className="flex items-center gap-2 mb-5">
                         <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide px-2.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/30">
@@ -1089,7 +1091,7 @@ const closeAnnouncement = () => {
                         {filteredApps.length > 0 ? (
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 md:gap-8">
                                 {filteredApps.map((app, i) => (
-                                    <Reveal key={app.title} delay={(i % 4) * 50}>
+                                    <Reveal key={app.title} delay={(i % 4) * 50} className={app.featured ? 'sm:col-span-2 lg:col-span-2 xl:col-span-2' : ''}>
                                         <AppCard app={app} isFavorite={favorites.includes(app.url)} onToggleFavorite={(url) => toggleFavorite(url)} onClick={handleAppClick} />
                                     </Reveal>
                                 ))}
