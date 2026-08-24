@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="pl" translate="no" class="notranslate">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduLekcja 360 — kompletna lekcja z AI | EduBox AI</title>
+    <meta name="description" content="Zaplanuj kompletną lekcję: cele, przebieg, zadania, quiz, kartę wyjścia i dostosowania SPE. Polski generator AI dla nauczycieli.">
+    <link rel="canonical" href="https://eduboxpro.pl/edulekcja360.html">
+    <link rel="icon" href="/icon-96.png" type="image/png">
+
+    <meta property="og:type" content="website">
+    <meta property="og:locale" content="pl_PL">
+    <meta property="og:site_name" content="EduBox AI">
+    <meta property="og:title" content="EduLekcja 360 — kompletna lekcja z AI">
+    <meta property="og:description" content="Jeden temat, jeden formularz i gotowy pakiet lekcyjny z możliwością rozwinięcia w aplikacjach EduBox AI.">
+    <meta property="og:url" content="https://eduboxpro.pl/edulekcja360.html">
+    <meta property="og:image" content="https://eduboxpro.pl/icon-512.png">
+    <meta name="twitter:card" content="summary">
+
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Plus Jakarta Sans', 'sans-serif'] },
+                    colors: { slate: { 950: '#020617' } }
+                }
+            }
+        };
+    </script>
+
+    <style>
+        html { scroll-behavior: smooth; }
+        body {
+            min-height: 100vh;
+            background:
+                radial-gradient(circle at 10% 5%, rgba(79, 70, 229, 0.20), transparent 30%),
+                radial-gradient(circle at 90% 10%, rgba(14, 165, 233, 0.14), transparent 28%),
+                #020617;
+            color: #f8fafc;
+        }
+        .glass { background: rgba(15, 23, 42, 0.76); border: 1px solid rgba(148, 163, 184, 0.16); backdrop-filter: blur(18px); }
+        .soft-scroll::-webkit-scrollbar { width: 7px; }
+        .soft-scroll::-webkit-scrollbar-thumb { background: #475569; border-radius: 99px; }
+        .print-only { display: none; }
+        @media print {
+            body { background: white !important; color: #0f172a !important; }
+            .print-hidden { display: none !important; }
+            .print-only { display: block !important; }
+            #lesson-document { display: block !important; color: #0f172a !important; }
+            @page { margin: 1.5cm; }
+        }
+    </style>
+
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "EduLekcja 360",
+      "description": "Generator kompletnego pakietu lekcyjnego z AI dla nauczycieli.",
+      "url": "https://eduboxpro.pl/edulekcja360.html",
+      "applicationCategory": "EducationalApplication",
+      "operatingSystem": "Web",
+      "inLanguage": "pl-PL",
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "PLN" },
+      "publisher": { "@type": "Organization", "name": "EduBox AI", "url": "https://eduboxpro.pl/" }
+    }
+    </script>
+</head>
+<body class="soft-scroll">
+    <div id="wspolne-menu-kontener" class="print-hidden"></div>
+    <div id="root"></div>
+
+    <script type="module">
+        import { EduBoxCore } from './global-core.js';
+        window.EduBoxCore = EduBoxCore;
+        window.dispatchEvent(new Event('EduBoxCoreReady'));
+    </script>
+
+    <script type="text/babel">
+        const { useEffect, useMemo, useState } = React;
+
+        const SPECIALIST_TOOLS = [
+            { id: 'scenario', title: 'Scenariusz AI PRO', url: 'eduscenariusz.html', icon: 'ph-book-open', color: 'from-emerald-500 to-teal-600', help: 'Rozbuduj przebieg i dialog nauczyciela.' },
+            { id: 'test', title: 'EduSprawdzian Maker', url: 'edusprawdzian.html', icon: 'ph-exam', color: 'from-cyan-500 to-blue-600', help: 'Zamień materiał w test lub kartkówkę.' },
+            { id: 'slides', title: 'EduPrezentacja PRO', url: 'eduprezentacja.html', icon: 'ph-projector-screen-chart', color: 'from-blue-500 to-indigo-600', help: 'Przygotuj slajdy i eksport do PPTX.' },
+            { id: 'adjustments', title: 'Asystent Dostosowań', url: 'edudostosowania.html', icon: 'ph-shield-check', color: 'from-violet-500 to-purple-600', help: 'Doprecyzuj wsparcie dla konkretnej diagnozy.' },
+            { id: 'tasks', title: 'EduZadania AI', url: 'eduzadania.html', icon: 'ph-calculator', color: 'from-amber-500 to-orange-600', help: 'Stwórz dodatkowe zadania tekstowe.' }
+        ];
+
+        const COMPONENTS = [
+            { id: 'timeline', label: 'Przebieg minutowy', icon: 'ph-clock' },
+            { id: 'worksheet', label: 'Zadania dla uczniów', icon: 'ph-note-pencil' },
+            { id: 'quiz', label: 'Quiz sprawdzający', icon: 'ph-question' },
+            { id: 'slides', label: 'Plan prezentacji', icon: 'ph-projector-screen-chart' },
+            { id: 'differentiation', label: 'Dostosowania i SPE', icon: 'ph-shield-check' },
+            { id: 'exit', label: 'Karta wyjścia', icon: 'ph-ticket' }
+        ];
+
+        const EMPTY_FORM = {
+            topic: '',
+            subject: 'Edukacja wczesnoszkolna',
+            level: 'Klasy 1–3',
+            duration: '45 minut',
+            classProfile: '',
+            learningGoal: '',
+            needs: 'Brak szczególnych potrzeb',
+            components: COMPONENTS.map(item => item.id)
+        };
+
+        const listify = (value) => {
+            if (Array.isArray(value)) return value;
+            if (value === null || value === undefined || value === '') return [];
+            return [String(value)];
+        };
+
+        const textify = (value) => {
+            if (value === null || value === undefined) return '';
+            if (typeof value === 'string') return value;
+            return JSON.stringify(value, null, 2);
+        };
+
+        function Toast({ toast }) {
+            if (!toast.visible) return null;
+            const styles = toast.type === 'error'
+                ? 'bg-red-950/95 border-red-500/50 text-red-100'
+                : toast.type === 'success'
+                    ? 'bg-emerald-950/95 border-emerald-500/50 text-emerald-100'
+                    : 'bg-slate-900/95 border-indigo-500/50 text-slate-100';
+            return (
+                <div className={`fixed bottom-5 left-1/2 -translate-x-1/2 z-[120] max-w-md w-[calc(100%-2rem)] border rounded-2xl px-5 py-4 shadow-2xl ${styles}`}>
+                    <div className="flex items-start gap-3">
+                        <i className={`ph-bold ${toast.type === 'error' ? 'ph-warning-circle' : 'ph-check-circle'} text-xl mt-0.5`}></i>
+                        <p className="text-sm font-semibold leading-relaxed">{toast.message}</p>
+                    </div>
+                </div>
+            );
+        }
+
+        function SectionTitle({ icon, children }) {
+            return (
+                <h3 className="flex items-center gap-2 text-lg font-black text-white mb-4">
+                    <i className={`ph-bold ${icon} text-indigo-400`}></i>{children}
+                </h3>
+            );
+        }
+
+        function LessonDocument({ result }) {
+            if (!result) return null;
+            const differentiation = result.differentiation || {};
+            return (
+                <article id="lesson-document" className="space-y-8">
+                    <header className="border-b border-slate-700 pb-6">
+                        <p className="text-xs font-black uppercase tracking-[0.2em] text-indigo-400 mb-2">EduLekcja 360</p>
+                        <h1 className="text-3xl md:text-4xl font-black text-white mb-3">{result.title || 'Kompletna lekcja'}</h1>
+                        <p className="text-slate-300 leading-relaxed">{result.summary}</p>
+                    </header>
+
+                    <section className="grid md:grid-cols-2 gap-5">
+                        <div className="bg-slate-950/55 border border-slate-800 rounded-2xl p-5">
+                            <SectionTitle icon="ph-target">Cele lekcji</SectionTitle>
+                            <ul className="space-y-2 text-sm text-slate-300">
+                                {listify(result.goals).map((item, i) => <li key={i} className="flex gap-2"><span className="text-indigo-400">•</span><span>{textify(item)}</span></li>)}
+                            </ul>
+                        </div>
+                        <div className="bg-slate-950/55 border border-slate-800 rounded-2xl p-5">
+                            <SectionTitle icon="ph-check-circle">Po czym poznamy sukces?</SectionTitle>
+                            <ul className="space-y-2 text-sm text-slate-300">
+                                {listify(result.success_criteria).map((item, i) => <li key={i} className="flex gap-2"><span className="text-emerald-400">✓</span><span>{textify(item)}</span></li>)}
+                            </ul>
+                        </div>
+                    </section>
+
+                    {listify(result.timeline).length > 0 && (
+                        <section>
+                            <SectionTitle icon="ph-clock">Przebieg lekcji</SectionTitle>
+                            <div className="space-y-4">
+                                {listify(result.timeline).map((step, i) => (
+                                    <div key={i} className="grid md:grid-cols-[110px_1fr] gap-4 bg-slate-950/55 border border-slate-800 rounded-2xl p-5">
+                                        <div>
+                                            <div className="text-indigo-400 font-black">{step.minutes || `${i + 1}. etap`}</div>
+                                            <div className="text-xs uppercase tracking-wider text-slate-500 mt-1">{step.phase}</div>
+                                        </div>
+                                        <div className="space-y-3">
+                                            <div><strong className="text-white text-sm">Nauczyciel:</strong><p className="text-sm text-slate-300 mt-1 whitespace-pre-line">{textify(step.teacher)}</p></div>
+                                            <div><strong className="text-white text-sm">Uczniowie:</strong><p className="text-sm text-slate-300 mt-1 whitespace-pre-line">{textify(step.students)}</p></div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </section>
+                    )}
+
+                    <section className="grid md:grid-cols-2 gap-5">
+                        <div className="bg-slate-950/55 border border-slate-800 rounded-2xl p-5">
+                            <SectionTitle icon="ph-package">Materiały</SectionTitle>
+                            <ul className="space-y-2 text-sm text-slate-300">
+                                {listify(result.materials).map((item, i) => <li key={i}>• {textify(item)}</li>)}
+                            </ul>
+                        </div>
+                        <div className="bg-slate-950/55 border border-slate-800 rounded-2xl p-5">
+                            <SectionTitle icon="ph-chalkboard">Notatka na tablicę</SectionTitle>
+                            <p className="text-sm text-slate-300 whitespace-pre-line">{textify(result.board_note)}</p>
+                        </div>
+                    </section>
+
+                    {listify(result.worksheet).length > 0 && (
+                        <section>
+                            <SectionTitle icon="ph-note-pencil">Zadania dla uczniów</SectionTitle>
+                            <div className="grid md:grid-cols-2 gap-4">
+                                {listify(result.worksheet).map((task, i) => (
+                                    <div key={i} className="bg-slate-950/55 border border-slate-800 rounded-2xl p-5">
+                                        <p className="text-xs uppercase tracking-wider text-indigo-400 font-black mb-2">Zadanie {i + 1} {task.type ? `• ${task.type}` : ''}</p>
+                                        <p className="text-sm text-slate-200 whitespace-pre-line">{textify(task.instruction || task)}</p>
+                                        {task.answer && <details className="mt-3 text-sm text-slate-400"><summary className="cursor-pointer font-bold">Pokaż odpowiedź</summary><p className="mt-2 whitespace-pre-line">{textify(task.answer)}</p></details>}
+                                    </div>
+                                ))}
+                            </div>
+                        </section>
+                    )}
+
+                    {listify(result.slides_outline).length > 0 && (
+                        <section>
+                            <SectionTitle icon="ph-projector-screen-chart">Plan prezentacji</SectionTitle>
+                            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {listify(result.slides_outline).map((slide, i) => (
+                                    <div key={i} className="bg-slate-950/55 border border-slate-800 rounded-2xl p-5">
+                                        <p className="text-xs text-indigo-400 font-black uppercase mb-2">Slajd {i + 1}</p>
+                                        <h4 className="font-bold text-white mb-2">{slide.title || `Slajd ${i + 1}`}</h4>
+                                        <p className="text-sm text-slate-300">{textify(slide.content || slide)}</p>
+                                    </div>
+                                ))}
+                            </div>
+                        </section>
+                    )}
+
+                    {listify(result.quiz).length > 0 && (
+                        <section>
+                            <SectionTitle icon="ph-question">Quiz sprawdzający</SectionTitle>
+                            <div className="space-y-4">
+                                {listify(result.quiz).map((q, i) => (
+                                    <div key={i} className="bg-slate-950/55 border border-slate-800 rounded-2xl p-5">
+                                        <p className="font-bold text-white mb-3">{i + 1}. {q.question || textify(q)}</p>
+                                        {listify(q.options).length > 0 && <ol className="grid sm:grid-cols-2 gap-2 text-sm text-slate-300">{listify(q.options).map((option, j) => <li key={j}>{String.fromCharCode(65 + j)}. {textify(option)}</li>)}</ol>}
+                                        {q.correct && <details className="mt-3 text-sm text-emerald-300"><summary className="cursor-pointer font-bold">Odpowiedź</summary><p className="mt-2">{textify(q.correct)} {q.explanation ? `— ${textify(q.explanation)}` : ''}</p></details>}
+                                    </div>
+                                ))}
+                            </div>
+                        </section>
+                    )}
+
+                    <section className="grid md:grid-cols-2 gap-5">
+                        <div className="bg-slate-950/55 border border-slate-800 rounded-2xl p-5">
+                            <SectionTitle icon="ph-ticket">Karta wyjścia</SectionTitle>
+                            <ul className="space-y-2 text-sm text-slate-300">{listify(result.exit_ticket).map((item, i) => <li key={i}>{i + 1}. {textify(item)}</li>)}</ul>
+                        </div>
+                        <div className="bg-slate-950/55 border border-slate-800 rounded-2xl p-5">
+                            <SectionTitle icon="ph-house">Praca domowa</SectionTitle>
+                            <p className="text-sm text-slate-300 whitespace-pre-line">{textify(result.homework) || 'Bez pracy domowej.'}</p>
+                        </div>
+                    </section>
+
+                    <section className="bg-violet-950/30 border border-violet-500/25 rounded-2xl p-6">
+                        <SectionTitle icon="ph-shield-check">Dostosowania i zróżnicowanie poziomu</SectionTitle>
+                        <div className="grid md:grid-cols-3 gap-5 text-sm">
+                            <div><strong className="text-violet-300">Wsparcie:</strong><ul className="mt-2 space-y-2 text-slate-300">{listify(differentiation.support).map((item, i) => <li key={i}>• {textify(item)}</li>)}</ul></div>
+                            <div><strong className="text-violet-300">Dla uczniów szybszych:</strong><ul className="mt-2 space-y-2 text-slate-300">{listify(differentiation.extension).map((item, i) => <li key={i}>• {textify(item)}</li>)}</ul></div>
+                            <div><strong className="text-violet-300">SPE:</strong><ul className="mt-2 space-y-2 text-slate-300">{listify(differentiation.spe).map((item, i) => <li key={i}>• {textify(item)}</li>)}</ul></div>
+                        </div>
+                    </section>
+                </article>
+            );
+        }
+
+        function App() {
+            const [form, setForm] = useState(() => {
+                try { return { ...EMPTY_FORM, ...JSON.parse(localStorage.getItem('edulekcja360_form') || '{}') }; }
+                catch { return EMPTY_FORM; }
+            });
+            const [result, setResult] = useState(() => {
+                try { return JSON.parse(localStorage.getItem('edulekcja360_result') || 'null'); }
+                catch { return null; }
+            });
+            const [isGenerating, setIsGenerating] = useState(false);
+            const [isPremium, setIsPremium] = useState(false);
+            const [usages, setUsages] = useState(0);
+            const [toast, setToast] = useState({ visible: false, message: '', type: 'info' });
+
+            useEffect(() => {
+                const interval = setInterval(() => {
+                    if (!window.EduBoxCore) return;
+                    clearInterval(interval);
+                    window.EduBoxCore.init(() => {
+                        setUsages(window.EduBoxCore.getUsageCount());
+                        const status = localStorage.getItem('eduboxProStatus');
+                        setIsPremium(status === 'PRO' || status === 'active');
+                    });
+                }, 100);
+                return () => clearInterval(interval);
+            }, []);
+
+            useEffect(() => { localStorage.setItem('edulekcja360_form', JSON.stringify(form)); }, [form]);
+            useEffect(() => {
+                if (result) localStorage.setItem('edulekcja360_result', JSON.stringify(result));
+            }, [result]);
+
+            const showToast = (message, type = 'info') => {
+                setToast({ visible: true, message, type });
+                setTimeout(() => setToast(prev => ({ ...prev, visible: false })), 4200);
+            };
+
+            const update = (key, value) => setForm(prev => ({ ...prev, [key]: value }));
+            const toggleComponent = (id) => setForm(prev => ({
+                ...prev,
+                components: prev.components.includes(id)
+                    ? prev.components.filter(item => item !== id)
+                    : [...prev.components, id]
+            }));
+
+            const requestedLabels = useMemo(() => COMPONENTS.filter(item => form.components.includes(item.id)).map(item => item.label), [form.components]);
+
+            const fetchLesson = async () => {
+                const systemPrompt = `Jesteś doświadczonym polskim metodykiem nauczania. Tworzysz realne, wykonalne lekcje, a nie ogólniki. Odpowiadasz WYŁĄCZNIE poprawnym JSON-em, bez markdownu.
+
+Zasady:
+- pilnuj podanego czasu i podziel go realistycznie między etapy,
+- język oraz trudność dopasuj do etapu edukacyjnego,
+- nie wymyślaj przepisów ani podstaw prawnych,
+- nie umieszczaj danych osobowych uczniów,
+- przygotuj zadania z odpowiedziami i quiz z jednoznacznym kluczem,
+- dostosowania mają być praktyczne i możliwe do zastosowania w klasie.
+
+Zwróć dokładnie strukturę:
+{
+  "title": "...",
+  "summary": "2-3 zdania",
+  "goals": ["..."],
+  "success_criteria": ["Uczeń potrafi..."],
+  "materials": ["..."],
+  "timeline": [{"minutes":"0-5 min","phase":"...","teacher":"...","students":"..."}],
+  "board_note": "krótka gotowa notatka",
+  "worksheet": [{"type":"...","instruction":"...","answer":"..."}],
+  "slides_outline": [{"title":"...","content":"..."}],
+  "quiz": [{"question":"...","options":["..."],"correct":"...","explanation":"..."}],
+  "exit_ticket": ["..."],
+  "homework": "...",
+  "differentiation": {"support":["..."],"extension":["..."],"spe":["..."]}
+}`;
+
+                const userPrompt = `Przygotuj kompletny pakiet lekcyjny.
+Temat: ${form.topic}
+Przedmiot/obszar: ${form.subject}
+Etap: ${form.level}
+Czas: ${form.duration}
+Profil klasy: ${form.classProfile || 'typowa zróżnicowana klasa'}
+Cel nauczyciela: ${form.learningGoal || 'dobierz właściwy cel'}
+Potrzeby i SPE: ${form.needs}
+Wymagane elementy: ${requestedLabels.join(', ') || 'podstawowy przebieg lekcji'}.
+Jeżeli dany element nie został wybrany, zwróć dla jego pola pustą tablicę lub pusty tekst.`;
+
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt: userPrompt, system: systemPrompt, format: 'json', temperature: 0.35, model: 'gpt-4o-mini' })
+                });
+                if (!response.ok) throw new Error(`Serwer zwrócił błąd ${response.status}.`);
+                const data = await response.json();
+                const raw = data.text || data.message || data.response || data.choices?.[0]?.message?.content;
+                if (!raw) throw new Error('Serwer nie zwrócił treści lekcji.');
+                let json = raw.replace(/```json/gi, '').replace(/```/g, '').trim();
+                const start = json.indexOf('{');
+                const end = json.lastIndexOf('}');
+                if (start !== -1 && end !== -1) json = json.slice(start, end + 1);
+                return JSON.parse(json);
+            };
+
+            const generate = () => {
+                if (!form.topic.trim()) return showToast('Najpierw wpisz temat lekcji.', 'error');
+                if (form.components.length === 0) return showToast('Wybierz przynajmniej jeden element pakietu.', 'error');
+                if (!window.EduBoxCore) return showToast('Silnik EduBox jeszcze się ładuje. Spróbuj za chwilę.', 'error');
+
+                window.EduBoxCore.executeWithLimitCheck(
+                    isPremium,
+                    async (newCount) => {
+                        setUsages(newCount);
+                        setIsGenerating(true);
+                        try {
+                            const lesson = await fetchLesson();
+                            setResult(lesson);
+                            showToast('Kompletna lekcja jest gotowa!', 'success');
+                            setTimeout(() => document.getElementById('wynik')?.scrollIntoView({ behavior: 'smooth' }), 150);
+                        } catch (error) {
+                            console.error(error);
+                            showToast(`Nie udało się wygenerować lekcji: ${error.message}`, 'error');
+                        } finally {
+                            setIsGenerating(false);
+                        }
+                    },
+                    (message) => showToast(message, 'error'),
+                    (message) => showToast(message, 'info')
+                );
+            };
+
+            const buildPlainText = () => {
+                if (!result) return '';
+                return `${result.title || 'EduLekcja 360'}\n\n${result.summary || ''}\n\nCELE:\n${listify(result.goals).map(x => `- ${textify(x)}`).join('\n')}\n\nPRZEBIEG:\n${listify(result.timeline).map(step => `${step.minutes || ''} ${step.phase || ''}\nNauczyciel: ${textify(step.teacher)}\nUczniowie: ${textify(step.students)}`).join('\n\n')}\n\nNOTATKA NA TABLICĘ:\n${textify(result.board_note)}\n\nZADANIA:\n${listify(result.worksheet).map((x, i) => `${i + 1}. ${textify(x.instruction || x)}\nOdpowiedź: ${textify(x.answer)}`).join('\n')}\n\nDOSTOSOWANIA:\n${textify(result.differentiation)}`;
+            };
+
+            const copyAll = async () => {
+                try {
+                    await navigator.clipboard.writeText(buildPlainText());
+                    showToast('Skopiowano cały pakiet lekcyjny.', 'success');
+                } catch {
+                    showToast('Przeglądarka nie pozwoliła skopiować tekstu.', 'error');
+                }
+            };
+
+            const exportWord = () => {
+                if (!result) return;
+                const content = document.getElementById('lesson-document').innerHTML;
+                const styles = `<style>body{font-family:Arial,sans-serif;line-height:1.5;color:#172033}h1{color:#4338ca}h3{color:#4338ca;border-bottom:1px solid #cbd5e1;padding-bottom:6px}section,div{margin-bottom:14px}ul{padding-left:20px}</style>`;
+                const blob = new Blob(['\ufeff', `<html><head><meta charset="utf-8">${styles}</head><body>${content}</body></html>`], { type: 'application/msword' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = `EduLekcja360_${(result.title || 'lekcja').replace(/[^a-zA-Z0-9ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]+/g, '_')}.doc`;
+                link.click();
+                URL.revokeObjectURL(link.href);
+            };
+
+            const openSpecialistTool = (tool) => {
+                if (!result) return;
+                const handoff = {
+                    source: 'EduLekcja 360',
+                    topic: form.topic,
+                    subject: form.subject,
+                    level: form.level,
+                    duration: form.duration,
+                    needs: form.needs,
+                    lesson: result
+                };
+                const context = `Kontekst z EduLekcja 360:\n${buildPlainText()}`;
+                localStorage.setItem('edulekcja360_handoff', JSON.stringify(handoff));
+                navigator.clipboard.writeText(context).catch(() => {});
+                window.open(tool.url, '_blank', 'noopener');
+                showToast(`Otwieram ${tool.title}. Kontekst został skopiowany — wklej go w formularzu.`, 'success');
+            };
+
+            const clearProject = () => {
+                setForm(EMPTY_FORM);
+                setResult(null);
+                localStorage.removeItem('edulekcja360_form');
+                localStorage.removeItem('edulekcja360_result');
+                showToast('Rozpoczęto nową lekcję.', 'info');
+            };
+
+            return (
+                <div className="min-h-screen">
+                    <a href="index.html" className="print-hidden fixed bottom-4 left-4 z-[80] w-12 h-12 rounded-full bg-slate-900/90 border border-slate-700 text-white flex items-center justify-center shadow-xl hover:bg-indigo-600 transition-colors" title="Wróć do EduBox AI">
+                        <i className="ph-bold ph-house text-xl"></i>
+                    </a>
+
+                    <header className="print-hidden pt-24 pb-10 px-5">
+                        <div className="max-w-7xl mx-auto">
+                            <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
+                                <div>
+                                    <div className="inline-flex items-center gap-2 bg-indigo-500/10 border border-indigo-400/30 text-indigo-300 px-4 py-2 rounded-full text-xs font-black uppercase tracking-widest mb-5">
+                                        <i className="ph-bold ph-orbit"></i> Centrum dowodzenia lekcją
+                                    </div>
+                                    <h1 className="text-4xl md:text-6xl font-black tracking-tight text-white mb-4">EduLekcja <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-cyan-400">360</span></h1>
+                                    <p className="max-w-2xl text-slate-300 text-lg leading-relaxed">Jeden temat zamieniamy w kompletną lekcję. Potem możesz rozwinąć wybrane elementy w obecnych aplikacjach EduBox.</p>
+                                </div>
+                                <div className="flex flex-wrap items-center gap-3 text-xs font-bold">
+                                    <span className="bg-slate-900 border border-slate-700 px-4 py-2 rounded-full text-slate-300">{isPremium ? 'PRO • bez limitu' : `Dzisiaj: ${usages}/5 użyć`}</span>
+                                    <button onClick={clearProject} className="bg-slate-900 hover:bg-slate-800 border border-slate-700 px-4 py-2 rounded-full text-slate-300 transition-colors"><i className="ph-bold ph-plus mr-1"></i> Nowa lekcja</button>
+                                </div>
+                            </div>
+                        </div>
+                    </header>
+
+                    <main className="max-w-7xl mx-auto px-5 pb-24">
+                        <section className="print-hidden grid lg:grid-cols-[420px_1fr] gap-7 items-start">
+                            <div className="glass rounded-3xl p-6 md:p-7 lg:sticky lg:top-6">
+                                <div className="flex items-center gap-3 mb-7">
+                                    <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-indigo-500 to-cyan-500 flex items-center justify-center"><i className="ph-bold ph-sliders-horizontal text-2xl"></i></div>
+                                    <div><h2 className="font-black text-xl">Ustawienia lekcji</h2><p className="text-xs text-slate-400">Minimum danych, maksimum konkretów</p></div>
+                                </div>
+
+                                <label className="block text-xs font-black uppercase tracking-wider text-slate-400 mb-2">Temat lekcji *</label>
+                                <textarea value={form.topic} onChange={e => update('topic', e.target.value)} placeholder="np. Obieg wody w przyrodzie" className="w-full h-24 bg-slate-950/70 border border-slate-700 rounded-2xl px-4 py-3 text-white outline-none focus:border-indigo-400 resize-none mb-5"></textarea>
+
+                                <div className="grid sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-4 mb-5">
+                                    <div>
+                                        <label className="block text-xs font-black uppercase tracking-wider text-slate-400 mb-2">Przedmiot</label>
+                                        <select value={form.subject} onChange={e => update('subject', e.target.value)} className="w-full bg-slate-950/70 border border-slate-700 rounded-xl px-3 py-3 text-sm text-white outline-none focus:border-indigo-400">
+                                            {['Edukacja przedszkolna','Edukacja wczesnoszkolna','Język polski','Matematyka','Przyroda','Biologia','Geografia','Historia','WOS','Język angielski','Fizyka','Chemia','Informatyka','Godzina wychowawcza','Inny przedmiot'].map(item => <option key={item}>{item}</option>)}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-black uppercase tracking-wider text-slate-400 mb-2">Etap</label>
+                                        <select value={form.level} onChange={e => update('level', e.target.value)} className="w-full bg-slate-950/70 border border-slate-700 rounded-xl px-3 py-3 text-sm text-white outline-none focus:border-indigo-400">
+                                            {['Przedszkole','Klasy 1–3','Klasy 4–6','Klasy 7–8','Szkoła ponadpodstawowa','Zajęcia rewalidacyjne'].map(item => <option key={item}>{item}</option>)}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-black uppercase tracking-wider text-slate-400 mb-2">Czas</label>
+                                        <select value={form.duration} onChange={e => update('duration', e.target.value)} className="w-full bg-slate-950/70 border border-slate-700 rounded-xl px-3 py-3 text-sm text-white outline-none focus:border-indigo-400">
+                                            {['30 minut','45 minut','60 minut','90 minut','2 × 45 minut'].map(item => <option key={item}>{item}</option>)}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-black uppercase tracking-wider text-slate-400 mb-2">Potrzeby</label>
+                                        <select value={form.needs} onChange={e => update('needs', e.target.value)} className="w-full bg-slate-950/70 border border-slate-700 rounded-xl px-3 py-3 text-sm text-white outline-none focus:border-indigo-400">
+                                            {['Brak szczególnych potrzeb','ADHD','Dysleksja / dysgrafia','Spektrum autyzmu','Trudności poznawcze','Klasa zróżnicowana / wiele potrzeb'].map(item => <option key={item}>{item}</option>)}
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <label className="block text-xs font-black uppercase tracking-wider text-slate-400 mb-2">Profil klasy — opcjonalnie</label>
+                                <input value={form.classProfile} onChange={e => update('classProfile', e.target.value)} placeholder="np. 24 uczniów, klasa żywa, lubi pracę w grupach" className="w-full bg-slate-950/70 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-indigo-400 mb-5" />
+
+                                <label className="block text-xs font-black uppercase tracking-wider text-slate-400 mb-2">Mój dodatkowy cel — opcjonalnie</label>
+                                <input value={form.learningGoal} onChange={e => update('learningGoal', e.target.value)} placeholder="np. ćwiczenie argumentowania" className="w-full bg-slate-950/70 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-indigo-400 mb-6" />
+
+                                <p className="text-xs font-black uppercase tracking-wider text-slate-400 mb-3">Co ma znaleźć się w pakiecie?</p>
+                                <div className="grid sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-2 mb-6">
+                                    {COMPONENTS.map(item => {
+                                        const selected = form.components.includes(item.id);
+                                        return <button key={item.id} onClick={() => toggleComponent(item.id)} className={`flex items-center gap-2 rounded-xl border px-3 py-3 text-left text-xs font-bold transition-all ${selected ? 'bg-indigo-500/15 border-indigo-400 text-indigo-200' : 'bg-slate-950/40 border-slate-800 text-slate-400 hover:border-slate-600'}`}><i className={`ph-bold ${selected ? 'ph-check-square' : 'ph-square'} text-lg`}></i><span>{item.label}</span></button>;
+                                    })}
+                                </div>
+
+                                <div className="bg-amber-500/10 border border-amber-500/25 rounded-2xl p-4 mb-6 flex gap-3">
+                                    <i className="ph-bold ph-lock-key text-amber-400 text-xl shrink-0"></i>
+                                    <p className="text-xs text-amber-100/80 leading-relaxed"><strong>Bez danych ucznia:</strong> nie wpisuj imion, nazwisk, PESEL-i ani informacji pozwalających rozpoznać dziecko.</p>
+                                </div>
+
+                                <button onClick={generate} disabled={isGenerating} className="w-full bg-gradient-to-r from-indigo-500 to-cyan-500 hover:from-indigo-400 hover:to-cyan-400 disabled:opacity-60 text-white font-black py-4 rounded-2xl flex items-center justify-center gap-2 shadow-lg transition-all">
+                                    <i className={`ph-bold ${isGenerating ? 'ph-spinner animate-spin' : 'ph-magic-wand'} text-xl`}></i>
+                                    {isGenerating ? 'Układam całą lekcję...' : 'Stwórz EduLekcję 360'}
+                                </button>
+                                <p className="text-center text-[11px] text-slate-500 mt-3">Cały pakiet = jedno użycie tekstowe.</p>
+                            </div>
+
+                            <div className="min-h-[640px]">
+                                {!result && !isGenerating && (
+                                    <div className="glass rounded-3xl p-8 md:p-12 min-h-[640px] flex flex-col justify-center items-center text-center">
+                                        <div className="w-24 h-24 rounded-[2rem] bg-gradient-to-br from-indigo-500/20 to-cyan-500/20 border border-indigo-400/20 flex items-center justify-center mb-7"><i className="ph-bold ph-orbit text-5xl text-indigo-300"></i></div>
+                                        <h2 className="text-3xl font-black mb-4">Jedna lekcja, pełne 360°</h2>
+                                        <p className="text-slate-400 max-w-xl leading-relaxed mb-8">EduLekcja 360 przygotuje bazowy pakiet. Specjalistyczne aplikacje pozostają na swoim miejscu i służą do dalszego rozwijania wybranych elementów.</p>
+                                        <div className="grid sm:grid-cols-3 gap-3 w-full max-w-2xl">
+                                            {[['ph-clock','Plan i czas'],['ph-note-pencil','Materiały'],['ph-shield-check','Dostosowania']].map(([icon,label]) => <div key={label} className="bg-slate-950/50 border border-slate-800 rounded-2xl p-4"><i className={`ph-bold ${icon} text-indigo-400 text-2xl`}></i><p className="text-sm font-bold mt-2">{label}</p></div>)}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {isGenerating && (
+                                    <div className="glass rounded-3xl p-8 min-h-[640px] flex flex-col items-center justify-center text-center">
+                                        <div className="w-20 h-20 border-4 border-indigo-500/20 border-t-indigo-400 rounded-full animate-spin mb-6"></div>
+                                        <h2 className="text-2xl font-black mb-3">Metodyk układa elementy lekcji</h2>
+                                        <p className="text-slate-400">Pilnuję czasu, poziomu, odpowiedzi i dostosowań. To może potrwać kilkanaście sekund.</p>
+                                    </div>
+                                )}
+
+                                {result && !isGenerating && (
+                                    <div id="wynik" className="glass rounded-3xl p-6 md:p-8">
+                                        <div className="flex flex-wrap items-center justify-between gap-3 mb-8 pb-5 border-b border-slate-800 print-hidden">
+                                            <div><p className="text-xs text-emerald-400 font-black uppercase tracking-widest">Pakiet gotowy</p><p className="text-sm text-slate-400 mt-1">Możesz skopiować, wydrukować albo rozwinąć dalej.</p></div>
+                                            <div className="flex flex-wrap gap-2">
+                                                <button onClick={copyAll} className="bg-slate-800 hover:bg-slate-700 border border-slate-700 px-4 py-2 rounded-xl text-xs font-bold"><i className="ph-bold ph-copy mr-1"></i> Kopiuj</button>
+                                                <button onClick={exportWord} className="bg-slate-800 hover:bg-slate-700 border border-slate-700 px-4 py-2 rounded-xl text-xs font-bold"><i className="ph-bold ph-file-doc mr-1"></i> Word</button>
+                                                <button onClick={() => window.print()} className="bg-indigo-600 hover:bg-indigo-500 px-4 py-2 rounded-xl text-xs font-bold"><i className="ph-bold ph-printer mr-1"></i> Drukuj</button>
+                                            </div>
+                                        </div>
+                                        <LessonDocument result={result} />
+                                    </div>
+                                )}
+                            </div>
+                        </section>
+
+                        {result && !isGenerating && (
+                            <section className="print-hidden mt-8 glass rounded-3xl p-6 md:p-8">
+                                <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-6">
+                                    <div><p className="text-xs text-cyan-400 uppercase tracking-widest font-black mb-2">Połączone narzędzia EduBox</p><h2 className="text-2xl md:text-3xl font-black">Rozwiń wybrany fragment lekcji</h2></div>
+                                    <p className="text-xs text-slate-400 max-w-md">Przycisk kopiuje kontekst i otwiera istniejącą aplikację. Wklej tekst w jej formularzu — niczego nie tracisz ani nie nadpisujesz.</p>
+                                </div>
+                                <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                                    {SPECIALIST_TOOLS.map(tool => (
+                                        <button key={tool.id} onClick={() => openSpecialistTool(tool)} className="text-left bg-slate-950/55 hover:bg-slate-900 border border-slate-800 hover:border-indigo-400/50 rounded-2xl p-5 transition-all group">
+                                            <div className={`w-11 h-11 bg-gradient-to-br ${tool.color} rounded-xl flex items-center justify-center mb-4 group-hover:scale-105 transition-transform`}><i className={`ph-bold ${tool.icon} text-xl text-white`}></i></div>
+                                            <h3 className="font-black text-white text-sm mb-2">{tool.title}</h3>
+                                            <p className="text-xs text-slate-400 leading-relaxed mb-4">{tool.help}</p>
+                                            <span className="text-xs text-indigo-300 font-bold">Skopiuj i otwórz <i className="ph-bold ph-arrow-up-right"></i></span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </section>
+                        )}
+                    </main>
+
+                    <div className="print-only"><LessonDocument result={result} /></div>
+                    <Toast toast={toast} />
+                </div>
+            );
+        }
+
+        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    </script>
+</body>
+</html>
