@@ -1,6 +1,6 @@
-const CACHE_NAME = 'edubox-cache-v2';
+const CACHE_NAME = 'edubox-cache-v3';
 const CORE_ASSETS = ['/index.html', '/apps.js', '/global-core.js', '/menu.html', '/manifest.json'];
-const NETWORK_FIRST_ASSETS = new Set(['/', '/index.html', '/apps.js', '/menu.html']);
+const NETWORK_FIRST_ASSETS = new Set(['/', '/index.html', '/apps.js', '/global-core.js', '/menu.html']);
 
 self.addEventListener('install', (event) => {
     event.waitUntil(
