@@ -1,8 +1,8 @@
 window.OGLOSZENIE = {
-  "id": "2026-08-17T08:32:54.351Z",
+  "id": "2026-08-24T21:49:27.351Z",
   "active": true,
   "title": "Nowość w EduBox AI!",
-  "message": "Dodałem właśnie małą aplikację EduDyplom Video. Możecie teraz tworzyć atrakcyjne dyplomy wideo i wysyłać rodzicom .",
+  "message": "Dzisiaj dodałem aplikację EduLekcja 360. To takie CENTRUM DOWODZENIA LEKCJĄ - zaplanuje kompletną lekcję: cele, przebieg, zadania, quiz, kartę wyjścia i dostosowania SPE.",
   "linkText": "Wypróbuj",
-  "linkUrl": "https://eduboxpro.pl/edudyplom.html"
+  "linkUrl": "https://eduboxpro.pl/edulekcja360.html"
 };
