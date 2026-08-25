@@ -292,8 +292,12 @@
             const [isPremium, setIsPremium] = useState(false);
             const [usages, setUsages] = useState(0);
             const [toast, setToast] = useState({ visible: false, message: '', type: 'info' });
+            const [appMode, setAppMode] = useState('generator');
+            const [gieldaItems, setGieldaItems] = useState([]);
+            const [isSavingToGielda, setIsSavingToGielda] = useState(false);
 
             useEffect(() => {
+                let unsubscribeSnapshot = null;
                 const interval = setInterval(() => {
                     if (!window.EduBoxCore) return;
                     clearInterval(interval);
@@ -302,8 +306,16 @@
                         const status = localStorage.getItem('eduboxProStatus');
                         setIsPremium(status === 'PRO' || status === 'active');
                     });
+                    unsubscribeSnapshot = window.EduBoxCore.subscribeToGielda(
+                        'lessons360_market',
+                        (items) => setGieldaItems(items),
+                        (error) => console.error('Błąd bazy EduLekcja 360:', error)
+                    );
                 }, 100);
-                return () => clearInterval(interval);
+                return () => {
+                    clearInterval(interval);
+                    if (unsubscribeSnapshot) unsubscribeSnapshot();
+                };
             }, []);
 
             useEffect(() => { localStorage.setItem('edulekcja360_form', JSON.stringify(form)); }, [form]);
@@ -452,9 +464,55 @@ Jeżeli dany element nie został wybrany, zwróć dla jego pola pustą tablicę 
                 showToast(`Otwieram ${tool.title}. Kontekst został skopiowany — wklej go w formularzu.`, 'success');
             };
 
+            const publishToGielda = async () => {
+                if (!result) return showToast('Najpierw przygotuj lekcję.', 'error');
+                if (!window.EduBoxCore) return showToast('Silnik EduBox jeszcze się ładuje. Spróbuj za chwilę.', 'error');
+                setIsSavingToGielda(true);
+                try {
+                    const fullTitle = String(result.title || form.topic || 'EduLekcja 360');
+                    const shortTitle = fullTitle.substring(0, 70) + (fullTitle.length > 70 ? '…' : '');
+                    await window.EduBoxCore.saveToGielda(
+                        'lessons360_market',
+                        'EduLekcja 360',
+                        shortTitle,
+                        { form, result }
+                    );
+                    showToast('Lekcja została dodana do bazy! 🎉', 'success');
+                } catch (error) {
+                    showToast(error.message || 'Nie udało się zapisać lekcji w bazie.', 'error');
+                } finally {
+                    setIsSavingToGielda(false);
+                }
+            };
+
+            const loadFromGielda = (item) => {
+                const savedForm = item?.config?.form;
+                const savedResult = item?.config?.result;
+                if (!savedResult) return showToast('Ta pozycja w bazie jest niekompletna.', 'error');
+                setForm({ ...EMPTY_FORM, ...(savedForm || {}) });
+                setResult(savedResult);
+                setAppMode('generator');
+                showToast('Lekcja została wczytana z bazy.', 'success');
+                setTimeout(() => document.getElementById('wynik')?.scrollIntoView({ behavior: 'smooth' }), 150);
+            };
+
+            const formatBaseDate = (createdAt) => {
+                try {
+                    const date = typeof createdAt?.toMillis === 'function'
+                        ? new Date(createdAt.toMillis())
+                        : createdAt?.seconds
+                            ? new Date(createdAt.seconds * 1000)
+                            : new Date(createdAt);
+                    return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString('pl-PL');
+                } catch {
+                    return '';
+                }
+            };
+
             const clearProject = () => {
                 setForm(EMPTY_FORM);
                 setResult(null);
+                setAppMode('generator');
                 localStorage.removeItem('edulekcja360_form');
                 localStorage.removeItem('edulekcja360_result');
                 showToast('Rozpoczęto nową lekcję.', 'info');
@@ -477,7 +535,11 @@ Jeżeli dany element nie został wybrany, zwróć dla jego pola pustą tablicę 
                                     <p className="max-w-2xl text-slate-300 text-lg leading-relaxed">Jeden temat zamieniamy w kompletną lekcję. Potem możesz rozwinąć wybrane elementy w obecnych aplikacjach EduBox.</p>
                                 </div>
                                 <div className="flex flex-wrap items-center gap-3 text-xs font-bold">
-                                    <span className="bg-slate-900 border border-slate-700 px-4 py-2 rounded-full text-slate-300">{isPremium ? 'PRO • bez limitu' : `Dzisiaj: ${usages}/5 użyć`}</span>
+                                    <div className="flex items-center bg-slate-900 border border-slate-700 rounded-full p-1">
+                                        <button onClick={() => setAppMode('generator')} className={`px-4 py-2 rounded-full transition-colors ${appMode === 'generator' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'}`}><i className="ph-bold ph-magic-wand mr-1"></i> Generator</button>
+                                        <button onClick={() => setAppMode('gielda')} className={`px-4 py-2 rounded-full transition-colors ${appMode === 'gielda' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'}`}><i className="ph-bold ph-books mr-1"></i> BAZA</button>
+                                    </div>
+                                    <span className="bg-slate-900 border border-slate-700 px-4 py-2 rounded-full text-slate-300">{isPremium ? 'PRO • bez limitów' : `Darmowy start: ${Math.max(0, 3 - usages)}/3`}</span>
                                     <button onClick={clearProject} className="bg-slate-900 hover:bg-slate-800 border border-slate-700 px-4 py-2 rounded-full text-slate-300 transition-colors"><i className="ph-bold ph-plus mr-1"></i> Nowa lekcja</button>
                                 </div>
                             </div>
@@ -485,6 +547,46 @@ Jeżeli dany element nie został wybrany, zwróć dla jego pola pustą tablicę 
                     </header>
 
                     <main className="max-w-7xl mx-auto px-5 pb-24">
+                        {appMode === 'gielda' ? (
+                            <section className="print-hidden glass rounded-3xl p-6 md:p-9 min-h-[560px]">
+                                <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8 pb-6 border-b border-slate-800">
+                                    <div>
+                                        <p className="text-xs text-indigo-400 uppercase tracking-widest font-black mb-2">Biblioteka EduBox</p>
+                                        <h2 className="text-3xl font-black text-white mb-2">BAZA lekcji 360</h2>
+                                        <p className="text-slate-400">Gotowe pakiety zapisane przez użytkowników. Jednym kliknięciem wczytasz formularz i całą lekcję.</p>
+                                    </div>
+                                    <button onClick={() => setAppMode('generator')} className="shrink-0 bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-3 rounded-xl text-sm font-bold transition-colors"><i className="ph-bold ph-plus mr-1"></i> Utwórz nową lekcję</button>
+                                </div>
+
+                                <div className="bg-amber-500/10 border border-amber-500/25 rounded-2xl p-4 mb-7 flex gap-3">
+                                    <i className="ph-bold ph-users-three text-amber-400 text-xl shrink-0"></i>
+                                    <p className="text-xs text-amber-100/80 leading-relaxed"><strong>To jest wspólna baza.</strong> Zapisane lekcje mogą zobaczyć inni użytkownicy, dlatego nie wpisuj danych osobowych uczniów.</p>
+                                </div>
+
+                                <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-5">
+                                    {gieldaItems.map(item => (
+                                        <article key={item.id} className="bg-slate-950/55 border border-slate-800 hover:border-indigo-400/50 rounded-2xl p-5 flex flex-col transition-colors group">
+                                            <div className="flex items-start justify-between gap-3 mb-4">
+                                                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500/25 to-cyan-500/20 border border-indigo-400/20 text-indigo-300 flex items-center justify-center group-hover:scale-105 transition-transform"><i className="ph-bold ph-chalkboard-teacher text-2xl"></i></div>
+                                                <span className="text-[11px] font-bold text-slate-500">{formatBaseDate(item.createdAt)}</span>
+                                            </div>
+                                            <h3 className="font-black text-white leading-snug mb-3 line-clamp-2">{item.name || 'EduLekcja 360'}</h3>
+                                            <p className="text-xs text-slate-400 mb-5">{item.config?.form?.subject || 'Przedmiot'} • {item.config?.form?.level || 'Etap'} • {item.config?.form?.duration || 'Czas lekcji'}</p>
+                                            <button onClick={() => loadFromGielda(item)} className="mt-auto w-full bg-slate-800 hover:bg-indigo-600 text-white py-3 rounded-xl text-sm font-bold transition-colors"><i className="ph-bold ph-download-simple mr-1"></i> Wczytaj lekcję</button>
+                                        </article>
+                                    ))}
+                                    {gieldaItems.length === 0 && (
+                                        <div className="sm:col-span-2 xl:col-span-3 py-16 text-center text-slate-500">
+                                            <i className="ph-thin ph-books text-6xl text-indigo-400/50 mb-4"></i>
+                                            <h3 className="text-xl font-black text-slate-300 mb-2">Baza jest jeszcze pusta</h3>
+                                            <p className="text-sm mb-5">Wygeneruj pierwszą lekcję i użyj przycisku „Dodaj do bazy”.</p>
+                                            <button onClick={() => setAppMode('generator')} className="bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-3 rounded-xl text-sm font-bold transition-colors">Przejdź do generatora</button>
+                                        </div>
+                                    )}
+                                </div>
+                            </section>
+                        ) : (
+                        <React.Fragment>
                         <section className="print-hidden grid lg:grid-cols-[420px_1fr] gap-7 items-start">
                             <div className="glass rounded-3xl p-6 md:p-7 lg:sticky lg:top-6">
                                 <div className="flex items-center gap-3 mb-7">
@@ -572,10 +674,11 @@ Jeżeli dany element nie został wybrany, zwróć dla jego pola pustą tablicę 
                                     <div id="wynik" className="glass rounded-3xl p-6 md:p-8">
                                         <div className="flex flex-wrap items-center justify-between gap-3 mb-8 pb-5 border-b border-slate-800 print-hidden">
                                             <div><p className="text-xs text-emerald-400 font-black uppercase tracking-widest">Pakiet gotowy</p><p className="text-sm text-slate-400 mt-1">Możesz skopiować, wydrukować albo rozwinąć dalej.</p></div>
-                                            <div className="flex flex-wrap gap-2">
-                                                <button onClick={copyAll} className="bg-slate-800 hover:bg-slate-700 border border-slate-700 px-4 py-2 rounded-xl text-xs font-bold"><i className="ph-bold ph-copy mr-1"></i> Kopiuj</button>
-                                                <button onClick={exportWord} className="bg-slate-800 hover:bg-slate-700 border border-slate-700 px-4 py-2 rounded-xl text-xs font-bold"><i className="ph-bold ph-file-doc mr-1"></i> Word</button>
-                                                <button onClick={() => window.print()} className="bg-indigo-600 hover:bg-indigo-500 px-4 py-2 rounded-xl text-xs font-bold"><i className="ph-bold ph-printer mr-1"></i> Drukuj</button>
+                                             <div className="flex flex-wrap gap-2">
+                                                 <button onClick={copyAll} className="bg-slate-800 hover:bg-slate-700 border border-slate-700 px-4 py-2 rounded-xl text-xs font-bold"><i className="ph-bold ph-copy mr-1"></i> Kopiuj</button>
+                                                 <button onClick={exportWord} className="bg-slate-800 hover:bg-slate-700 border border-slate-700 px-4 py-2 rounded-xl text-xs font-bold"><i className="ph-bold ph-file-doc mr-1"></i> Word</button>
+                                                 <button onClick={publishToGielda} disabled={isSavingToGielda} className="bg-emerald-700 hover:bg-emerald-600 disabled:opacity-60 px-4 py-2 rounded-xl text-xs font-bold"><i className={`ph-bold ${isSavingToGielda ? 'ph-spinner animate-spin' : 'ph-database'} mr-1`}></i> {isSavingToGielda ? 'Zapisuję...' : 'Dodaj do bazy'}</button>
+                                                 <button onClick={() => window.print()} className="bg-indigo-600 hover:bg-indigo-500 px-4 py-2 rounded-xl text-xs font-bold"><i className="ph-bold ph-printer mr-1"></i> Drukuj</button>
                                             </div>
                                         </div>
                                         <LessonDocument result={result} />
@@ -601,6 +704,8 @@ Jeżeli dany element nie został wybrany, zwróć dla jego pola pustą tablicę 
                                     ))}
                                 </div>
                             </section>
+                        )}
+                        </React.Fragment>
                         )}
                     </main>
 
