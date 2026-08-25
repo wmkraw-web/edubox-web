@@ -1,4 +1,4 @@
 window.PORADA_DNIA = {
-  "text": "Zarezerwuj 10 minut dziennie na refleksję nad swoją pracą i potrzebami uczniów; regularne przemyślenia pomogą poprawić jakość nauczania i zbudować lepszą relację z klasą.",
-  "date": "2026-08-24"
+  "text": "Zaplanuj codziennie 10 minut na refleksję po lekcjach – przemyśl, co poszło dobrze, a co można poprawić, aby lepiej wspierać swoich uczniów.",
+  "date": "2026-08-25"
 };
