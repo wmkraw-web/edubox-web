@@ -170,6 +170,104 @@
 
         const BUY_COFFEE_LINK = "https://buycoffee.to/magiccolor";
 
+        const NOVA_ANIMATIONS = {
+            idle: { row: 0, frames: 7, fps: 5 },
+            waving: { row: 3, frames: 4, fps: 7 },
+            failed: { row: 5, frames: 8, fps: 7 },
+            waiting: { row: 6, frames: 6, fps: 5 },
+            running: { row: 7, frames: 6, fps: 9 },
+            review: { row: 8, frames: 6, fps: 6 }
+        };
+
+        function NovaAvatar({ state = 'idle', size = 48, trackPointer = false, className = '' }) {
+            const canvasRef = useRef(null);
+            const pointerRef = useRef(null);
+            const [imageFailed, setImageFailed] = useState(false);
+
+            useEffect(() => {
+                const canvas = canvasRef.current;
+                if (!canvas) return;
+                const context = canvas.getContext('2d');
+                const sprite = new Image();
+                let animationFrame = 0;
+                let active = true;
+                const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+                const sourceWidth = 192;
+                const sourceHeight = 208;
+
+                const rememberPointer = (event) => {
+                    pointerRef.current = { x: event.clientX, y: event.clientY };
+                };
+                if (trackPointer) window.addEventListener('mousemove', rememberPointer, { passive: true });
+
+                const draw = (time = 0) => {
+                    if (!active || !sprite.complete || !sprite.naturalWidth) return;
+                    let row;
+                    let column;
+                    const pointer = trackPointer ? pointerRef.current : null;
+
+                    if (pointer) {
+                        const box = canvas.getBoundingClientRect();
+                        const dx = pointer.x - (box.left + box.width / 2);
+                        const dy = pointer.y - (box.top + box.height / 2);
+                        const distance = Math.hypot(dx, dy);
+                        if (distance > Math.max(12, box.width * 0.35)) {
+                            let angle = Math.atan2(dx, -dy);
+                            if (angle < 0) angle += Math.PI * 2;
+                            const direction = Math.round(angle / (Math.PI / 8)) % 16;
+                            row = direction < 8 ? 9 : 10;
+                            column = direction < 8 ? direction : direction - 8;
+                        }
+                    }
+
+                    if (row === undefined) {
+                        const animation = NOVA_ANIMATIONS[state] || NOVA_ANIMATIONS.idle;
+                        row = animation.row;
+                        column = reduceMotion ? 0 : Math.floor(time / (1000 / animation.fps)) % animation.frames;
+                    }
+
+                    context.clearRect(0, 0, canvas.width, canvas.height);
+                    context.imageSmoothingEnabled = true;
+                    context.imageSmoothingQuality = 'high';
+                    context.drawImage(
+                        sprite,
+                        column * sourceWidth, row * sourceHeight, sourceWidth, sourceHeight,
+                        0, 0, canvas.width, canvas.height
+                    );
+                    if (!reduceMotion) animationFrame = requestAnimationFrame(draw);
+                };
+
+                sprite.onload = () => {
+                    setImageFailed(false);
+                    draw();
+                };
+                sprite.onerror = () => setImageFailed(true);
+                sprite.src = '/nova-spritesheet.webp';
+
+                return () => {
+                    active = false;
+                    cancelAnimationFrame(animationFrame);
+                    window.removeEventListener('mousemove', rememberPointer);
+                };
+            }, [state, trackPointer]);
+
+            if (imageFailed) {
+                return <i className={`ph-fill ph-robot text-white ${className}`} style={{ fontSize: size * 0.55 }} aria-label="NOVA" />;
+            }
+
+            return (
+                <span className={`inline-flex items-center justify-center overflow-hidden ${className}`} role="img" aria-label="NOVA, asystentka AI">
+                    <canvas
+                        ref={canvasRef}
+                        width="192"
+                        height="208"
+                        aria-hidden="true"
+                        style={{ width: `${size}px`, height: `${Math.round(size * 208 / 192)}px` }}
+                    />
+                </span>
+            );
+        }
+
         // ==========================================
         // BAZA DANYCH APLIKACJI (Standard V3)
         // ==========================================
@@ -313,7 +411,7 @@
         };
 
         // ==========================================
-        // OMNI-BOT AI (Prawy Dolny Róg - Mini Karty i Szybkie Prompty)
+        // NOVA AI (Prawy Dolny Róg - tekst jak dotychczas + opcjonalny głos)
         // ==========================================
         const OmniBot = ({ appsData, isOpen, setIsOpen, openQuiz }) => {
             const [inputText, setInputText] = useState('');
@@ -321,11 +419,69 @@
                 { sender: 'ai', text: 'Cześć! Rozwiązuję nauczycielskie problemy. Opisz swoimi słowami, w czym Ci dzisiaj pomóc.' }
             ]);
             const [isThinking, setIsThinking] = useState(false);
+            const [isSpeaking, setIsSpeaking] = useState(false);
+            const [voiceEnabled, setVoiceEnabled] = useState(() => {
+                try { return localStorage.getItem('edubox-nova-voice') === 'on'; }
+                catch (e) { return false; }
+            });
             const messagesEndRef = useRef(null);
+            const canSpeak = typeof window !== 'undefined' && 'speechSynthesis' in window;
 
             const QUICK_PROMPTS = ["📄 Dokumenty i IPET", "🎲 Gra na zastępstwo", "🧩 Uczeń z autyzmem", "📝 Szybki sprawdzian"];
 
             useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, isOpen, isThinking]);
+
+            useEffect(() => () => {
+                if (canSpeak) window.speechSynthesis.cancel();
+            }, []);
+
+            const choosePolishVoice = () => {
+                if (!canSpeak) return null;
+                const voices = window.speechSynthesis.getVoices();
+                const polish = voices.filter(voice => voice.lang && voice.lang.toLowerCase().startsWith('pl'));
+                const friendlyNames = ['Zofia', 'Paulina', 'Agnieszka', 'Kasia', 'Maja', 'Female'];
+                return polish.find(voice => friendlyNames.some(name => voice.name.includes(name))) || polish[0] || null;
+            };
+
+            const speakText = (text, force = false) => {
+                if (!canSpeak || (!voiceEnabled && !force) || !text) return;
+                window.speechSynthesis.cancel();
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'pl-PL';
+                utterance.rate = 1.02;
+                utterance.pitch = 1.06;
+                const voice = choosePolishVoice();
+                if (voice) utterance.voice = voice;
+                utterance.onstart = () => setIsSpeaking(true);
+                utterance.onend = () => setIsSpeaking(false);
+                utterance.onerror = () => setIsSpeaking(false);
+                window.speechSynthesis.speak(utterance);
+            };
+
+            const addAiMessage = (text, apps) => {
+                setMessages(prev => [...prev, { sender: 'ai', text, ...(apps ? { apps } : {}) }]);
+                speakText(text);
+            };
+
+            const toggleVoice = () => {
+                if (!canSpeak) return;
+                const nextValue = !voiceEnabled;
+                setVoiceEnabled(nextValue);
+                try { localStorage.setItem('edubox-nova-voice', nextValue ? 'on' : 'off'); } catch (e) {}
+                if (!nextValue) {
+                    window.speechSynthesis.cancel();
+                    setIsSpeaking(false);
+                    return;
+                }
+                const latestAiMessage = [...messages].reverse().find(message => message.sender === 'ai');
+                if (latestAiMessage) speakText(latestAiMessage.text, true);
+            };
+
+            const closeChat = () => {
+                if (canSpeak) window.speechSynthesis.cancel();
+                setIsSpeaking(false);
+                setIsOpen(false);
+            };
 
             // Stary mechanizm - dopasowywanie słów-kluczy do wbudowanego słownika synonimów.
             // Zostaje jako AWARYJNY fallback, gdyby wywołanie AI zawiodło (np. brak sieci) - żeby
@@ -393,7 +549,7 @@
                 setInputText('');
 
                 if (userMsg.toLowerCase().includes('kawa') || userMsg.toLowerCase().includes('premium')) {
-                    setMessages(prev => [...prev, { sender: 'ai', text: 'Możesz mnie wesprzeć stawiając wirtualną kawę ☕ – w podziękowaniu dostaniesz kod, który wyłącza dzienne limity we wszystkich narzędziach!' }]);
+                    addAiMessage('Możesz mnie wesprzeć stawiając wirtualną kawę ☕ – w podziękowaniu dostaniesz kod, który wyłącza dzienne limity we wszystkich narzędziach!');
                     return;
                 }
 
@@ -408,13 +564,9 @@
                 setIsThinking(false);
 
                 if (matchedApps.length > 0) {
-                    setMessages(prev => [...prev, {
-                        sender: 'ai',
-                        text: 'Znalazłem narzędzia, które powinny rozwiązać ten problem! Wybierz jedno z poniższych:',
-                        apps: matchedApps
-                    }]);
+                    addAiMessage('Znalazłam narzędzia, które powinny rozwiązać ten problem! Wybierz jedno z poniższych:', matchedApps);
                 } else {
-                    setMessages(prev => [...prev, { sender: 'ai', text: 'Nie znalazłem dokładnie tego czego szukasz - spróbuj opisać to prościej, albo odpowiedz na 2 szybkie pytania niżej.' }]);
+                    addAiMessage('Nie znalazłam dokładnie tego, czego szukasz — spróbuj opisać to prościej albo odpowiedz na 2 szybkie pytania niżej.');
                 }
             };
 
@@ -423,20 +575,35 @@
                 processUserMessage(inputText.trim());
             };
 
+            const novaState = isThinking ? 'running' : isSpeaking ? 'review' : 'idle';
+
             return (
                 <div className="fixed bottom-6 right-6 z-[100] flex flex-col items-end print-hidden">
                     {isOpen && (
                         <div className="bg-white dark:bg-slate-900 w-[calc(100vw-48px)] sm:w-[380px] h-[550px] rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-700 mb-4 flex flex-col overflow-hidden animate-[reveal_0.2s_ease-out]">
                             {/* Header */}
-                            <div className="bg-blue-600 p-4 flex items-center justify-between text-white shadow-md">
+                            <div className="bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 p-3 flex items-center justify-between text-white shadow-md border-b border-cyan-400/20">
                                 <div className="flex items-center gap-3">
-                                    <div className="bg-white/20 p-2 rounded-full"><i className="ph-fill ph-robot text-2xl"></i></div>
+                                    <div className="w-12 h-12 rounded-2xl bg-cyan-400/10 border border-cyan-300/30 flex items-center justify-center overflow-hidden shadow-[0_0_18px_rgba(34,211,238,0.18)]">
+                                        <NovaAvatar state={novaState} size={43} />
+                                    </div>
                                     <div>
-                                        <h3 className="font-bold leading-tight">EduBot AI</h3>
-                                        <p className="text-[10px] text-blue-200 uppercase tracking-widest font-black flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span> Online</p>
+                                        <h3 className="font-bold leading-tight">NOVA AI</h3>
+                                        <p className="text-[10px] text-cyan-200 uppercase tracking-widest font-black flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span> {isSpeaking ? 'Mówię…' : isThinking ? 'Pracuję…' : 'Online'}</p>
                                     </div>
                                 </div>
-                                <button onClick={() => setIsOpen(false)} className="text-blue-200 hover:text-white p-1 text-2xl transition-colors"><i className="ph-bold ph-x"></i></button>
+                                <div className="flex items-center gap-1">
+                                    <button
+                                        onClick={toggleVoice}
+                                        disabled={!canSpeak}
+                                        className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${voiceEnabled ? 'bg-cyan-400 text-slate-950' : 'bg-white/10 text-cyan-100 hover:bg-white/20'} disabled:opacity-40`}
+                                        aria-label={voiceEnabled ? 'Wyłącz automatyczne odpowiedzi głosowe NOVY' : 'Włącz automatyczne odpowiedzi głosowe NOVY'}
+                                        title={!canSpeak ? 'Ta przeglądarka nie obsługuje głosu' : voiceEnabled ? 'Głos NOVY: włączony' : 'Głos NOVY: wyłączony'}
+                                    >
+                                        <i className={`ph-bold ${voiceEnabled ? 'ph-speaker-high' : 'ph-speaker-slash'} text-lg`}></i>
+                                    </button>
+                                    <button onClick={closeChat} className="text-cyan-100 hover:text-white p-2 text-2xl transition-colors" aria-label="Zamknij czat z NOVĄ"><i className="ph-bold ph-x"></i></button>
+                                </div>
                             </div>
 
                             {/* Chat Area */}
@@ -444,7 +611,12 @@
                                 {messages.map((msg, i) => (
                                     <div key={i} className="flex flex-col gap-2">
                                         <div className={`max-w-[85%] p-3 rounded-2xl text-sm shadow-sm ${msg.sender === 'ai' ? 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 self-start rounded-tl-sm' : 'bg-blue-600 text-white self-end rounded-tr-sm'}`}>
-                                            {msg.text}
+                                            <div>{msg.text}</div>
+                                            {msg.sender === 'ai' && canSpeak && (
+                                                <button onClick={() => speakText(msg.text, true)} className="mt-2 text-[10px] font-bold text-blue-600 dark:text-cyan-300 hover:text-blue-800 dark:hover:text-cyan-100 flex items-center gap-1" aria-label="Odsłuchaj tę odpowiedź NOVY">
+                                                    <i className="ph-bold ph-speaker-high"></i> Odsłuchaj
+                                                </button>
+                                            )}
                                         </div>
 
                                         {/* Wyświetlanie Mini-Kart Aplikacji */}
@@ -497,10 +669,10 @@
                             {/* Input Area - awatar bota obok pola, żeby wyraźnie zaznaczyć że to AI odpowiada */}
                             <div className="p-3 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 flex items-center gap-2">
                                 <div className="relative shrink-0">
-                                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-md">
-                                        <i className="ph-fill ph-robot text-white text-lg"></i>
+                                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-slate-900 to-blue-950 border border-cyan-400/40 flex items-center justify-center shadow-md overflow-hidden">
+                                        <NovaAvatar state={novaState} size={36} />
                                     </div>
-                                    <span className="absolute -inset-1 rounded-full border-2 border-blue-400/50 animate-ping"></span>
+                                    {isThinking && <span className="absolute -inset-1 rounded-full border-2 border-cyan-400/50 animate-ping"></span>}
                                 </div>
                                 <input
                                     type="text" value={inputText} onChange={e => setInputText(e.target.value)} onKeyPress={e => e.key === 'Enter' && handleSend()}
@@ -515,8 +687,8 @@
                     )}
 
                     {/* Bot Toggle Button */}
-                    <button onClick={() => setIsOpen(!isOpen)} className="bg-gradient-to-br from-blue-500 to-purple-600 w-16 h-16 rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(59,130,246,0.5)] hover:shadow-[0_0_30px_rgba(59,130,246,0.8)] hover:scale-105 transition-all relative z-50 group border-2 border-white/20">
-                        {isOpen ? <i className="ph-bold ph-x text-white text-2xl"></i> : <i className="ph-fill ph-robot text-white text-3xl animate-float"></i>}
+                    <button onClick={() => isOpen ? closeChat() : setIsOpen(true)} aria-label={isOpen ? 'Zamknij czat z NOVĄ' : 'Otwórz czat z NOVĄ'} className="bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 w-[72px] h-[72px] rounded-full flex items-center justify-center shadow-[0_0_22px_rgba(34,211,238,0.45)] hover:shadow-[0_0_32px_rgba(34,211,238,0.7)] hover:scale-105 transition-all relative z-50 group border-2 border-cyan-300/40 overflow-visible">
+                        {isOpen ? <i className="ph-bold ph-x text-white text-2xl"></i> : <NovaAvatar state="idle" size={63} trackPointer={true} />}
                         {!isOpen && <div className="absolute top-0 right-0 w-4 h-4 bg-red-500 border-2 border-white dark:border-slate-900 rounded-full animate-ping"></div>}
                         {!isOpen && <div className="absolute top-0 right-0 w-4 h-4 bg-red-500 border-2 border-white dark:border-slate-900 rounded-full"></div>}
                     </button>
