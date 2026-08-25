@@ -424,6 +424,11 @@
                 try { return localStorage.getItem('edubox-nova-voice') === 'on'; }
                 catch (e) { return false; }
             });
+            const [availableVoices, setAvailableVoices] = useState([]);
+            const [selectedVoiceId, setSelectedVoiceId] = useState(() => {
+                try { return localStorage.getItem('edubox-nova-voice-id') || ''; }
+                catch (e) { return ''; }
+            });
             const messagesEndRef = useRef(null);
             const canSpeak = typeof window !== 'undefined' && 'speechSynthesis' in window;
 
@@ -431,31 +436,98 @@
 
             useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, isOpen, isThinking]);
 
-            useEffect(() => () => {
-                if (canSpeak) window.speechSynthesis.cancel();
-            }, []);
+            const getVoiceId = (voice) => voice.voiceURI || `${voice.name}|${voice.lang}`;
 
-            const choosePolishVoice = () => {
-                if (!canSpeak) return null;
-                const voices = window.speechSynthesis.getVoices();
+            const choosePolishVoice = (voices, preferredId = selectedVoiceId) => {
+                if (!voices.length) return null;
+                const preferred = voices.find(voice => getVoiceId(voice) === preferredId);
+                if (preferred) return preferred;
+
                 const polish = voices.filter(voice => voice.lang && voice.lang.toLowerCase().startsWith('pl'));
-                const friendlyNames = ['Zofia', 'Paulina', 'Agnieszka', 'Kasia', 'Maja', 'Female'];
-                return polish.find(voice => friendlyNames.some(name => voice.name.includes(name))) || polish[0] || null;
+                const femaleNames = ['zofia', 'paulina', 'agnieszka', 'kasia', 'maja', 'female', 'kobieta'];
+                const maleNames = ['marek', 'adam', 'maciej', 'male', 'mężczyzna'];
+                const isFemale = (voice) => femaleNames.some(name => voice.name.toLowerCase().includes(name));
+                const isMale = (voice) => maleNames.some(name => voice.name.toLowerCase().includes(name));
+
+                return polish.find(isFemale)
+                    || polish.find(voice => !isMale(voice))
+                    || polish[0]
+                    || voices.find(isFemale)
+                    || voices[0];
             };
 
-            const speakText = (text, force = false) => {
+            useEffect(() => {
+                if (!canSpeak) return;
+                let retryTimer;
+                const loadVoices = () => {
+                    const voices = window.speechSynthesis.getVoices();
+                    if (!voices.length) return;
+                    const sortedVoices = [...voices].sort((a, b) => {
+                        const aPolish = a.lang?.toLowerCase().startsWith('pl') ? 0 : 1;
+                        const bPolish = b.lang?.toLowerCase().startsWith('pl') ? 0 : 1;
+                        return aPolish - bPolish || a.name.localeCompare(b.name, 'pl');
+                    });
+                    setAvailableVoices(sortedVoices);
+                    setSelectedVoiceId(currentId => {
+                        if (currentId && sortedVoices.some(voice => getVoiceId(voice) === currentId)) return currentId;
+                        const bestVoice = choosePolishVoice(sortedVoices, '');
+                        const bestId = bestVoice ? getVoiceId(bestVoice) : '';
+                        if (bestId) {
+                            try { localStorage.setItem('edubox-nova-voice-id', bestId); } catch (e) {}
+                        }
+                        return bestId;
+                    });
+                };
+
+                loadVoices();
+                window.speechSynthesis.addEventListener('voiceschanged', loadVoices);
+                retryTimer = setTimeout(loadVoices, 800);
+                return () => {
+                    clearTimeout(retryTimer);
+                    window.speechSynthesis.removeEventListener('voiceschanged', loadVoices);
+                    window.speechSynthesis.cancel();
+                };
+            }, []);
+
+            const waitForVoices = () => new Promise(resolve => {
+                const currentVoices = window.speechSynthesis.getVoices();
+                if (currentVoices.length) {
+                    resolve(currentVoices);
+                    return;
+                }
+                let settled = false;
+                const finish = () => {
+                    if (settled) return;
+                    settled = true;
+                    window.speechSynthesis.removeEventListener('voiceschanged', finish);
+                    resolve(window.speechSynthesis.getVoices());
+                };
+                window.speechSynthesis.addEventListener('voiceschanged', finish);
+                setTimeout(finish, 1200);
+            });
+
+            const speakText = async (text, force = false, voiceId = selectedVoiceId) => {
                 if (!canSpeak || (!voiceEnabled && !force) || !text) return;
                 window.speechSynthesis.cancel();
+                const voices = await waitForVoices();
                 const utterance = new SpeechSynthesisUtterance(text);
                 utterance.lang = 'pl-PL';
-                utterance.rate = 1.02;
-                utterance.pitch = 1.06;
-                const voice = choosePolishVoice();
+                utterance.rate = 1.0;
+                utterance.pitch = 1.05;
+                const voice = choosePolishVoice(voices, voiceId);
                 if (voice) utterance.voice = voice;
                 utterance.onstart = () => setIsSpeaking(true);
                 utterance.onend = () => setIsSpeaking(false);
                 utterance.onerror = () => setIsSpeaking(false);
                 window.speechSynthesis.speak(utterance);
+            };
+
+            const changeVoice = (event) => {
+                const nextVoiceId = event.target.value;
+                setSelectedVoiceId(nextVoiceId);
+                try { localStorage.setItem('edubox-nova-voice-id', nextVoiceId); } catch (e) {}
+                const latestAiMessage = [...messages].reverse().find(message => message.sender === 'ai');
+                if (latestAiMessage) speakText(latestAiMessage.text, true, nextVoiceId);
             };
 
             const addAiMessage = (text, apps) => {
@@ -605,6 +677,25 @@
                                     <button onClick={closeChat} className="text-cyan-100 hover:text-white p-2 text-2xl transition-colors" aria-label="Zamknij czat z NOVĄ"><i className="ph-bold ph-x"></i></button>
                                 </div>
                             </div>
+
+                            {voiceEnabled && availableVoices.length > 0 && (
+                                <div className="px-3 py-2 bg-cyan-50 dark:bg-slate-950 border-b border-cyan-200 dark:border-cyan-900/50 flex items-center gap-2">
+                                    <label htmlFor="nova-voice-select" className="text-[10px] font-black uppercase tracking-wider text-slate-600 dark:text-cyan-200 shrink-0">Głos NOVY</label>
+                                    <select
+                                        id="nova-voice-select"
+                                        value={selectedVoiceId}
+                                        onChange={changeVoice}
+                                        className="min-w-0 flex-1 bg-white dark:bg-slate-800 border border-cyan-200 dark:border-cyan-800 rounded-lg px-2 py-1.5 text-[11px] text-slate-800 dark:text-slate-100 outline-none focus:border-cyan-500"
+                                        aria-label="Wybierz głos NOVY"
+                                    >
+                                        {availableVoices.map(voice => (
+                                            <option key={getVoiceId(voice)} value={getVoiceId(voice)}>
+                                                {voice.name} ({voice.lang})
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
 
                             {/* Chat Area */}
                             <div className="flex-1 p-4 overflow-y-auto custom-scrollbar flex flex-col gap-4 bg-slate-50 dark:bg-slate-900/50">
