@@ -568,26 +568,34 @@
                 return scoredApps.filter(app => app.score > 0).sort((a, b) => b.score - a.score).slice(0, 3);
             };
 
-            // Nowy mechanizm - prawdziwe rozumienie zapytania przez AI, zamiast dopasowywania
-            // słów-kluczy. Dostaje pełny katalog (tytuł/opis/tagi/url) i samo zdanie nauczyciela,
-            // i wybiera do 3 NAJTRAFNIEJSZYCH narzędzi rozumiejąc sens, nie tylko wspólne słowa
-            // (np. "nie mówi, komunikuje się gestami" -> AAC, mimo że nigdzie nie pada słowo "AAC").
-            const findAppsAI = async (query) => {
+            // Tryb rozmowy: NOVA odpowiada na pytanie własnymi słowami i tylko wtedy, gdy ma to
+            // sens, dołącza maksymalnie 3 narzędzia z istniejącego katalogu EduBox.
+            const askNovaAI = async (query, conversationMessages) => {
                 const catalog = appsData.map(a => ({ url: a.url, title: a.title, desc: a.desc, tags: a.tags }));
-                const system = `Jesteś systemem dopasowującym narzędzia edukacyjne z katalogu do problemu opisanego przez nauczyciela. Dostajesz katalog narzędzi (JSON: url, title, desc, tags) oraz wiadomość nauczyciela. Wybierz maksymalnie 3 narzędzia NAJLEPIEJ pasujące do SENSU wiadomości, nie tylko wspólnych słów (np. "dziecko się bije/kłóci/gryzie" to trudne zachowanie, "nie mówi, komunikuje się gestami" to AAC/komunikacja alternatywna). Zwróć WYŁĄCZNIE czysty obiekt JSON: {"urls": ["dokladny_url_z_katalogu", "..."]}, w kolejności od najlepszego dopasowania. Jeśli naprawdę nic sensownie nie pasuje, zwróć {"urls": []}.`;
+                const history = conversationMessages.slice(-6).map(message => ({
+                    role: message.sender === 'ai' ? 'NOVA' : 'Nauczyciel',
+                    text: message.text
+                }));
+                const system = `Jesteś NOVA — ciepłą, inteligentną i lekko żartobliwą asystentką AI serwisu EduBox dla nauczycieli. Odpowiedz bezpośrednio na najnowszą wiadomość użytkownika po polsku. Bądź konkretna, praktyczna i przyjazna. Odpowiedź powinna mieć zwykle 2–6 krótkich zdań i maksymalnie 900 znaków, aby dobrze brzmiała także po przeczytaniu głosem. Uwzględniaj ostatnie wiadomości rozmowy, jeśli pytanie do nich nawiązuje. Możesz odpowiadać również na zwykłe pytania niezwiązane bezpośrednio z katalogiem. Nie zmyślaj faktów ani możliwości aplikacji. Przy sprawach medycznych, prawnych lub innych wymagających specjalisty zaznacz ograniczenia i wskaż bezpieczny kolejny krok.
+
+Dodatkowo oceń, czy któreś narzędzia z przekazanego katalogu EduBox realnie pomagają w tej konkretnej sprawie. Jeśli tak, wybierz maksymalnie 3 i użyj wyłącznie dokładnych adresów URL z katalogu. Jeśli nie są potrzebne, zwróć pustą listę. Nie wciskaj rekomendacji na siłę.
+
+Zwróć WYŁĄCZNIE poprawny obiekt JSON w postaci: {"answer":"pełna odpowiedź NOVY","urls":["dokladny_url_z_katalogu"]}. Bez Markdownu i bez dodatkowego tekstu.`;
                 const res = await fetch('/api/chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        prompt: `Katalog narzędzi:\n${JSON.stringify(catalog)}\n\nWiadomość nauczyciela: ${query}`,
+                        prompt: `Katalog narzędzi EduBox:\n${JSON.stringify(catalog)}\n\nOstatnia rozmowa:\n${JSON.stringify(history)}\n\nNajnowsza wiadomość nauczyciela:\n${query}`,
                         system, temperature: 0.3, format: 'json', model: 'gpt-4o-mini'
                     })
                 });
                 if (!res.ok) throw new Error('HTTP ' + res.status);
                 const data = await res.json();
                 const parsed = JSON.parse(data.text);
-                if (!Array.isArray(parsed.urls)) return [];
-                return parsed.urls.map(u => appsData.find(a => a.url === u)).filter(Boolean).slice(0, 3);
+                if (typeof parsed.answer !== 'string' || !parsed.answer.trim()) throw new Error('Brak odpowiedzi NOVY');
+                const urls = Array.isArray(parsed.urls) ? parsed.urls : [];
+                const matchedApps = urls.map(u => appsData.find(a => a.url === u)).filter(Boolean).slice(0, 3);
+                return { answer: parsed.answer.trim(), apps: matchedApps };
             };
 
             const processUserMessage = async (userMsg) => {
@@ -600,20 +608,26 @@
                 }
 
                 setIsThinking(true);
-                let matchedApps = [];
+                let novaReply;
                 try {
-                    matchedApps = await findAppsAI(userMsg);
+                    novaReply = await askNovaAI(userMsg, messages);
                 } catch (e) {
-                    console.log('EduBot: wywołanie AI nie powiodło się, wracam do dopasowania słów-kluczy.', e);
-                    matchedApps = findAppsKeyword(userMsg);
+                    console.log('NOVA: rozmowa AI nie powiodła się, uruchamiam tryb awaryjny.', e);
+                    const matchedApps = findAppsKeyword(userMsg);
+                    novaReply = matchedApps.length > 0
+                        ? {
+                            answer: 'Mam chwilowy problem z przygotowaniem pełnej odpowiedzi, ale znalazłam narzędzia EduBox, które mogą pomóc w tej sprawie.',
+                            apps: matchedApps
+                        }
+                        : {
+                            answer: 'Mam chwilową przerwę w łączności z AI. Spróbuj proszę ponownie za moment — nie chcę zgadywać i wprowadzić Cię w błąd.',
+                            apps: []
+                        };
+                } finally {
+                    setIsThinking(false);
                 }
-                setIsThinking(false);
 
-                if (matchedApps.length > 0) {
-                    addAiMessage('Znalazłam narzędzia, które powinny rozwiązać ten problem! Wybierz jedno z poniższych:', matchedApps);
-                } else {
-                    addAiMessage('Nie znalazłam dokładnie tego, czego szukasz — spróbuj opisać to prościej albo odpowiedz na 2 szybkie pytania niżej.');
-                }
+                addAiMessage(novaReply.answer, novaReply.apps);
             };
 
             const handleSend = () => {
@@ -728,7 +742,7 @@
                                 </div>
                                 <input
                                     type="text" value={inputText} onChange={e => setInputText(e.target.value)} onKeyPress={e => e.key === 'Enter' && handleSend()}
-                                    placeholder="Napisz swój problem..." disabled={isThinking}
+                                    placeholder="Zadaj pytanie NOVIE..." disabled={isThinking}
                                     className="flex-1 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl px-4 py-3 outline-none text-sm focus:border-blue-500 dark:focus:border-blue-500 transition-colors disabled:opacity-60"
                                 />
                                 <button onClick={handleSend} disabled={isThinking} className="bg-blue-600 hover:bg-blue-500 text-white w-12 h-12 rounded-xl flex items-center justify-center transition-all shadow-md active:scale-95 disabled:opacity-60 shrink-0">
