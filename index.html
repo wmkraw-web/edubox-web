@@ -424,110 +424,86 @@
                 try { return localStorage.getItem('edubox-nova-voice') === 'on'; }
                 catch (e) { return false; }
             });
-            const [availableVoices, setAvailableVoices] = useState([]);
-            const [selectedVoiceId, setSelectedVoiceId] = useState(() => {
-                try { return localStorage.getItem('edubox-nova-voice-id') || ''; }
-                catch (e) { return ''; }
-            });
+            const [isVoiceLoading, setIsVoiceLoading] = useState(false);
             const messagesEndRef = useRef(null);
-            const canSpeak = typeof window !== 'undefined' && 'speechSynthesis' in window;
+            const audioRef = useRef(null);
+            const audioUrlRef = useRef(null);
+            const voiceRequestRef = useRef(0);
+            const canSpeak = typeof window !== 'undefined' && typeof window.Audio === 'function' && typeof window.fetch === 'function';
 
             const QUICK_PROMPTS = ["📄 Dokumenty i IPET", "🎲 Gra na zastępstwo", "🧩 Uczeń z autyzmem", "📝 Szybki sprawdzian"];
 
             useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, isOpen, isThinking]);
 
-            const getVoiceId = (voice) => voice.voiceURI || `${voice.name}|${voice.lang}`;
-
-            const choosePolishVoice = (voices, preferredId = selectedVoiceId) => {
-                if (!voices.length) return null;
-                const preferred = voices.find(voice => getVoiceId(voice) === preferredId);
-                if (preferred) return preferred;
-
-                const polish = voices.filter(voice => voice.lang && voice.lang.toLowerCase().startsWith('pl'));
-                const femaleNames = ['zofia', 'paulina', 'agnieszka', 'kasia', 'maja', 'female', 'kobieta'];
-                const maleNames = ['marek', 'adam', 'maciej', 'male', 'mężczyzna'];
-                const isFemale = (voice) => femaleNames.some(name => voice.name.toLowerCase().includes(name));
-                const isMale = (voice) => maleNames.some(name => voice.name.toLowerCase().includes(name));
-
-                return polish.find(isFemale)
-                    || polish.find(voice => !isMale(voice))
-                    || polish[0]
-                    || voices.find(isFemale)
-                    || voices[0];
+            const stopVoice = () => {
+                voiceRequestRef.current += 1;
+                if (audioRef.current) {
+                    audioRef.current.pause();
+                    audioRef.current.currentTime = 0;
+                    audioRef.current = null;
+                }
+                if (audioUrlRef.current) {
+                    URL.revokeObjectURL(audioUrlRef.current);
+                    audioUrlRef.current = null;
+                }
+                setIsSpeaking(false);
+                setIsVoiceLoading(false);
             };
 
             useEffect(() => {
-                if (!canSpeak) return;
-                let retryTimer;
-                const loadVoices = () => {
-                    const voices = window.speechSynthesis.getVoices();
-                    if (!voices.length) return;
-                    const sortedVoices = [...voices].sort((a, b) => {
-                        const aPolish = a.lang?.toLowerCase().startsWith('pl') ? 0 : 1;
-                        const bPolish = b.lang?.toLowerCase().startsWith('pl') ? 0 : 1;
-                        return aPolish - bPolish || a.name.localeCompare(b.name, 'pl');
-                    });
-                    setAvailableVoices(sortedVoices);
-                    setSelectedVoiceId(currentId => {
-                        if (currentId && sortedVoices.some(voice => getVoiceId(voice) === currentId)) return currentId;
-                        const bestVoice = choosePolishVoice(sortedVoices, '');
-                        const bestId = bestVoice ? getVoiceId(bestVoice) : '';
-                        if (bestId) {
-                            try { localStorage.setItem('edubox-nova-voice-id', bestId); } catch (e) {}
-                        }
-                        return bestId;
-                    });
-                };
-
-                loadVoices();
-                window.speechSynthesis.addEventListener('voiceschanged', loadVoices);
-                retryTimer = setTimeout(loadVoices, 800);
                 return () => {
-                    clearTimeout(retryTimer);
-                    window.speechSynthesis.removeEventListener('voiceschanged', loadVoices);
-                    window.speechSynthesis.cancel();
+                    voiceRequestRef.current += 1;
+                    if (audioRef.current) audioRef.current.pause();
+                    if (audioUrlRef.current) URL.revokeObjectURL(audioUrlRef.current);
                 };
             }, []);
 
-            const waitForVoices = () => new Promise(resolve => {
-                const currentVoices = window.speechSynthesis.getVoices();
-                if (currentVoices.length) {
-                    resolve(currentVoices);
-                    return;
-                }
-                let settled = false;
-                const finish = () => {
-                    if (settled) return;
-                    settled = true;
-                    window.speechSynthesis.removeEventListener('voiceschanged', finish);
-                    resolve(window.speechSynthesis.getVoices());
-                };
-                window.speechSynthesis.addEventListener('voiceschanged', finish);
-                setTimeout(finish, 1200);
-            });
-
-            const speakText = async (text, force = false, voiceId = selectedVoiceId) => {
+            const speakText = async (text, force = false) => {
                 if (!canSpeak || (!voiceEnabled && !force) || !text) return;
-                window.speechSynthesis.cancel();
-                const voices = await waitForVoices();
-                const utterance = new SpeechSynthesisUtterance(text);
-                utterance.lang = 'pl-PL';
-                utterance.rate = 1.0;
-                utterance.pitch = 1.05;
-                const voice = choosePolishVoice(voices, voiceId);
-                if (voice) utterance.voice = voice;
-                utterance.onstart = () => setIsSpeaking(true);
-                utterance.onend = () => setIsSpeaking(false);
-                utterance.onerror = () => setIsSpeaking(false);
-                window.speechSynthesis.speak(utterance);
-            };
+                stopVoice();
+                const requestId = voiceRequestRef.current;
+                setIsVoiceLoading(true);
 
-            const changeVoice = (event) => {
-                const nextVoiceId = event.target.value;
-                setSelectedVoiceId(nextVoiceId);
-                try { localStorage.setItem('edubox-nova-voice-id', nextVoiceId); } catch (e) {}
-                const latestAiMessage = [...messages].reverse().find(message => message.sender === 'ai');
-                if (latestAiMessage) speakText(latestAiMessage.text, true, nextVoiceId);
+                try {
+                    const response = await fetch('/api/tts', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ text })
+                    });
+                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+                    const audioBlob = await response.blob();
+                    if (voiceRequestRef.current !== requestId) return;
+
+                    const audioUrl = URL.createObjectURL(audioBlob);
+                    const audio = new Audio(audioUrl);
+                    audioRef.current = audio;
+                    audioUrlRef.current = audioUrl;
+
+                    const finish = () => {
+                        if (audioRef.current === audio) audioRef.current = null;
+                        if (audioUrlRef.current === audioUrl) {
+                            URL.revokeObjectURL(audioUrl);
+                            audioUrlRef.current = null;
+                        }
+                        setIsSpeaking(false);
+                        setIsVoiceLoading(false);
+                    };
+
+                    audio.onplay = () => {
+                        setIsVoiceLoading(false);
+                        setIsSpeaking(true);
+                    };
+                    audio.onended = finish;
+                    audio.onerror = finish;
+                    await audio.play();
+                } catch (error) {
+                    if (voiceRequestRef.current === requestId) {
+                        setIsSpeaking(false);
+                        setIsVoiceLoading(false);
+                        console.warn('NOVA: nie udało się odtworzyć głosu OpenAI.', error);
+                    }
+                }
             };
 
             const addAiMessage = (text, apps) => {
@@ -541,8 +517,7 @@
                 setVoiceEnabled(nextValue);
                 try { localStorage.setItem('edubox-nova-voice', nextValue ? 'on' : 'off'); } catch (e) {}
                 if (!nextValue) {
-                    window.speechSynthesis.cancel();
-                    setIsSpeaking(false);
+                    stopVoice();
                     return;
                 }
                 const latestAiMessage = [...messages].reverse().find(message => message.sender === 'ai');
@@ -550,8 +525,7 @@
             };
 
             const closeChat = () => {
-                if (canSpeak) window.speechSynthesis.cancel();
-                setIsSpeaking(false);
+                stopVoice();
                 setIsOpen(false);
             };
 
@@ -647,7 +621,7 @@
                 processUserMessage(inputText.trim());
             };
 
-            const novaState = isThinking ? 'running' : isSpeaking ? 'review' : 'idle';
+            const novaState = isThinking || isVoiceLoading ? 'running' : isSpeaking ? 'review' : 'idle';
 
             return (
                 <div className="fixed bottom-6 right-6 z-[100] flex flex-col items-end print-hidden">
@@ -661,7 +635,7 @@
                                     </div>
                                     <div>
                                         <h3 className="font-bold leading-tight">NOVA AI</h3>
-                                        <p className="text-[10px] text-cyan-200 uppercase tracking-widest font-black flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span> {isSpeaking ? 'Mówię…' : isThinking ? 'Pracuję…' : 'Online'}</p>
+                                        <p className="text-[10px] text-cyan-200 uppercase tracking-widest font-black flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span> {isSpeaking ? 'Mówię…' : isVoiceLoading ? 'Przygotowuję głos…' : isThinking ? 'Pracuję…' : 'Online'}</p>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-1">
@@ -670,7 +644,7 @@
                                         disabled={!canSpeak}
                                         className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${voiceEnabled ? 'bg-cyan-400 text-slate-950' : 'bg-white/10 text-cyan-100 hover:bg-white/20'} disabled:opacity-40`}
                                         aria-label={voiceEnabled ? 'Wyłącz automatyczne odpowiedzi głosowe NOVY' : 'Włącz automatyczne odpowiedzi głosowe NOVY'}
-                                        title={!canSpeak ? 'Ta przeglądarka nie obsługuje głosu' : voiceEnabled ? 'Głos NOVY: włączony' : 'Głos NOVY: wyłączony'}
+                                        title={!canSpeak ? 'Ta przeglądarka nie obsługuje dźwięku' : voiceEnabled ? 'Głos NOVY OpenAI: włączony' : 'Głos NOVY OpenAI: wyłączony'}
                                     >
                                         <i className={`ph-bold ${voiceEnabled ? 'ph-speaker-high' : 'ph-speaker-slash'} text-lg`}></i>
                                     </button>
@@ -678,22 +652,9 @@
                                 </div>
                             </div>
 
-                            {voiceEnabled && availableVoices.length > 0 && (
-                                <div className="px-3 py-2 bg-cyan-50 dark:bg-slate-950 border-b border-cyan-200 dark:border-cyan-900/50 flex items-center gap-2">
-                                    <label htmlFor="nova-voice-select" className="text-[10px] font-black uppercase tracking-wider text-slate-600 dark:text-cyan-200 shrink-0">Głos NOVY</label>
-                                    <select
-                                        id="nova-voice-select"
-                                        value={selectedVoiceId}
-                                        onChange={changeVoice}
-                                        className="min-w-0 flex-1 bg-white dark:bg-slate-800 border border-cyan-200 dark:border-cyan-800 rounded-lg px-2 py-1.5 text-[11px] text-slate-800 dark:text-slate-100 outline-none focus:border-cyan-500"
-                                        aria-label="Wybierz głos NOVY"
-                                    >
-                                        {availableVoices.map(voice => (
-                                            <option key={getVoiceId(voice)} value={getVoiceId(voice)}>
-                                                {voice.name} ({voice.lang})
-                                            </option>
-                                        ))}
-                                    </select>
+                            {voiceEnabled && (
+                                <div className="px-3 py-2 bg-cyan-50 dark:bg-slate-950 border-b border-cyan-200 dark:border-cyan-900/50 text-[10px] font-bold text-slate-600 dark:text-cyan-200 flex items-center gap-1.5">
+                                    <i className="ph-bold ph-waveform"></i> Głos generowany przez AI (OpenAI)
                                 </div>
                             )}
 
