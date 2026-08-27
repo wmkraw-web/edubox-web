@@ -1,4 +1,4 @@
 window.PORADA_DNIA = {
-  "text": "Regularnie zbieraj feedback od uczniów na temat swojej pracy, aby lepiej dostosować metody nauczania do ich potrzeb i stworzyć bardziej angażujące środowisko.",
-  "date": "2026-08-26"
+  "text": "Zaplanuj codziennie 10 minut na refleksję nad swoim dniem - to pomoże w lepszej organizacji pracy i poprawie relacji z uczniami i rodzicami.",
+  "date": "2026-08-27"
 };
