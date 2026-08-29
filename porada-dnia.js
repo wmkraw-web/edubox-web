@@ -1,4 +1,4 @@
 window.PORADA_DNIA = {
-  "text": "Zaplanuj codziennie 10 minut na refleksję nad przebiegiem lekcji i relacjami z uczniami, aby skuteczniej dostosować swoje metody nauczania i poprawić atmosferę w klasie.",
-  "date": "2026-08-28"
+  "text": "Ustal regularny czas na feedback dla uczniów, aby stworzyć otwartą przestrzeń do rozmowy, a także wypróbuj narzędzia AI do tworzenia zindywidualizowanych materiałów edukacyjnych.",
+  "date": "2026-08-29"
 };
