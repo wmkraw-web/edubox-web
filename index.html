@@ -289,14 +289,26 @@
             { label: 'Grafiki i dekoracji', key: 'grafika', icon: 'ph-palette' },
           ];
 
+          // Celowo używamy także krótkich rdzeni wyrazów (np. "dysleks"), aby
+          // dopasować różne odmiany tych samych pojęć w tytułach, opisach i tagach.
+          const STAGE_PROFILES = {
+            przedszkole: ['przedszkole', 'bajk', 'aac', 'piktogram', 'sensory', 'zabaw', 'wiersz', 'piosenk', 'wyliczank', 'kolorowank', 'dyplom', 'zgody', 'wycieczk'],
+            wczesnoszkolna: ['wczesnoszkol', 'czytani', 'matemat', 'zadani', 'gry', 'fiszk', 'memory', 'bingo', 'dobble', 'rym', 'komiks', 'opisow', 'dziennik', 'litery', 'kolorowank', 'rysunk', 'girland'],
+            starsza: ['fake news', 'debat', 'obywatelsk', 'zdrowotn', 'prezentac', 'slajd', 'sprawdzian', 'test', 'kartków', 'escape', 'szyfr', 'praw', 'protokół', 'ocenian', 'dostosowa', 'wymagania', 'diagnoz', 'trudne zachowania', 'plakat'],
+            spe: ['spe', 'specjaln', 'ipet', 'wopfu', 'aac', 'autis', 'adhd', 'dysleks', 'terapi', 'tus', 'diagnoz', 'sensory', 'piktogram', 'dostosowa', 'trudne zachowania', 'symbol', 'kolorowank', 'rysunk', 'naklejk', 'ilustrac']
+          };
+
           const handleQ1 = (key) => { setEtap(key); setStep(2); };
           const handleQ2 = (potrzeba) => {
-            const scored = apps.map(a => ({
-              ...a,
-              score: (a.category === potrzeba ? 3 : 0) + (a.tags && a.tags.includes(etap) ? 2 : 0)
-            }));
-            scored.sort((a, b) => b.score - a.score);
-            setResults(scored.slice(0, 3));
+            const profile = STAGE_PROFILES[etap] || [];
+            const categoryApps = apps.filter(a => a.category === potrzeba);
+            const scored = categoryApps.map((a, order) => {
+              const searchable = `${a.title} ${a.desc} ${(a.tags || []).join(' ')}`.toLowerCase();
+              const stageHits = profile.filter(keyword => searchable.includes(keyword)).length;
+              return { ...a, score: (stageHits * 4) + (a.featured ? 1 : 0), order };
+            });
+            scored.sort((a, b) => (b.score - a.score) || (a.order - b.order));
+            setResults(scored.slice(0, 2));
             setStep(3);
           };
           const restart = () => { setStep(1); setEtap(null); setResults([]); };
