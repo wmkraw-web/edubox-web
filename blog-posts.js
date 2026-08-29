@@ -24,8 +24,8 @@ window.BLOG_POSTS = [
 },
   {
     slug: "jak-napisac-skuteczny-plan-pracy-nauczyciela",
-    title: "Jak napisać skuteczny plan pracy nauczyciela klasy na nowy rok szkolny",
-    excerpt: "Przewodnik po tworzeniu efektywnego planu pracy dla nauczycieli na nowy rok szkolny, który ułatwi organizację zajęć i osiąganie celów edukacyjnych.",
+    title: "Plan pracy nauczyciela metodą SMART — krótka checklista na nowy rok",
+    excerpt: "Krótka checklista tworzenia celów SMART, harmonogramu i sposobu monitorowania postępów w planie pracy nauczyciela.",
     date: "2026-08-23",
     category: "Poradnik",
     readTime: "5 min",
