@@ -1,6 +1,7 @@
 const CACHE_NAME = 'edubox-cache-v3';
 const CORE_ASSETS = ['/index.html', '/apps.js', '/global-core.js', '/menu.html', '/manifest.json'];
-const NETWORK_FIRST_ASSETS = new Set(['/', '/index.html', '/apps.js', '/global-core.js', '/menu.html']);
+// Poradnik prawny i jego zasoby też najpierw odświeżamy z sieci.
+const NETWORK_FIRST_ASSETS = new Set(['/', '/index.html', '/apps.js', '/global-core.js', '/menu.html', '/standardy-ochrony-maloletnich.html', '/standardy-ochrony-maloletnich.css', '/standardy-ochrony-maloletnich.js']);
 
 self.addEventListener('install', (event) => {
     event.waitUntil(
