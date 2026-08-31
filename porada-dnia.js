@@ -1,4 +1,4 @@
 window.PORADA_DNIA = {
-  "text": "Rozpocznij lekcję od krótkiej rozmowy z uczniami na temat ich potrzeb i oczekiwań – to buduje zaufanie i zwiększa zaangażowanie w proces nauki.",
-  "date": "2026-08-30"
+  "text": "Stwórz system regularnej komunikacji z rodzicami, wysyłając cotygodniowe podsumowania postępów uczniów, co wzmocni zaufanie i zaangażowanie w proces edukacji.",
+  "date": "2026-08-31"
 };
