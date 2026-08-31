@@ -141,6 +141,61 @@ const getWeekKey = () => {
 // Zmienne wewnętrzne
 let app, auth, db, currentUser = null;
 let isInitialized = false;
+let pendingGlobalCounterIncrement = 0;
+let isFlushingGlobalCounter = false;
+
+const TRACKED_AI_ENDPOINTS = new Set([
+    '/api/chat',
+    '/api/gemini',
+    '/api/generate',
+    '/api/generate-openai',
+    '/api/malarz',
+    '/api/upscale',
+    '/api/describe-image',
+    '/api/ewa-generate'
+]);
+
+const parseRequestBody = (body) => {
+    if (typeof body !== 'string') return null;
+    try { return JSON.parse(body); } catch (error) { return null; }
+};
+
+const shouldTrackSuccessfulAiRequest = (input, init = {}) => {
+    try {
+        const rawUrl = typeof input === 'string' || input instanceof URL ? String(input) : input?.url;
+        if (!rawUrl) return false;
+        const url = new URL(rawUrl, window.location.origin);
+        if (url.origin !== window.location.origin || !TRACKED_AI_ENDPOINTS.has(url.pathname)) return false;
+
+        const method = String(init.method || input?.method || 'GET').toUpperCase();
+        if (method !== 'POST') return false;
+
+        const body = parseRequestBody(init.body);
+        if (url.pathname === '/api/chat' && body?.mode === 'tts') return false;
+        if (url.pathname === '/api/ewa-generate' && body?.type === 'video-status') return false;
+        return true;
+    } catch (error) {
+        return false;
+    }
+};
+
+const flushGlobalCounter = async () => {
+    if (!db || !currentUser || isFlushingGlobalCounter || pendingGlobalCounterIncrement < 1) return;
+
+    const amount = pendingGlobalCounterIncrement;
+    pendingGlobalCounterIncrement = 0;
+    isFlushingGlobalCounter = true;
+    const statsRef = doc(db, 'artifacts', APP_ID, 'public', 'data', 'stats', 'global_counter');
+
+    try {
+        await setDoc(statsRef, { total: increment(amount) }, { merge: true });
+    } catch (error) {
+        pendingGlobalCounterIncrement += amount;
+        console.warn('Nie udało się zapisać statystyki wygenerowanych materiałów.', error);
+    } finally {
+        isFlushingGlobalCounter = false;
+    }
+};
 
 // Sprawdza i czyści wygasły bonusowy dostęp PRO (np. nagroda za polecenie znajomego).
 // Dotyczy WYŁĄCZNIE kont, które dostały czasowy bonus (eduboxBonusUntil ustawione) —
@@ -177,6 +232,7 @@ export const EduBoxCore = {
         
         onAuthStateChanged(auth, (user) => {
             currentUser = user;
+            if (user) flushGlobalCounter();
             if(onUserLoad) onUserLoad(user);
         });
     },
@@ -209,8 +265,7 @@ export const EduBoxCore = {
     executeWithLimitCheck: (isPremium, onSuccess, onLimitReached, onToastUpdate) => {
         const status = localStorage.getItem('eduboxProStatus');
         if (status === 'PRO' || status === 'active' || isPremium) {
-            // Konto PRO - akcja bez zwiększania licznika, ale podajemy dotychczasowy stan
-            EduBoxCore.bumpGlobalCounter();
+            // Statystyka jest zwiększana dopiero po udanej odpowiedzi API.
             onSuccess(EduBoxCore.getUsageCount());
             return;
         }
@@ -225,7 +280,6 @@ export const EduBoxCore = {
         saveTrialCount(TEXT_TRIAL_KEY, newCount);
         
         onToastUpdate(`Darmowy start: wykorzystano ${newCount}/${TEXT_TRIAL_LIMIT} generowań tekstowych`);
-        EduBoxCore.bumpGlobalCounter();
         onSuccess(newCount);
     },
 
@@ -241,7 +295,6 @@ export const EduBoxCore = {
     executeImageLimitCheck: (isPremium, onSuccess, onLimitReached, onToastUpdate) => {
         const status = localStorage.getItem('eduboxProStatus');
         if (status === 'PRO' || status === 'active' || isPremium) {
-            EduBoxCore.bumpGlobalCounter();
             onSuccess(readTrialCount(IMAGE_TRIAL_KEY));
             return;
         }
@@ -256,7 +309,6 @@ export const EduBoxCore = {
         saveTrialCount(IMAGE_TRIAL_KEY, newCount);
 
         onToastUpdate(`Darmowy start: wykorzystano ${newCount}/${IMAGE_TRIAL_LIMIT} grafiki AI`);
-        EduBoxCore.bumpGlobalCounter();
         onSuccess(newCount);
     },
 
@@ -319,11 +371,10 @@ export const EduBoxCore = {
         }, onError);
     },
 
-    // STATYSTYKI - prawdziwy, globalny licznik wykonanych działań AI (nie fałszywy!)
+    // STATYSTYKI - prawdziwy, globalny licznik udanych odpowiedzi API AI.
     bumpGlobalCounter: () => {
-        if (!db) return;
-        const statsRef = doc(db, 'artifacts', APP_ID, 'public', 'data', 'stats', 'global_counter');
-        setDoc(statsRef, { total: increment(1) }, { merge: true }).catch(() => {});
+        pendingGlobalCounterIncrement += 1;
+        flushGlobalCounter();
     },
 
     subscribeGlobalCounter: (callback) => {
@@ -356,3 +407,18 @@ export const EduBoxCore = {
         }, () => callback([]));
     }
 };
+
+// Jedno miejsce zliczania dla wszystkich narzędzi korzystających ze wspólnego API.
+// Nie liczymy rozpoczętych ani nieudanych prób, odczytów statusu wideo i syntezy głosu.
+if (typeof window !== 'undefined' && !window.__eduboxGenerationFetchTrackerV1) {
+    const nativeFetch = window.fetch.bind(window);
+    window.fetch = async (input, init) => {
+        const response = await nativeFetch(input, init);
+        if (response.ok && shouldTrackSuccessfulAiRequest(input, init)) {
+            EduBoxCore.bumpGlobalCounter();
+        }
+        return response;
+    };
+    Object.defineProperty(window, '__eduboxGenerationFetchTrackerV1', { value: true });
+}
+
