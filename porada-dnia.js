@@ -1,4 +1,4 @@
 window.PORADA_DNIA = {
-  "text": "Stwórz system regularnej komunikacji z rodzicami, wysyłając cotygodniowe podsumowania postępów uczniów, co wzmocni zaufanie i zaangażowanie w proces edukacji.",
-  "date": "2026-08-31"
+  "text": "Zachęcaj uczniów do zadawania pytań, tworząc przestrzeń na otwartą komunikację; dzięki temu zbudujesz zaufanie i poprawisz atmosferę w klasie.",
+  "date": "2026-09-01"
 };
