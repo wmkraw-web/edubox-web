@@ -1,8 +1,8 @@
 window.OGLOSZENIE = {
-  "id": "2026-08-24T22:06:27.718Z",
+  "id": "2026-09-01T20:26:33.958Z",
   "active": true,
   "title": "Nowość w EduBox AI!",
-  "message": "Dzisiaj dodałem aplikację EduLekcja 360. To takie CENTRUM DOWODZENIA LEKCJĄ - zaplanuje kompletną lekcję: cele, przebieg, zadania, quiz, kartę wyjścia i dostosowania SPE.",
-  "linkText": "Wypróbuj",
-  "linkUrl": "https://eduboxpro.pl/edulekcja360.html"
+  "message": "Bezpieczeństwo dzieci · Poradnik dla szkoły\n\nStandardy ochrony małoletnich — sprawdź przed nowym rokiem szkolnym\nObowiązki placówki, przegląd standardów, bezpieczeństwo w Internecie i sprawdzone źródła prawne. Bez logowania, z listą kontrolną do wydruku.",
+  "linkText": "",
+  "linkUrl": ""
 };
