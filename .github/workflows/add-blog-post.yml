@@ -15,6 +15,16 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: main
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
 
       - name: Add new post to blog-posts.js
         env:
@@ -43,50 +53,11 @@ jobs:
           console.log('Wpis dodany poprawnie.');
           EOF
 
-      - name: Update sitemap.xml with the new post
-        run: |
-          node <<'EOF'
-          const fs = require('fs');
+      - name: Rebuild public sitemap safely
+        run: npm run seo:sitemap
 
-          const postsFileText = fs.readFileSync('blog-posts.js', 'utf8');
-          const fakeWindow = {};
-          new Function('window', postsFileText)(fakeWindow);
-          const posts = fakeWindow.BLOG_POSTS;
-
-          const today = new Date().toISOString().slice(0, 10);
-          const isDate = (d) => /^\d{4}-\d{2}-\d{2}$/.test(d || '');
-
-          let sitemap = fs.readFileSync('sitemap.xml', 'utf8');
-
-          // Remove all existing "blog.html?post=..." entries
-          sitemap = sitemap.replace(
-            /\s*<url>\s*<loc>https:\/\/eduboxpro\.pl\/blog\.html\?post=[^<]*<\/loc>[\s\S]*?<\/url>/g,
-            ''
-          );
-
-          // Rebuild one entry per current post, newest (top of array) first
-          const entries = posts.map((p) => {
-            const lastmod = isDate(p.date) ? p.date : today;
-            return (
-              '  <url>\n' +
-              `    <loc>https://eduboxpro.pl/blog.html?post=${p.slug}</loc>\n` +
-              `    <lastmod>${lastmod}</lastmod>\n` +
-              '    <changefreq>monthly</changefreq>\n' +
-              '    <priority>0.7</priority>\n' +
-              '  </url>'
-            );
-          }).join('\n');
-
-          // Insert the fresh list right after the plain blog.html entry,
-          // and bump that entry's own lastmod to today.
-          sitemap = sitemap.replace(
-            /<url>\s*<loc>https:\/\/eduboxpro\.pl\/blog\.html<\/loc>\s*<lastmod>[^<]*<\/lastmod>([\s\S]*?)<\/url>/,
-            `<url>\n    <loc>https://eduboxpro.pl/blog.html</loc>\n    <lastmod>${today}</lastmod>$1</url>\n${entries}`
-          );
-
-          fs.writeFileSync('sitemap.xml', sitemap);
-          console.log('sitemap.xml zaktualizowany, wpisów w mapie:', posts.length);
-          EOF
+      - name: Validate SEO before commit
+        run: npm run seo:check
 
       - name: Commit and push
         run: |

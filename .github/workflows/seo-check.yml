@@ -1,0 +1,63 @@
+name: SEO Manager 2.0
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '**/*.html'
+      - 'apps.js'
+      - 'blog-posts.js'
+      - 'seo.config.js'
+      - 'seo-manager.js'
+      - 'sitemap.xml'
+      - 'robots.txt'
+      - 'package.json'
+      - 'package-lock.json'
+  push:
+    branches: [main]
+    paths:
+      - '**/*.html'
+      - 'apps.js'
+      - 'blog-posts.js'
+      - 'seo.config.js'
+      - 'seo-manager.js'
+      - 'sitemap.xml'
+      - 'robots.txt'
+      - 'package.json'
+      - 'package-lock.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    env:
+      SEO_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+    steps:
+      - name: Pobierz repozytorium wraz z historią zmian
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Ustaw Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Zainstaluj zależności
+        run: npm ci --no-audit --no-fund
+
+      - name: Sprawdź SEO i składnię stron bez modyfikowania plików
+        run: npm test
+
+      - name: Zachowaj raport z audytu
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: seo-manager-report
+          path: seo-reports/
+          if-no-files-found: warn
+          retention-days: 14

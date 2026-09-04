@@ -1,25 +1,34 @@
 @echo off
-:: Ustawienie kodowania znaków na UTF-8, żeby polskie litery wyświetlały się poprawnie
 chcp 65001 >nul
-title EduBox AI - Panel Automatyzacji SEO v3.0
+title EduBox AI - SEO Manager 2.0
 cls
 
 echo ======================================================================
-echo          EDUBOX AI (eduboxpro.pl) - AUTOMATYZAJA SEO v3.0             
+echo                 EDUBOX AI - SEO MANAGER 2.0
 echo ======================================================================
 echo.
-echo  [SYSTEM] Sprawdzam pliki HTML, naprawiam meta-tagi i generuje sitemape...
-echo  [SYSTEM] Proszę czekać, to zajmie tylko chwilę...
+echo Ten skrót wykonuje BEZPIECZNY AUDYT. Nie zmienia plików HTML.
 echo.
-echo ----------------------------------------------------------------------
 
-:: Uruchomienie naszego skryptu Node.js
-node seo-automator.js
+if not exist node_modules\cheerio (
+  echo [SYSTEM] Pierwsze uruchomienie - instaluję wymagane składniki...
+  call npm ci --no-audit --no-fund
+  if errorlevel 1 goto error
+)
 
-echo ----------------------------------------------------------------------
+call npm run seo:check
+if errorlevel 1 goto error
+
 echo.
-echo  [OK] Wszystkie zadania zostały wykonane pomyślnie!
-echo  [INFO] Możesz teraz bezpiecznie zamknąć to okno.
+echo [OK] Audyt zakończony bez błędów blokujących.
+echo [INFO] Raport znajdziesz w folderze seo-reports.
+goto end
+
+:error
 echo.
-echo ======================================================================
+echo [UWAGA] Audyt wykrył błąd. Nic nie zostało automatycznie nadpisane.
+echo [INFO] Szczegóły są w folderze seo-reports.
+
+:end
+echo.
 pause

@@ -110,6 +110,14 @@ kod PRO znosi limit (`localStorage.eduboxProStatus`, weryfikacja przez
 historyczna z czasów, gdy strona nazywała się "Magic Color" — NIE
 `eduboxpro`, to była realna literówka naprawiona w `edusymbol.html`).
 
+**SEO Manager 2.0:** każdy plik HTML musi być jawnie sklasyfikowany w
+`seo.config.js`. Nowy HTML jest domyślnie niepubliczny i nie może trafić do
+sitemap bez dopisania do `publicPages`. Strony redakcyjne/testowe należą do
+`excludedPages` i dostają wyłącznie kontrolowane `noindex, nofollow` — automat
+nie nadpisuje ich ręcznych tytułów ani opisów. GitHub Action uruchamia tylko
+`npm run seo:check`; nigdy automatycznego `seo:fix`. Szczegóły:
+`docs/SEO-MANAGER.md`.
+
 **Generowanie treści przez AI — wypracowane wzorce:**
 - *Dwuetapowy generator + weryfikator* (EduRymy): pierwsze zapytanie
   proponuje kandydatów swobodnie, DRUGIE, niezależne zapytanie (bez
