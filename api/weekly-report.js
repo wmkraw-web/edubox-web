@@ -184,8 +184,8 @@ function isWithinLastDays(dateText, days) {
 export default async function handler(req, res) {
     if (req.method === 'GET' && req.query.view === 'make-health') {
         if (!isPanelAuthorized(req)) {
-            res.setHeader('WWW-Authenticate', 'Basic realm="Prywatny panel EduBox"');
-            return res.status(401).json({ error: 'Autoryzacja wymagana.' });
+            res.setHeader('Cache-Control', 'private, no-store');
+            return res.status(401).json({ error: 'Niepoprawny login lub hasło.' });
         }
         try {
             const payload = await buildMakePanelPayload();
