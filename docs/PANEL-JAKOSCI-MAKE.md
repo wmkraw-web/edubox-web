@@ -14,8 +14,9 @@ Opcjonalne zmienne mają bezpieczne wartości domyślne dla obecnego środowiska
 - `MAKE_TEAM_ID=1469669`
 - `MAKE_ZONE=eu1.make.com`
 
-Token należy dodać w Vercel jako sekret dla Production i Preview. Nigdy nie wolno
-wklejać go do HTML, JavaScriptu przeglądarkowego, repozytorium ani komentarza PR.
+Najpierw dodaj token dla Preview i sprawdź panel na podglądzie PR. Dopiero po
+udanym teście dodaj go również dla Production. Nigdy nie wolno wklejać tokenu
+do HTML, JavaScriptu przeglądarkowego, repozytorium ani komentarza PR.
 
 ## Utworzenie tokenu w Make
 
@@ -33,3 +34,4 @@ wklejać go do HTML, JavaScriptu przeglądarkowego, repozytorium ani komentarza 
 - Nie pobiera zawartości arkuszy, promptów, treści postów ani danych uczniów.
 - Wynik jest przechowywany w pamięci funkcji najwyżej 5 minut, żeby ograniczyć liczbę odczytów.
 - Brak tokenu lub awaria Make nie wpływa na publiczną część EduBox.
+
