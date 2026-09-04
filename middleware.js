@@ -4,11 +4,18 @@
 // główna) działa bez żadnych zmian.
 
 export const config = {
-  matcher: ['/ewamarketing.html', '/ewa-marketing.html', '/aniawideo.html', '/api/ewa-generate'],
+  matcher: ['/ewamarketing.html', '/ewa-marketing.html', '/aniawideo.html', '/panel-jakosci.html', '/api/ewa-generate', '/api/weekly-report'],
 };
 
 export default function middleware(request) {
   const authHeader = request.headers.get('authorization');
+  const pathname = new URL(request.url).pathname;
+
+  // GitHub Actions korzysta z tego endpointu do raportu tygodniowego i wysyła
+  // własny sekret Bearer. Jego pełną poprawność nadal sprawdza funkcja API.
+  if (pathname === '/api/weekly-report' && authHeader?.startsWith('Bearer ')) {
+    return;
+  }
 
   if (authHeader) {
     const [scheme, encoded] = authHeader.split(' ');
