@@ -387,6 +387,10 @@
         const APPS = window.EduBoxData.APPS;
 
         const RECOMMENDATIONS = window.EduBoxData.RECOMMENDATIONS;
+        const JOURNEYS = window.EduBoxData.JOURNEYS || [];
+        const QUALITY = window.EduBoxData.QUALITY || {};
+        const CENTERS = window.EduBoxData.CENTERS || [];
+        const appBaseUrl = (url) => String(url || '').split(/[?#]/, 1)[0];
 
         // --- Utils ---
         const Reveal = ({ children, delay = 0, className = '' }) => {
@@ -442,8 +446,6 @@
             const audioUrlRef = useRef(null);
             const voiceRequestRef = useRef(0);
             const canSpeak = typeof window !== 'undefined' && typeof window.Audio === 'function' && typeof window.fetch === 'function';
-
-            const QUICK_PROMPTS = ["📄 Dokumenty i IPET", "🎲 Gra na zastępstwo", "🧩 Uczeń z autyzmem", "📝 Szybki sprawdzian"];
 
             useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, isOpen, isThinking]);
 
@@ -518,8 +520,8 @@
                 }
             };
 
-            const addAiMessage = (text, apps) => {
-                setMessages(prev => [...prev, { sender: 'ai', text, ...(apps ? { apps } : {}) }]);
+            const addAiMessage = (text, apps, extra = {}) => {
+                setMessages(prev => [...prev, { sender: 'ai', text, ...(apps ? { apps } : {}), ...extra }]);
                 speakText(text);
             };
 
@@ -590,7 +592,7 @@
                 }));
                 const system = `Jesteś NOVA — ciepłą, inteligentną i lekko żartobliwą asystentką AI serwisu EduBox dla nauczycieli. Odpowiedz bezpośrednio na najnowszą wiadomość użytkownika po polsku. Bądź konkretna, praktyczna i przyjazna. Odpowiedź powinna mieć zwykle 2–6 krótkich zdań i maksymalnie 900 znaków, aby dobrze brzmiała także po przeczytaniu głosem. Uwzględniaj ostatnie wiadomości rozmowy, jeśli pytanie do nich nawiązuje. Możesz odpowiadać również na zwykłe pytania niezwiązane bezpośrednio z katalogiem. Nie zmyślaj faktów ani możliwości aplikacji. Przy sprawach medycznych, prawnych lub innych wymagających specjalisty zaznacz ograniczenia i wskaż bezpieczny kolejny krok.
 
-Dodatkowo oceń, czy któreś narzędzia z przekazanego katalogu EduBox realnie pomagają w tej konkretnej sprawie. Jeśli tak, wybierz maksymalnie 3 i użyj wyłącznie dokładnych adresów URL z katalogu. Jeśli nie są potrzebne, zwróć pustą listę. Nie wciskaj rekomendacji na siłę.
+Dodatkowo oceń, czy któreś narzędzia z przekazanego katalogu EduBox realnie pomagają w tej konkretnej sprawie. Jeśli tak, wybierz maksymalnie 3 i ustaw je w praktycznej kolejności działania. Użyj wyłącznie dokładnych adresów URL z katalogu — mogą zawierać parametr mode, który otwiera właściwą funkcję. Użytkownik zobaczy te adresy jako klikalne kafelki, więc w odpowiedzi powiedz krótko, w jakiej kolejności warto je otworzyć. Jeśli narzędzia nie są potrzebne, zwróć pustą listę. Nie wciskaj rekomendacji na siłę.
 
 Zwróć WYŁĄCZNIE poprawny obiekt JSON w postaci: {"answer":"pełna odpowiedź NOVY","urls":["dokladny_url_z_katalogu"]}. Bez Markdownu i bez dodatkowego tekstu.`;
                 const res = await fetch('/api/chat', {
@@ -642,6 +644,21 @@ Zwróć WYŁĄCZNIE poprawny obiekt JSON w postaci: {"answer":"pełna odpowiedź
                 addAiMessage(novaReply.answer, novaReply.apps);
             };
 
+            const openJourney = (journey) => {
+                if (isThinking) return;
+                const matchedApps = journey.urls
+                    .map(url => appsData.find(app => app.url === url))
+                    .filter(Boolean);
+                setMessages(prev => [...prev, { sender: 'user', text: `${journey.icon} ${journey.label}` }]);
+                addAiMessage(journey.answer, matchedApps, { guided: true });
+            };
+
+            const trackNovaAppClick = (app) => {
+                if (window.EduBoxCore && window.EduBoxCore.trackAppClick) {
+                    window.EduBoxCore.trackAppClick(appBaseUrl(app.url));
+                }
+            };
+
             const handleSend = () => {
                 if (!inputText.trim() || isThinking) return;
                 processUserMessage(inputText.trim());
@@ -652,7 +669,7 @@ Zwróć WYŁĄCZNIE poprawny obiekt JSON w postaci: {"answer":"pełna odpowiedź
             return (
                 <div className="fixed bottom-6 right-6 z-[100] flex flex-col items-end print-hidden">
                     {isOpen && (
-                        <div className="bg-white dark:bg-slate-900 w-[calc(100vw-48px)] sm:w-[380px] h-[550px] rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-700 mb-4 flex flex-col overflow-hidden animate-[reveal_0.2s_ease-out]">
+                        <div className="bg-white dark:bg-slate-900 w-[calc(100vw-32px)] sm:w-[410px] h-[620px] max-h-[calc(100vh-110px)] rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-700 mb-4 flex flex-col overflow-hidden animate-[reveal_0.2s_ease-out]">
                             {/* Header */}
                             <div className="bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 p-3 flex items-center justify-between text-white shadow-md border-b border-cyan-400/20">
                                 <div className="flex items-center gap-3">
@@ -697,19 +714,23 @@ Zwróć WYŁĄCZNIE poprawny obiekt JSON w postaci: {"answer":"pełna odpowiedź
                                             )}
                                         </div>
 
-                                        {/* Wyświetlanie Mini-Kart Aplikacji */}
+                                        {/* Wyraźne, klikalne kafelki narzędzi wskazanych przez NOVĘ */}
                                         {msg.apps && msg.apps.length > 0 && (
-                                            <div className="flex flex-col gap-2 w-[85%] self-start mt-1">
+                                            <div className="flex flex-col gap-2 w-[92%] self-start mt-1">
+                                                <p className="text-[10px] font-black uppercase tracking-widest text-blue-600 dark:text-cyan-300 px-1">
+                                                    {msg.guided ? 'Twoja ścieżka — klikaj po kolei' : 'Kliknij kafelek, aby otworzyć'}
+                                                </p>
                                                 {msg.apps.map((app, appIdx) => (
-                                                    <a key={appIdx} href={app.url} className="flex items-center gap-3 bg-white dark:bg-slate-800 border border-blue-200 dark:border-blue-900/50 p-2.5 rounded-xl hover:border-blue-500 dark:hover:border-blue-500 transition-colors shadow-sm group">
-                                                        <div className={`w-10 h-10 rounded-lg bg-slate-100 dark:bg-slate-900 flex items-center justify-center ${app.color} group-hover:scale-110 transition-transform`}>
-                                                            <i className={`ph-bold ${app.icon} text-xl`}></i>
+                                                    <a key={appIdx} href={app.url} onClick={() => trackNovaAppClick(app)} className="flex items-center gap-3 bg-white dark:bg-slate-800 border-2 border-blue-200 dark:border-blue-900/60 p-3 rounded-2xl hover:border-blue-500 dark:hover:border-cyan-400 hover:-translate-y-0.5 transition-all shadow-sm hover:shadow-md group">
+                                                        <div className="w-6 h-6 rounded-full bg-blue-600 text-white text-[10px] font-black flex items-center justify-center shrink-0" aria-hidden="true">{appIdx + 1}</div>
+                                                        <div className={`w-11 h-11 rounded-xl bg-slate-100 dark:bg-slate-900 flex items-center justify-center ${app.color} group-hover:scale-110 transition-transform shrink-0`}>
+                                                            <i className={`ph-bold ${app.icon} text-2xl`}></i>
                                                         </div>
-                                                        <div className="flex-1 overflow-hidden">
-                                                            <div className="font-bold text-xs text-slate-900 dark:text-white truncate">{app.title}</div>
-                                                            <div className="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-wider">{app.category}</div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="font-black text-xs text-slate-900 dark:text-white leading-tight">{app.title}</div>
+                                                            <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 line-clamp-2 leading-snug">{app.desc}</div>
                                                         </div>
-                                                        <i className="ph-bold ph-caret-right text-slate-300 dark:text-slate-600 group-hover:text-blue-500"></i>
+                                                        <span className="text-[10px] font-black text-blue-600 dark:text-cyan-300 flex items-center gap-1 shrink-0">OTWÓRZ <i className="ph-bold ph-arrow-right"></i></span>
                                                     </a>
                                                 ))}
                                             </div>
@@ -728,15 +749,16 @@ Zwróć WYŁĄCZNIE poprawny obiekt JSON w postaci: {"answer":"pełna odpowiedź
                                 <div ref={messagesEndRef} />
                             </div>
 
-                            {/* Pigułki szybkiego wyboru + alternatywa (quiz) */}
-                            <div className="bg-slate-50 dark:bg-slate-900/50 px-3 pt-2 pb-1 flex gap-2 overflow-x-auto custom-scrollbar whitespace-nowrap">
-                                {QUICK_PROMPTS.map((prompt, idx) => (
+                            {/* Gotowe potrzeby — działają lokalnie, bez wywołania AI */}
+                            <div className="bg-slate-50 dark:bg-slate-900/50 px-3 pt-2 pb-1 flex gap-2 overflow-x-auto custom-scrollbar whitespace-nowrap" aria-label="Szybkie ścieżki NOVY">
+                                {JOURNEYS.map((journey) => (
                                     <button
-                                        key={idx}
-                                        onClick={() => !isThinking && processUserMessage(prompt)}
-                                        className="text-[10px] md:text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 px-3 py-1.5 rounded-full hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors shrink-0"
+                                        key={journey.id}
+                                        onClick={() => openJourney(journey)}
+                                        disabled={isThinking}
+                                        className="text-[10px] md:text-xs font-bold text-blue-700 dark:text-cyan-200 bg-blue-100 dark:bg-cyan-950/40 border border-blue-200 dark:border-cyan-800/70 px-3 py-2 rounded-xl hover:bg-blue-200 dark:hover:bg-cyan-900/50 transition-colors shrink-0 disabled:opacity-50"
                                     >
-                                        {prompt}
+                                        {journey.icon} {journey.label}
                                     </button>
                                 ))}
                             </div>
@@ -893,7 +915,7 @@ Zwróć WYŁĄCZNIE poprawny obiekt JSON w postaci: {"answer":"pełna odpowiedź
                     {app.badge && <div className={`absolute top-0 right-0 ${app.badgeColor} text-white text-[10px] font-black px-4 py-2 rounded-bl-2xl uppercase tracking-widest z-10 shadow-md`}>{app.badge}</div>}
 
                     {app.verified2026 && (
-                        <div className="absolute top-6 left-6 z-20 w-8 h-8 flex items-center justify-center rounded-full bg-emerald-500/15 border border-emerald-500/40 backdrop-blur-md" title="Zweryfikowano pod kątem przepisów i podstawy programowej obowiązujących w roku szkolnym 2026/2027 (sierpień 2026)">
+                        <div className="absolute top-6 left-6 z-20 w-8 h-8 flex items-center justify-center rounded-full bg-emerald-500/15 border border-emerald-500/40 backdrop-blur-md" title={QUALITY.verifiedLabel || 'Treść sprawdzona na rok szkolny 2026/2027'}>
                             <i className="ph-fill ph-shield-check text-emerald-500 text-base"></i>
                         </div>
                     )}
@@ -904,6 +926,17 @@ Zwróć WYŁĄCZNIE poprawny obiekt JSON w postaci: {"answer":"pełna odpowiedź
                     
                     <h3 className={`${app.featured ? 'text-2xl md:text-3xl' : 'text-xl md:text-2xl'} font-bold text-slate-900 dark:text-white mb-3 tracking-tight pr-6 leading-tight`}>{app.title}</h3>
                     <p className={`text-slate-600 dark:text-slate-400 ${app.featured ? 'text-base max-w-2xl' : 'text-sm'} leading-relaxed mb-5 flex-grow`}>{app.desc}</p>
+
+                    <div className="flex flex-wrap items-center gap-2 mb-3">
+                        <span className="inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-500/30" title={`Katalog sprawdzany automatycznie · ostatnia kontrola ${QUALITY.catalogCheckedAt || '2026-09-04'}`}>
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" aria-hidden="true"></span> Aktywne
+                        </span>
+                        {app.verified2026 && (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/30">
+                                <i className="ph-fill ph-shield-check"></i> Treść {QUALITY.verifiedSchoolYear || '2026/2027'}
+                            </span>
+                        )}
+                    </div>
 
                     <div className="flex items-center gap-2 mb-5">
                         <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide px-2.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/30">
@@ -1001,11 +1034,22 @@ const closeAnnouncement = () => {
             
             // Historia kliknięć i ulubione
             const [recentApps, setRecentApps] = useState(() => {
-                try { return JSON.parse(localStorage.getItem('edubox_recents')) || []; } catch(e) { return []; }
+                try {
+                    const stored = JSON.parse(localStorage.getItem('edubox_recents')) || [];
+                    return stored.map(item => APPS.find(app => app.title === item.title) || item).slice(0, 4);
+                } catch(e) { return []; }
             });
 
             const [favorites, setFavorites] = useState(() => {
-                try { return JSON.parse(localStorage.getItem('edubox_favorites')) || []; } catch(e) { return []; }
+                try {
+                    const stored = JSON.parse(localStorage.getItem('edubox_favorites')) || [];
+                    const migrated = stored.flatMap(url => {
+                        if (APPS.some(app => app.url === url)) return [url];
+                        const matchingModes = APPS.filter(app => appBaseUrl(app.url) === appBaseUrl(url)).map(app => app.url);
+                        return matchingModes.length ? matchingModes : [url];
+                    });
+                    return [...new Set(migrated)];
+                } catch(e) { return []; }
             });
 
             // Prawdziwe statystyki (Firestore) - licznik globalny i popularność tygodniowa
@@ -1020,7 +1064,7 @@ const closeAnnouncement = () => {
                     const unsubCounter = window.EduBoxCore.subscribeGlobalCounter(setGlobalCounter);
                     const unsubPopular = window.EduBoxCore.subscribeWeeklyPopular((list) => {
                         const enriched = list
-                            .map(item => ({ ...item, appData: APPS.find(a => a.url === item.url) }))
+                            .map(item => ({ ...item, appData: APPS.find(app => app.url === item.url || appBaseUrl(app.url) === appBaseUrl(item.url)) }))
                             .filter(item => item.appData);
                         setPopularApps(enriched);
                     }, 5);
@@ -1047,7 +1091,7 @@ const closeAnnouncement = () => {
                     return [app, ...filtered].slice(0, 4); // Trzyma tylko 4 ostatnie
                 });
                 if (window.EduBoxCore && window.EduBoxCore.trackAppClick) {
-                    window.EduBoxCore.trackAppClick(app.url);
+                    window.EduBoxCore.trackAppClick(appBaseUrl(app.url));
                 }
             };
 
@@ -1124,6 +1168,7 @@ const closeAnnouncement = () => {
                                     <a href="co-nowego.html" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">Co nowego</a>
                                     <a href="#wideo" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">Galeria</a>
                                     <a href="oferta.pdf" target="_blank" className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 hover:text-emerald-500 transition-colors">📄 Katalog</a>
+                                    <a href="teczka.html" className="hidden xl:flex items-center gap-1.5 text-cyan-600 dark:text-cyan-400 hover:text-cyan-500 transition-colors">📁 Teczka</a>
                                 </div>
                                 
                                 {/* Przełącznik Motywu */}
@@ -1165,6 +1210,7 @@ const closeAnnouncement = () => {
                                 <a href="co-nowego.html" className="py-3 text-sm font-bold text-slate-700 dark:text-slate-300 border-b border-slate-100 dark:border-slate-800">Co nowego</a>
                                 <a href="#wideo" onClick={() => setMobileMenuOpen(false)} className="py-3 text-sm font-bold text-slate-700 dark:text-slate-300 border-b border-slate-100 dark:border-slate-800">Galeria</a>
                                 <a href="oferta.pdf" target="_blank" className="py-3 text-sm font-bold text-emerald-600 dark:text-emerald-400 border-b border-slate-100 dark:border-slate-800">📄 Katalog</a>
+                                <a href="teczka.html" className="py-3 text-sm font-bold text-cyan-600 dark:text-cyan-400 border-b border-slate-100 dark:border-slate-800">📁 Moja Teczka</a>
                                 <button
                                     onClick={() => { setMobileMenuOpen(false); setShowProModal(true); }}
                                     className="py-3 text-sm font-bold text-slate-700 dark:text-slate-300 border-b border-slate-100 dark:border-slate-800 text-left"
@@ -1284,6 +1330,28 @@ const closeAnnouncement = () => {
                             </div>
                         </div>
                     </section>
+                    {/* CZTERY PROSTE WEJŚCIA DLA OSÓB, KTÓRE NIE ZNAJĄ JESZCZE NAZW APLIKACJI */}
+                    <section aria-labelledby="centra-heading" className="max-w-[90rem] mx-auto px-6 pb-16 relative z-10">
+                        <Reveal>
+                            <div className="text-center mb-8">
+                                <p className="text-xs font-black uppercase tracking-[0.2em] text-blue-600 dark:text-blue-400 mb-3">Zacznij od potrzeby</p>
+                                <h2 id="centra-heading" className="text-3xl md:text-4xl font-black text-slate-900 dark:text-white tracking-tight">Wybierz swoje centrum</h2>
+                                <p className="text-slate-600 dark:text-slate-400 mt-3">Nie musisz pamiętać nazw aplikacji. Kliknij obszar, a zobaczysz tylko pasujące narzędzia.</p>
+                            </div>
+                            <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-5">
+                                {CENTERS.map(center => (
+                                    <a key={center.url} href={center.url} className="group rounded-3xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-6 shadow-sm hover:-translate-y-1 hover:shadow-xl hover:border-blue-400 transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue-500">
+                                        <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${center.color} text-white flex items-center justify-center shadow-lg mb-5`} aria-hidden="true">
+                                            <i className={`ph-bold ${center.icon} text-2xl`}></i>
+                                        </div>
+                                        <h3 className="text-lg font-black text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">{center.title}</h3>
+                                        <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed mt-2">{center.desc}</p>
+                                        <span className="inline-flex items-center gap-2 mt-5 text-sm font-black text-blue-600 dark:text-blue-400">Pokaż narzędzia <i className="ph-bold ph-arrow-right group-hover:translate-x-1 transition-transform"></i></span>
+                                    </a>
+                                ))}
+                            </div>
+                        </Reveal>
+                    </section>
                     {/* KATEGORIE I GRID APLIKACJI */}
                     <section id="narzedzia" className="max-w-[90rem] mx-auto px-6 py-20 z-10 relative border-t border-slate-200 dark:border-slate-800/50">
                         <Reveal>
@@ -1349,6 +1417,10 @@ const closeAnnouncement = () => {
                             </div>
 
                             <div className="flex flex-col items-center gap-3 mb-16">
+                                <div className="inline-flex items-center gap-2 text-xs text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/30 rounded-full px-4 py-2">
+                                    <i className="ph-fill ph-check-circle text-blue-500 text-base shrink-0"></i>
+                                    <span><strong>Aktywne</strong> = narzędzie znajduje się w kontrolowanym katalogu EduBox (kontrola: {QUALITY.catalogCheckedAt || 'bieżąca'})</span>
+                                </div>
                                 <div className="inline-flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/30 rounded-full px-4 py-2">
                                     <i className="ph-fill ph-shield-check text-emerald-500 text-base shrink-0"></i>
                                     <span><strong className="text-emerald-600 dark:text-emerald-400">Tarcza</strong> na karcie = zweryfikowane pod kątem przepisów i podstawy programowej na rok szkolny 2026/2027</span>
@@ -1659,4 +1731,3 @@ const closeAnnouncement = () => {
     </script>
 
 </body></html>
-

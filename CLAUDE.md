@@ -1,6 +1,6 @@
 # CLAUDE.md — EduBox AI (eduboxpro.pl)
 
-Portfolio ~65 darmowych narzędzi AI dla nauczycieli (Polska). Utrzymywany
+Portfolio 66 kafelków darmowych narzędzi AI dla nauczycieli (Polska). Utrzymywany
 przez jedną osobę (Witold, wmkraw@gmail.com) z pomocą Claude Code. Ton marki:
 "koleżanka z pokoju nauczycielskiego" — ciepło, konkret, zero korpo-mowy.
 Wsparcie finansowe przedstawiane jako "dziękuję", nigdy jako "kup teraz".
@@ -61,7 +61,7 @@ wzorów (np. EduDialog).
   `weekly-report.yml` (poniedziałki — raport tygodniowy),
   `update-porada-dnia.yml` (Porada dnia).
 
-## Katalog narzędzi (`apps.js`, 65 wpisów, 4 kategorie)
+## Katalog narzędzi (`apps.js`, 66 wpisów, 4 kategorie)
 
 `window.EduBoxData.APPS` — pojedyncze źródło prawdy dla katalogu, menu,
 wyszukiwarki (OmniBot) i generatorów treści marketingowych (EwaMarketing,
@@ -79,7 +79,7 @@ category, tags`.
   (wierszyki/piosenki), **EduRymy AI** (słownik rymów — osobne narzędzie od
   EduTik, dwuetapowa weryfikacja rymów), EduPrezentacja, EduKomiks,
   EduMotywator, EduGrupy, EduFiszki, EduGry, EduBystrzak, EduEscape, Studio,
-  EduWakacje.
+  EduWakacje oraz EduLekcja 360.
 - **grafika** (12): EduWystrój/EduDekorator, EduKatalog, EduGenerator,
   EduDyplomy, Magic Color, EduPlakat, EduStudio, EduGazetka, MagicLetters,
   EduMalarz, EduDetox.
@@ -117,6 +117,22 @@ sitemap bez dopisania do `publicPages`. Strony redakcyjne/testowe należą do
 nie nadpisuje ich ręcznych tytułów ani opisów. GitHub Action uruchamia tylko
 `npm run seo:check`; nigdy automatycznego `seo:fix`. Szczegóły:
 `docs/SEO-MANAGER.md`.
+
+**Nawigacja oparta na potrzebach:** `apps.js` przechowuje również `JOURNEYS`
+(gotowe ścieżki NOVY z 2–3 klikalnymi kafelkami), `CENTERS` (cztery publiczne
+centra tematyczne) i `QUALITY` (data kontroli katalogu oraz etykieta roku
+szkolnego). Nie duplikuj tych danych ręcznie w `index.html`. Strony
+`centrum-*.html` generuje `npm run centers:generate`; CI sprawdza ich aktualność
+przez `npm run centers:check` i jakość katalogu przez `npm run catalog:check`.
+
+**Głębokie linki:** wielofunkcyjne aplikacje przyjmują kontrolowany parametr
+`?mode=...`, dzięki czemu kafelek otwiera właściwą zakładkę, a nie tylko stronę
+startową. Dozwolone wartości są jawnie sprawdzane w `scripts/check-catalog.js`.
+
+**Moja Teczka:** `teczka.html` i `teczka.js` zapisują notatki wyłącznie w
+`localStorage` bieżącej przeglądarki. Nie wysyłają treści do Firebase ani API.
+Strona jest celowo prywatna (`noindex`) i wykluczona z sitemap. Przy zmianach
+nie dodawaj synchronizacji chmurowej bez osobnej, świadomej decyzji właściciela.
 
 **Generowanie treści przez AI — wypracowane wzorce:**
 - *Dwuetapowy generator + weryfikator* (EduRymy): pierwsze zapytanie

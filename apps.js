@@ -8,6 +8,61 @@ window.EduBoxData = {
         { name: 'Suno AI', url: 'https://suno.com/', icon: '🎵', desc: 'Twórz piosenki na zajęcia z AI.' }
     ],
 
+    // Gotowe ścieżki NOVY. Każda prowadzi wyłącznie do narzędzi z katalogu,
+    // dzięki czemu szybki wybór działa natychmiast i nie zużywa wywołania AI.
+    JOURNEYS: [
+        {
+            id: 'lesson', icon: '🎓', label: 'Przygotować lekcję',
+            prompt: 'Pomóż mi przygotować kompletną lekcję.',
+            answer: 'Zacznij od planu całej lekcji, potem przygotuj zadania i na końcu szybkie sprawdzenie wiedzy. Klikaj kafelki po kolei — każdy otworzy właściwe narzędzie.',
+            urls: ['edulekcja360.html', 'eduzadania.html', 'edusprawdzian.html']
+        },
+        {
+            id: 'documents', icon: '📄', label: 'Przygotować dokument',
+            prompt: 'Potrzebuję szkolnego dokumentu.',
+            answer: 'Najpierw wybierz rodzaj dokumentu. Jeśli sprawa dotyczy IPET lub WOPFU, przejdź od razu do Asystenta Pedagoga; przy notatce lub protokole użyj właściwego skrótu EduBiurokraty.',
+            urls: ['edubiurokrata.html?mode=protokol', 'asystent-pedagoga.html', 'edusprawozdania.html']
+        },
+        {
+            id: 'parents', icon: '💬', label: 'Napisać do rodzica',
+            prompt: 'Muszę napisać spokojną wiadomość do rodzica.',
+            answer: 'Najpierw ułóż dyplomatyczną wiadomość w EduDialogu. Jeśli rozmowa wymaga później formalnej notatki, drugi kafelek otworzy od razu właściwy tryb.',
+            urls: ['edudialog.html?mode=nvc', 'edubiurokrata.html?mode=notatka']
+        },
+        {
+            id: 'spe', icon: '🧩', label: 'Pomóc uczniowi ze SPE',
+            prompt: 'Potrzebuję materiałów lub wsparcia dla ucznia ze SPE.',
+            answer: 'Zacznij od dostosowań, potem dobierz prostą wizualizację kroków. Jeśli potrzebujesz planu zajęć TUS, trzeci kafelek otworzy go bez szukania zakładki.',
+            urls: ['edudostosowania.html', 'eduwizualizator.html?mode=steps', 'eduterapia.html?mode=tus']
+        },
+        {
+            id: 'substitution', icon: '⚡', label: 'Mam nagłe zastępstwo',
+            prompt: 'Mam zastępstwo i potrzebuję czegoś na już.',
+            answer: 'Tu liczy się czas: pierwszy kafelek daje zabawy bez przygotowania, a kolejne pozwalają szybko zrobić BINGO lub fiszki do dowolnego tematu.',
+            urls: ['eduzastepstwo.html', 'edugry.html?mode=bingo', 'edufiszki.html']
+        },
+        {
+            id: 'behavior', icon: '🛟', label: 'Trudne zachowanie',
+            prompt: 'Uczeń zachowuje się trudno i potrzebuję planu działania.',
+            answer: 'Najpierw uporządkuj sytuację z EduSOS. Potem możesz przygotować tablicę Najpierw–Potem albo krótką historyjkę społeczną — odpowiednie tryby są już otwarte w kafelkach.',
+            urls: ['edusos.html', 'eduwizualizator.html?mode=first_then', 'eduterapia.html?mode=story']
+        }
+    ],
+
+    QUALITY: {
+        catalogCheckedAt: '2026-09-04',
+        verifiedSchoolYear: '2026/2027',
+        verifiedLabel: 'Treść sprawdzona na rok szkolny 2026/2027',
+        activeLabel: 'Aktywne narzędzie EduBox'
+    },
+
+    CENTERS: [
+        { title: 'Centrum lekcji i zajęć', desc: 'Scenariusze, zadania, quizy i pomoce gotowe do użycia na lekcji.', url: 'centrum-lekcje.html', icon: 'ph-chalkboard-teacher', color: 'from-blue-600 to-cyan-500', category: 'zajecia' },
+        { title: 'Centrum dokumentów', desc: 'Dokumentacja, opinie, sprawozdania i szkolna biurokracja w jednym miejscu.', url: 'centrum-dokumenty.html', icon: 'ph-files', color: 'from-indigo-600 to-violet-600', category: 'biurokracja' },
+        { title: 'Centrum terapii i SPE', desc: 'Dostosowania, AAC, TUS i praktyczne wsparcie ucznia.', url: 'centrum-spe.html', icon: 'ph-heart', color: 'from-pink-600 to-rose-500', category: 'terapia' },
+        { title: 'Centrum grafiki i materiałów', desc: 'Dyplomy, plakaty, prezentacje, obrazy i wideo dla szkoły.', url: 'centrum-grafika.html', icon: 'ph-palette', color: 'from-amber-500 to-orange-600', category: 'grafika' }
+    ],
+
     APPS: [
         // --- GŁÓWNE CENTRUM DOWODZENIA ---
         { title: 'EduLekcja 360', desc: 'Centrum dowodzenia lekcją. Tworzy plan, zadania, quiz, notatkę, kartę wyjścia i dostosowania, a potem łączy z aplikacjami EduBox.', url: 'edulekcja360.html', badge: 'NOWOŚĆ 360°', badgeColor: 'bg-gradient-to-r from-indigo-600 to-cyan-500', icon: 'ph-chalkboard-teacher', color: 'text-indigo-500', category: 'zajecia', tags: ['lekcja', 'scenariusz', 'quiz', 'zadania', 'prezentacja', 'spe', 'kompletny pakiet'], featured: true },
@@ -15,13 +70,13 @@ window.EduBoxData = {
         // --- TERAPIA I SPE ---
         { title: 'EduKasia PRO', desc: 'Asystent przedszkolny. Porady SOS, mówik AAC, dziennik sukcesów i bajki!', url: 'edukasia.html', badge: 'DLA KASI ❤️', badgeColor: 'bg-rose-600', icon: 'ph-heart', color: 'text-rose-500', category: 'terapia', tags: ['przedszkole', 'bajki', 'aac'] },
         { title: 'Asystent Dostosowań', desc: 'Dobiera formy dostosowania wymagań pod zadaną diagnozę ucznia.', url: 'edudostosowania.html', icon: 'ph-shield-check', color: 'text-blue-500', category: 'terapia', tags: ['dostosowania', 'wymagania', 'diagnoza'] , verified2026: true },
-        { title: 'EduDialog AI (Tłumacz)', desc: 'Przetłumaczy Twój nerwowy tekst na dyplomatyczną wiadomość dla rodzica.', url: 'edudialog.html', icon: 'ph-chats', color: 'text-violet-500', category: 'terapia', tags: ['rodzice', 'wiadomość', 'dyplomacja'] },
-        { title: 'EduTerapia PRO (TUS)', desc: 'Kompletne plany zajęć Treningu Umiejętności Społecznych.', url: 'eduterapia.html', badge: 'TERAPIA', badgeColor: 'bg-pink-600', icon: 'ph-users-three', color: 'text-pink-500', category: 'terapia', tags: ['tus', 'terapia', 'społeczne'] },
-        { title: 'Generator Historyjek 3D', desc: 'Układa spersonalizowaną historyjkę dla dziecka i rysuje ilustracje.', url: 'eduterapia.html', badge: 'AI GRAFIKA', badgeColor: 'bg-pink-600', icon: 'ph-video-camera', color: 'text-pink-500', category: 'terapia', tags: ['bajki', 'historyjki', 'czytanie'] },
-        { title: 'EduWizualizator (AAC)', desc: 'Dzieli trudną czynność na kroki z piktogramami (Najpierw-Potem).', url: 'eduwizualizator.html', badge: 'AAC', badgeColor: 'bg-yellow-500 text-yellow-950', icon: 'ph-stack', color: 'text-yellow-500', category: 'terapia', tags: ['aac', 'autism', 'wizualizacja'] },
-        { title: 'Tablice Najpierw-Potem', desc: 'Przeciwdziałanie oporowi. Tablica "Zadanie - Nagroda" gotowa do druku.', url: 'eduwizualizator.html', icon: 'ph-layout', color: 'text-orange-500', category: 'terapia', tags: ['aac', 'nagroda', 'motywacja'] },
+        { title: 'EduDialog AI (Tłumacz)', desc: 'Przetłumaczy Twój nerwowy tekst na dyplomatyczną wiadomość dla rodzica.', url: 'edudialog.html?mode=nvc', icon: 'ph-chats', color: 'text-violet-500', category: 'terapia', tags: ['rodzice', 'wiadomość', 'dyplomacja'] },
+        { title: 'EduTerapia PRO (TUS)', desc: 'Kompletne plany zajęć Treningu Umiejętności Społecznych.', url: 'eduterapia.html?mode=tus', badge: 'TERAPIA', badgeColor: 'bg-pink-600', icon: 'ph-users-three', color: 'text-pink-500', category: 'terapia', tags: ['tus', 'terapia', 'społeczne'] },
+        { title: 'Generator Historyjek 3D', desc: 'Układa spersonalizowaną historyjkę dla dziecka i rysuje ilustracje.', url: 'eduterapia.html?mode=story', badge: 'AI GRAFIKA', badgeColor: 'bg-pink-600', icon: 'ph-video-camera', color: 'text-pink-500', category: 'terapia', tags: ['bajki', 'historyjki', 'czytanie'] },
+        { title: 'EduWizualizator (AAC)', desc: 'Dzieli trudną czynność na kroki z piktogramami (Najpierw-Potem).', url: 'eduwizualizator.html?mode=steps', badge: 'AAC', badgeColor: 'bg-yellow-500 text-yellow-950', icon: 'ph-stack', color: 'text-yellow-500', category: 'terapia', tags: ['aac', 'autism', 'wizualizacja'] },
+        { title: 'Tablice Najpierw-Potem', desc: 'Przeciwdziałanie oporowi. Tablica "Zadanie - Nagroda" gotowa do druku.', url: 'eduwizualizator.html?mode=first_then', icon: 'ph-layout', color: 'text-orange-500', category: 'terapia', tags: ['aac', 'nagroda', 'motywacja'] },
         { title: 'EduChunk AI', desc: 'Dla uczniów z ADHD/Dysleksją. Dzieli trudny tekst na czytelne fiszki.', url: 'chunking.html', badge: 'INKLUZJA', badgeColor: 'bg-teal-600', icon: 'ph-brain', color: 'text-teal-500', category: 'terapia', tags: ['dysleksja', 'adhd', 'fiszki', 'chunking'] },
-        { title: 'Asystent Sensoryki (SI)', desc: 'Baza tanich, szybkich zabaw sensorycznych celujących w układ proprioceptywny.', url: 'eduterapia.html', icon: 'ph-hand-pointing', color: 'text-fuchsia-500', category: 'terapia', tags: ['si', 'sensoryka', 'zabawy'] },
+        { title: 'Asystent Sensoryki (SI)', desc: 'Baza tanich, szybkich zabaw sensorycznych celujących w układ proprioceptywny.', url: 'eduterapia.html?mode=sensory', icon: 'ph-hand-pointing', color: 'text-fuchsia-500', category: 'terapia', tags: ['si', 'sensoryka', 'zabawy'] },
         { title: "EduBajka PRO (Ilustrowana)", desc: "Generator bajek terapeutycznych. Podaj problem ucznia (np. strach, złość), a AI stworzy 4-stronicową, pięknie ilustrowaną książeczkę do druku.", url: "edubajka.html", badge: "HIT / SPE", badgeColor: "bg-purple-600", icon: "ph-book-bookmark", color: "text-purple-500", category: "terapia", tags: ["bajki", "terapia", "książki", "emocje"] },
         { title: 'EduSymbol AI', desc: 'Twórz grafiki do ksiąg komunikacyjnych w gotowej siatce do wydruku.', url: 'edusymbol.html', icon: 'ph-squares-four', color: 'text-fuchsia-500', category: 'terapia', tags: ['symbole', 'aac', 'karty'] },
         { title: 'EduSOS PRO', desc: 'Trudne zachowanie ucznia? AI podpowie metody i psychologiczne rady.', url: 'edusos.html', icon: 'ph-lifebuoy', color: 'text-fuchsia-500', category: 'terapia', tags: ['sos', 'pomoc', 'trudne zachowania'] },
@@ -37,10 +92,10 @@ window.EduBoxData = {
         { title: 'EduAwans PRO MAX', desc: 'Edytor sprawozdań z AI. Generuj i drukuj oficjalne dokumenty awansowe w PDF.', url: 'eduawans.html', badge: 'AWANS MAX', badgeColor: 'bg-blue-600', icon: 'ph-briefcase', color: 'text-blue-500', category: 'biurokracja', tags: ['awans', 'pdf', 'dokumenty'] , verified2026: true },
         { title: 'EduWycieczka Organizator', desc: 'Wyliczy zrzutkę, napisze na Librusa i stworzy gotowe zgody RODO do druku.', url: 'eduwycieczka.html', badge: 'NOWOŚĆ', badgeColor: 'bg-emerald-600', icon: 'ph-map-trifold', color: 'text-emerald-500', category: 'biurokracja', tags: ['wycieczka', 'rodo', 'librus'] },
         { title: 'EduPrawo AI', desc: 'Interpretacja Prawa Oświatowego i generowanie gotowych wniosków urzędowych.', url: 'eduprawo.html', badge: 'PRAWO MEN', badgeColor: 'bg-red-600', icon: 'ph-scales', color: 'text-red-500', category: 'biurokracja', tags: ['prawo', 'ustawa', 'wniosek'] , verified2026: true },
-        { title: 'EduBiurokrata AI', desc: 'Sformalizowane protokoły zebrań z rodzicami oraz zgody.', url: 'edubiurokrata.html', icon: 'ph-file-doc', color: 'text-blue-500', category: 'biurokracja', tags: ['zebrania', 'protokół', 'zgody'] },
-        { title: 'Kreator Opinii (PPP)', desc: 'Zamienia brudnopis w oficjalną Opinię do Poradni z żargonem PPP.', url: 'edudialog.html', icon: 'ph-signature', color: 'text-rose-500', category: 'biurokracja', tags: ['ppp', 'opinia', 'poradnia'] },
+        { title: 'EduBiurokrata AI', desc: 'Sformalizowane protokoły zebrań z rodzicami oraz zgody.', url: 'edubiurokrata.html?mode=protokol', icon: 'ph-file-doc', color: 'text-blue-500', category: 'biurokracja', tags: ['zebrania', 'protokół', 'zgody'] },
+        { title: 'Kreator Opinii (PPP)', desc: 'Zamienia brudnopis w oficjalną Opinię do Poradni z żargonem PPP.', url: 'edudialog.html?mode=ppp', icon: 'ph-signature', color: 'text-rose-500', category: 'biurokracja', tags: ['ppp', 'opinia', 'poradnia'] },
         { title: 'EduSprawozdawca PRO', desc: 'AI analizuje notatki i pliki PDF, by wygenerować sprawozdanie roczne.', url: 'edusprawozdania.html', badge: 'NOWOŚĆ', badgeColor: 'bg-emerald-500', icon: 'ph-presentation-chart', color: 'text-emerald-500', category: 'biurokracja', tags: ['sprawozdanie', 'półrocze', 'rok'] },
-        { title: 'Notatki Służbowe', desc: 'Zmienia emocjonalny opis zdarzenia w chłodną, urzędową notatkę.', url: 'edubiurokrata.html', icon: 'ph-clipboard-text', color: 'text-slate-400', category: 'biurokracja', tags: ['notatka', 'dziennik', 'służbowa'] },
+        { title: 'Notatki Służbowe', desc: 'Zmienia emocjonalny opis zdarzenia w chłodną, urzędową notatkę.', url: 'edubiurokrata.html?mode=notatka', icon: 'ph-clipboard-text', color: 'text-slate-400', category: 'biurokracja', tags: ['notatka', 'dziennik', 'służbowa'] },
         { title: 'EduOcena AI', desc: 'Kreator Ocen Opisowych. Wyklikaj umiejętności na świadectwo!', url: 'eduocena.html', badge: 'OCENY', badgeColor: 'bg-violet-600', icon: 'ph-user-check', color: 'text-violet-500', category: 'biurokracja', tags: ['ocena', 'opisowa', 'świadectwo'] },
         { title: 'EduKorektor AI (NAZU)', desc: 'Sprawdza tekst ucznia, podając 2 jego mocne strony (zamiast jedynek).', url: 'edukorektor.html', icon: 'ph-target', color: 'text-violet-500', category: 'biurokracja', tags: ['korektor', 'sprawdzanie', 'ocenianie'] },
         { title: 'EduWpisy PRO (Dziennik)', desc: 'Koniec wymyślania! Generuje ultra-profesjonalne, urzędowe wpisy do dziennika (Librus/Vulcan) z uwzględnieniem zapisów o dzieciach ze SPE.', url: 'eduwpisy.html', badge: 'HIT MEN', badgeColor: 'bg-indigo-600', icon: 'ph-pencil-line', color: 'text-indigo-500', category: 'biurokracja', tags: ['dziennik', 'librus', 'vulcan', 'spe', 'wpisy'] },
@@ -50,7 +105,7 @@ window.EduBoxData = {
 
         // --- ZAJĘCIA I GRY ---
         { title: 'Scenariusz AI PRO', desc: 'Tworzy 45-minutowe konspekty ze skryptem dialogowym dla nauczyciela.', url: 'eduscenariusz.html', badge: 'HIT! PRO', badgeColor: 'bg-emerald-600', icon: 'ph-book-open', color: 'text-emerald-500', category: 'zajecia', tags: ['konspekt', 'scenariusz', 'lekcja'] },
-        { title: 'Edukacja 2025 AI', desc: 'Debaty i symulacje pod nową Edukację Obywatelską i Zdrowotną.', url: 'edukacja2025.html', badge: 'NOWOŚĆ', badgeColor: 'bg-emerald-600', icon: 'ph-sparkle', color: 'text-emerald-500', category: 'zajecia', tags: ['obywatelska', 'zdrowotna', 'debaty'] , verified2026: true },
+        { title: 'Edukacja 2025 AI', desc: 'Debaty i symulacje pod nową Edukację Obywatelską i Zdrowotną.', url: 'edukacja2025.html?mode=civic', badge: 'NOWOŚĆ', badgeColor: 'bg-emerald-600', icon: 'ph-sparkle', color: 'text-emerald-500', category: 'zajecia', tags: ['obywatelska', 'zdrowotna', 'debaty'] , verified2026: true },
         { title: 'EduZadania AI', desc: 'Generuje matematyczne zadania tekstowe z ulubionymi postaciami dzieci.', url: 'eduzadania.html', badge: 'GRYWALIZACJA', badgeColor: 'bg-sky-500', icon: 'ph-calculator', color: 'text-sky-500', category: 'zajecia', tags: ['matematyka', 'zadania', 'grywalizacja'] },
         { title: 'EduSprawdzian Maker', desc: 'Zrobi test (Grupa A i B) na podstawie wklejonej notatki z lekcji.', url: 'edusprawdzian.html', icon: 'ph-exam', color: 'text-emerald-500', category: 'zajecia', tags: ['sprawdzian', 'test', 'kartkówka'] },
         { title: "EduKalendarz PRO MAX", desc: "Baza Świąt Nietypowych. Generuje gotowe zajęcia 'Zero-Prep' (bez przygotowania) i łączy Cię z innymi narzędziami EduBoxa.", url: "edukalendarz.html", badge: "NOWOŚĆ", badgeColor: "bg-violet-600", icon: "ph-calendar-star", color: "text-violet-500", category: "zajecia", tags: ["kalendarz", "święta nietypowe", "scenariusz", "zajęcia"] },
@@ -58,14 +113,14 @@ window.EduBoxData = {
         { title: 'EduTimer PRO', desc: 'Wizualny stoper i harmonogram etapów lekcji na tablicę interaktywną.', url: 'edustoper.html', badge: 'NOWOŚĆ', badgeColor: 'bg-amber-500 text-amber-950', icon: 'ph-hourglass', color: 'text-amber-500', category: 'zajecia', tags: ['stoper', 'czas', 'harmonogram'] },
         { title: 'EduTik PRO (Wierszyki i Piosenki)', desc: 'Wpisz temat, a AI ułoży rymujący się wierszyk, piosenkę albo wyliczankę z ilustracją, dopasowane do wieku i nastroju.', url: 'edutik.html', badge: 'GENERATOR', badgeColor: 'bg-fuchsia-600', icon: 'ph-lightbulb', color: 'text-fuchsia-500', category: 'zajecia', tags: ['wierszyki', 'piosenki', 'wyliczanki'] },
         { title: 'EduRymy AI', desc: 'Wpisz dowolne słowo, a AI znajdzie do niego prawdziwe polskie rymy - gotowe do gier, zagadek i ćwiczeń fonologicznych.', url: 'edurymy.html', badge: 'NOWOŚĆ', badgeColor: 'bg-emerald-600', icon: 'ph-text-aa', color: 'text-emerald-400', category: 'zajecia', tags: ['rymy', 'fonologia', 'zabawy językowe', 'wczesnoszkolne'] },
-        { title: 'Łowca Fake Newsów', desc: 'Rozwija krytyczne myślenie. AI tworzy fałszywy artykuł do zdemaskowania.', url: 'edukacja2025.html', icon: 'ph-detective', color: 'text-emerald-500', category: 'zajecia', tags: ['fake news', 'dziennikarstwo', 'myślenie'] , verified2026: true },
+        { title: 'Łowca Fake Newsów', desc: 'Rozwija krytyczne myślenie. AI tworzy fałszywy artykuł do zdemaskowania.', url: 'edukacja2025.html?mode=fake-news', icon: 'ph-detective', color: 'text-emerald-500', category: 'zajecia', tags: ['fake news', 'dziennikarstwo', 'myślenie'] , verified2026: true },
         { title: 'EduPrezentacja PRO', desc: 'Generator prezentacji z eksportem do PPTX. AI układa plan i grafiki do slajdów.', url: 'eduprezentacja.html', badge: 'NOWOŚĆ', badgeColor: 'bg-blue-600', icon: 'ph-projector-screen-chart', color: 'text-blue-500', category: 'zajecia', tags: ['prezentacja', 'slajdy', 'powerpoint'] },
         { title: 'EduKomiks AI', desc: 'Wymyśla opowieść z morałem, rysuje kadry i nakłada komiksowe dymki.', url: 'edukomiks.html', badge: 'NOWOŚĆ', badgeColor: 'bg-yellow-400 text-black', icon: 'ph-chats-teardrop', color: 'text-yellow-500', category: 'zajecia', tags: ['komiks', 'obrazki', 'kreatywne'] },
         { title: 'EduMotywator AI', desc: 'Koniec zadań do domu! Generuje wciągające Karty Wyjścia (Exit Tickets).', url: 'edumotywator.html', badge: 'GRYWALIZACJA', badgeColor: 'bg-fuchsia-600', icon: 'ph-ticket', color: 'text-fuchsia-500', category: 'zajecia', tags: ['karty wyjścia', 'ewaluacja'] },
         { title: 'EduGrupy (Koło Fortuny)', desc: 'Animowane Koło Fortuny do losowania uczniów i dzielenia na równe grupy.', url: 'edugrupy.html', badge: 'GRYWALIZACJA', badgeColor: 'bg-pink-600', icon: 'ph-spinner-gap', color: 'text-pink-500', category: 'zajecia', tags: ['losowanie', 'koło fortuny', 'grupy'] },
         { title: 'EduFiszki i Memory AI', desc: 'Wyciąga słowa kluczowe z tekstu i układa dwustronne fiszki PDF gotowe do druku.', url: 'edufiszki.html', badge: 'HIT!', badgeColor: 'bg-fuchsia-600', icon: 'ph-cards', color: 'text-fuchsia-500', category: 'zajecia', tags: ['fiszki', 'memory', 'nauka'] },
-        { title: 'EduGry (Ja Mam)', desc: 'Gra, która ożywi klasę. System łączy podane słowa w zamkniętą pętlę kart.', url: 'edugry.html', badge: 'ROZRYWKA', badgeColor: 'bg-rose-600', icon: 'ph-game-controller', color: 'text-rose-500', category: 'zajecia', tags: ['ja mam', 'gry'] },
-        { title: 'Kreator BINGO', desc: 'Wpisz słówka z lekcji, a system wygeneruje 30 unikalnych plansz BINGO!', url: 'edugry.html', icon: 'ph-grid-four', color: 'text-indigo-500', category: 'zajecia', tags: ['bingo', 'plansze', 'gry'] },
+        { title: 'EduGry (Ja Mam)', desc: 'Gra, która ożywi klasę. System łączy podane słowa w zamkniętą pętlę kart.', url: 'edugry.html?mode=jamam', badge: 'ROZRYWKA', badgeColor: 'bg-rose-600', icon: 'ph-game-controller', color: 'text-rose-500', category: 'zajecia', tags: ['ja mam', 'gry'] },
+        { title: 'Kreator BINGO', desc: 'Wpisz słówka z lekcji, a system wygeneruje 30 unikalnych plansz BINGO!', url: 'edugry.html?mode=bingo', icon: 'ph-grid-four', color: 'text-indigo-500', category: 'zajecia', tags: ['bingo', 'plansze', 'gry'] },
         { title: 'EduBystrzak AI', desc: 'Wybierz temat. Dostaniesz gotowe karty Dobble (6 kółek na A4) do gry z klasą!', url: 'edubystrzak.html', badge: 'HIT!', badgeColor: 'bg-fuchsia-600', icon: 'ph-lightning', color: 'text-fuchsia-500', category: 'zajecia', tags: ['dobble', 'spostrzegawczość', 'karty'] },
         { title: 'EduEscape PRO', desc: 'Generator fabularnych Escape Roomów. Twórz angażujące karty zagadek i szyfry.', url: 'eduescape.html', icon: 'ph-key', color: 'text-violet-500', category: 'zajecia', tags: ['escape room', 'zagadki', 'szyfry'] },
         { title: 'EduBoxPro Studio', desc: 'Zaawansowany kombajn. Generuje scenariusze TikTok/Reels edukacyjnych.', url: 'studio.html', badge: 'STUDIO', badgeColor: 'bg-fuchsia-600', icon: 'ph-film-strip', color: 'text-fuchsia-500', category: 'zajecia', tags: ['tiktok', 'reels', 'wideo'] },
