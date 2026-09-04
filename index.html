@@ -584,8 +584,8 @@
 
             // Tryb rozmowy: NOVA odpowiada na pytanie własnymi słowami i tylko wtedy, gdy ma to
             // sens, dołącza maksymalnie 3 narzędzia z istniejącego katalogu EduBox.
-            const askNovaAI = async (query, conversationMessages) => {
-                const catalog = appsData.map(a => ({ url: a.url, title: a.title, desc: a.desc, tags: a.tags }));
+            const askNovaAI = async (query, conversationMessages, catalogApps = appsData) => {
+                const catalog = catalogApps.map(a => ({ url: a.url, title: a.title, desc: a.desc, tags: a.tags }));
                 const history = conversationMessages.slice(-6).map(message => ({
                     role: message.sender === 'ai' ? 'NOVA' : 'Nauczyciel',
                     text: message.text
@@ -594,7 +594,7 @@
 
 Dodatkowo oceń, czy któreś narzędzia z przekazanego katalogu EduBox realnie pomagają w tej konkretnej sprawie. Jeśli tak, wybierz maksymalnie 3 i ustaw je w praktycznej kolejności działania. Użyj wyłącznie dokładnych adresów URL z katalogu — mogą zawierać parametr mode, który otwiera właściwą funkcję. Użytkownik zobaczy te adresy jako klikalne kafelki. Kafelki są dodatkiem do pełnej porady, a nie jej zamiennikiem: najpierw wyjaśnij temat i podaj wskazówki, dopiero potem krótko napisz, do czego przydadzą się polecane narzędzia. Jeśli narzędzia nie są potrzebne, zwróć pustą listę. Nie wciskaj rekomendacji na siłę.
 
-Zwróć WYŁĄCZNIE poprawny obiekt JSON w postaci: {"answer":"pełna odpowiedź NOVY","urls":["dokladny_url_z_katalogu"]}. Bez Markdownu i bez dodatkowego tekstu.`;
+Zwróć WYŁĄCZNIE poprawny obiekt JSON w postaci: {"answer":"pełna odpowiedź NOVY","urls":["dokladny_url_z_katalogu"]}. W polu answer używaj czystego tekstu bez znaczników Markdown, takich jak gwiazdki i nagłówki; listę możesz zapisać jako 1., 2., 3. Bez dodatkowego tekstu poza obiektem JSON.`;
                 const res = await fetch('/api/chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -657,7 +657,8 @@ Zwróć WYŁĄCZNIE poprawny obiekt JSON w postaci: {"answer":"pełna odpowiedź
                 try {
                     const novaReply = await askNovaAI(
                         `${journey.prompt}\n\nRozwiń ten temat: podaj praktyczny plan, konkretne wskazówki i następny krok. Nie ograniczaj odpowiedzi do nazw aplikacji — kafelki zostaną pokazane osobno.`,
-                        messages
+                        messages,
+                        journeyApps
                     );
                     answer = novaReply.answer;
                     matchedApps = [...journeyApps, ...(novaReply.apps || [])]
