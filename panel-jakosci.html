@@ -30,14 +30,17 @@
                 <h1 class="text-4xl md:text-6xl font-black tracking-tight">Panel jakości <span class="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-cyan-300">Make</span></h1>
                 <p class="mt-4 text-slate-400 max-w-2xl leading-relaxed">Sprawdza zdrowie automatów publikacyjnych. Panel wyłącznie czyta dane — nie uruchamia, nie zatrzymuje i nie zmienia żadnego scenariusza.</p>
             </div>
-            <button id="refresh-button" class="inline-flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-wait px-5 py-3 rounded-xl font-black transition-colors">
-                <i class="ph-bold ph-arrows-clockwise"></i><span>Odśwież dane</span>
-            </button>
+            <div class="flex flex-wrap gap-2">
+                <button id="logout-button" class="hidden inline-flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 px-4 py-3 rounded-xl font-bold transition-colors">
+                    <i class="ph-bold ph-sign-out"></i><span>Wyloguj</span>
+                </button>
+                <button id="refresh-button" class="hidden inline-flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-wait px-5 py-3 rounded-xl font-black transition-colors">
+                    <i class="ph-bold ph-arrows-clockwise"></i><span>Odśwież dane</span>
+                </button>
+            </div>
         </header>
 
-        <section id="message" class="glass rounded-2xl p-5 mb-6" aria-live="polite">
-            <div class="flex items-center gap-3 text-slate-300"><i class="ph ph-circle-notch animate-spin text-2xl text-cyan-300"></i><span>Łączę się bezpiecznie z Make…</span></div>
-        </section>
+        <section id="message" class="glass rounded-2xl p-5 mb-6" aria-live="polite"></section>
 
         <section id="summary" class="hidden grid grid-cols-2 lg:grid-cols-5 gap-3 mb-6"></section>
 
@@ -61,7 +64,7 @@
     </main>
 
     <script>
-        const state = { scenarios: [], filter: 'all' };
+        const state = { scenarios: [], filter: 'all', authHeader: null };
         const statusStyles = {
             ok: { dot: 'bg-emerald-400 text-emerald-400', badge: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/25', border: 'hover:border-emerald-500/35' },
             warning: { dot: 'bg-amber-400 text-amber-400', badge: 'bg-amber-500/10 text-amber-300 border-amber-500/25', border: 'hover:border-amber-500/35' },
@@ -88,6 +91,43 @@
 
         function channelIcon(channel) {
             return channel === 'facebook' ? 'ph-facebook-logo' : channel === 'pinterest' ? 'ph-pinterest-logo' : 'ph-youtube-logo';
+        }
+
+        function createBasicHeader(user, pass) {
+            const bytes = new TextEncoder().encode(`${user}:${pass}`);
+            let binary = '';
+            bytes.forEach(byte => { binary += String.fromCharCode(byte); });
+            return `Basic ${btoa(binary)}`;
+        }
+
+        function renderLogin(errorMessage = '') {
+            state.authHeader = null;
+            state.scenarios = [];
+            document.getElementById('summary').classList.add('hidden');
+            document.getElementById('filters').classList.add('hidden');
+            document.getElementById('scenario-list').innerHTML = '';
+            document.getElementById('refresh-button').classList.add('hidden');
+            document.getElementById('logout-button').classList.add('hidden');
+            document.getElementById('message').innerHTML = `
+                <div class="max-w-md mx-auto py-3">
+                    <div class="h-12 w-12 rounded-2xl bg-indigo-500/15 text-indigo-300 flex items-center justify-center text-2xl mb-4"><i class="ph-bold ph-lock-key"></i></div>
+                    <h2 class="text-2xl font-black">Zaloguj się do panelu</h2>
+                    <p class="text-sm text-slate-400 mt-2 leading-relaxed">Użyj tego samego loginu i hasła co w prywatnych narzędziach Ewy i Ani. Dane nie są zapisywane — znikną po zamknięciu tej karty.</p>
+                    <form id="login-form" class="mt-5 space-y-3">
+                        <label class="block"><span class="text-xs font-bold text-slate-400">Login</span><input id="login-user" type="text" autocomplete="username" required class="mt-1 w-full rounded-xl bg-slate-950 border border-slate-700 px-4 py-3 outline-none focus:border-indigo-400"></label>
+                        <label class="block"><span class="text-xs font-bold text-slate-400">Hasło</span><input id="login-pass" type="password" autocomplete="current-password" required class="mt-1 w-full rounded-xl bg-slate-950 border border-slate-700 px-4 py-3 outline-none focus:border-indigo-400"></label>
+                        <p id="login-error" class="${errorMessage ? '' : 'hidden'} text-sm text-rose-300"><i class="ph-bold ph-warning-circle mr-1"></i>${escapeHtml(errorMessage)}</p>
+                        <button type="submit" class="w-full inline-flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 px-5 py-3 rounded-xl font-black transition-colors"><i class="ph-bold ph-sign-in"></i>Wejdź do panelu</button>
+                    </form>
+                </div>`;
+            document.getElementById('login-form').addEventListener('submit', async event => {
+                event.preventDefault();
+                const user = document.getElementById('login-user').value;
+                const passInput = document.getElementById('login-pass');
+                state.authHeader = createBasicHeader(user, passInput.value);
+                passInput.value = '';
+                await loadData();
+            });
         }
 
         function renderSummary(summary, updatedAt) {
@@ -141,15 +181,29 @@
             button.disabled = true;
             button.querySelector('i').classList.add('animate-spin');
             try {
-                const response = await fetch('/api/weekly-report?view=make-health', { credentials: 'same-origin', cache: 'no-store' });
+                const response = await fetch('/api/weekly-report?view=make-health', {
+                    credentials: 'same-origin',
+                    cache: 'no-store',
+                    headers: { Authorization: state.authHeader },
+                });
                 const data = await response.json().catch(() => ({}));
-                if (!response.ok) throw new Error(data.error || `Nie udało się pobrać danych (HTTP ${response.status}).`);
+                if (!response.ok) {
+                    const error = new Error(data.error || `Nie udało się pobrać danych (HTTP ${response.status}).`);
+                    error.status = response.status;
+                    throw error;
+                }
                 state.scenarios = Array.isArray(data.scenarios) ? data.scenarios : [];
                 renderSummary(data.summary, data.updatedAt);
                 renderScenarios();
                 document.getElementById('filters').classList.remove('hidden');
+                document.getElementById('refresh-button').classList.remove('hidden');
+                document.getElementById('logout-button').classList.remove('hidden');
                 if (data.makeUrl) document.getElementById('make-link').href = data.makeUrl;
             } catch (error) {
+                if (error.status === 401) {
+                    renderLogin('Login lub hasło są niepoprawne. Spróbuj ponownie.');
+                    return;
+                }
                 document.getElementById('message').innerHTML = `<div class="flex gap-3 text-amber-200"><i class="ph-bold ph-warning-circle text-2xl"></i><div><p class="font-black">Panel nie może jeszcze pobrać danych.</p><p class="text-sm text-slate-400 mt-1">${escapeHtml(error.message)}</p></div></div>`;
             } finally {
                 button.disabled = false;
@@ -158,13 +212,14 @@
         }
 
         document.getElementById('refresh-button').addEventListener('click', loadData);
+        document.getElementById('logout-button').addEventListener('click', () => renderLogin('Wylogowano z panelu.'));
         document.querySelectorAll('.filter').forEach(button => button.addEventListener('click', () => {
             state.filter = button.dataset.filter;
             document.querySelectorAll('.filter').forEach(item => item.className = 'filter bg-slate-800 text-slate-300 px-4 py-2 rounded-full text-sm font-bold');
             button.className = 'filter bg-white text-slate-950 px-4 py-2 rounded-full text-sm font-black';
             renderScenarios();
         }));
-        loadData();
+        renderLogin();
     </script>
 </body>
 </html>
