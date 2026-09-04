@@ -10,6 +10,8 @@ const panel = read('panel-jakosci.html');
 const api = read('api/weekly-report.js');
 const middleware = read('middleware.js');
 const seoConfig = read('seo.config.js');
+const ewa = read('ewamarketing.html');
+const ania = read('aniawideo.html');
 
 assert.match(panel, /noindex,\s*nofollow,\s*noarchive/i, 'panel musi pozostać poza Google');
 assert.match(panel, /\/api\/weekly-report\?view=make-health/, 'panel musi korzystać ze wspólnego endpointu raportowego');
@@ -25,8 +27,11 @@ assert.match(middleware, /api\/weekly-report/, 'dane panelu muszą być objęte 
 const matcher = middleware.match(/matcher:\s*\[([^\]]+)\]/)?.[1] || '';
 assert.doesNotMatch(matcher, /panel-jakosci\.html/, 'ekran logowania nie może wywoływać niestabilnego systemowego okna Basic Auth');
 assert.match(seoConfig, /panel-jakosci\.html/, 'panel musi być jawnie sklasyfikowany jako prywatny');
+assert.match(ewa, /href="panel-jakosci\.html"/, 'prywatny Generator Ewy powinien mieć skrót do panelu');
+assert.match(ania, /href="panel-jakosci\.html"/, 'prywatny Generator Ani powinien mieć skrót do panelu');
 
 const functionFiles = fs.readdirSync(path.join(root, 'api')).filter(name => name.endsWith('.js'));
 assert.ok(functionFiles.length <= 12, `limit Vercel przekroczony: ${functionFiles.length}/12 funkcji`);
 
 console.log(`[Panel Make] OK — prywatny odczyt, brak sterowania scenariuszami, funkcje Vercel: ${functionFiles.length}/12.`);
+
