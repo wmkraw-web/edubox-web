@@ -4,7 +4,7 @@
 // główna) działa bez żadnych zmian.
 
 export const config = {
-  matcher: ['/ewamarketing.html', '/ewa-marketing.html', '/aniawideo.html', '/panel-jakosci.html', '/api/ewa-generate', '/api/weekly-report'],
+  matcher: ['/ewamarketing.html', '/ewa-marketing.html', '/aniawideo.html', '/api/ewa-generate', '/api/weekly-report'],
 };
 
 export default function middleware(request) {
@@ -41,6 +41,19 @@ export default function middleware(request) {
         // Niepoprawne dane logowania - lecimy do 401 poniżej
       }
     }
+  }
+
+  // Panel korzysta z własnego formularza logowania. Dla jego API zwracamy
+  // zwykły JSON bez WWW-Authenticate, aby przeglądarka nie otwierała i nie
+  // zamykała systemowego okienka Basic Auth.
+  if (pathname === '/api/weekly-report') {
+    return new Response(JSON.stringify({ error: 'Niepoprawny login lub hasło.' }), {
+      status: 401,
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Cache-Control': 'no-store',
+      },
+    });
   }
 
   return new Response('Autoryzacja wymagana.', {
