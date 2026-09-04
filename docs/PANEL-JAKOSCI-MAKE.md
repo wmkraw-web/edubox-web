@@ -1,7 +1,9 @@
 # Panel jakości Make
 
-Panel znajduje się pod adresem `/panel-jakosci.html`. Jest prywatny, chroniony
-tym samym Basic Auth co narzędzia Ewy i Ani, ma `noindex` i pozostaje poza sitemapą.
+Panel znajduje się pod adresem `/panel-jakosci.html`. Pokazuje własny formularz
+logowania, a dane chroni tym samym loginem i hasłem co narzędzia Ewy i Ani.
+Login i hasło są przechowywane tylko w pamięci otwartej karty. Panel ma
+`noindex` i pozostaje poza sitemapą.
 
 ## Konfiguracja Vercel
 
@@ -30,8 +32,10 @@ do HTML, JavaScriptu przeglądarkowego, repozytorium ani komentarza PR.
 ## Granice bezpieczeństwa
 
 - Panel wykonuje tylko zapytania HTTP `GET`.
+- Publiczny plik HTML nie zawiera danych Make; są one dostępne dopiero po
+  poprawnym zalogowaniu do chronionego endpointu.
+- Login i hasło nie trafiają do localStorage ani sessionStorage.
 - Nie używa endpointów uruchamiania, zatrzymywania ani edycji scenariuszy.
 - Nie pobiera zawartości arkuszy, promptów, treści postów ani danych uczniów.
 - Wynik jest przechowywany w pamięci funkcji najwyżej 5 minut, żeby ograniczyć liczbę odczytów.
 - Brak tokenu lub awaria Make nie wpływa na publiczną część EduBox.
-
