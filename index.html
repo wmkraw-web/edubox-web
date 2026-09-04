@@ -582,6 +582,13 @@
                 return scoredApps.filter(app => app.score > 0).sort((a, b) => b.score - a.score).slice(0, 3);
             };
 
+            const sanitizeNovaAnswer = (value) => String(value || '')
+                .replace(/\*\*/g, '')
+                .replace(/__/g, '')
+                .replace(/^\s*#{1,6}\s*/gm, '')
+                .replace(/^\s*[-*]\s+/gm, '• ')
+                .trim();
+
             // Tryb rozmowy: NOVA odpowiada na pytanie własnymi słowami i tylko wtedy, gdy ma to
             // sens, dołącza maksymalnie 3 narzędzia z istniejącego katalogu EduBox.
             const askNovaAI = async (query, conversationMessages, catalogApps = appsData) => {
@@ -606,10 +613,11 @@ Zwróć WYŁĄCZNIE poprawny obiekt JSON w postaci: {"answer":"pełna odpowiedź
                 if (!res.ok) throw new Error('HTTP ' + res.status);
                 const data = await res.json();
                 const parsed = JSON.parse(data.text);
-                if (typeof parsed.answer !== 'string' || !parsed.answer.trim()) throw new Error('Brak odpowiedzi NOVY');
+                const answer = sanitizeNovaAnswer(parsed.answer);
+                if (!answer) throw new Error('Brak odpowiedzi NOVY');
                 const urls = Array.isArray(parsed.urls) ? parsed.urls : [];
                 const matchedApps = urls.map(u => appsData.find(a => a.url === u)).filter(Boolean).slice(0, 3);
-                return { answer: parsed.answer.trim(), apps: matchedApps };
+                return { answer, apps: matchedApps };
             };
 
             const processUserMessage = async (userMsg) => {
