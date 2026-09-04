@@ -582,19 +582,26 @@
                 return scoredApps.filter(app => app.score > 0).sort((a, b) => b.score - a.score).slice(0, 3);
             };
 
+            const sanitizeNovaAnswer = (value) => String(value || '')
+                .replace(/\*\*/g, '')
+                .replace(/__/g, '')
+                .replace(/^\s*#{1,6}\s*/gm, '')
+                .replace(/^\s*[-*]\s+/gm, '• ')
+                .trim();
+
             // Tryb rozmowy: NOVA odpowiada na pytanie własnymi słowami i tylko wtedy, gdy ma to
             // sens, dołącza maksymalnie 3 narzędzia z istniejącego katalogu EduBox.
-            const askNovaAI = async (query, conversationMessages) => {
-                const catalog = appsData.map(a => ({ url: a.url, title: a.title, desc: a.desc, tags: a.tags }));
+            const askNovaAI = async (query, conversationMessages, catalogApps = appsData) => {
+                const catalog = catalogApps.map(a => ({ url: a.url, title: a.title, desc: a.desc, tags: a.tags }));
                 const history = conversationMessages.slice(-6).map(message => ({
                     role: message.sender === 'ai' ? 'NOVA' : 'Nauczyciel',
                     text: message.text
                 }));
-                const system = `Jesteś NOVA — ciepłą, inteligentną i lekko żartobliwą asystentką AI serwisu EduBox dla nauczycieli. Odpowiedz bezpośrednio na najnowszą wiadomość użytkownika po polsku. Bądź konkretna, praktyczna i przyjazna. Odpowiedź powinna mieć zwykle 2–6 krótkich zdań i maksymalnie 900 znaków, aby dobrze brzmiała także po przeczytaniu głosem. Uwzględniaj ostatnie wiadomości rozmowy, jeśli pytanie do nich nawiązuje. Możesz odpowiadać również na zwykłe pytania niezwiązane bezpośrednio z katalogiem. Nie zmyślaj faktów ani możliwości aplikacji. Przy sprawach medycznych, prawnych lub innych wymagających specjalisty zaznacz ograniczenia i wskaż bezpieczny kolejny krok.
+                const system = `Jesteś NOVA — ciepłą, inteligentną i lekko żartobliwą asystentką AI serwisu EduBox dla nauczycieli. Odpowiedz bezpośrednio na najnowszą wiadomość użytkownika po polsku. Bądź konkretna, praktyczna i przyjazna. Rozwiń temat tak, aby nauczyciel dostał nie tylko odpowiedź, ale też użyteczne wskazówki: zwykle napisz 5–9 zdań, podaj 2–4 konkretne kroki, przykłady lub rzeczy, na które warto uważać, i zakończ jasnym następnym krokiem. Możesz używać krótkich akapitów lub numerowanej listy rozdzielonej znakami nowej linii. Dla prostego pytania wystarczy krótsza odpowiedź, ale nie skracaj złożonego tematu tylko dlatego, że rekomendujesz narzędzia. Celuj w maksymalnie 1600 znaków, aby odpowiedź nadal wygodnie się czytała i dało się ją odsłuchać. Uwzględniaj ostatnie wiadomości rozmowy, jeśli pytanie do nich nawiązuje. Możesz odpowiadać również na zwykłe pytania niezwiązane bezpośrednio z katalogiem. Nie zmyślaj faktów ani możliwości aplikacji. Przy sprawach medycznych, prawnych lub innych wymagających specjalisty zaznacz ograniczenia i wskaż bezpieczny kolejny krok.
 
-Dodatkowo oceń, czy któreś narzędzia z przekazanego katalogu EduBox realnie pomagają w tej konkretnej sprawie. Jeśli tak, wybierz maksymalnie 3 i ustaw je w praktycznej kolejności działania. Użyj wyłącznie dokładnych adresów URL z katalogu — mogą zawierać parametr mode, który otwiera właściwą funkcję. Użytkownik zobaczy te adresy jako klikalne kafelki, więc w odpowiedzi powiedz krótko, w jakiej kolejności warto je otworzyć. Jeśli narzędzia nie są potrzebne, zwróć pustą listę. Nie wciskaj rekomendacji na siłę.
+Dodatkowo oceń, czy któreś narzędzia z przekazanego katalogu EduBox realnie pomagają w tej konkretnej sprawie. Jeśli tak, wybierz maksymalnie 3 i ustaw je w praktycznej kolejności działania. Użyj wyłącznie dokładnych adresów URL z katalogu — mogą zawierać parametr mode, który otwiera właściwą funkcję. Użytkownik zobaczy te adresy jako klikalne kafelki. Kafelki są dodatkiem do pełnej porady, a nie jej zamiennikiem: najpierw wyjaśnij temat i podaj wskazówki, dopiero potem krótko napisz, do czego przydadzą się polecane narzędzia. Jeśli narzędzia nie są potrzebne, zwróć pustą listę. Nie wciskaj rekomendacji na siłę.
 
-Zwróć WYŁĄCZNIE poprawny obiekt JSON w postaci: {"answer":"pełna odpowiedź NOVY","urls":["dokladny_url_z_katalogu"]}. Bez Markdownu i bez dodatkowego tekstu.`;
+Zwróć WYŁĄCZNIE poprawny obiekt JSON w postaci: {"answer":"pełna odpowiedź NOVY","urls":["dokladny_url_z_katalogu"]}. W polu answer używaj czystego tekstu bez znaczników Markdown, takich jak gwiazdki i nagłówki; listę możesz zapisać jako 1., 2., 3. Bez dodatkowego tekstu poza obiektem JSON.`;
                 const res = await fetch('/api/chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -606,10 +613,11 @@ Zwróć WYŁĄCZNIE poprawny obiekt JSON w postaci: {"answer":"pełna odpowiedź
                 if (!res.ok) throw new Error('HTTP ' + res.status);
                 const data = await res.json();
                 const parsed = JSON.parse(data.text);
-                if (typeof parsed.answer !== 'string' || !parsed.answer.trim()) throw new Error('Brak odpowiedzi NOVY');
+                const answer = sanitizeNovaAnswer(parsed.answer);
+                if (!answer) throw new Error('Brak odpowiedzi NOVY');
                 const urls = Array.isArray(parsed.urls) ? parsed.urls : [];
                 const matchedApps = urls.map(u => appsData.find(a => a.url === u)).filter(Boolean).slice(0, 3);
-                return { answer: parsed.answer.trim(), apps: matchedApps };
+                return { answer, apps: matchedApps };
             };
 
             const processUserMessage = async (userMsg) => {
@@ -644,13 +652,33 @@ Zwróć WYŁĄCZNIE poprawny obiekt JSON w postaci: {"answer":"pełna odpowiedź
                 addAiMessage(novaReply.answer, novaReply.apps);
             };
 
-            const openJourney = (journey) => {
+            const openJourney = async (journey) => {
                 if (isThinking) return;
-                const matchedApps = journey.urls
+                const journeyApps = journey.urls
                     .map(url => appsData.find(app => app.url === url))
                     .filter(Boolean);
                 setMessages(prev => [...prev, { sender: 'user', text: `${journey.icon} ${journey.label}` }]);
-                addAiMessage(journey.answer, matchedApps, { guided: true });
+                setIsThinking(true);
+
+                let answer = journey.answer;
+                let matchedApps = journeyApps;
+                try {
+                    const novaReply = await askNovaAI(
+                        `${journey.prompt}\n\nRozwiń ten temat: podaj praktyczny plan, konkretne wskazówki i następny krok. Nie ograniczaj odpowiedzi do nazw aplikacji — kafelki zostaną pokazane osobno.`,
+                        messages,
+                        journeyApps
+                    );
+                    answer = novaReply.answer;
+                    matchedApps = [...journeyApps, ...(novaReply.apps || [])]
+                        .filter((app, index, all) => all.findIndex(candidate => candidate.url === app.url) === index)
+                        .slice(0, 3);
+                } catch (error) {
+                    console.log('NOVA: pełna odpowiedź dla szybkiej ścieżki nie powiodła się, używam bezpiecznej podpowiedzi lokalnej.', error);
+                } finally {
+                    setIsThinking(false);
+                }
+
+                addAiMessage(answer, matchedApps, { guided: true });
             };
 
             const trackNovaAppClick = (app) => {
@@ -706,7 +734,7 @@ Zwróć WYŁĄCZNIE poprawny obiekt JSON w postaci: {"answer":"pełna odpowiedź
                                 {messages.map((msg, i) => (
                                     <div key={i} className="flex flex-col gap-2">
                                         <div className={`max-w-[85%] p-3 rounded-2xl text-sm shadow-sm ${msg.sender === 'ai' ? 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 self-start rounded-tl-sm' : 'bg-blue-600 text-white self-end rounded-tr-sm'}`}>
-                                            <div>{msg.text}</div>
+                                            <div className="whitespace-pre-line leading-relaxed">{msg.text}</div>
                                             {msg.sender === 'ai' && canSpeak && (
                                                 <button onClick={() => speakText(msg.text, true)} className="mt-2 text-[10px] font-bold text-blue-600 dark:text-cyan-300 hover:text-blue-800 dark:hover:text-cyan-100 flex items-center gap-1" aria-label="Odsłuchaj tę odpowiedź NOVY">
                                                     <i className="ph-bold ph-speaker-high"></i> Odsłuchaj
