@@ -109,7 +109,8 @@ function loadCatalog() {
   const apps = sandbox.window.EduBoxData?.APPS || [];
   const byPath = new Map();
   for (const app of apps) {
-    if (!/^https?:\/\//i.test(app.url || '') && !byPath.has(app.url)) byPath.set(normalisePath(app.url), app);
+    const localPath = normalisePath((app.url || '').split(/[?#]/, 1)[0]);
+    if (!/^https?:\/\//i.test(app.url || '') && localPath && !byPath.has(localPath)) byPath.set(localPath, app);
   }
   return { apps, byPath };
 }

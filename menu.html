@@ -46,6 +46,14 @@
             <!-- Prawa strona - Akcje użytkownika / Limity -->
             <div class="flex items-center gap-2 sm:gap-3 flex-shrink-0">
 
+                <a href="teczka.html" class="hidden lg:flex items-center gap-2 text-slate-200 hover:text-white hover:bg-slate-800 px-3 py-2 rounded-lg text-sm font-bold transition-colors" title="Prywatna Teczka EduBox — dane zostają w tej przeglądarce">
+                    📁 <span class="hidden xl:inline">Teczka</span><span class="js-folder-count min-w-5 h-5 px-1 rounded-full bg-blue-600 text-white text-[10px] flex items-center justify-center">0</span>
+                </a>
+
+                <button onclick="openFolderSaveOverlay()" class="hidden lg:flex p-2 rounded-md text-slate-300 hover:text-white hover:bg-slate-800 transition-colors" aria-label="Zapisz zaznaczony tekst lub tę stronę do Teczki" title="Zapisz do Teczki">
+                    💾
+                </button>
+
                 <!-- Licznik limitów - tylko na komputerze, na telefonie jest w rozwijanym menu -->
                 <div class="hidden lg:flex flex-col items-end">
                     <span class="text-xs text-slate-400 font-medium">Pozostało użyć:</span>
@@ -93,6 +101,10 @@
             <a href="edugry.html" class="block px-3 py-2.5 rounded-md text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-800">Gry &amp; Zabawy</a>
             <a href="blog.html" class="block px-3 py-2.5 rounded-md text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-800">Blog</a>
             <a href="co-nowego.html" class="block px-3 py-2.5 rounded-md text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-800">Co nowego</a>
+            <a href="teczka.html" class="flex items-center justify-between px-3 py-2.5 rounded-md text-sm font-bold text-cyan-300 hover:text-white hover:bg-slate-800">
+                <span>📁 Moja Teczka</span><span class="js-folder-count min-w-5 h-5 px-1 rounded-full bg-blue-600 text-white text-[10px] flex items-center justify-center">0</span>
+            </a>
+            <button onclick="openFolderSaveOverlay()" class="mx-3 mt-2 bg-blue-600 hover:bg-blue-500 text-white px-3 py-2.5 rounded-md text-sm font-bold text-center">💾 Zapisz tę stronę lub zaznaczony tekst</button>
 
             <button onclick="openPolecOverlay()" class="mx-3 mt-3 bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-2.5 rounded-md text-sm font-bold text-center flex items-center justify-center gap-2">
                 🎁 Poleć i zyskaj PRO
@@ -107,6 +119,25 @@
                     <input id="menu-pro-input-mobile" type="text" placeholder="Kod PRO" class="bg-transparent text-xs flex-1 px-2 outline-none font-medium text-white uppercase placeholder-slate-500">
                     <button onclick="activatePro('menu-pro-input-mobile')" class="px-3 py-1.5 text-white rounded bg-amber-600 hover:bg-amber-500 transition-colors text-xs font-bold">OK</button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PRYWATNA TECZKA — zapis wyłącznie w localStorage tej przeglądarki -->
+    <div id="folder-save-overlay" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-[110] items-center justify-center p-4">
+        <div class="bg-slate-900 border border-cyan-800/60 rounded-3xl max-w-lg w-full p-7 relative shadow-2xl">
+            <button onclick="closeFolderSaveOverlay()" class="absolute top-4 right-4 text-slate-400 hover:text-white" aria-label="Zamknij zapis do Teczki">✕</button>
+            <div class="inline-flex items-center gap-2 bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full mb-4">📁 Moja Teczka</div>
+            <h3 class="text-xl font-black text-white mb-2">Zapisz materiał na tym urządzeniu</h3>
+            <p class="text-slate-300 text-sm leading-relaxed mb-5">Jeżeli zaznaczysz wynik w aplikacji przed kliknięciem 💾, trafi on tutaj automatycznie. Dane nie są wysyłane do chmury.</p>
+            <label for="folder-save-title" class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Nazwa materiału</label>
+            <input id="folder-save-title" maxlength="120" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-cyan-500 mb-4">
+            <label for="folder-save-text" class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Tekst lub krótka notatka</label>
+            <textarea id="folder-save-text" maxlength="12000" rows="7" placeholder="Możesz wkleić tutaj wynik albo własną notatkę…" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-cyan-500 resize-y"></textarea>
+            <p id="folder-save-status" class="hidden text-sm font-bold mt-3"></p>
+            <div class="flex flex-col sm:flex-row gap-3 mt-5">
+                <button onclick="saveCurrentToFolder()" class="flex-1 bg-cyan-500 hover:bg-cyan-400 text-slate-950 px-5 py-3 rounded-xl text-sm font-black transition-colors">Zapisz w Teczce</button>
+                <a href="teczka.html" class="flex-1 text-center bg-slate-800 hover:bg-slate-700 text-white px-5 py-3 rounded-xl text-sm font-bold transition-colors">Otwórz Teczkę</a>
             </div>
         </div>
     </div>
@@ -193,7 +224,65 @@
 
     <!-- SKRYPT LOGIKI MENU (Limity i Autoryzacja PRO) -->
     <script src="ogloszenie.js"></script>
+    <script src="/teczka.js"></script>
     <script>
+        let pendingFolderSourceUrl = '';
+
+        function updateFolderBadges(attempt) {
+            attempt = attempt || 0;
+            if (!window.EduBoxFolder) {
+                if (attempt < 20) setTimeout(() => updateFolderBadges(attempt + 1), 100);
+                return;
+            }
+            const count = window.EduBoxFolder.list().length;
+            document.querySelectorAll('.js-folder-count').forEach((element) => {
+                element.innerText = String(count);
+                element.setAttribute('aria-label', `${count} materiałów w Teczce`);
+            });
+        }
+
+        function openFolderSaveOverlay() {
+            const overlay = document.getElementById('folder-save-overlay');
+            const titleInput = document.getElementById('folder-save-title');
+            const textInput = document.getElementById('folder-save-text');
+            const status = document.getElementById('folder-save-status');
+            const selectedText = window.getSelection ? window.getSelection().toString().trim() : '';
+
+            pendingFolderSourceUrl = window.location.href;
+            titleInput.value = document.title.replace(/\s*[|–-]\s*EduBox.*$/i, '').trim() || 'Materiał EduBox';
+            textInput.value = selectedText.slice(0, 12000);
+            status.classList.add('hidden');
+            overlay.classList.remove('hidden');
+            overlay.classList.add('flex');
+            setTimeout(() => selectedText ? textInput.focus() : titleInput.focus(), 50);
+        }
+
+        function closeFolderSaveOverlay() {
+            const overlay = document.getElementById('folder-save-overlay');
+            overlay.classList.add('hidden');
+            overlay.classList.remove('flex');
+        }
+
+        function saveCurrentToFolder() {
+            const status = document.getElementById('folder-save-status');
+            if (!window.EduBoxFolder) {
+                status.innerText = 'Teczka jeszcze się ładuje. Spróbuj ponownie za sekundę.';
+                status.className = 'text-sm font-bold mt-3 text-amber-400';
+                return;
+            }
+            const title = document.getElementById('folder-save-title').value.trim();
+            const text = document.getElementById('folder-save-text').value.trim();
+            window.EduBoxFolder.add({
+                title: title || 'Materiał EduBox',
+                text,
+                url: pendingFolderSourceUrl,
+                source: document.title
+            });
+            status.innerText = '✅ Zapisano prywatnie w tej przeglądarce.';
+            status.className = 'text-sm font-bold mt-3 text-emerald-400';
+            updateFolderBadges();
+        }
+
         function initMenuLogic() {
             // Sprawdź w przeglądarce czy uzytkownik wpisał już kiedyś kod PRO
             const proStatusRaw = localStorage.getItem('eduboxProStatus');
@@ -327,6 +416,7 @@
             if (e.target && e.target.id === 'ogloszenie-overlay') closeOgloszenie();
             if (e.target && e.target.id === 'polec-overlay') closePolecOverlay();
             if (e.target && e.target.id === 'help-overlay') closeHelpOverlay();
+            if (e.target && e.target.id === 'folder-save-overlay') closeFolderSaveOverlay();
         });
 
         // Okno "Poleć znajomym" - zapis do programu poleceń
@@ -378,6 +468,8 @@
         // Uruchomienie skryptu natychmiast po załadowaniu menu w dowolnej aplikacji
         initMenuLogic();
         initOgloszenie();
+        updateFolderBadges();
+        window.addEventListener('edubox-folder-change', () => updateFolderBadges());
 
         // Zrobienie funkcji globalnej żeby React w innych plikach mógł wymusić odświeżenie licznika po kliknięciu "Generuj"
         window.updateGlobalLimitDisplay = initMenuLogic;

@@ -21,12 +21,15 @@ jego tytułu, opisu i metadanych społecznościowych.
 ## Klasyfikacja obecnych stron
 
 - **Publiczne:** strona główna, blog, „Co nowego”, standardy ochrony
-  małoletnich oraz 58 unikalnych lokalnych narzędzi z `apps.js`.
+  małoletnich, cztery centra tematyczne oraz 58 unikalnych lokalnych narzędzi
+  z `apps.js`.
 - **Publiczny EduKatalog:** `edukatalog.html` jest aplikacją dla użytkowników i
   występuje w katalogu, więc należy do stron publicznych.
 - **Prywatne/redakcyjne:** Generator Influencerki (`ewamarketing.html`),
   Generator Wideo Ani (`aniawideo.html`), Kreator Wpisów do Menu,
   Redaktor Ogłoszeń i Redaktor Bloga.
+- **Prywatna funkcja użytkownika:** `teczka.html` przechowuje materiały tylko
+  w przeglądarce i celowo nie trafia do Google.
 - **Techniczne:** `menu.html`, `api/index.html` i `test-edubiurokrata.html`.
 
 Pełna, wiążąca lista znajduje się w `seo.config.js`.
@@ -38,6 +41,12 @@ Pełna, wiążąca lista znajduje się w `seo.config.js`.
 - `npm run seo:sitemap` — przebudowuje wyłącznie `sitemap.xml`.
 - `npm run seo:fix` — świadomie naprawia metadane stron publicznych, dodaje
   `noindex` stronom wykluczonym oraz przebudowuje sitemap i robots.
+- `npm run catalog:check` — sprawdza kompletność kafelków, tryby `?mode=...`,
+  ścieżki NOVY i brak odnośników do stron prywatnych.
+- `npm run centers:generate` — świadomie przebudowuje cztery publiczne centra
+  z danych w `apps.js`.
+- `npm run centers:check` — tylko sprawdza, czy centra są aktualne; niczego nie
+  nadpisuje.
 
 Dwuklik `Uruchom-SEO.bat` wykonuje tylko bezpieczny audyt. Nie poprawia plików
 samodzielnie.
