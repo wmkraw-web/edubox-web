@@ -134,6 +134,12 @@ startową. Dozwolone wartości są jawnie sprawdzane w `scripts/check-catalog.js
 Strona jest celowo prywatna (`noindex`) i wykluczona z sitemap. Przy zmianach
 nie dodawaj synchronizacji chmurowej bez osobnej, świadomej decyzji właściciela.
 
+**Panel jakości Make:** `panel-jakosci.html` korzysta z odczytowego trybu
+`GET /api/weekly-report?view=make-health`, dzięki czemu nie powstaje trzynasta
+funkcja Vercel. Strona i endpoint są chronione istniejącym Basic Auth, a token
+Make pozostaje wyłącznie w `MAKE_API_TOKEN` na Vercelu. Token ma mieć tylko
+zakres `scenarios:read`; panel nigdy nie uruchamia ani nie zmienia scenariuszy.
+
 **Generowanie treści przez AI — wypracowane wzorce:**
 - *Dwuetapowy generator + weryfikator* (EduRymy): pierwsze zapytanie
   proponuje kandydatów swobodnie, DRUGIE, niezależne zapytanie (bez
