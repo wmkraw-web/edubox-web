@@ -42,6 +42,56 @@
   <link rel="canonical" href="https://eduboxpro.pl/blog.html">
   <meta name="description" content="Aktualności prawne, poradniki i praktyczne wskazówki dla nauczycieli. Reforma podstawy programowej, awans zawodowy, AI w edukacji.">
   <link rel="icon" href="/icon-96.png" type="image/png">
+  <script>
+    (() => {
+      const INDEX_SEO = {
+        title: 'Blog EduBox AI - Poradnik i aktualności dla nauczycieli',
+        description: 'Aktualności prawne, poradniki i praktyczne wskazówki dla nauczycieli. Reforma podstawy programowej, awans zawodowy, AI w edukacji.',
+        url: 'https://eduboxpro.pl/blog.html',
+        image: 'https://eduboxpro.pl/okladka.jpg',
+        type: 'website'
+      };
+
+      const setMeta = (attribute, key, content) => {
+        let element = document.head.querySelector(`meta[${attribute}="${key}"]`);
+        if (!element) {
+          element = document.createElement('meta');
+          element.setAttribute(attribute, key);
+          document.head.appendChild(element);
+        }
+        element.setAttribute('content', content);
+      };
+
+      window.applyBlogSeo = (post) => {
+        const seo = post ? {
+          title: `${post.title} - Blog EduBox AI`,
+          description: post.excerpt,
+          url: `https://eduboxpro.pl/blog.html?post=${encodeURIComponent(post.slug)}`,
+          image: post.image ? new URL(post.image, 'https://eduboxpro.pl/').href : INDEX_SEO.image,
+          type: 'article'
+        } : INDEX_SEO;
+
+        document.title = seo.title;
+        document.querySelector('meta[name="description"]').setAttribute('content', seo.description);
+        document.querySelector('link[rel="canonical"]').setAttribute('href', seo.url);
+        setMeta('name', 'robots', 'index, follow, max-image-preview:large');
+        setMeta('property', 'og:title', seo.title);
+        setMeta('property', 'og:description', seo.description);
+        setMeta('property', 'og:type', seo.type);
+        setMeta('property', 'og:url', seo.url);
+        setMeta('property', 'og:image', seo.image);
+        setMeta('name', 'twitter:card', 'summary_large_image');
+        setMeta('name', 'twitter:title', seo.title);
+        setMeta('name', 'twitter:description', seo.description);
+        setMeta('name', 'twitter:image', seo.image);
+      };
+
+      const slug = new URLSearchParams(window.location.search).get('post');
+      const initialPost = (window.BLOG_POSTS || []).find(post => post.slug === slug) || null;
+      window.applyBlogSeo(initialPost);
+    })();
+  </script>
+  <meta name="robots" content="index, follow, max-image-preview:large">
 </head>
 <body>
     <script>window.EDUBOX_IMAGE_APP = false;</script>
@@ -90,12 +140,8 @@
             const [activePost, setActivePost] = useState(() => getPostFromUrl());
 
             useEffect(() => {
-                if (activePost) {
-                    document.title = activePost.title + " - Blog EduBox AI";
-                    window.scrollTo(0, 0);
-                } else {
-                    document.title = "Blog EduBox AI - Poradnik i aktualności dla nauczycieli";
-                }
+                window.applyBlogSeo(activePost);
+                if (activePost) window.scrollTo(0, 0);
             }, [activePost]);
 
             useEffect(() => {
@@ -109,7 +155,7 @@
                         "headline": activePost.title,
                         "description": activePost.excerpt,
                         "datePublished": activePost.date,
-                        "dateModified": activePost.date,
+                        "dateModified": activePost.updated || activePost.date,
                         "author": { "@type": "Organization", "name": "EduBox AI", "url": "https://eduboxpro.pl/" },
                         "publisher": {
                             "@type": "Organization",
