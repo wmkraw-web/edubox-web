@@ -1,6 +1,6 @@
 const TTS_RATE_WINDOW_MS = 5 * 60 * 1000;
 const TTS_RATE_MAX_REQUESTS = 12;
-const TTS_MAX_TEXT_LENGTH = 1200;
+const TTS_MAX_TEXT_LENGTH = 1800;
 
 const ttsRateStore = globalThis.__novaTtsRateStore || new Map();
 globalThis.__novaTtsRateStore = ttsRateStore;
