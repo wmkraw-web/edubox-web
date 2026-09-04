@@ -17,6 +17,8 @@ assert.match(index, /Kafelki są dodatkiem do pełnej porady, a nie jej zamienni
 assert.match(index, /zwykle napisz 5–9 zdań/, 'NOVA powinna rozwijać złożone tematy');
 assert.match(index, /whitespace-pre-line/, 'akapitowe odpowiedzi NOVY powinny zachowywać podziały wierszy');
 assert.match(index, /czystego tekstu bez znaczników Markdown/, 'NOVA nie powinna wyświetlać surowych znaczników Markdown');
+assert.match(index, /const sanitizeNovaAnswer =/, 'odpowiedź NOVY powinna być oczyszczana z przypadkowych znaczników');
+assert.match(index, /return \{ answer, apps: matchedApps \}/, 'interfejs powinien otrzymać oczyszczoną odpowiedź NOVY');
 
 const ttsLimit = Number(chatApi.match(/TTS_MAX_TEXT_LENGTH\s*=\s*(\d+)/)?.[1]);
 assert.ok(ttsLimit >= 1600, 'limit głosu musi mieścić maksymalną zalecaną długość odpowiedzi NOVY');
