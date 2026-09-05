@@ -148,7 +148,6 @@ const TRACKED_AI_ENDPOINTS = new Set([
     '/api/chat',
     '/api/gemini',
     '/api/generate',
-    '/api/generate-openai',
     '/api/malarz',
     '/api/upscale',
     '/api/describe-image',

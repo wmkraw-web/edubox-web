@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="pl" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel statystyk społecznościowych — EduBox AI</title>
+    <meta name="description" content="Prywatny panel statystyk własnych kont EduBox AI w mediach społecznościowych.">
+    <meta name="robots" content="noindex, nofollow, noarchive">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <style>
+        body { background: #020617; }
+        .glass { background: rgba(15, 23, 42, .78); border: 1px solid rgba(148, 163, 184, .16); box-shadow: 0 20px 55px rgba(2, 6, 23, .32); }
+        .pin-card { transition: transform .18s ease, border-color .18s ease; }
+        .pin-card:hover { transform: translateY(-2px); }
+    </style>
+</head>
+<body class="min-h-screen text-slate-100 antialiased">
+    <div class="fixed inset-0 pointer-events-none overflow-hidden">
+        <div class="absolute -top-44 -left-24 h-96 w-96 rounded-full bg-rose-600/20 blur-3xl"></div>
+        <div class="absolute top-1/3 -right-36 h-96 w-96 rounded-full bg-cyan-500/10 blur-3xl"></div>
+    </div>
+
+    <main class="relative max-w-6xl mx-auto px-5 py-8 md:py-12">
+        <header class="flex flex-col lg:flex-row lg:items-end justify-between gap-6 mb-8">
+            <div>
+                <a href="/" class="inline-flex items-center gap-2 text-cyan-300 hover:text-cyan-200 text-sm font-bold mb-5"><i class="ph-bold ph-arrow-left"></i> EduBox AI</a>
+                <p class="text-xs uppercase tracking-[.28em] text-rose-300 font-black mb-3">Prywatne centrum kontroli</p>
+                <h1 class="text-4xl md:text-6xl font-black tracking-tight">Statystyki <span class="text-transparent bg-clip-text bg-gradient-to-r from-rose-400 to-cyan-300">społecznościowe</span></h1>
+                <p class="mt-4 text-slate-400 max-w-2xl leading-relaxed">Realne dane z Twoich kont (na razie Pinterest) - żeby wiedzieć, co faktycznie działa, zamiast zgadywać po liczbie wyświetleń na platformie.</p>
+            </div>
+            <div class="flex flex-wrap gap-2">
+                <button id="logout-button" class="hidden inline-flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 px-4 py-3 rounded-xl font-bold transition-colors">
+                    <i class="ph-bold ph-sign-out"></i><span>Wyloguj</span>
+                </button>
+                <button id="refresh-button" class="hidden inline-flex items-center justify-center gap-2 bg-rose-600 hover:bg-rose-500 disabled:opacity-50 disabled:cursor-wait px-5 py-3 rounded-xl font-black transition-colors">
+                    <i class="ph-bold ph-arrows-clockwise"></i><span>Odśwież dane</span>
+                </button>
+            </div>
+        </header>
+
+        <section id="message" class="glass rounded-2xl p-5 mb-6" aria-live="polite"></section>
+
+        <section id="account-summary" class="hidden grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6"></section>
+
+        <section id="analytics-note" class="hidden mb-6"></section>
+
+        <h2 id="pins-heading" class="hidden text-sm font-black uppercase tracking-widest text-slate-400 mb-3">Ostatnie piny</h2>
+        <section id="pins-list" class="grid md:grid-cols-2 xl:grid-cols-3 gap-4"></section>
+    </main>
+
+    <script>
+        const state = { authHeader: null };
+
+        function escapeHtml(value) {
+            return String(value ?? '').replace(/[&<>'"]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[char]);
+        }
+
+        function formatDate(value) {
+            if (!value) return 'brak danych';
+            const date = new Date(value);
+            if (Number.isNaN(date.getTime())) return 'brak danych';
+            return date.toLocaleDateString('pl-PL', { day: '2-digit', month: 'short', year: 'numeric' });
+        }
+
+        function createBasicHeader(user, pass) {
+            const bytes = new TextEncoder().encode(`${user}:${pass}`);
+            let binary = '';
+            bytes.forEach(byte => { binary += String.fromCharCode(byte); });
+            return `Basic ${btoa(binary)}`;
+        }
+
+        function renderLogin(errorMessage = '') {
+            state.authHeader = null;
+            document.getElementById('account-summary').classList.add('hidden');
+            document.getElementById('analytics-note').classList.add('hidden');
+            document.getElementById('pins-heading').classList.add('hidden');
+            document.getElementById('pins-list').innerHTML = '';
+            document.getElementById('refresh-button').classList.add('hidden');
+            document.getElementById('logout-button').classList.add('hidden');
+            document.getElementById('message').innerHTML = `
+                <div class="max-w-md mx-auto py-3">
+                    <div class="h-12 w-12 rounded-2xl bg-rose-500/15 text-rose-300 flex items-center justify-center text-2xl mb-4"><i class="ph-bold ph-lock-key"></i></div>
+                    <h2 class="text-2xl font-black">Zaloguj się do panelu</h2>
+                    <p class="text-sm text-slate-400 mt-2 leading-relaxed">Ten sam login i hasło co w pozostałych prywatnych panelach EduBox. Dane nie są zapisywane - znikną po zamknięciu tej karty.</p>
+                    <form id="login-form" class="mt-5 space-y-3">
+                        <label class="block"><span class="text-xs font-bold text-slate-400">Login</span><input id="login-user" type="text" autocomplete="username" required class="mt-1 w-full rounded-xl bg-slate-950 border border-slate-700 px-4 py-3 outline-none focus:border-rose-400"></label>
+                        <label class="block"><span class="text-xs font-bold text-slate-400">Hasło</span><input id="login-pass" type="password" autocomplete="current-password" required class="mt-1 w-full rounded-xl bg-slate-950 border border-slate-700 px-4 py-3 outline-none focus:border-rose-400"></label>
+                        <p id="login-error" class="${errorMessage ? '' : 'hidden'} text-sm text-rose-300"><i class="ph-bold ph-warning-circle mr-1"></i>${escapeHtml(errorMessage)}</p>
+                        <button type="submit" class="w-full inline-flex items-center justify-center gap-2 bg-rose-600 hover:bg-rose-500 px-5 py-3 rounded-xl font-black transition-colors"><i class="ph-bold ph-sign-in"></i>Wejdź do panelu</button>
+                    </form>
+                </div>`;
+            document.getElementById('login-form').addEventListener('submit', async event => {
+                event.preventDefault();
+                const user = document.getElementById('login-user').value;
+                const passInput = document.getElementById('login-pass');
+                state.authHeader = createBasicHeader(user, passInput.value);
+                passInput.value = '';
+                await loadData();
+            });
+        }
+
+        function renderAccount(account) {
+            const cards = [
+                ['Konto', account.username ? '@' + account.username : '—', 'text-white'],
+                ['Obserwujący', account.followers ?? '—', 'text-cyan-300'],
+                ['Piny (ostatnie)', state.pinsCount ?? '—', 'text-rose-300'],
+                ['Ostatnia aktualizacja', formatDate(state.updatedAt), 'text-slate-300'],
+            ];
+            document.getElementById('account-summary').innerHTML = cards.map(([label, value, color]) => `
+                <article class="glass rounded-2xl p-4">
+                    <p class="text-[11px] uppercase tracking-wider text-slate-500 font-black">${escapeHtml(label)}</p>
+                    <p class="text-xl md:text-2xl font-black mt-1 ${color} truncate">${escapeHtml(String(value))}</p>
+                </article>`).join('');
+            document.getElementById('account-summary').classList.remove('hidden');
+        }
+
+        function renderAnalytics(analytics, analyticsError) {
+            const container = document.getElementById('analytics-note');
+            if (analyticsError) {
+                container.innerHTML = `<div class="glass rounded-2xl p-4 text-sm text-amber-200"><i class="ph-bold ph-info mr-2"></i>${escapeHtml(analyticsError)}</div>`;
+                container.classList.remove('hidden');
+                return;
+            }
+            if (!analytics || !analytics.all) {
+                container.classList.add('hidden');
+                return;
+            }
+            const totals = analytics.all.summary_metrics || {};
+            const items = [
+                ['Wyświetlenia (30 dni)', totals.IMPRESSION],
+                ['Zapisania', totals.SAVE],
+                ['Kliknięcia w pin', totals.PIN_CLICK],
+                ['Kliknięcia na stronę', totals.OUTBOUND_CLICK],
+            ].filter(([, value]) => value !== undefined);
+            if (!items.length) { container.classList.add('hidden'); return; }
+            container.innerHTML = `<div class="glass rounded-2xl p-5">
+                <p class="text-xs uppercase tracking-widest text-slate-500 font-black mb-3">Ostatnie 30 dni - konto Pinterest</p>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    ${items.map(([label, value]) => `<div class="bg-slate-950/55 rounded-xl p-3"><dt class="text-xs text-slate-500">${escapeHtml(label)}</dt><dd class="font-black text-lg text-white mt-1">${escapeHtml(String(value))}</dd></div>`).join('')}
+                </div>
+            </div>`;
+            container.classList.remove('hidden');
+        }
+
+        function renderPins(pins) {
+            document.getElementById('pins-heading').classList.toggle('hidden', pins.length === 0);
+            document.getElementById('pins-list').innerHTML = pins.map(pin => `
+                <a href="${escapeHtml(pin.pinUrl)}" target="_blank" rel="noopener noreferrer" class="pin-card glass rounded-2xl overflow-hidden flex flex-col">
+                    ${pin.media ? `<img src="${escapeHtml(pin.media)}" alt="" class="w-full h-40 object-cover" loading="lazy">` : `<div class="w-full h-40 bg-slate-800 flex items-center justify-center text-slate-600"><i class="ph-bold ph-image text-4xl"></i></div>`}
+                    <div class="p-4">
+                        <p class="font-bold text-sm text-white line-clamp-2">${escapeHtml(pin.title)}</p>
+                        <p class="text-xs text-slate-500 mt-2">${escapeHtml(formatDate(pin.createdAt))}</p>
+                    </div>
+                </a>`).join('');
+        }
+
+        async function loadData() {
+            const button = document.getElementById('refresh-button');
+            button.disabled = true;
+            button.querySelector('i')?.classList.add('animate-spin');
+            try {
+                const response = await fetch('/api/social-stats?platform=pinterest', {
+                    credentials: 'same-origin',
+                    cache: 'no-store',
+                    headers: { Authorization: state.authHeader },
+                });
+                const data = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    const error = new Error(data.error || `Nie udało się pobrać danych (HTTP ${response.status}).`);
+                    error.status = response.status;
+                    throw error;
+                }
+                state.pinsCount = Array.isArray(data.pins) ? data.pins.length : 0;
+                state.updatedAt = data.updatedAt;
+                renderAccount(data.account || {});
+                renderAnalytics(data.analytics, data.analyticsError);
+                renderPins(Array.isArray(data.pins) ? data.pins : []);
+                document.getElementById('message').innerHTML = `<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2"><span class="text-emerald-300 font-bold"><i class="ph-bold ph-shield-check mr-2"></i>Dane pobrane bez zmian na koncie Pinterest.</span><span class="text-xs text-slate-500">Aktualizacja: ${escapeHtml(formatDate(data.updatedAt))}</span></div>`;
+                document.getElementById('refresh-button').classList.remove('hidden');
+                document.getElementById('logout-button').classList.remove('hidden');
+            } catch (error) {
+                if (error.status === 401) {
+                    renderLogin('Login lub hasło są niepoprawne. Spróbuj ponownie.');
+                    return;
+                }
+                document.getElementById('message').innerHTML = `<div class="flex gap-3 text-amber-200"><i class="ph-bold ph-warning-circle text-2xl"></i><div><p class="font-black">Panel nie może jeszcze pobrać danych.</p><p class="text-sm text-slate-400 mt-1">${escapeHtml(error.message)}</p></div></div>`;
+            } finally {
+                button.disabled = false;
+                button.querySelector('i')?.classList.remove('animate-spin');
+            }
+        }
+
+        document.getElementById('refresh-button').addEventListener('click', loadData);
+        document.getElementById('logout-button').addEventListener('click', () => renderLogin('Wylogowano z panelu.'));
+        renderLogin();
+    </script>
+</body>
+</html>
