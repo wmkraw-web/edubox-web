@@ -1,16 +1,16 @@
 <!DOCTYPE html><html lang="pl" translate="no" class="notranslate"><head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EduPodsumowanie - Roczne Podsumowanie Klasy Wideo</title>
-    <meta property="og:title" content="EduPodsumowanie - Roczne Podsumowanie Klasy Wideo">
-    <meta property="og:description" content="Wygeneruj efektowne wideo-podsumowanie roku/semestru dla swojej klasy w stylu 'Wrapped'. Podaj 3 fakty, AI zrobi resztę.">
+    <title>EduPodsumowanie - Wideo-Podsumowanie Roku i Wydarzeń</title>
+    <meta property="og:title" content="EduPodsumowanie - Wideo-Podsumowanie Roku i Wydarzeń">
+    <meta property="og:description" content="Wygeneruj wideo-podsumowanie w stylu 'Wrapped' dla roku, wycieczki, projektu czy konkursu - z muzyką w tle, dopasowane do wieku dzieci. Podaj kilka faktów, AI zrobi resztę.">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://eduboxpro.pl/edupodsumowanie.html">
     <meta property="og:image" content="https://eduboxpro.pl/okladka.jpg">
     <meta property="og:locale" content="pl_PL">
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="EduPodsumowanie - Roczne Podsumowanie Klasy Wideo">
-    <meta name="twitter:description" content="Wygeneruj efektowne wideo-podsumowanie roku/semestru dla swojej klasy w stylu 'Wrapped'. Podaj 3 fakty, AI zrobi resztę.">
+    <meta name="twitter:title" content="EduPodsumowanie - Wideo-Podsumowanie Roku i Wydarzeń">
+    <meta name="twitter:description" content="Wygeneruj wideo-podsumowanie w stylu 'Wrapped' dla roku, wycieczki, projektu czy konkursu - z muzyką w tle, dopasowane do wieku dzieci. Podaj kilka faktów, AI zrobi resztę.">
 
     <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-3RQ9R0N0K8"></script>
     <script>
@@ -35,6 +35,7 @@
         .fact-input { background: #14103a; border: 2px solid rgba(255,255,255,0.1); border-radius: 14px; padding: 10px 14px; color: #ECE9FF; }
         .fact-input::placeholder { color: #8981C2; }
         .fact-input:focus { outline: none; border-color: #FF5DA2; }
+        select.fact-input { appearance: none; -webkit-appearance: none; background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%238981C2'><path d='M7 10l5 5 5-5z'/></svg>"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 36px; }
         .generate-btn { background: linear-gradient(135deg, #FF5DA2, #7B5CFF); box-shadow: 0 6px 0 #4E37B0; }
         .generate-btn:active { transform: translateY(4px); box-shadow: 0 2px 0 #4E37B0; }
         .generate-btn:disabled { opacity: 0.55; box-shadow: 0 6px 0 #33306e; cursor: default; }
@@ -42,14 +43,14 @@
     </style>
 
   <link rel="canonical" href="https://eduboxpro.pl/edupodsumowanie.html">
-  <meta name="description" content="Wygeneruj efektowne wideo-podsumowanie roku/semestru dla swojej klasy w stylu 'Wrapped'. Podaj 3 fakty, AI zrobi resztę.">
+  <meta name="description" content="Wygeneruj wideo-podsumowanie w stylu 'Wrapped' dla roku, wycieczki, projektu czy konkursu - z muzyką w tle, dopasowane do wieku dzieci. Podaj kilka faktów, AI zrobi resztę.">
   <link rel="icon" href="/icon-96.png" type="image/png">
   <script type="application/ld+json">
 {
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
-  "name": "EduPodsumowanie - Roczne Podsumowanie Klasy Wideo",
-  "description": "Wygeneruj efektowne wideo-podsumowanie roku/semestru dla swojej klasy w stylu 'Wrapped'.",
+  "name": "EduPodsumowanie - Wideo-Podsumowanie Roku i Wydarzeń",
+  "description": "Wygeneruj efektowne wideo-podsumowanie w stylu 'Wrapped' dla dowolnego wydarzenia - roku, wycieczki, projektu czy konkursu, z muzyką w tle.",
   "url": "https://eduboxpro.pl/edupodsumowanie.html",
   "applicationCategory": "EducationalApplication",
   "operatingSystem": "Web",
@@ -85,13 +86,37 @@
         const FACT_PLACEHOLDERS = [
             'np. Przeczytaliśmy razem 12 książek',
             'np. Wygraliśmy konkurs recytatorski',
-            'np. Nauczyliśmy się liczyć do 100 po angielsku'
+            'np. Nauczyliśmy się liczyć do 100 po angielsku',
+            'np. Zorganizowaliśmy kiermasz charytatywny',
+            'np. Zwiedziliśmy 3 muzea'
         ];
 
+        // Typ podsumowania - steruje odznaką na starcie wideo, etykietą kart oraz kontekstem
+        // przekazywanym do AI (żeby "Wrapped" pasował do wycieczki tak samo dobrze jak do roku).
+        const EVENT_TYPES = [
+            { id: 'rok', label: 'Rok szkolny', badge: '🎬 PODSUMOWANIE ROKU', aiLabel: 'cały rok szkolny klasy', momentLabel: 'MOMENT' },
+            { id: 'semestr', label: 'Semestr', badge: '🎬 PODSUMOWANIE SEMESTRU', aiLabel: 'semestr klasy', momentLabel: 'MOMENT' },
+            { id: 'wycieczka', label: 'Wycieczka / wyjście', badge: '🧭 PODSUMOWANIE WYCIECZKI', aiLabel: 'wycieczkę lub wyjście klasowe', momentLabel: 'PRZYSTANEK' },
+            { id: 'projekt', label: 'Projekt / akcja', badge: '🚀 PODSUMOWANIE PROJEKTU', aiLabel: 'projekt lub akcję szkolną', momentLabel: 'ETAP' },
+            { id: 'konkurs', label: 'Konkurs / wydarzenie', badge: '🏆 PODSUMOWANIE WYDARZENIA', aiLabel: 'konkurs lub jednorazowe wydarzenie', momentLabel: 'HIGHLIGHT' },
+            { id: 'inne', label: 'Inny temat', badge: '✨ NASZE PODSUMOWANIE', aiLabel: 'dowolne wydarzenie opisane przez nauczyciela', momentLabel: 'MOMENT' }
+        ];
+        const DEFAULT_EVENT_TYPE = 'rok';
+
+        // Grupa wiekowa - wpływa na ton tekstu dobierany przez AI (przedszkole = prościej i cieplej,
+        // starsze klasy = można podkreślić dumę z realnych osiągnięć).
+        const AGE_GROUPS = [
+            { id: 'przedszkole', label: 'Przedszkole', aiHint: 'bardzo proste słowa, dużo ciepła i entuzjazmu, zero trudnych pojęć' },
+            { id: 'wczesnoszkolna', label: 'Klasy 1-3', aiHint: 'proste, żywe zdania, entuzjastyczny, ale zrozumiały dla dziecka ton' },
+            { id: 'starsza', label: 'Klasy 4-8', aiHint: 'nieco bardziej dojrzały ton, można podkreślić osiągnięcia i dumę z efektów' }
+        ];
+        const DEFAULT_AGE_GROUP = 'wczesnoszkolna';
+
         // Cztery gotowe "nastroje" wideo - AI wybiera jeden na podstawie tego, co nauczyciel napisał
-        // (opis + fakty), a nastrój steruje kolorami aur, akcentów kart i tempem animacji. To jest
-        // realna personalizacja napędzana przez AI, ale zero ryzyka generowania obrazków - wszystko
-        // dalej renderuje się w Canvasie, po prostu innymi paletami/tempem.
+        // (typ, wiek, opis + fakty), a nastrój steruje kolorami aur, akcentów kart, tempem animacji
+        // ORAZ podkładem muzycznym (ten sam klucz wybiera plik audio). To jest realna personalizacja
+        // napędzana przez AI, ale zero ryzyka generowania obrazków - wszystko dalej renderuje się
+        // w Canvasie, po prostu innymi paletami/tempem/muzyką.
         const MOOD_THEMES = {
             energetic: { aura: ['251,146,60', '236,72,153', '250,204,21'], accent: ['#FF7A45', '#FFC145', '#FF5DA2'], speed: 1.25 },
             cozy: { aura: ['245,158,11', '244,114,182', '168,85,247'], accent: ['#FBBF24', '#FB7185', '#C084FC'], speed: 0.8 },
@@ -100,15 +125,28 @@
         };
         const DEFAULT_MOOD = 'playful';
 
+        // Krótkie (~22-24s), zapętlalne podkłady muzyczne dobrane do każdego nastroju.
+        // Źródło: kolekcja "Free PD" (domena publiczna, bez wymogu podawania autora) -
+        // przycięte i znormalizowane głośnościowo lokalnie, żeby zawsze brzmiały spójnie.
+        const MUSIC_TRACKS = {
+            energetic: 'audio/podsumowanie/energetic.mp3',
+            cozy: 'audio/podsumowanie/cozy.mp3',
+            proud: 'audio/podsumowanie/proud.mp3',
+            playful: 'audio/podsumowanie/playful.mp3'
+        };
+
         function App() {
             const [user, setUser] = useState(null);
             const [isPremium, setIsPremium] = useState(false);
             const [accessCode, setAccessCode] = useState('');
             const [toastMessage, setToastMessage] = useState(null);
 
+            const [eventType, setEventType] = useState(DEFAULT_EVENT_TYPE);
+            const [ageGroup, setAgeGroup] = useState(DEFAULT_AGE_GROUP);
             const [className, setClassName] = useState('');
             const [description, setDescription] = useState('');
-            const [facts, setFacts] = useState(['', '', '']);
+            const [facts, setFacts] = useState(['', '', '', '', '']);
+            const [musicOn, setMusicOn] = useState(true);
 
             const [stage, setStage] = useState('form');
             const [statusText, setStatusText] = useState('');
@@ -119,11 +157,15 @@
             const mediaRecorderRef = useRef(null);
             const chunksRef = useRef([]);
             const particlesRef = useRef([]);
-            const punchyFactsRef = useRef(['', '', '']);
+            const punchyFactsRef = useRef([]);
             const hookRef = useRef('');
             const closingLineRef = useRef('Dziękujemy za wspólny czas!');
-            const iconsRef = useRef(['✨', '✨', '✨']);
+            const iconsRef = useRef([]);
             const themeRef = useRef(MOOD_THEMES[DEFAULT_MOOD]);
+            const badgeRef = useRef(EVENT_TYPES[0].badge);
+            const momentLabelRef = useRef('MOMENT');
+            const factCountRef = useRef(3);
+            const moodKeyRef = useRef(DEFAULT_MOOD);
 
             useEffect(() => {
                 const initCore = () => {
@@ -269,18 +311,32 @@
                 });
             }
 
-            // Cztery odsłony: tytuł klasy -> fakt 1 -> fakt 2 -> fakt 3 -> zamknięcie (eduboxpro.pl)
-            function buildTimeline() {
-                return {
-                    title: { start: 300, end: 3200 },
-                    fact1: { start: 3400, end: 7200 },
-                    fact2: { start: 7400, end: 11200 },
-                    fact3: { start: 11400, end: 15200 },
-                    closing: { start: 15400, end: 18500 },
-                    stars: [{ start: 18700, end: 19400 }, { start: 19400, end: 20100 }, { start: 20100, end: 20800 }]
-                };
+            // Oś czasu jest teraz DYNAMICZNA - liczba "momentów" (2 do 5) realnie zmienia długość
+            // wideo, zamiast sztywnych 3 kart za każdym razem. Dla factCount=3 daje dokładnie taki
+            // sam przebieg jak poprzednia, sztywna wersja.
+            function buildTimeline(factCount) {
+                const GAP = 200;
+                const title = { start: 300, end: 300 + 2900 };
+                let cursor = title.end + GAP;
+                const facts = [];
+                for (let i = 0; i < factCount; i++) {
+                    const seg = { start: cursor, end: cursor + 3800 };
+                    facts.push(seg);
+                    cursor = seg.end + GAP;
+                }
+                const closing = { start: cursor, end: cursor + 3100 };
+                cursor = closing.end + GAP;
+                const stars = [0, 1, 2].map(() => { const seg = { start: cursor, end: cursor + 700 }; cursor = seg.end; return seg; });
+                return { title, facts, closing, stars, duration: cursor };
             }
             function prog(el, t) { if (t < el.start) return 0; if (t > el.end) return 1; return (t - el.start) / (el.end - el.start); }
+
+            // Kierunek wjazdu karty (na przemian z lewej/prawej/dołu) - działa dla dowolnej liczby
+            // kart (2-5), nie tylko dla sztywnych trzech jak poprzednio.
+            function slideDir(idx) {
+                const seq = [-1, 1, 0, -1, 1];
+                return seq[idx % seq.length];
+            }
 
             // Tło: ciemna baza + 3 miękkie, animowane gradientowe "aury" (dokładnie styl .aura-blob
             // z index.html) zamiast wygenerowanej przez AI ilustracji - spójne z resztą portfolio,
@@ -320,37 +376,32 @@
                     ctx.restore();
                 });
 
-                // Tytuł klasy - odznaka wjeżdża z odbiciem, nazwa klasy i hasło AI odsłaniają się słowo po słowie
+                // Tytuł - odznaka (dopasowana przez AI do typu wydarzenia) wjeżdża z odbiciem,
+                // nazwa/temat i hasło AI odsłaniają się słowo po słowie
                 const titleP = prog(timeline.title, t);
                 if (titleP > 0) {
                     const s = easeBounce(Math.min(1, titleP * 1.8));
                     ctx.save();
                     ctx.translate(W / 2, H * 0.13);
                     ctx.scale(0.3 + s * 0.7, 0.3 + s * 0.7);
-                    drawPill(ctx, 0, -34, '🎬 PODSUMOWANIE ROKU', "800 24px 'Baloo 2'", 20, 12, 'rgba(255,255,255,0.14)', '#FFC145', Math.min(1, s * 1.4));
+                    drawPill(ctx, 0, -34, badgeRef.current, "800 24px 'Baloo 2'", 20, 12, 'rgba(255,255,255,0.14)', '#FFC145', Math.min(1, s * 1.4));
                     ctx.restore();
                     drawKineticText(ctx, className || 'Nasza klasa', W / 2, H * 0.25, "800 56px 'Baloo 2'", '#FFFFFF', Math.min(1, titleP * 1.4), W * 0.86, 60);
-                    // Hasło dopasowane przez AI do treści - startuje odrobinę później niż nazwa klasy
+                    // Hasło dopasowane przez AI do treści - startuje odrobinę później niż nazwa
                     const hookP = Math.max(0, Math.min(1, (titleP - 0.25) / 0.7));
                     if (hookP > 0 && hookRef.current) {
                         drawKineticText(ctx, hookRef.current, W / 2, H * 0.33, "700 26px 'Nunito'", theme.accent[0], hookP, W * 0.78, 32);
                     }
                 }
 
-                // Trzy szklane karty faktów, każda z gigantyczną cyfrą w tle i innym kierunkiem wjazdu
-                const SLIDE_FROM = [-1, 0, 1]; // karta 1 z lewej, 2 z dołu (bez przesunięcia X), 3 z prawej
-                const factDefs = [
-                    { key: 'fact1', idx: 0 },
-                    { key: 'fact2', idx: 1 },
-                    { key: 'fact3', idx: 2 }
-                ];
-                factDefs.forEach(({ key, idx }) => {
-                    const el = timeline[key];
+                // Szklane karty faktów (2-5, zależnie od tego, ile podał nauczyciel), każda
+                // z gigantyczną cyfrą w tle i innym kierunkiem wjazdu.
+                timeline.facts.forEach((el, idx) => {
                     const raw = prog(el, t);
                     if (raw <= 0) return;
                     const p = ease(Math.min(1, raw * 3));
                     const cardY = H * 0.55 + (1 - p) * 18;
-                    const xOffset = (1 - p) * SLIDE_FROM[idx] * 90;
+                    const xOffset = (1 - p) * slideDir(idx) * 90;
                     const alpha = Math.min(1, raw * 4) * (raw > 0.93 ? Math.max(0, (1 - raw) * 14) : 1);
                     const accent = theme.accent[idx % theme.accent.length];
 
@@ -379,7 +430,7 @@
                     ctx.fillStyle = accent;
                     ctx.font = "800 20px 'Baloo 2'"; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
                     const icon = iconsRef.current[idx] || '✨';
-                    ctx.fillText(`${icon} MOMENT ${idx + 1}`, cx + 26, cardY + 46);
+                    ctx.fillText(`${icon} ${momentLabelRef.current} ${idx + 1}`, cx + 26, cardY + 46);
 
                     ctx.fillStyle = '#FFFFFF'; ctx.font = "800 34px 'Nunito'"; ctx.textAlign = 'left';
                     const factText = punchyFactsRef.current[idx] || facts[idx] || '';
@@ -414,21 +465,65 @@
                 ctx.restore();
             }
 
-            function playAndRecord() {
+            // Przygotowuje (opcjonalny) podkład muzyczny dopasowany do nastroju: wczytuje krótki
+            // plik audio, dekoduje go Web Audio API i podpina jako osobny tor dźwiękowy do strumienia
+            // z Canvasu. Jeśli cokolwiek zawiedzie (brak sieci, stary przeglądarka) - wideo i tak
+            // powstaje, tylko bez dźwięku, więc generowanie nigdy nie blokuje się na muzyce.
+            async function prepareAudioTrack(moodKey) {
+                const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                if (!AudioCtx) return null;
+                const audioCtx = new AudioCtx();
+                const src = MUSIC_TRACKS[moodKey] || MUSIC_TRACKS[DEFAULT_MOOD];
+                const resp = await fetch(src);
+                const arrBuf = await resp.arrayBuffer();
+                const audioBuffer = await audioCtx.decodeAudioData(arrBuf);
+                const source = audioCtx.createBufferSource();
+                source.buffer = audioBuffer;
+                source.loop = true;
+                const gainNode = audioCtx.createGain();
+                gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
+                gainNode.gain.linearRampToValueAtTime(0.55, audioCtx.currentTime + 0.5);
+                const dest = audioCtx.createMediaStreamDestination();
+                source.connect(gainNode).connect(dest);
+                source.start(0);
+                return {
+                    audioTrack: dest.stream.getAudioTracks()[0],
+                    fadeOut: (whenSeconds) => { try { gainNode.gain.linearRampToValueAtTime(0, audioCtx.currentTime + whenSeconds); } catch (e) {} },
+                    cleanup: () => { try { source.stop(); } catch (e) {} try { audioCtx.close(); } catch (e) {} }
+                };
+            }
+
+            async function playAndRecord(factCount, moodKey) {
                 const canvas = canvasRef.current;
                 const W = 720, H = 1280;
                 canvas.width = W; canvas.height = H;
                 const ctx = canvas.getContext('2d');
                 initParticles(W, H);
-                const timeline = buildTimeline();
-                const duration = 21000;
+                const timeline = buildTimeline(factCount);
+                const duration = timeline.duration;
 
-                const stream = canvas.captureStream(30);
-                const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9' : 'video/webm';
-                const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 4000000 });
+                const canvasStream = canvas.captureStream(30);
+                let finalStream = canvasStream;
+                let audioHandle = null;
+
+                if (musicOn) {
+                    try {
+                        audioHandle = await prepareAudioTrack(moodKey);
+                        if (audioHandle) finalStream = new MediaStream([...canvasStream.getVideoTracks(), audioHandle.audioTrack]);
+                    } catch (e) {
+                        console.log('Muzyka niedostępna, generuję wideo bez dźwięku.');
+                        audioHandle = null;
+                        finalStream = canvasStream;
+                    }
+                }
+
+                const mimeCandidates = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp9', 'video/webm'];
+                const mimeType = mimeCandidates.find(m => MediaRecorder.isTypeSupported(m)) || 'video/webm';
+                const recorder = new MediaRecorder(finalStream, { mimeType, videoBitsPerSecond: 4000000 });
                 chunksRef.current = [];
                 recorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
                 recorder.onstop = () => {
+                    if (audioHandle) audioHandle.cleanup();
                     const blob = new Blob(chunksRef.current, { type: 'video/webm' });
                     setDownloadUrl(URL.createObjectURL(blob));
                     setStage('done');
@@ -437,11 +532,16 @@
                 mediaRecorderRef.current = recorder;
                 recorder.start();
 
+                let fadeStarted = false;
                 const startTime = performance.now();
                 function loop(now) {
                     const t = now - startTime;
                     renderFrame(ctx, W, H, t, timeline);
                     setProgressPct(Math.min(100, (t / duration) * 100));
+                    if (audioHandle && !fadeStarted && t > duration - 900) {
+                        fadeStarted = true;
+                        audioHandle.fadeOut(0.85);
+                    }
                     if (t < duration) requestAnimationFrame(loop);
                     else if (recorder.state !== 'inactive') recorder.stop();
                 }
@@ -449,37 +549,39 @@
             }
 
             const handleGenerate = () => {
-                if (facts.every(f => !f.trim())) { showToast('Wpisz przynajmniej jeden fakt/wydarzenie!'); return; }
+                const filledFacts = facts.map(f => f.trim()).filter(Boolean);
+                if (filledFacts.length < 2) { showToast('Wpisz przynajmniej 2 fakty/momenty!'); return; }
                 window.EduBoxCore.executeWithLimitCheck(isPremium,
                     async () => {
                         setStage('generating');
-                        setStatusText('AI analizuje Waszą klasę...');
+                        setStatusText('AI analizuje to, co się wydarzyło...');
                         setProgressPct(0);
                         try {
-                            // JEDNO wywołanie AI, które analizuje CAŁOŚĆ (opis + fakty) holistycznie i
-                            // personalizuje wideo bez ryzykownego generowania obrazków: pisze spójny hook,
-                            // dopracowuje fakty, dobiera zamknięcie, WYBIERA NASTRÓJ (który realnie zmienia
-                            // kolory/tempo animacji w renderFrame) i ikony do każdej karty. Tło i tak dalej
-                            // rysuje się w 100% w Canvasie - to jedyne wywołanie API w całym narzędziu.
-                            const combinedSystem = `Jesteś kreatywnym dyrektorem tworzącym krótkie wideo "Wrapped" (jak roczne podsumowanie Spotify) podsumowujące rok szkolny klasy, na podstawie informacji od nauczyciela.
-Dostajesz nazwę/opis klasy, opcjonalny dłuższy opis roku oraz do 3 faktów/wydarzeń. Na tej podstawie:
-1. "hook" - jedno krótkie, chwytliwe zdanie (max 10 słów) pod nazwą klasy, oddające charakter/ducha tego roku.
-2. "facts" - dla KAŻDEGO podanego faktu (pomijając puste, w tej samej kolejności) mocniejsza, max 8-słowowa wersja.
-3. "closing" - krótkie (max 8 słów), ciepłe zdanie zamykające wideo, dopasowane do charakteru roku (nie musi być ogólnikiem typu "dziękujemy za wspólny czas" - dopasuj do treści).
-4. "mood" - DOKŁADNIE jedno słowo z: energetic, cozy, proud, playful - to, które najlepiej pasuje do charakteru opisu/faktów (energetic = żywiołowa/sportowa/pełna energii klasa, cozy = ciepła/kameralna/spokojna, proud = osiągnięcia/sukcesy/duma, playful = zabawa/kreatywność/humor).
-5. "icons" - dla KAŻDEGO podanego faktu (ta sama kolejność co "facts") jedno pasujące pojedyncze emoji.
-Zwróć WYŁĄCZNIE czysty obiekt JSON, bez żadnego dodatkowego tekstu: {"hook": "...", "facts": ["...", "..."], "closing": "...", "mood": "...", "icons": ["...", "..."]}
+                            const eventTypeInfo = EVENT_TYPES.find(e => e.id === eventType) || EVENT_TYPES[0];
+                            const ageGroupInfo = AGE_GROUPS.find(a => a.id === ageGroup) || AGE_GROUPS[1];
+
+                            // JEDNO wywołanie AI, które analizuje CAŁOŚĆ (typ, wiek, opis + fakty) holistycznie
+                            // i personalizuje wideo bez ryzykownego generowania obrazków: pisze spójną odznakę
+                            // i hook, dopracowuje fakty, dobiera zamknięcie, WYBIERA NASTRÓJ (który realnie
+                            // zmienia kolory/tempo/muzykę w renderFrame) i ikony do każdej karty.
+                            const combinedSystem = `Jesteś kreatywnym dyrektorem tworzącym krótkie wideo "Wrapped" (jak roczne podsumowanie Spotify) podsumowujące ${eventTypeInfo.aiLabel}, dla grupy: ${ageGroupInfo.label}, na podstawie informacji od nauczyciela.
+Dostajesz temat/nazwę, opcjonalny dłuższy opis oraz od 2 do 5 faktów/momentów. Zwróć WYŁĄCZNIE czysty obiekt JSON, bez żadnego dodatkowego tekstu:
+{"badge": "krótka odznaka na górze wideo, WIELKIMI LITERAMI, z jednym pasującym emoji na początku, max 4 słowa (np. 'PODSUMOWANIE WYCIECZKI')", "hook": "jedno krótkie, chwytliwe zdanie (max 10 słów) pod tytułem", "facts": ["dla KAŻDEGO podanego faktu, w tej samej kolejności, dokładnie ${filledFacts.length} pozycji, mocniejsza max 8-słowowa wersja - nie zmyślaj nowych faktów, tylko wzmocnij podane"], "closing": "krótkie (max 8 słów), ciepłe zdanie zamykające, dopasowane do treści i wieku", "mood": "DOKŁADNIE jedno słowo z: energetic, cozy, proud, playful - dopasowane do charakteru i wieku (energetic = żywiołowe/aktywne, cozy = ciepłe/kameralne/małe dzieci, proud = osiągnięcia/duma, playful = zabawa/humor)", "icons": ["dla KAŻDEGO faktu, ta sama kolejność, dokładnie ${filledFacts.length} pozycji, jedno pasujące pojedyncze emoji"]}
+Ton dopasuj do grupy wiekowej: ${ageGroupInfo.aiHint}.
 Wszystko po polsku (poza wartością "mood"), bez cudzysłowów i dwukropków w treściach tekstowych.`;
 
-                            let contextUser = `Nazwa/opis klasy: ${className.trim() || 'brak nazwy'}\n`;
-                            if (description.trim()) contextUser += `Dodatkowy opis roku od nauczyciela: ${description.trim()}\n`;
-                            contextUser += `Fakty:\n` + facts.filter(f => f.trim()).map((f, i) => `${i + 1}. ${f.trim()}`).join('\n');
+                            let contextUser = `Temat/nazwa: ${className.trim() || 'brak nazwy'}\n`;
+                            if (description.trim()) contextUser += `Dodatkowy opis od nauczyciela: ${description.trim()}\n`;
+                            contextUser += `Fakty:\n` + filledFacts.map((f, i) => `${i + 1}. ${f}`).join('\n');
 
-                            let punchy = facts.map(f => f.trim());
-                            let hook = '';
-                            let closing = 'Dziękujemy za wspólny czas!';
-                            let mood = DEFAULT_MOOD;
-                            let icons = ['✨', '✨', '✨'];
+                            let result = {
+                                badge: eventTypeInfo.badge,
+                                hook: '',
+                                facts: filledFacts,
+                                closing: 'Dziękujemy za wspólny czas!',
+                                mood: DEFAULT_MOOD,
+                                icons: filledFacts.map(() => '✨')
+                            };
                             try {
                                 const resCombined = await fetch('/api/chat', {
                                     method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -488,30 +590,56 @@ Wszystko po polsku (poza wartością "mood"), bez cudzysłowów i dwukropków w 
                                 if (resCombined.ok) {
                                     const dataCombined = await resCombined.json();
                                     const parsed = JSON.parse(dataCombined.text);
-                                    if (Array.isArray(parsed.facts)) {
-                                        let j = 0;
-                                        punchy = facts.map(f => f.trim() ? (parsed.facts[j++] || f.trim()) : '');
-                                    }
-                                    if (typeof parsed.hook === 'string' && parsed.hook.trim()) hook = parsed.hook.trim();
-                                    if (typeof parsed.closing === 'string' && parsed.closing.trim()) closing = parsed.closing.trim();
-                                    if (MOOD_THEMES[parsed.mood]) mood = parsed.mood;
-                                    if (Array.isArray(parsed.icons)) {
-                                        let k = 0;
-                                        const defaultIcons = icons;
-                                        icons = facts.map((f, idx) => f.trim() ? (parsed.icons[k++] || defaultIcons[idx]) : defaultIcons[idx]);
-                                    }
+                                    if (typeof parsed.badge === 'string' && parsed.badge.trim()) result.badge = parsed.badge.trim();
+                                    if (typeof parsed.hook === 'string') result.hook = parsed.hook.trim();
+                                    if (Array.isArray(parsed.facts) && parsed.facts.length === filledFacts.length) result.facts = parsed.facts;
+                                    if (typeof parsed.closing === 'string' && parsed.closing.trim()) result.closing = parsed.closing.trim();
+                                    if (MOOD_THEMES[parsed.mood]) result.mood = parsed.mood;
+                                    if (Array.isArray(parsed.icons) && parsed.icons.length === filledFacts.length) result.icons = parsed.icons;
                                 }
                             } catch (e) { console.log('Nie udało się spersonalizować przez AI, używam wersji domyślnej.'); }
 
-                            punchyFactsRef.current = punchy;
-                            hookRef.current = hook;
-                            closingLineRef.current = closing;
-                            themeRef.current = MOOD_THEMES[mood] || MOOD_THEMES[DEFAULT_MOOD];
-                            iconsRef.current = icons;
+                            // Drugie, NIEZALEŻNE wywołanie AI jako krytyczny weryfikator (ten sam wzorzec
+                            // "generator + weryfikator" co w EduRymy) - łapie halucynacje/nonsensy, których
+                            // model nie widzi we własnym pierwszym przebiegu. Jeśli coś pójdzie nie tak,
+                            // po prostu zostaje pierwsza wersja - weryfikacja nigdy nie blokuje wideo.
+                            setStatusText('Sprawdzam jakość treści...');
+                            try {
+                                const verifySystem = `Jesteś rygorystycznym redaktorem jakości treści do wideo edukacyjnych. Dostajesz oryginalne fakty od nauczyciela oraz przygotowaną wersję JSON do wideo. Sprawdź krytycznie: (1) czy pole "facts" niczego nie zmyśla ponad to, co podał nauczyciel, tylko wzmacnia sformułowanie, (2) czy ton pasuje do grupy wiekowej: ${ageGroupInfo.label}, (3) czy nie ma powtórzeń, nonsensów lub pustych ogólników. Jeśli wszystko jest OK, zwróć DOKŁADNIE ten sam obiekt JSON bez zmian. Jeśli coś wymaga poprawy, zwróć POPRAWIONĄ wersję w TYM SAMYM formacie JSON (te same klucze: badge, hook, facts, closing, mood, icons). Zwróć WYŁĄCZNIE obiekt JSON, bez dodatkowego tekstu.`;
+                                const verifyUser = `Oryginalne fakty od nauczyciela:\n${filledFacts.map((f, i) => `${i + 1}. ${f}`).join('\n')}\n\nWersja do weryfikacji:\n${JSON.stringify(result)}`;
+                                const resVerify = await fetch('/api/chat', {
+                                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ prompt: verifyUser, system: verifySystem, temperature: 0.3, format: 'json', model: 'gpt-4o-mini' })
+                                });
+                                if (resVerify.ok) {
+                                    const dataVerify = await resVerify.json();
+                                    const parsedVerify = JSON.parse(dataVerify.text);
+                                    if (Array.isArray(parsedVerify.facts) && parsedVerify.facts.length === filledFacts.length && typeof parsedVerify.closing === 'string' && parsedVerify.closing.trim() && MOOD_THEMES[parsedVerify.mood]) {
+                                        result = {
+                                            badge: typeof parsedVerify.badge === 'string' && parsedVerify.badge.trim() ? parsedVerify.badge.trim() : result.badge,
+                                            hook: typeof parsedVerify.hook === 'string' ? parsedVerify.hook.trim() : result.hook,
+                                            facts: parsedVerify.facts,
+                                            closing: parsedVerify.closing.trim(),
+                                            mood: parsedVerify.mood,
+                                            icons: Array.isArray(parsedVerify.icons) && parsedVerify.icons.length === filledFacts.length ? parsedVerify.icons : result.icons
+                                        };
+                                    }
+                                }
+                            } catch (e) { console.log('Weryfikacja pominięta, używam pierwszej wersji.'); }
+
+                            punchyFactsRef.current = result.facts;
+                            hookRef.current = result.hook;
+                            closingLineRef.current = result.closing;
+                            themeRef.current = MOOD_THEMES[result.mood] || MOOD_THEMES[DEFAULT_MOOD];
+                            iconsRef.current = result.icons;
+                            badgeRef.current = result.badge;
+                            momentLabelRef.current = eventTypeInfo.momentLabel;
+                            factCountRef.current = filledFacts.length;
+                            moodKeyRef.current = result.mood;
 
                             setStage('recording');
                             setStatusText('Nagrywam wideo...');
-                            playAndRecord();
+                            await playAndRecord(filledFacts.length, result.mood);
                         } catch (err) {
                             showToast('Błąd: ' + err.message);
                             setStage('form');
@@ -522,8 +650,9 @@ Wszystko po polsku (poza wartością "mood"), bez cudzysłowów i dwukropków w 
                 );
             };
 
-            const handleReplay = () => {
-                setStage('recording'); setStatusText('Nagrywam wideo...'); playAndRecord();
+            const handleReplay = async () => {
+                setStage('recording'); setStatusText('Nagrywam wideo...');
+                await playAndRecord(factCountRef.current, moodKeyRef.current);
             };
 
             const updateFact = (i, val) => {
@@ -537,8 +666,8 @@ Wszystko po polsku (poza wartością "mood"), bez cudzysłowów i dwukropków w 
                             <div className="inline-flex items-center gap-2 bg-[#2A2170] text-[#FFC145] text-xs font-black uppercase tracking-widest px-4 py-2 rounded-full mb-4">
                                 <i className="ph-bold ph-film-strip"></i> EduPodsumowanie
                             </div>
-                            <h1 className="display-font text-3xl font-extrabold text-white mb-2">Roczne podsumowanie klasy</h1>
-                            <p className="text-sm text-[#A79FE0]">Podaj fakty (i opcjonalnie opis roku) - AI naprawdę je analizuje i personalizuje wideo: dobiera nastrój, kolory i ton.</p>
+                            <h1 className="display-font text-3xl font-extrabold text-white mb-2">Wideo-podsumowanie dowolnego wydarzenia</h1>
+                            <p className="text-sm text-[#A79FE0]">Rok, semestr, wycieczka, projekt czy konkurs - podaj typ, wiek dzieci i kilka faktów. AI dobiera ton, nastrój, kolory i muzykę.</p>
                         </div>
 
                         {!isPremium && (
@@ -550,23 +679,48 @@ Wszystko po polsku (poza wartością "mood"), bez cudzysłowów i dwukropków w 
 
                         {stage === 'form' && (
                             <div className="card-panel p-5 space-y-5">
-                                <div>
-                                    <label className="text-xs font-black uppercase text-[#A79FE0] mb-2 block">Nazwa/opis klasy</label>
-                                    <input type="text" value={className} onChange={(e) => setClassName(e.target.value)} maxLength="40" placeholder="np. Klasa 4B" className="w-full fact-input" />
-                                </div>
-
-                                <div>
-                                    <label className="text-xs font-black uppercase text-[#A79FE0] mb-2 block">Opisz swoją klasę/rok (opcjonalnie)</label>
-                                    <textarea value={description} onChange={(e) => setDescription(e.target.value)} maxLength="400" rows="3" placeholder="np. Byliśmy bardzo aktywni sportowo, dużo razem świętowaliśmy, klasa pełna energii i pomysłów..." className="w-full fact-input resize-none" />
-                                    <p className="text-[10px] text-[#8981C2] mt-1">AI przeanalizuje to razem z faktami i dobierze nastrój, kolory i ton całego wideo.</p>
-                                </div>
-
-                                {[0, 1, 2].map(i => (
-                                    <div key={i}>
-                                        <label className="text-xs font-black uppercase text-[#A79FE0] mb-2 block">Fakt / wydarzenie {i + 1}</label>
-                                        <input type="text" value={facts[i]} onChange={(e) => updateFact(i, e.target.value)} maxLength="120" placeholder={FACT_PLACEHOLDERS[i]} className="w-full fact-input" />
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="text-xs font-black uppercase text-[#A79FE0] mb-2 block">Typ podsumowania</label>
+                                        <select value={eventType} onChange={(e) => setEventType(e.target.value)} className="w-full fact-input">
+                                            {EVENT_TYPES.map(et => <option key={et.id} value={et.id}>{et.label}</option>)}
+                                        </select>
                                     </div>
-                                ))}
+                                    <div>
+                                        <label className="text-xs font-black uppercase text-[#A79FE0] mb-2 block">Grupa wiekowa</label>
+                                        <select value={ageGroup} onChange={(e) => setAgeGroup(e.target.value)} className="w-full fact-input">
+                                            {AGE_GROUPS.map(ag => <option key={ag.id} value={ag.id}>{ag.label}</option>)}
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="text-xs font-black uppercase text-[#A79FE0] mb-2 block">Nazwa / temat</label>
+                                    <input type="text" value={className} onChange={(e) => setClassName(e.target.value)} maxLength="40" placeholder="np. Klasa 4B albo Wycieczka do Muzeum" className="w-full fact-input" />
+                                </div>
+
+                                <div>
+                                    <label className="text-xs font-black uppercase text-[#A79FE0] mb-2 block">Opisz szerzej (opcjonalnie)</label>
+                                    <textarea value={description} onChange={(e) => setDescription(e.target.value)} maxLength="400" rows="3" placeholder="np. Byliśmy bardzo aktywni sportowo, dużo razem świętowaliśmy, klasa pełna energii i pomysłów..." className="w-full fact-input resize-none" />
+                                    <p className="text-[10px] text-[#8981C2] mt-1">AI przeanalizuje to razem z faktami i dobierze nastrój, kolory, ton i muzykę całego wideo.</p>
+                                </div>
+
+                                <div>
+                                    <div className="flex items-center justify-between mb-2">
+                                        <label className="text-xs font-black uppercase text-[#A79FE0]">Fakty / momenty</label>
+                                        <span className="text-[10px] text-[#8981C2]">wypełnij co najmniej 2 z 5</span>
+                                    </div>
+                                    <div className="space-y-3">
+                                        {[0, 1, 2, 3, 4].map(i => (
+                                            <input key={i} type="text" value={facts[i]} onChange={(e) => updateFact(i, e.target.value)} maxLength="120" placeholder={FACT_PLACEHOLDERS[i]} className="w-full fact-input" />
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <label className="flex items-center gap-3 bg-[#14103a] border-2 border-[#3A2F8C] rounded-2xl px-4 py-3 cursor-pointer">
+                                    <input type="checkbox" checked={musicOn} onChange={(e) => setMusicOn(e.target.checked)} className="w-4 h-4" />
+                                    <span className="text-sm font-bold text-white">🎵 Dodaj podkład muzyczny dopasowany do nastroju</span>
+                                </label>
 
                                 <button onClick={handleGenerate} className="generate-btn w-full text-white display-font font-bold text-lg py-4 rounded-2xl">
                                     Wygeneruj wideo-podsumowanie
@@ -604,7 +758,7 @@ Wszystko po polsku (poza wartością "mood"), bez cudzysłowów i dwukropków w 
                             </div>
                         )}
 
-                        <p className="text-center text-[11px] text-[#A79FE0] mt-6 leading-relaxed">Nagrywanie tworzy prawdziwy plik wideo (WebM) w Twojej przeglądarce - do AI wysyłamy tylko wpisany tekst (fakty i opis), żeby dopracować treść i dobrać nastrój wideo.</p>
+                        <p className="text-center text-[11px] text-[#A79FE0] mt-6 leading-relaxed">Nagrywanie tworzy prawdziwy plik wideo (WebM, z opcjonalną muzyką bez praw autorskich) w Twojej przeglądarce - do AI wysyłamy tylko wpisany tekst (fakty i opis), żeby dopracować treść i dobrać nastrój wideo.</p>
                     </main>
 
                     {toastMessage && (
