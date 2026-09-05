@@ -337,6 +337,31 @@ export const EduBoxCore = {
         }
     },
 
+    // Zapis na powiadomienia o nowościach - jeden e-mail, bez zakładania konta. Zero nowej
+    // funkcji Vercel (i tak mamy 12/12) - zapis idzie WPROST do Firestore, tym samym torem
+    // co Giełda Wzorów/liczniki poniżej. Dokument ID = e-mail, więc drugi zapis tego samego
+    // adresu tylko nadpisuje (merge) zamiast tworzyć duplikat.
+    // Dodatkowo łapie utm_source/utm_medium/utm_campaign z adresu strony w momencie zapisu -
+    // dzięki temu widać w Firestore/Analytics, KTÓRA kampania faktycznie przynosi zapisy,
+    // nie tylko kliknięcia.
+    subscribeNewsletter: async (email) => {
+        const trimmed = String(email || '').trim().toLowerCase();
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) throw new Error('Podaj poprawny adres e-mail.');
+        if (!db) throw new Error('Brak połączenia z chmurą. Odśwież stronę i spróbuj ponownie.');
+
+        const params = typeof location !== 'undefined' ? new URLSearchParams(location.search) : new URLSearchParams();
+        const safeId = trimmed.replace(/[.#$/\[\]]/g, '_');
+        const ref = doc(db, 'artifacts', APP_ID, 'public', 'data', 'newsletter_signups', safeId);
+        await setDoc(ref, {
+            email: trimmed,
+            page: typeof location !== 'undefined' ? location.pathname : '',
+            utmSource: params.get('utm_source') || null,
+            utmMedium: params.get('utm_medium') || null,
+            utmCampaign: params.get('utm_campaign') || null,
+            createdAt: serverTimestamp()
+        }, { merge: true });
+    },
+
     // Giełda Wzorów - ZAPIS
     saveToGielda: async (collectionName, appType, itemName, config) => {
         if (!currentUser) throw new Error("Brak połączenia z chmurą. Odśwież stronę.");

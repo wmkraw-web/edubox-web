@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="pl" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generator linków kampanii (UTM) — EduBox AI</title>
+    <meta name="description" content="Prywatny generator linków z parametrami UTM do postów Pinterest/YouTube/Facebook EduBox AI.">
+    <meta name="robots" content="noindex, nofollow, noarchive">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <script src="apps.js"></script>
+    <style>
+        body { background: #020617; }
+        .glass { background: rgba(15, 23, 42, .78); border: 1px solid rgba(148, 163, 184, .16); box-shadow: 0 20px 55px rgba(2, 6, 23, .32); }
+        .field { background: #0b1224; border: 1px solid rgba(148,163,184,.22); border-radius: .75rem; padding: .65rem .9rem; color: #e2e8f0; }
+        .field:focus { outline: none; border-color: #38bdf8; }
+    </style>
+</head>
+<body class="min-h-screen text-slate-100 antialiased">
+    <div class="fixed inset-0 pointer-events-none overflow-hidden">
+        <div class="absolute -top-44 -left-24 h-96 w-96 rounded-full bg-indigo-600/20 blur-3xl"></div>
+        <div class="absolute top-1/3 -right-36 h-96 w-96 rounded-full bg-cyan-500/10 blur-3xl"></div>
+    </div>
+
+    <main class="relative max-w-4xl mx-auto px-5 py-8 md:py-12">
+        <a href="/" class="inline-flex items-center gap-2 text-cyan-300 hover:text-cyan-200 text-sm font-bold mb-5"><i class="ph-bold ph-arrow-left"></i> EduBox AI</a>
+        <p class="text-xs uppercase tracking-[.28em] text-indigo-300 font-black mb-3">Prywatne centrum kontroli</p>
+        <h1 class="text-3xl md:text-5xl font-black tracking-tight mb-3">Generator linków <span class="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-cyan-300">kampanii</span></h1>
+        <p class="text-slate-400 max-w-2xl leading-relaxed mb-8">Zawsze linkuj z pinów/filmików do KONKRETNEGO narzędzia, nigdy do strony głównej — i zawsze z tagiem UTM, żeby w Google Analytics było widać, który post/platforma faktycznie przynosi wejścia.</p>
+
+        <div class="glass rounded-2xl p-6 md:p-8 space-y-5">
+            <div class="grid md:grid-cols-2 gap-4">
+                <div>
+                    <label class="text-xs font-black uppercase text-slate-400 mb-2 block">Platforma (utm_source)</label>
+                    <select id="f-source" class="field w-full">
+                        <option value="pinterest">Pinterest</option>
+                        <option value="youtube">YouTube</option>
+                        <option value="facebook">Facebook</option>
+                        <option value="instagram">Instagram</option>
+                        <option value="inne">Inne</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="text-xs font-black uppercase text-slate-400 mb-2 block">Format (utm_medium)</label>
+                    <select id="f-medium" class="field w-full">
+                        <option value="pin">Pin (obrazek)</option>
+                        <option value="short">Short / Reel</option>
+                        <option value="video">Wideo (dłuższe)</option>
+                        <option value="post">Post</option>
+                        <option value="story">Story</option>
+                    </select>
+                </div>
+            </div>
+
+            <div>
+                <label class="text-xs font-black uppercase text-slate-400 mb-2 block">Cel linku (konkretne narzędzie lub centrum)</label>
+                <select id="f-target" class="field w-full"></select>
+                <p class="text-[11px] text-slate-500 mt-1">Zawsze wybieraj to samo narzędzie, które pokazujesz w poście — nie stronę główną.</p>
+            </div>
+
+            <div>
+                <label class="text-xs font-black uppercase text-slate-400 mb-2 block">Nazwa kampanii / posta (utm_campaign)</label>
+                <input id="f-campaign" type="text" placeholder="np. dyplom-koniec-roku-2026" class="field w-full" />
+                <p class="text-[11px] text-slate-500 mt-1">Coś, co Ci samemu pomoże rozpoznać ten konkretny post za miesiąc. Zamienię to automatycznie na bezpieczny format.</p>
+            </div>
+
+            <div>
+                <label class="text-xs font-black uppercase text-slate-400 mb-2 block">Gotowy link</label>
+                <div class="flex gap-2">
+                    <input id="f-output" type="text" readonly class="field w-full font-mono text-sm text-cyan-200" />
+                    <button id="btn-copy" class="shrink-0 bg-cyan-600 hover:bg-cyan-500 text-white font-black px-5 py-2.5 rounded-xl transition-colors">Kopiuj</button>
+                </div>
+                <p id="copy-feedback" class="text-[11px] text-emerald-400 mt-1 h-4"></p>
+            </div>
+        </div>
+
+        <section class="mt-8">
+            <div class="flex items-center justify-between mb-3">
+                <h2 class="text-sm font-black uppercase tracking-widest text-slate-400">Ostatnio wygenerowane (tylko w tej przeglądarce)</h2>
+                <button id="btn-clear-history" class="text-xs text-slate-500 hover:text-rose-400 font-bold">Wyczyść</button>
+            </div>
+            <div id="history-list" class="space-y-2"></div>
+        </section>
+    </main>
+
+    <script>
+        const BASE_URL = 'https://eduboxpro.pl';
+        const HISTORY_KEY = 'eduboxUtmHistoryV1';
+
+        function slugify(text) {
+            return String(text || '')
+                .toLowerCase()
+                .replace(/ą/g, 'a').replace(/ć/g, 'c').replace(/ę/g, 'e').replace(/ł/g, 'l')
+                .replace(/ń/g, 'n').replace(/ó/g, 'o').replace(/ś/g, 's').replace(/ż/g, 'z').replace(/ź/g, 'z')
+                .replace(/[^a-z0-9]+/g, '-')
+                .replace(/^-+|-+$/g, '')
+                .slice(0, 60);
+        }
+
+        function buildTargetOptions() {
+            const select = document.getElementById('f-target');
+            const data = (window.EduBoxData) || { APPS: [], CENTERS: [] };
+            const groups = [];
+
+            groups.push({ label: 'Strony ogólne', items: [{ url: 'index.html', title: 'Strona główna (unikaj, jeśli to możliwe)' }] });
+
+            if (Array.isArray(data.CENTERS) && data.CENTERS.length) {
+                groups.push({ label: 'Centra tematyczne', items: data.CENTERS.map(c => ({ url: c.url, title: c.title })) });
+            }
+            if (Array.isArray(data.APPS) && data.APPS.length) {
+                const sorted = [...data.APPS].sort((a, b) => a.title.localeCompare(b.title, 'pl'));
+                groups.push({ label: 'Konkretne narzędzia', items: sorted.map(a => ({ url: a.url, title: a.title })) });
+            }
+
+            select.innerHTML = groups.map(g => `<optgroup label="${g.label}">${g.items.map(i => `<option value="${i.url}">${i.title}</option>`).join('')}</optgroup>`).join('');
+        }
+
+        function loadHistory() {
+            try { return JSON.parse(localStorage.getItem(HISTORY_KEY)) || []; } catch (e) { return []; }
+        }
+        function saveHistory(list) {
+            localStorage.setItem(HISTORY_KEY, JSON.stringify(list.slice(0, 20)));
+        }
+        function renderHistory() {
+            const list = loadHistory();
+            const container = document.getElementById('history-list');
+            if (!list.length) { container.innerHTML = '<p class="text-sm text-slate-500">Jeszcze pusto — pierwszy wygenerowany link pojawi się tutaj.</p>'; return; }
+            container.innerHTML = list.map(item => `
+                <div class="glass rounded-xl px-4 py-3 flex items-center justify-between gap-3">
+                    <div class="min-w-0">
+                        <p class="text-xs text-slate-500">${item.date}</p>
+                        <p class="text-sm text-slate-200 truncate font-mono">${item.url}</p>
+                    </div>
+                    <button data-url="${item.url}" class="copy-history shrink-0 text-cyan-300 hover:text-cyan-100 text-xs font-black px-3 py-1.5 rounded-lg border border-cyan-500/30">Kopiuj</button>
+                </div>
+            `).join('');
+            container.querySelectorAll('.copy-history').forEach(btn => {
+                btn.addEventListener('click', () => navigator.clipboard.writeText(btn.dataset.url));
+            });
+        }
+
+        function updateOutput() {
+            const target = document.getElementById('f-target').value || 'index.html';
+            const source = document.getElementById('f-source').value;
+            const medium = document.getElementById('f-medium').value;
+            const campaign = slugify(document.getElementById('f-campaign').value) || 'bez-nazwy';
+            const path = target === 'index.html' ? '/' : `/${target}`;
+            const url = `${BASE_URL}${path}?utm_source=${source}&utm_medium=${medium}&utm_campaign=${campaign}`;
+            document.getElementById('f-output').value = url;
+            return url;
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            buildTargetOptions();
+            renderHistory();
+            ['f-source', 'f-medium', 'f-target', 'f-campaign'].forEach(id => {
+                document.getElementById(id).addEventListener('input', updateOutput);
+                document.getElementById(id).addEventListener('change', updateOutput);
+            });
+            updateOutput();
+
+            document.getElementById('btn-copy').addEventListener('click', async () => {
+                const url = updateOutput();
+                try {
+                    await navigator.clipboard.writeText(url);
+                    const feedback = document.getElementById('copy-feedback');
+                    feedback.textContent = 'Skopiowano ✓';
+                    setTimeout(() => { feedback.textContent = ''; }, 2500);
+                    const history = loadHistory();
+                    history.unshift({ url, date: new Date().toLocaleString('pl-PL', { dateStyle: 'short', timeStyle: 'short' }) });
+                    saveHistory(history);
+                    renderHistory();
+                } catch (e) {}
+            });
+
+            document.getElementById('btn-clear-history').addEventListener('click', () => {
+                localStorage.removeItem(HISTORY_KEY);
+                renderHistory();
+            });
+        });
+    </script>
+</body>
+</html>

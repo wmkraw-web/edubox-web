@@ -1059,6 +1059,25 @@ const closeAnnouncement = () => {
     setAnnouncement(null);
 };
             const [activeCategory, setActiveCategory] = useState('all');
+
+            // Zapis na powiadomienia o nowościach - jeden e-mail, bez zakładania konta.
+            const [newsletterEmail, setNewsletterEmail] = useState('');
+            const [newsletterStatus, setNewsletterStatus] = useState('idle'); // idle | sending | done | error
+            const [newsletterMsg, setNewsletterMsg] = useState('');
+            const handleNewsletterSubmit = async (e) => {
+                e.preventDefault();
+                if (!window.EduBoxCore || !window.EduBoxCore.subscribeNewsletter) return;
+                setNewsletterStatus('sending');
+                try {
+                    await window.EduBoxCore.subscribeNewsletter(newsletterEmail);
+                    setNewsletterStatus('done');
+                    setNewsletterMsg('Zapisano! Odezwiemy się, gdy pojawi się coś nowego.');
+                    setNewsletterEmail('');
+                } catch (err) {
+                    setNewsletterStatus('error');
+                    setNewsletterMsg(err.message || 'Coś poszło nie tak. Spróbuj ponownie.');
+                }
+            };
             
             // Historia kliknięć i ulubione
             const [recentApps, setRecentApps] = useState(() => {
@@ -1337,6 +1356,39 @@ const closeAnnouncement = () => {
         </div>
     </section>
 )}
+                    {/* ZAPIS NA POWIADOMIENIA - najważniejsze miejsce dla ruchu z social mediów: ktoś
+                        wchodzi raz z pina/filmiku, nie zostawia kawy, ale zapisany e-mail daje szansę
+                        wrócić do niego przy kolejnym narzędziu. Zero konta, jeden e-mail, zapis wprost
+                        do Firestore (patrz global-core.js subscribeNewsletter) - bez nowej funkcji Vercel. */}
+                    <section className="max-w-4xl mx-auto px-6 mb-10 relative z-10">
+                        <div className="bg-gradient-to-br from-blue-600 to-purple-600 rounded-3xl p-6 md:p-8 shadow-xl">
+                            <div className="flex flex-col md:flex-row md:items-center gap-5 md:gap-8">
+                                <div className="flex-1 text-center md:text-left">
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-blue-100 mb-2">📬 Nowości EduBox prosto na skrzynkę</p>
+                                    <h2 className="text-xl md:text-2xl font-black text-white mb-1">Nie chcesz przegapić nowego narzędzia?</h2>
+                                    <p className="text-sm text-blue-100">Zero konta, zero spamu - tylko krótka wiadomość, gdy pojawi się coś nowego.</p>
+                                </div>
+                                <form onSubmit={handleNewsletterSubmit} className="flex flex-col sm:flex-row gap-2 w-full md:w-auto shrink-0">
+                                    <input
+                                        type="email" required value={newsletterEmail}
+                                        onChange={(e) => setNewsletterEmail(e.target.value)}
+                                        placeholder="twoj@email.pl"
+                                        className="bg-white/95 text-slate-900 placeholder-slate-400 rounded-full px-5 py-3 text-sm font-medium outline-none w-full sm:w-64"
+                                    />
+                                    <button
+                                        type="submit" disabled={newsletterStatus === 'sending'}
+                                        className="bg-slate-900 hover:bg-slate-800 disabled:opacity-60 text-white font-bold px-6 py-3 rounded-full text-sm transition-colors shrink-0"
+                                    >
+                                        {newsletterStatus === 'sending' ? 'Zapisuję...' : 'Zapisz mnie'}
+                                    </button>
+                                </form>
+                            </div>
+                            {newsletterMsg && (
+                                <p className={`text-center md:text-left text-xs font-bold mt-3 ${newsletterStatus === 'error' ? 'text-rose-200' : 'text-emerald-200'}`}>{newsletterMsg}</p>
+                            )}
+                        </div>
+                    </section>
+
                     {/* STANDARDY OCHRONY MAŁOLETNICH — poradnik, nie formalne standardy serwisu */}
                     <section aria-labelledby="standardy-heading" className="max-w-[90rem] mx-auto px-6 pb-10 relative z-10">
                         <div className="bg-gradient-to-br from-teal-50 to-blue-50 dark:from-teal-950/40 dark:to-slate-900 border border-teal-200 dark:border-teal-800/60 rounded-3xl p-6 md:p-8 flex flex-col lg:flex-row gap-6 lg:items-center lg:justify-between">
