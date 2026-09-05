@@ -1,7 +1,11 @@
 // Prywatny, wyłącznie do odczytu, panel statystyk WŁASNYCH kont w mediach społecznościowych.
-// Na start: Pinterest. Docelowo Facebook i YouTube pod tym samym endpointem przez ?platform=...
-// (dokładnie ten sam wzorzec co /api/weekly-report?view=make-health - jeden endpoint, wybór
-// trybu przez parametr, żeby nie mnożyć funkcji Vercel ponad limit 12).
+// Pinterest + YouTube. Docelowo też Facebook, wszystko pod tym samym endpointem przez
+// ?platform=... (dokładnie ten sam wzorzec co /api/weekly-report?view=make-health - jeden
+// endpoint, wybór trybu przez parametr, żeby nie mnożyć funkcji Vercel ponad limit 12).
+//
+// YouTube jest prostszy niż Pinterest: liczby wyświetleń/polubień/komentarzy publicznych
+// filmów są dostępne przez zwykły klucz API (YouTube Data API v3), bez OAuth i bez logowania
+// się aplikacją na konto - to dane publiczne każdego opublikowanego filmu.
 //
 // BEZPIECZEŃSTWO: token dostawcy (Pinterest itd.) jest używany WYŁĄCZNIE tutaj, po stronie
 // serwera - nigdy nie trafia do przeglądarki. Dostęp do samego endpointu jest podwójnie
@@ -94,6 +98,77 @@ async function fetchPinterestStats() {
     };
 }
 
+// WYMAGANE ZMIENNE ŚRODOWISKOWE (YouTube):
+//   YOUTUBE_API_KEY       - klucz z Google Cloud Console (projekt edubox-pro), ograniczony
+//                           do "YouTube Data API v3"
+//   YOUTUBE_CHANNEL_ID    - ID kanału (ciąg zaczynający się od "UC"), z Ustawień kanału
+async function fetchYouTubeStats() {
+    const apiKey = process.env.YOUTUBE_API_KEY;
+    const channelId = process.env.YOUTUBE_CHANNEL_ID;
+    if (!apiKey) throw new Error('Brak YOUTUBE_API_KEY w zmiennych środowiskowych Vercela.');
+    if (!channelId) throw new Error('Brak YOUTUBE_CHANNEL_ID w zmiennych środowiskowych Vercela.');
+
+    const channelUrl = `https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics,contentDetails&id=${encodeURIComponent(channelId)}&key=${apiKey}`;
+    const channelRes = await fetch(channelUrl);
+    if (!channelRes.ok) {
+        const detail = await channelRes.text().catch(() => '');
+        throw new Error(`YouTube: nie udało się pobrać kanału (HTTP ${channelRes.status}). ${detail}`.trim());
+    }
+    const channelData = await channelRes.json();
+    const channel = channelData.items && channelData.items[0];
+    if (!channel) throw new Error('YouTube: nie znaleziono kanału o podanym ID.');
+
+    let videos = [];
+    const uploadsPlaylistId = channel.contentDetails?.relatedPlaylists?.uploads;
+    if (uploadsPlaylistId) {
+        const playlistUrl = `https://www.googleapis.com/youtube/v3/playlistItems?part=snippet,contentDetails&playlistId=${uploadsPlaylistId}&maxResults=25&key=${apiKey}`;
+        const playlistRes = await fetch(playlistUrl);
+        if (playlistRes.ok) {
+            const playlistData = await playlistRes.json();
+            const items = Array.isArray(playlistData.items) ? playlistData.items : [];
+            const videoIds = items.map((item) => item.contentDetails?.videoId).filter(Boolean);
+
+            let statsById = new Map();
+            if (videoIds.length) {
+                const statsUrl = `https://www.googleapis.com/youtube/v3/videos?part=statistics&id=${videoIds.join(',')}&key=${apiKey}`;
+                const statsRes = await fetch(statsUrl);
+                if (statsRes.ok) {
+                    const statsData = await statsRes.json();
+                    statsById = new Map((statsData.items || []).map((video) => [video.id, video.statistics]));
+                }
+            }
+
+            videos = items.map((item) => {
+                const videoId = item.contentDetails?.videoId;
+                const stats = statsById.get(videoId);
+                return {
+                    id: videoId,
+                    title: item.snippet?.title || '(bez tytułu)',
+                    publishedAt: item.contentDetails?.videoPublishedAt || item.snippet?.publishedAt || null,
+                    thumbnail: item.snippet?.thumbnails?.medium?.url || item.snippet?.thumbnails?.default?.url || null,
+                    views: stats ? Number(stats.viewCount || 0) : null,
+                    likes: stats ? Number(stats.likeCount || 0) : null,
+                    comments: stats ? Number(stats.commentCount || 0) : null,
+                    url: `https://www.youtube.com/watch?v=${videoId}`,
+                };
+            });
+        }
+    }
+
+    return {
+        platform: 'youtube',
+        account: {
+            title: channel.snippet?.title || null,
+            thumbnail: channel.snippet?.thumbnails?.default?.url || null,
+            subscribers: channel.statistics?.hiddenSubscriberCount ? null : Number(channel.statistics?.subscriberCount || 0),
+            totalViews: Number(channel.statistics?.viewCount || 0),
+            videoCount: Number(channel.statistics?.videoCount || 0),
+        },
+        videos,
+        updatedAt: new Date().toISOString(),
+    };
+}
+
 export default async function handler(req, res) {
     if (req.method !== 'GET') {
         return res.status(405).json({ error: 'Metoda niedozwolona' });
@@ -106,6 +181,10 @@ export default async function handler(req, res) {
     try {
         if (platform === 'pinterest') {
             const data = await fetchPinterestStats();
+            return res.status(200).json(data);
+        }
+        if (platform === 'youtube') {
+            const data = await fetchYouTubeStats();
             return res.status(200).json(data);
         }
         return res.status(400).json({ error: `Nieobsługiwana platforma: ${platform}` });

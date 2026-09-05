@@ -39,6 +39,11 @@
             </div>
         </header>
 
+        <div id="platform-tabs" class="hidden flex gap-2 mb-6">
+            <button data-platform="pinterest" class="platform-tab bg-white text-slate-950 px-4 py-2 rounded-full text-sm font-black inline-flex items-center gap-2"><i class="ph-fill ph-pinterest-logo"></i>Pinterest</button>
+            <button data-platform="youtube" class="platform-tab bg-slate-800 text-slate-300 px-4 py-2 rounded-full text-sm font-bold inline-flex items-center gap-2"><i class="ph-fill ph-youtube-logo"></i>YouTube</button>
+        </div>
+
         <section id="message" class="glass rounded-2xl p-5 mb-6" aria-live="polite"></section>
 
         <section id="account-summary" class="hidden grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6"></section>
@@ -50,7 +55,7 @@
     </main>
 
     <script>
-        const state = { authHeader: null };
+        const state = { authHeader: null, platform: 'pinterest' };
 
         function escapeHtml(value) {
             return String(value ?? '').replace(/[&<>'"]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[char]);
@@ -78,6 +83,7 @@
             document.getElementById('pins-list').innerHTML = '';
             document.getElementById('refresh-button').classList.add('hidden');
             document.getElementById('logout-button').classList.add('hidden');
+            document.getElementById('platform-tabs').classList.add('hidden');
             document.getElementById('message').innerHTML = `
                 <div class="max-w-md mx-auto py-3">
                     <div class="h-12 w-12 rounded-2xl bg-rose-500/15 text-rose-300 flex items-center justify-center text-2xl mb-4"><i class="ph-bold ph-lock-key"></i></div>
@@ -100,11 +106,16 @@
             });
         }
 
-        function renderAccount(account) {
-            const cards = [
+        function renderAccount(platform, account) {
+            const cards = platform === 'youtube' ? [
+                ['Kanał', account.title || '—', 'text-white'],
+                ['Subskrybenci', account.subscribers ?? 'ukryte', 'text-rose-300'],
+                ['Wyświetlenia (kanał)', account.totalViews ?? '—', 'text-cyan-300'],
+                ['Liczba filmów', account.videoCount ?? '—', 'text-slate-300'],
+            ] : [
                 ['Konto', account.username ? '@' + account.username : '—', 'text-white'],
                 ['Obserwujący', account.followers ?? '—', 'text-cyan-300'],
-                ['Piny (ostatnie)', state.pinsCount ?? '—', 'text-rose-300'],
+                ['Piny (ostatnie)', state.itemsCount ?? '—', 'text-rose-300'],
                 ['Ostatnia aktualizacja', formatDate(state.updatedAt), 'text-slate-300'],
             ];
             document.getElementById('account-summary').innerHTML = cards.map(([label, value, color]) => `
@@ -143,16 +154,37 @@
             container.classList.remove('hidden');
         }
 
-        function renderPins(pins) {
-            document.getElementById('pins-heading').classList.toggle('hidden', pins.length === 0);
-            document.getElementById('pins-list').innerHTML = pins.map(pin => `
-                <a href="${escapeHtml(pin.pinUrl)}" target="_blank" rel="noopener noreferrer" class="pin-card glass rounded-2xl overflow-hidden flex flex-col">
-                    ${pin.media ? `<img src="${escapeHtml(pin.media)}" alt="" class="w-full h-40 object-cover" loading="lazy">` : `<div class="w-full h-40 bg-slate-800 flex items-center justify-center text-slate-600"><i class="ph-bold ph-image text-4xl"></i></div>`}
+        function renderItems(platform, rawItems) {
+            const heading = document.getElementById('pins-heading');
+            heading.textContent = platform === 'youtube' ? 'Ostatnie filmy' : 'Ostatnie piny';
+            heading.classList.toggle('hidden', rawItems.length === 0);
+
+            document.getElementById('pins-list').innerHTML = rawItems.map(item => {
+                if (platform === 'youtube') {
+                    const metrics = [
+                        item.views !== null ? `<span title="Wyświetlenia"><i class="ph-bold ph-eye"></i> ${escapeHtml(String(item.views))}</span>` : '',
+                        item.likes !== null ? `<span title="Polubienia"><i class="ph-bold ph-thumbs-up"></i> ${escapeHtml(String(item.likes))}</span>` : '',
+                        item.comments !== null ? `<span title="Komentarze"><i class="ph-bold ph-chat-circle"></i> ${escapeHtml(String(item.comments))}</span>` : '',
+                    ].filter(Boolean).join(' ');
+                    return `
+                    <a href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer" class="pin-card glass rounded-2xl overflow-hidden flex flex-col">
+                        ${item.thumbnail ? `<img src="${escapeHtml(item.thumbnail)}" alt="" class="w-full h-40 object-cover" loading="lazy">` : `<div class="w-full h-40 bg-slate-800 flex items-center justify-center text-slate-600"><i class="ph-bold ph-video-camera text-4xl"></i></div>`}
+                        <div class="p-4">
+                            <p class="font-bold text-sm text-white line-clamp-2">${escapeHtml(item.title)}</p>
+                            <div class="flex flex-wrap gap-3 text-xs text-cyan-300 font-bold mt-2">${metrics}</div>
+                            <p class="text-xs text-slate-500 mt-2">${escapeHtml(formatDate(item.publishedAt))}</p>
+                        </div>
+                    </a>`;
+                }
+                return `
+                <a href="${escapeHtml(item.pinUrl)}" target="_blank" rel="noopener noreferrer" class="pin-card glass rounded-2xl overflow-hidden flex flex-col">
+                    ${item.media ? `<img src="${escapeHtml(item.media)}" alt="" class="w-full h-40 object-cover" loading="lazy">` : `<div class="w-full h-40 bg-slate-800 flex items-center justify-center text-slate-600"><i class="ph-bold ph-image text-4xl"></i></div>`}
                     <div class="p-4">
-                        <p class="font-bold text-sm text-white line-clamp-2">${escapeHtml(pin.title)}</p>
-                        <p class="text-xs text-slate-500 mt-2">${escapeHtml(formatDate(pin.createdAt))}</p>
+                        <p class="font-bold text-sm text-white line-clamp-2">${escapeHtml(item.title)}</p>
+                        <p class="text-xs text-slate-500 mt-2">${escapeHtml(formatDate(item.createdAt))}</p>
                     </div>
-                </a>`).join('');
+                </a>`;
+            }).join('');
         }
 
         async function loadData() {
@@ -160,7 +192,7 @@
             button.disabled = true;
             button.querySelector('i')?.classList.add('animate-spin');
             try {
-                const response = await fetch('/api/social-stats?platform=pinterest', {
+                const response = await fetch(`/api/social-stats?platform=${encodeURIComponent(state.platform)}`, {
                     credentials: 'same-origin',
                     cache: 'no-store',
                     headers: { Authorization: state.authHeader },
@@ -171,19 +203,22 @@
                     error.status = response.status;
                     throw error;
                 }
-                state.pinsCount = Array.isArray(data.pins) ? data.pins.length : 0;
+                const items = Array.isArray(data.pins) ? data.pins : (Array.isArray(data.videos) ? data.videos : []);
+                state.itemsCount = items.length;
                 state.updatedAt = data.updatedAt;
-                renderAccount(data.account || {});
+                renderAccount(data.platform, data.account || {});
                 renderAnalytics(data.analytics, data.analyticsError);
-                renderPins(Array.isArray(data.pins) ? data.pins : []);
-                document.getElementById('message').innerHTML = `<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2"><span class="text-emerald-300 font-bold"><i class="ph-bold ph-shield-check mr-2"></i>Dane pobrane bez zmian na koncie Pinterest.</span><span class="text-xs text-slate-500">Aktualizacja: ${escapeHtml(formatDate(data.updatedAt))}</span></div>`;
+                renderItems(data.platform, items);
+                document.getElementById('message').innerHTML = `<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2"><span class="text-emerald-300 font-bold"><i class="ph-bold ph-shield-check mr-2"></i>Dane pobrane bez zmian na koncie.</span><span class="text-xs text-slate-500">Aktualizacja: ${escapeHtml(formatDate(data.updatedAt))}</span></div>`;
                 document.getElementById('refresh-button').classList.remove('hidden');
                 document.getElementById('logout-button').classList.remove('hidden');
+                document.getElementById('platform-tabs').classList.remove('hidden');
             } catch (error) {
                 if (error.status === 401) {
                     renderLogin('Login lub hasło są niepoprawne. Spróbuj ponownie.');
                     return;
                 }
+                document.getElementById('platform-tabs').classList.remove('hidden');
                 document.getElementById('message').innerHTML = `<div class="flex gap-3 text-amber-200"><i class="ph-bold ph-warning-circle text-2xl"></i><div><p class="font-black">Panel nie może jeszcze pobrać danych.</p><p class="text-sm text-slate-400 mt-1">${escapeHtml(error.message)}</p></div></div>`;
             } finally {
                 button.disabled = false;
@@ -193,6 +228,12 @@
 
         document.getElementById('refresh-button').addEventListener('click', loadData);
         document.getElementById('logout-button').addEventListener('click', () => renderLogin('Wylogowano z panelu.'));
+        document.querySelectorAll('.platform-tab').forEach(button => button.addEventListener('click', () => {
+            state.platform = button.dataset.platform;
+            document.querySelectorAll('.platform-tab').forEach(tab => tab.className = 'platform-tab bg-slate-800 text-slate-300 px-4 py-2 rounded-full text-sm font-bold inline-flex items-center gap-2');
+            button.className = 'platform-tab bg-white text-slate-950 px-4 py-2 rounded-full text-sm font-black inline-flex items-center gap-2';
+            loadData();
+        }));
         renderLogin();
     </script>
 </body>
