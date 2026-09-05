@@ -1,4 +1,4 @@
 window.PORADA_DNIA = {
-  "text": "Wprowadź regularne, krótkie przerwy podczas lekcji, aby uczniowie mogli się zregenerować – poprawi to ich koncentrację i efektywność nauki.",
-  "date": "2026-09-04"
+  "text": "Stosuj regularne przerwy w pracy, aby zwiększyć swoją efektywność i poprawić samopoczucie; pozwala to także na lepsze zarządzanie stresem i kreatywnością w nauczaniu.",
+  "date": "2026-09-05"
 };
