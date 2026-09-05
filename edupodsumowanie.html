@@ -26,6 +26,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <script src="https://unpkg.com/jszip@3.10.1/dist/jszip.min.js"></script>
     <script src="apps.js"></script>
 
     <style>
@@ -595,9 +596,11 @@
             }
 
             // Eksport "karuzeli" - zamiast czekać na nagranie wideo, od razu renderuje kilka
-            // statycznych obrazków PNG (okładka + po jednym na moment + zamknięcie) i pobiera je
-            // po kolei. Korzysta z DOKŁADNIE tych samych danych (badge/hook/facts/closing/theme),
-            // które AI przygotowało dla wideo - zero dodatkowego zapytania do AI.
+            // statycznych obrazków PNG (okładka + po jednym na moment + zamknięcie) i pakuje je
+            // w JEDEN plik ZIP (JSZip) pobierany jednym kliknięciem - przeglądarki blokują/utrudniają
+            // kilka automatycznych pobrań naraz, więc pojedyncze pliki nie były wygodne. Korzysta
+            // z DOKŁADNIE tych samych danych (badge/hook/facts/closing/theme), które AI przygotowało
+            // dla wideo - zero dodatkowego zapytania do AI.
             async function exportCarousel() {
                 const W = 1080, H = 1350;
                 const canvas = document.createElement('canvas');
@@ -605,22 +608,24 @@
                 const ctx = canvas.getContext('2d');
                 const factCount = factCountRef.current;
                 const slides = [{ type: 'cover' }, ...Array.from({ length: factCount }, (_, i) => ({ type: 'fact', idx: i })), { type: 'closing' }];
+
+                const zip = new JSZip();
                 for (let i = 0; i < slides.length; i++) {
                     renderCarouselFrame(ctx, W, H, slides[i]);
                     const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
                     if (!blob) continue;
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `edupodsumowanie-${i + 1}.png`;
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    // Mała przerwa między pobraniami - przeglądarki potrafią zablokować kilka
-                    // jednoczesnych pobrań jako "podejrzany" ruch (jak wiele pop-upów naraz).
-                    await new Promise(r => setTimeout(r, 350));
-                    URL.revokeObjectURL(url);
+                    const label = slides[i].type === 'cover' ? '00-okladka' : slides[i].type === 'closing' ? `${String(slides.length - 1).padStart(2, '0')}-zamkniecie` : `${String(i).padStart(2, '0')}-moment`;
+                    zip.file(`edupodsumowanie-${label}.png`, blob);
                 }
+                const zipBlob = await zip.generateAsync({ type: 'blob' });
+                const url = URL.createObjectURL(zipBlob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'edupodsumowanie-karuzela.zip';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
             }
 
             // Przygotowuje (opcjonalny) podkład muzyczny dopasowany do nastroju: wczytuje krótki
@@ -925,7 +930,7 @@ Wszystko po polsku (poza wartością "mood"), bez cudzysłowów i dwukropków w 
                                 )}
                                 {stage === 'done' && (
                                     <button onClick={handleCarousel} disabled={carouselBusy} className="w-full mt-3 max-w-[300px] mx-auto block bg-transparent border-2 border-[#FFC145] text-[#FFC145] font-bold text-sm py-3 rounded-xl disabled:opacity-50">
-                                        {carouselBusy ? 'Przygotowuję obrazki...' : '📸 Pobierz jako karuzelę (PNG)'}
+                                        {carouselBusy ? 'Pakuję obrazki do ZIP...' : '📸 Pobierz jako karuzelę (ZIP)'}
                                     </button>
                                 )}
                                 {stage === 'done' && (
