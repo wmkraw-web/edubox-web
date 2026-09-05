@@ -265,6 +265,23 @@
                 return lines.length;
             }
 
+            // Mini-bitmapa emoji cząsteczki - generowana RAZ na dany glif (nie na każdą klatkę!),
+            // potem tylko przeskalowywana przez drawImage. To samo podejście co cache ziarna filmowego
+            // poniżej - unika drogiego, powtarzanego fillText() z kolorowym fontem emoji co klatkę.
+            const glyphCanvasCache = {};
+            function getGlyphCanvas(glyph) {
+                if (glyphCanvasCache[glyph]) return glyphCanvasCache[glyph];
+                const size = 64;
+                const gc = document.createElement('canvas');
+                gc.width = size; gc.height = size;
+                const gctx = gc.getContext('2d');
+                gctx.font = `${Math.round(size * 0.8)}px sans-serif`;
+                gctx.textAlign = 'center'; gctx.textBaseline = 'middle';
+                gctx.fillText(glyph, size / 2, size / 2 + 2);
+                glyphCanvasCache[glyph] = gc;
+                return gc;
+            }
+
             // Ziarno filmowe (grain) - generowane RAZ jako mały kafelek z losowym szumem, potem
             // powtarzane (pattern) na całej klatce z niską przezroczystością. Daje kinowe, "drogie"
             // wykończenie zamiast płaskiego, cyfrowego gradientu.
@@ -415,9 +432,11 @@
                     if (p.y > H + 20) { p.y = -20; p.x = Math.random() * W; }
                     ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot);
                     if (p.glyph) {
-                        ctx.font = `${p.size}px sans-serif`;
-                        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-                        ctx.fillText(p.glyph, 0, 0);
+                        // Rysujemy z RAZ przygotowanej mini-bitmapy (patrz getGlyphCanvas) zamiast
+                        // fillText co klatkę - fillText emoji jest kosztowne (własny font, kolorowe
+                        // glify) i przy 40 cząsteczkach x 30 kl/s potrafiło realnie "ciąć" nagranie.
+                        const gc = getGlyphCanvas(p.glyph);
+                        ctx.drawImage(gc, -p.size / 2, -p.size / 2, p.size, p.size);
                     } else {
                         ctx.fillStyle = p.color; ctx.fillRect(-p.size / 2, -p.size / 3, p.size, p.size * 0.6);
                     }
