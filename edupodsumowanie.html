@@ -169,6 +169,7 @@
             const [statusText, setStatusText] = useState('');
             const [progressPct, setProgressPct] = useState(0);
             const [downloadUrl, setDownloadUrl] = useState(null);
+            const [carouselBusy, setCarouselBusy] = useState(false);
 
             const canvasRef = useRef(null);
             const mediaRecorderRef = useRef(null);
@@ -263,6 +264,22 @@
                 lines.push(line);
                 lines.forEach((l, i) => ctx.fillText(l.trim(), x, y + i * lineHeight));
                 return lines.length;
+            }
+
+            // Wersja wrapText wyśrodkowana w poziomie I w pionie wokół danego Y - używana do
+            // statycznych "kart" karuzeli (PNG), gdzie nie ma animacji odsłaniania słów.
+            function wrapCenteredText(ctx, text, cx, y, font, color, maxWidth, lineHeight) {
+                ctx.font = font; ctx.fillStyle = color; ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+                const words = text.split(' ');
+                let line = '', lines = [];
+                for (const w of words) {
+                    const test = line + w + ' ';
+                    if (ctx.measureText(test).width > maxWidth && line) { lines.push(line.trim()); line = w + ' '; }
+                    else line = test;
+                }
+                lines.push(line.trim());
+                const startY = y - ((lines.length - 1) * lineHeight) / 2;
+                lines.forEach((l, i) => ctx.fillText(l, cx, startY + i * lineHeight));
             }
 
             // Mini-bitmapa emoji cząsteczki - generowana RAZ na dany glif (nie na każdą klatkę!),
@@ -532,6 +549,80 @@
                 ctx.restore();
             }
 
+            // Statyczna "karta" karuzeli (do PNG) - ta sama paleta/tło/motyw co wideo (aury, ziarno),
+            // ale bez animacji: jedna klatka w pełnej "odsłonie". Trzy rodzaje: cover (tytuł+hasło),
+            // fact (pojedynczy moment) i closing (zamknięcie+marka).
+            function renderCarouselFrame(ctx, W, H, slide) {
+                const theme = themeRef.current;
+                ctx.fillStyle = '#0f0a2e';
+                ctx.fillRect(0, 0, W, H);
+
+                const auraLayout = AURA_LAYOUTS[theme.layout] || AURA_LAYOUTS.wide;
+                auraLayout.forEach((b, i) => {
+                    const color = theme.aura[i % theme.aura.length];
+                    const x = b.baseX * W, y = b.baseY * H, r = b.r * W;
+                    const grad = ctx.createRadialGradient(x, y, 0, x, y, r);
+                    grad.addColorStop(0, `rgba(${color},0.55)`);
+                    grad.addColorStop(1, `rgba(${color},0)`);
+                    ctx.fillStyle = grad;
+                    ctx.fillRect(0, 0, W, H);
+                });
+
+                if (slide.type === 'cover') {
+                    drawPill(ctx, W / 2, H * 0.10, badgeRef.current, "800 34px 'Baloo 2'", 26, 16, 'rgba(255,255,255,0.14)', '#FFC145', 1);
+                    wrapCenteredText(ctx, className || 'Nasza klasa', W / 2, H * 0.32, "800 84px 'Baloo 2'", '#FFFFFF', W * 0.86, 92);
+                    if (hookRef.current) wrapCenteredText(ctx, hookRef.current, W / 2, H * 0.5, "700 38px 'Nunito'", theme.accent[0], W * 0.78, 46);
+                    drawPill(ctx, W / 2, H * 0.88, 'eduboxpro.pl', "800 30px 'Baloo 2'", 22, 14, 'rgba(20,15,50,0.75)', theme.accent[2], 1);
+                } else if (slide.type === 'fact') {
+                    const idx = slide.idx;
+                    const accent = theme.accent[idx % theme.accent.length];
+                    const icon = iconsRef.current[idx] || '✨';
+                    ctx.font = "800 30px 'Baloo 2'"; ctx.fillStyle = accent; ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+                    ctx.fillText(`${icon} ${momentLabelRef.current} ${idx + 1}`, W / 2, H * 0.3);
+                    wrapCenteredText(ctx, punchyFactsRef.current[idx] || '', W / 2, H * 0.46, "800 58px 'Nunito'", '#FFFFFF', W * 0.82, 68);
+                    drawPill(ctx, W / 2, H * 0.88, 'eduboxpro.pl', "800 26px 'Baloo 2'", 20, 12, 'rgba(20,15,50,0.7)', accent, 1);
+                } else if (slide.type === 'closing') {
+                    wrapCenteredText(ctx, closingLineRef.current, W / 2, H * 0.4, "800 60px 'Baloo 2'", '#FFFFFF', W * 0.82, 68);
+                    drawPill(ctx, W / 2, H * 0.58, 'eduboxpro.pl', "800 46px 'Baloo 2'", 30, 18, 'rgba(20,15,50,0.75)', theme.accent[2], 1);
+                }
+
+                ctx.save();
+                ctx.globalAlpha = 0.5;
+                ctx.globalCompositeOperation = 'overlay';
+                ctx.fillStyle = getGrainPattern(ctx);
+                ctx.fillRect(0, 0, W, H);
+                ctx.restore();
+            }
+
+            // Eksport "karuzeli" - zamiast czekać na nagranie wideo, od razu renderuje kilka
+            // statycznych obrazków PNG (okładka + po jednym na moment + zamknięcie) i pobiera je
+            // po kolei. Korzysta z DOKŁADNIE tych samych danych (badge/hook/facts/closing/theme),
+            // które AI przygotowało dla wideo - zero dodatkowego zapytania do AI.
+            async function exportCarousel() {
+                const W = 1080, H = 1350;
+                const canvas = document.createElement('canvas');
+                canvas.width = W; canvas.height = H;
+                const ctx = canvas.getContext('2d');
+                const factCount = factCountRef.current;
+                const slides = [{ type: 'cover' }, ...Array.from({ length: factCount }, (_, i) => ({ type: 'fact', idx: i })), { type: 'closing' }];
+                for (let i = 0; i < slides.length; i++) {
+                    renderCarouselFrame(ctx, W, H, slides[i]);
+                    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+                    if (!blob) continue;
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `edupodsumowanie-${i + 1}.png`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    // Mała przerwa między pobraniami - przeglądarki potrafią zablokować kilka
+                    // jednoczesnych pobrań jako "podejrzany" ruch (jak wiele pop-upów naraz).
+                    await new Promise(r => setTimeout(r, 350));
+                    URL.revokeObjectURL(url);
+                }
+            }
+
             // Przygotowuje (opcjonalny) podkład muzyczny dopasowany do nastroju: wczytuje krótki
             // plik audio, dekoduje go Web Audio API i podpina jako osobny tor dźwiękowy do strumienia
             // z Canvasu. Jeśli cokolwiek zawiedzie (brak sieci, stary przeglądarka) - wideo i tak
@@ -723,6 +814,18 @@ Wszystko po polsku (poza wartością "mood"), bez cudzysłowów i dwukropków w 
                 await playAndRecord(factCountRef.current, moodKeyRef.current);
             };
 
+            const handleCarousel = async () => {
+                if (carouselBusy) return;
+                setCarouselBusy(true);
+                try {
+                    await exportCarousel();
+                } catch (e) {
+                    showToast('Nie udało się przygotować karuzeli: ' + e.message);
+                } finally {
+                    setCarouselBusy(false);
+                }
+            };
+
             const updateFact = (i, val) => {
                 const next = [...facts]; next[i] = val; setFacts(next);
             };
@@ -819,6 +922,11 @@ Wszystko po polsku (poza wartością "mood"), bez cudzysłowów i dwukropków w 
                                         <a href={downloadUrl} download="edupodsumowanie.webm" className="flex-1 bg-[#57E6C4] text-[#0f0a2e] text-center font-bold text-sm py-3 rounded-xl">⬇ Pobierz wideo</a>
                                         <button onClick={handleReplay} className="flex-1 bg-transparent border-2 border-[#3A2F8C] text-[#ECE9FF] font-bold text-sm py-3 rounded-xl">↻ Podgląd</button>
                                     </div>
+                                )}
+                                {stage === 'done' && (
+                                    <button onClick={handleCarousel} disabled={carouselBusy} className="w-full mt-3 max-w-[300px] mx-auto block bg-transparent border-2 border-[#FFC145] text-[#FFC145] font-bold text-sm py-3 rounded-xl disabled:opacity-50">
+                                        {carouselBusy ? 'Przygotowuję obrazki...' : '📸 Pobierz jako karuzelę (PNG)'}
+                                    </button>
                                 )}
                                 {stage === 'done' && (
                                     <button onClick={() => { setStage('form'); setDownloadUrl(null); }} className="w-full text-center text-xs text-[#A79FE0] font-bold mt-4 underline">Zrób kolejne podsumowanie</button>
