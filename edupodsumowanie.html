@@ -118,12 +118,29 @@
         // napędzana przez AI, ale zero ryzyka generowania obrazków - wszystko dalej renderuje się
         // w Canvasie, po prostu innymi paletami/tempem/muzyką.
         const MOOD_THEMES = {
-            energetic: { aura: ['251,146,60', '236,72,153', '250,204,21'], accent: ['#FF7A45', '#FFC145', '#FF5DA2'], speed: 1.25 },
-            cozy: { aura: ['245,158,11', '244,114,182', '168,85,247'], accent: ['#FBBF24', '#FB7185', '#C084FC'], speed: 0.8 },
-            proud: { aura: ['59,130,246', '234,179,8', '124,58,237'], accent: ['#FFD166', '#7B8CFF', '#60A5FA'], speed: 0.85 },
-            playful: { aura: ['59,130,246', '168,85,247', '16,185,129'], accent: ['#FF5DA2', '#FFC145', '#57E6C4'], speed: 1 }
+            energetic: { aura: ['251,146,60', '236,72,153', '250,204,21'], accent: ['#FF7A45', '#FFC145', '#FF5DA2'], speed: 1.25, layout: 'corners' },
+            cozy: { aura: ['245,158,11', '244,114,182', '168,85,247'], accent: ['#FBBF24', '#FB7185', '#C084FC'], speed: 0.8, layout: 'single' },
+            proud: { aura: ['59,130,246', '234,179,8', '124,58,237'], accent: ['#FFD166', '#7B8CFF', '#60A5FA'], speed: 0.85, layout: 'wide' },
+            playful: { aura: ['59,130,246', '168,85,247', '16,185,129'], accent: ['#FF5DA2', '#FFC145', '#57E6C4'], speed: 1, layout: 'scatter' }
         };
         const DEFAULT_MOOD = 'playful';
+
+        // Motywy cząsteczek dopasowane do typu wydarzenia - zamiast zawsze tego samego confetti.
+        // null = klasyczne, kolorowe prostokąty confetti (dobrze pasują do roku/semestru/"inne").
+        // Grupa "Przedszkole" ma PIERWSZEŃSTWO nad typem wydarzenia - zawsze przyjazne, okrągłe motywy.
+        const PARTICLE_MOTIFS = {
+            rok: null,
+            semestr: null,
+            wycieczka: ['🧭', '🗺️', '👣', '⭐'],
+            projekt: ['🚀', '⚙️', '💡', '✨'],
+            konkurs: ['🏆', '⭐', '✨', '🎉'],
+            inne: null
+        };
+        const PRZEDSZKOLE_MOTIFS = ['🎈', '⭐', '🌈', '✨'];
+        function resolveMotifs(eventTypeId, ageGroupId) {
+            if (ageGroupId === 'przedszkole') return PRZEDSZKOLE_MOTIFS;
+            return PARTICLE_MOTIFS[eventTypeId] || null;
+        }
 
         // Krótkie (~22-24s), zapętlalne podkłady muzyczne dobrane do każdego nastroju.
         // Źródło: kolekcja "Free PD" (domena publiczna, bez wymogu podawania autora) -
@@ -166,6 +183,7 @@
             const momentLabelRef = useRef('MOMENT');
             const factCountRef = useRef(3);
             const moodKeyRef = useRef(DEFAULT_MOOD);
+            const motifsRef = useRef(null);
 
             useEffect(() => {
                 const initCore = () => {
@@ -198,14 +216,18 @@
             function initParticles(W, H) {
                 // Kolory konfetti dopasowane do wybranego przez AI nastroju wideo
                 const particleColors = [...themeRef.current.accent, '#FFFFFF'];
+                const motifs = motifsRef.current;
                 const arr = [];
                 for (let i = 0; i < 40; i++) {
+                    const glyph = motifs ? motifs[Math.floor(Math.random() * motifs.length)] : null;
                     arr.push({
                         x: Math.random() * W, y: Math.random() * H,
-                        size: 6 + Math.random() * 10, speed: 1.2 + Math.random() * 2,
+                        size: glyph ? 16 + Math.random() * 14 : 6 + Math.random() * 10,
+                        speed: 1.2 + Math.random() * 2,
                         drift: (Math.random() - 0.5) * 1.4, rot: Math.random() * 7,
-                        rotSpeed: (Math.random() - 0.5) * 0.07,
-                        color: particleColors[Math.floor(Math.random() * particleColors.length)]
+                        rotSpeed: (Math.random() - 0.5) * (glyph ? 0.02 : 0.07),
+                        color: particleColors[Math.floor(Math.random() * particleColors.length)],
+                        glyph
                     });
                 }
                 particlesRef.current = arr;
@@ -343,18 +365,38 @@
             // zawsze eleganckie, zero ryzyka "generycznego" wyglądu AI-clipartu. Same pozycje/tempo
             // za każdym razem, ale KOLORY pochodzą z nastroju wybranego przez AI (themeRef) - to
             // realna personalizacja bez ryzyka generowania obrazków.
-            const AURA_POSITIONS = [
-                { baseX: 0.18, baseY: 0.15, r: 0.55, speed: 0.00018, phase: 0 },
-                { baseX: 0.82, baseY: 0.35, r: 0.48, speed: 0.00021, phase: 2.1 },
-                { baseX: 0.35, baseY: 0.85, r: 0.62, speed: 0.00015, phase: 4.2 }
-            ];
+            // Kilka układów "aur" do wyboru per nastrój - zamiast zawsze tego samego rozstawienia
+            // trzech plam światła. "wide" to oryginalny, przestrzenny układ (proud), "single" to
+            // jedna, spokojna duża poświata (cozy), "corners" to żywiołowe naroża (energetic),
+            // a "scatter" to nieregularne, zabawowe rozproszenie (playful).
+            const AURA_LAYOUTS = {
+                wide: [
+                    { baseX: 0.18, baseY: 0.15, r: 0.55, speed: 0.00018, phase: 0 },
+                    { baseX: 0.82, baseY: 0.35, r: 0.48, speed: 0.00021, phase: 2.1 },
+                    { baseX: 0.35, baseY: 0.85, r: 0.62, speed: 0.00015, phase: 4.2 }
+                ],
+                single: [
+                    { baseX: 0.5, baseY: 0.4, r: 0.78, speed: 0.00014, phase: 0 }
+                ],
+                corners: [
+                    { baseX: 0.12, baseY: 0.12, r: 0.5, speed: 0.0002, phase: 0 },
+                    { baseX: 0.88, baseY: 0.14, r: 0.5, speed: 0.00019, phase: 1.5 },
+                    { baseX: 0.5, baseY: 0.92, r: 0.6, speed: 0.00016, phase: 3 }
+                ],
+                scatter: [
+                    { baseX: 0.25, baseY: 0.22, r: 0.4, speed: 0.00022, phase: 0.5 },
+                    { baseX: 0.78, baseY: 0.2, r: 0.35, speed: 0.00025, phase: 2 },
+                    { baseX: 0.5, baseY: 0.78, r: 0.5, speed: 0.0002, phase: 3.5 }
+                ]
+            };
 
             function renderFrame(ctx, W, H, t, timeline) {
                 const theme = themeRef.current;
                 ctx.fillStyle = '#0f0a2e';
                 ctx.fillRect(0, 0, W, H);
 
-                AURA_POSITIONS.forEach((b, i) => {
+                const auraLayout = AURA_LAYOUTS[theme.layout] || AURA_LAYOUTS.wide;
+                auraLayout.forEach((b, i) => {
                     const color = theme.aura[i % theme.aura.length];
                     const spd = b.speed * theme.speed;
                     const drift = 0.04;
@@ -372,7 +414,13 @@
                     p.y += p.speed; p.x += p.drift; p.rot += p.rotSpeed;
                     if (p.y > H + 20) { p.y = -20; p.x = Math.random() * W; }
                     ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot);
-                    ctx.fillStyle = p.color; ctx.fillRect(-p.size / 2, -p.size / 3, p.size, p.size * 0.6);
+                    if (p.glyph) {
+                        ctx.font = `${p.size}px sans-serif`;
+                        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                        ctx.fillText(p.glyph, 0, 0);
+                    } else {
+                        ctx.fillStyle = p.color; ctx.fillRect(-p.size / 2, -p.size / 3, p.size, p.size * 0.6);
+                    }
                     ctx.restore();
                 });
 
@@ -636,6 +684,7 @@ Wszystko po polsku (poza wartością "mood"), bez cudzysłowów i dwukropków w 
                             momentLabelRef.current = eventTypeInfo.momentLabel;
                             factCountRef.current = filledFacts.length;
                             moodKeyRef.current = result.mood;
+                            motifsRef.current = resolveMotifs(eventType, ageGroup);
 
                             setStage('recording');
                             setStatusText('Nagrywam wideo...');
