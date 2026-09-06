@@ -1,4 +1,4 @@
 window.PORADA_DNIA = {
-  "text": "Stosuj regularne przerwy w pracy, aby zwiększyć swoją efektywność i poprawić samopoczucie; pozwala to także na lepsze zarządzanie stresem i kreatywnością w nauczaniu.",
-  "date": "2026-09-05"
+  "text": "Wykorzystaj technologię, np. narzędzia AI, do personalizacji nauki – dostosuj materiały do indywidualnych potrzeb uczniów, co zwiększy ich zaangażowanie i efektywność.",
+  "date": "2026-09-06"
 };
