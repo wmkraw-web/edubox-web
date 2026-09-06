@@ -60,7 +60,53 @@
 
         <h2 id="pins-heading" class="hidden text-sm font-black uppercase tracking-widest text-slate-400 mb-3">Ostatnie piny</h2>
         <section id="pins-list" class="grid md:grid-cols-2 xl:grid-cols-3 gap-4"></section>
+
+        <section id="retry-log-section" class="hidden mt-10">
+            <h2 class="text-sm font-black uppercase tracking-widest text-slate-400 mb-3"><i class="ph-bold ph-arrow-clockwise mr-1"></i>Śledzone testy</h2>
+            <div id="retry-log-list" class="space-y-3"></div>
+        </section>
     </main>
+
+    <script type="module">
+        // Śledzenie testów "wrzuć ponownie ze zmianą i porównaj" - ta sama baza Firestore, tego
+        // samego projektu (edubox-pro), co Giełda Wzorów w global-core.js. Konfiguracja klucza
+        // webowego Firebase jest z założenia publiczna (bezpieczeństwo zapewniają reguły Firestore,
+        // nie ukrywanie tego klucza) - to ta sama wartość, już jawna w global-core.js.
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
+        import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
+        import { getFirestore, collection, addDoc, updateDoc, doc, getDocs, orderBy, query, serverTimestamp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+
+        const FIREBASE_CONFIG = {
+            apiKey: "AIzaSyDL_mvepNJjMmZYQzifN2cXzoKwCE8jNd0",
+            authDomain: "edubox-pro.firebaseapp.com",
+            projectId: "edubox-pro",
+            storageBucket: "edubox-pro.firebasestorage.app",
+            messagingSenderId: "570263845714",
+            appId: "1:570263845714:web:0b029211f7af071b66988b"
+        };
+        const app = initializeApp(FIREBASE_CONFIG);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        signInAnonymously(auth).catch((e) => console.warn('Firebase Auth error:', e));
+
+        const retryCollection = () => collection(db, 'artifacts', 'eduboxpro', 'public', 'data', 'retry_log');
+
+        window.RetryLog = {
+            ready: new Promise((resolve) => onAuthStateChanged(auth, (user) => { if (user) resolve(); })),
+            add: async (entry) => {
+                await addDoc(retryCollection(), { ...entry, status: 'pending', createdAt: serverTimestamp() });
+            },
+            markCompared: async (id, newTitle, newValue) => {
+                await updateDoc(doc(db, 'artifacts', 'eduboxpro', 'public', 'data', 'retry_log', id), {
+                    status: 'compared', newTitle, newValue, comparedAt: serverTimestamp(),
+                });
+            },
+            list: async () => {
+                const snap = await getDocs(query(retryCollection(), orderBy('createdAt', 'desc')));
+                return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+            },
+        };
+    </script>
 
     <div id="item-modal" class="hidden fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
         <div class="glass rounded-2xl max-w-lg w-full max-h-[85vh] overflow-y-auto p-6 relative">
@@ -101,6 +147,7 @@
             document.getElementById('platform-tabs').classList.add('hidden');
             document.getElementById('ai-analysis-trigger').classList.add('hidden');
             document.getElementById('ai-analysis-result').classList.add('hidden');
+            document.getElementById('retry-log-section').classList.add('hidden');
             document.getElementById('message').innerHTML = `
                 <div class="max-w-md mx-auto py-3">
                     <div class="h-12 w-12 rounded-2xl bg-rose-500/15 text-rose-300 flex items-center justify-center text-2xl mb-4"><i class="ph-bold ph-lock-key"></i></div>
@@ -197,7 +244,10 @@
                             <a href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer" class="font-bold text-sm text-white line-clamp-2 hover:text-cyan-300">${escapeHtml(item.title)}</a>
                             <div class="flex flex-wrap gap-3 text-xs text-cyan-300 font-bold mt-2">${metrics}</div>
                             <p class="text-xs text-slate-500 mt-2">${escapeHtml(formatDate(item.publishedAt))}</p>
-                            <button data-idx="${idx}" class="analyze-item-btn mt-3 inline-flex items-center gap-1.5 self-start bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-200 text-xs font-bold px-3 py-1.5 rounded-lg transition-colors"><i class="ph-bold ph-magnifying-glass"></i>Analizuj</button>
+                            <div class="flex flex-wrap gap-2 mt-3">
+                                <button data-idx="${idx}" class="analyze-item-btn inline-flex items-center gap-1.5 self-start bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-200 text-xs font-bold px-3 py-1.5 rounded-lg transition-colors"><i class="ph-bold ph-magnifying-glass"></i>Analizuj</button>
+                                <button data-idx="${idx}" class="track-retry-btn inline-flex items-center gap-1.5 self-start bg-cyan-600/20 hover:bg-cyan-600/40 text-cyan-200 text-xs font-bold px-3 py-1.5 rounded-lg transition-colors"><i class="ph-bold ph-push-pin"></i>Śledź test</button>
+                            </div>
                         </div>
                     </div>`;
                 }
@@ -216,7 +266,10 @@
                             <a href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer" class="font-bold text-sm text-white line-clamp-2 hover:text-cyan-300">${escapeHtml(item.title)}</a>
                             <div class="flex flex-wrap gap-3 text-xs text-cyan-300 font-bold mt-2">${metrics}</div>
                             <p class="text-xs text-slate-500 mt-2">${escapeHtml(formatDate(item.createdAt))}</p>
-                            <button data-idx="${idx}" class="analyze-item-btn mt-3 inline-flex items-center gap-1.5 self-start bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-200 text-xs font-bold px-3 py-1.5 rounded-lg transition-colors"><i class="ph-bold ph-magnifying-glass"></i>Analizuj</button>
+                            <div class="flex flex-wrap gap-2 mt-3">
+                                <button data-idx="${idx}" class="analyze-item-btn inline-flex items-center gap-1.5 self-start bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-200 text-xs font-bold px-3 py-1.5 rounded-lg transition-colors"><i class="ph-bold ph-magnifying-glass"></i>Analizuj</button>
+                                <button data-idx="${idx}" class="track-retry-btn inline-flex items-center gap-1.5 self-start bg-cyan-600/20 hover:bg-cyan-600/40 text-cyan-200 text-xs font-bold px-3 py-1.5 rounded-lg transition-colors"><i class="ph-bold ph-push-pin"></i>Śledź test</button>
+                            </div>
                         </div>
                     </div>`;
                 }
@@ -228,7 +281,10 @@
                     <div class="p-4 flex flex-col flex-1">
                         <a href="${escapeHtml(item.pinUrl)}" target="_blank" rel="noopener noreferrer" class="font-bold text-sm text-white line-clamp-2 hover:text-cyan-300">${escapeHtml(item.title)}</a>
                         <p class="text-xs text-slate-500 mt-2">${escapeHtml(formatDate(item.createdAt))}</p>
-                        <button data-idx="${idx}" class="analyze-item-btn mt-3 inline-flex items-center gap-1.5 self-start bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-200 text-xs font-bold px-3 py-1.5 rounded-lg transition-colors"><i class="ph-bold ph-magnifying-glass"></i>Analizuj</button>
+                        <div class="flex flex-wrap gap-2 mt-3">
+                            <button data-idx="${idx}" class="analyze-item-btn inline-flex items-center gap-1.5 self-start bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-200 text-xs font-bold px-3 py-1.5 rounded-lg transition-colors"><i class="ph-bold ph-magnifying-glass"></i>Analizuj</button>
+                            <button data-idx="${idx}" class="track-retry-btn inline-flex items-center gap-1.5 self-start bg-cyan-600/20 hover:bg-cyan-600/40 text-cyan-200 text-xs font-bold px-3 py-1.5 rounded-lg transition-colors"><i class="ph-bold ph-push-pin"></i>Śledź test</button>
+                        </div>
                     </div>
                 </div>`;
             }).join('');
@@ -264,6 +320,7 @@
                 document.getElementById('platform-tabs').classList.remove('hidden');
                 document.getElementById('ai-analysis-result').classList.add('hidden');
                 document.getElementById('ai-analysis-trigger').classList.toggle('hidden', items.length < 3);
+                renderRetryLog();
             } catch (error) {
                 if (error.status === 401) {
                     renderLogin('Login lub hasło są niepoprawne. Spróbuj ponownie.');
@@ -452,10 +509,106 @@ Pisz po polsku, konkretnie.`;
         }
 
         document.getElementById('pins-list').addEventListener('click', (event) => {
-            const button = event.target.closest('.analyze-item-btn');
+            const analyzeBtn = event.target.closest('.analyze-item-btn');
+            if (analyzeBtn) {
+                event.preventDefault();
+                analyzeSingleItem(Number(analyzeBtn.dataset.idx));
+                return;
+            }
+            const trackBtn = event.target.closest('.track-retry-btn');
+            if (trackBtn) {
+                event.preventDefault();
+                trackRetryItem(Number(trackBtn.dataset.idx));
+            }
+        });
+
+        // Śledzenie testów "wrzuć ponownie ze zmianą i porównaj wynik" - patrz komentarz przy
+        // window.RetryLog na górze pliku. Zapisuje ORYGINALNĄ pozycję jako punkt odniesienia;
+        // porównanie z nowym wynikiem robi się później, ręcznie wskazując, który aktualny wpis
+        // to ta sama treść po zmianie (Facebook/YouTube/Pinterest nie łączą tego automatycznie).
+        async function trackRetryItem(idx) {
+            const items = state.lastItems || [];
+            const platform = state.lastPlatform || state.platform;
+            const item = items[idx];
+            if (!item) return;
+            const plannedChange = window.prompt(`Jaką zmianę planujesz przetestować dla:\n"${item.title}"?\n\n(np. "nowy tytuł: ...", "inna miniaturka", "inna pora publikacji")`);
+            if (plannedChange === null || !plannedChange.trim()) return;
+
+            try {
+                await window.RetryLog.ready;
+                await window.RetryLog.add({
+                    platform,
+                    originalTitle: item.title,
+                    originalMetric: itemMetricValue(platform, item),
+                    plannedChange: plannedChange.trim(),
+                });
+                showItemToast('Zapisano do śledzonych testów.');
+                await renderRetryLog();
+            } catch (error) {
+                showItemToast('Nie udało się zapisać: ' + error.message);
+            }
+        }
+
+        function showItemToast(text) {
+            const el = document.createElement('div');
+            el.className = 'fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-slate-800 border border-slate-700 text-white px-5 py-3 rounded-full text-sm font-bold shadow-2xl';
+            el.textContent = text;
+            document.body.appendChild(el);
+            setTimeout(() => el.remove(), 3000);
+        }
+
+        async function renderRetryLog() {
+            const section = document.getElementById('retry-log-section');
+            const list = document.getElementById('retry-log-list');
+            try {
+                await window.RetryLog.ready;
+                const entries = await window.RetryLog.list();
+                if (!entries.length) { section.classList.add('hidden'); return; }
+                section.classList.remove('hidden');
+                const currentItems = state.lastItems || [];
+                list.innerHTML = entries.map((entry) => {
+                    if (entry.status === 'compared') {
+                        const delta = typeof entry.newValue === 'number' && typeof entry.originalMetric === 'number' ? entry.newValue - entry.originalMetric : null;
+                        const deltaLabel = delta === null ? '' : (delta >= 0 ? `+${delta}` : String(delta));
+                        const deltaColor = delta === null ? 'text-slate-400' : delta > 0 ? 'text-emerald-300' : delta < 0 ? 'text-rose-300' : 'text-slate-400';
+                        return `<div class="glass rounded-xl p-4">
+                            <p class="text-sm text-slate-300">"${escapeHtml(entry.originalTitle)}" (${entry.originalMetric ?? '?'}) → "${escapeHtml(entry.newTitle || '')}" (${entry.newValue ?? '?'}) <span class="font-black ${deltaColor}">${deltaLabel}</span></p>
+                            <p class="text-xs text-slate-500 mt-1">Zmiana: ${escapeHtml(entry.plannedChange)}</p>
+                        </div>`;
+                    }
+                    const optionsHtml = currentItems.map((it, i) => `<option value="${i}">${escapeHtml(it.title)}</option>`).join('');
+                    return `<div class="glass rounded-xl p-4">
+                        <p class="text-sm text-white font-bold">"${escapeHtml(entry.originalTitle)}" <span class="text-xs font-normal text-slate-500">(${entry.originalMetric ?? '?'})</span></p>
+                        <p class="text-xs text-slate-400 mt-1">Planowana zmiana: ${escapeHtml(entry.plannedChange)}</p>
+                        <div class="flex gap-2 mt-2">
+                            <select class="retry-compare-select field bg-slate-950 border border-slate-700 rounded-lg text-xs px-2 py-1.5 text-slate-200 flex-1">
+                                <option value="">Wybierz nowy materiał do porównania...</option>
+                                ${optionsHtml}
+                            </select>
+                            <button data-id="${entry.id}" class="retry-compare-btn bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg">Porównaj</button>
+                        </div>
+                    </div>`;
+                }).join('');
+            } catch (error) {
+                section.classList.add('hidden');
+            }
+        }
+
+        document.getElementById('retry-log-list').addEventListener('click', async (event) => {
+            const button = event.target.closest('.retry-compare-btn');
             if (!button) return;
-            event.preventDefault();
-            analyzeSingleItem(Number(button.dataset.idx));
+            const select = button.parentElement.querySelector('.retry-compare-select');
+            const idx = select.value;
+            if (idx === '') return;
+            const item = (state.lastItems || [])[Number(idx)];
+            const platform = state.lastPlatform || state.platform;
+            if (!item) return;
+            try {
+                await window.RetryLog.markCompared(button.dataset.id, item.title, itemMetricValue(platform, item));
+                await renderRetryLog();
+            } catch (error) {
+                showItemToast('Nie udało się zapisać porównania: ' + error.message);
+            }
         });
 
         document.getElementById('ai-analyze-button').addEventListener('click', analyzeWithAI);

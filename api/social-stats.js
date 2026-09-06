@@ -41,7 +41,7 @@ function formatDate(date) {
 // Pobiera profil, ostatnie piny i (jeśli dostęp konta na to pozwala) zbiorczą analitykę
 // z ostatnich 30 dni. Analityka jest "nice to have" - jej brak/błąd (typowy przy dostępie
 // próbnym/ograniczonym) nie blokuje reszty panelu, tylko pomija tę sekcję.
-async function fetchPinterestStats() {
+export async function fetchPinterestStats() {
     const token = process.env.PINTEREST_ACCESS_TOKEN;
     if (!token) throw new Error('Brak PINTEREST_ACCESS_TOKEN w zmiennych środowiskowych Vercela.');
     const headers = { Authorization: `Bearer ${token}` };
@@ -102,7 +102,7 @@ async function fetchPinterestStats() {
 //   YOUTUBE_API_KEY       - klucz z Google Cloud Console (projekt edubox-pro), ograniczony
 //                           do "YouTube Data API v3"
 //   YOUTUBE_CHANNEL_ID    - ID kanału (ciąg zaczynający się od "UC"), z Ustawień kanału
-async function fetchYouTubeStats() {
+export async function fetchYouTubeStats() {
     const apiKey = process.env.YOUTUBE_API_KEY;
     const channelId = process.env.YOUTUBE_CHANNEL_ID;
     if (!apiKey) throw new Error('Brak YOUTUBE_API_KEY w zmiennych środowiskowych Vercela.');
@@ -175,7 +175,7 @@ async function fetchYouTubeStats() {
 //   FACEBOOK_PAGE_ID             - ID strony na Facebooku
 const FB_GRAPH_VERSION = 'v21.0';
 
-async function fetchFacebookStats() {
+export async function fetchFacebookStats() {
     const token = process.env.FACEBOOK_PAGE_ACCESS_TOKEN;
     const pageId = process.env.FACEBOOK_PAGE_ID;
     if (!token) throw new Error('Brak FACEBOOK_PAGE_ACCESS_TOKEN w zmiennych środowiskowych Vercela.');

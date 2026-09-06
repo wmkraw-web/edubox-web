@@ -140,6 +140,18 @@ jobs:
             return data;
           }
 
+          // Najlepszy/najsłabszy post tygodnia z YouTube/Facebooka - żeby nie trzeba było
+          // pamiętać o samodzielnym wejściu do panel-analytics.html co tydzień.
+          async function fetchSocialSummary() {
+            const res = await fetch(`${process.env.BASE_URL}/api/weekly-report?view=social-summary`, {
+              method: 'GET',
+              headers: { Authorization: `Bearer ${process.env.WEEKLY_REPORT_SECRET}` }
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+            return data;
+          }
+
           async function main() {
             let openaiTotal = null, openaiError = null;
             try { openaiTotal = await fetchOpenAIWeekCost(); } catch (e) { openaiError = e.message; }
@@ -195,11 +207,17 @@ jobs:
               try { sheetStats = await fetchSheetStats(); } catch (e) { sheetStatsError = e.message; }
             }
 
+            let socialSummary = null, socialSummaryError = null, socialSummaryConfigured = !!process.env.WEEKLY_REPORT_SECRET;
+            if (socialSummaryConfigured) {
+              try { socialSummary = await fetchSocialSummary(); } catch (e) { socialSummaryError = e.message; }
+            }
+
             console.log('OpenAI 7 dni:', openaiTotal, openaiError);
             console.log('Fal.ai saldo:', falBalance, falError);
             console.log('GA4:', ga4Configured, ga4, ga4Error);
             console.log('Materiały:', generationsConfigured, generations, 'lifetime:', generationsLifetimeTotal, generationsError);
             console.log('Kawa/Polecenia:', sheetStatsConfigured, sheetStats, sheetStatsError);
+            console.log('Social media:', socialSummaryConfigured, socialSummary, socialSummaryError);
 
             const dateLabel = new Date().toLocaleDateString('pl-PL', { day: 'numeric', month: 'long', year: 'numeric' });
 
@@ -235,6 +253,34 @@ jobs:
               `;
             }
 
+            function formatBestWorst(label, entry, metricLabel) {
+              if (!entry) return '';
+              const value = entry[Object.keys(entry).find(k => k !== 'title')];
+              return `<li>${label}: "${entry.title}" (${value} ${metricLabel})</li>`;
+            }
+
+            let socialHtml;
+            if (!socialSummaryConfigured) {
+              socialHtml = '';
+            } else if (socialSummaryError) {
+              socialHtml = `<li>Social media: błąd pobierania (${socialSummaryError})</li>`;
+            } else {
+              const parts = [];
+              if (socialSummary.youtubeError) {
+                parts.push(`<li>YouTube: błąd pobierania (${socialSummary.youtubeError})</li>`);
+              } else if (socialSummary.youtube) {
+                parts.push(formatBestWorst('YouTube - najlepszy film', socialSummary.youtube.best, 'wyświetleń'));
+                parts.push(formatBestWorst('YouTube - najsłabszy film', socialSummary.youtube.worst, 'wyświetleń'));
+              }
+              if (socialSummary.facebookError) {
+                parts.push(`<li>Facebook: błąd pobierania (${socialSummary.facebookError})</li>`);
+              } else if (socialSummary.facebook) {
+                parts.push(formatBestWorst('Facebook - najlepszy post', socialSummary.facebook.best, 'wyświetleń'));
+                parts.push(formatBestWorst('Facebook - najsłabszy post', socialSummary.facebook.worst, 'wyświetleń'));
+              }
+              socialHtml = parts.filter(Boolean).join('\n');
+            }
+
             const html = `
               <h2>EduBox AI - raport tygodniowy (${dateLabel})</h2>
               <ul>
@@ -243,7 +289,9 @@ jobs:
                 ${trafficHtml}
                 ${materialsHtml}
                 ${coffeeReferralHtml}
+                ${socialHtml}
               </ul>
+              <p>Pełne dane i analiza AI: <a href="${process.env.BASE_URL}/panel-analytics.html">panel statystyk społecznościowych</a></p>
               <p><a href="https://platform.openai.com/settings/organization/usage">Panel OpenAI</a> &bull; <a href="https://fal.ai/dashboard/billing">Panel Fal.ai</a></p>
             `;
 

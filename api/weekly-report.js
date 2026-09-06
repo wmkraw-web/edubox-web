@@ -13,6 +13,7 @@
 //   WEEKLY_REPORT_SECRET        - NOWA - dowolny losowy string, potwierdza wywołanie z GitHub Actions
 
 import { getServiceAccountAccessToken } from './_lib/googleServiceAccountAuth.js';
+import { fetchYouTubeStats, fetchFacebookStats } from './social-stats.js';
 
 const MAKE_PANEL_CACHE_MS = 5 * 60 * 1000;
 const makePanelCache = { expiresAt: 0, payload: null };
@@ -55,6 +56,45 @@ function isPanelAuthorized(req) {
         credentials.user === process.env.EWA_AUTH_USER &&
         credentials.pass === process.env.EWA_AUTH_PASS
     );
+}
+
+// Najlepszy/najsłabszy wynik tygodnia z YouTube/Facebooka - do cotygodniowego maila, żeby nie
+// trzeba było pamiętać o samodzielnym wejściu do panelu statystyk. Pinterest celowo pomijamy tu -
+// nasze konto nie ma jeszcze pewnych metryk per-pin (patrz panel-analytics.html), więc nie ma
+// z czego uczciwie wybrać "najlepszy/najgorszy".
+function pickBestWorst(items, metricKey) {
+    const withMetric = items.filter((item) => typeof item[metricKey] === 'number');
+    if (!withMetric.length) return { best: null, worst: null };
+    const sorted = [...withMetric].sort((a, b) => b[metricKey] - a[metricKey]);
+    return { best: sorted[0], worst: sorted[sorted.length - 1] };
+}
+
+async function buildSocialSummary() {
+    const result = { youtube: null, youtubeError: null, facebook: null, facebookError: null };
+
+    try {
+        const data = await fetchYouTubeStats();
+        const { best, worst } = pickBestWorst(data.videos, 'views');
+        result.youtube = {
+            best: best ? { title: best.title, views: best.views } : null,
+            worst: worst && worst.id !== best?.id ? { title: worst.title, views: worst.views } : null,
+        };
+    } catch (error) {
+        result.youtubeError = error.message;
+    }
+
+    try {
+        const data = await fetchFacebookStats();
+        const { best, worst } = pickBestWorst(data.posts, 'impressions');
+        result.facebook = {
+            best: best ? { title: best.title, impressions: best.impressions } : null,
+            worst: worst && worst.id !== best?.id ? { title: worst.title, impressions: worst.impressions } : null,
+        };
+    } catch (error) {
+        result.facebookError = error.message;
+    }
+
+    return result;
 }
 
 async function fetchMake(path, token, zone) {
@@ -195,6 +235,20 @@ export default async function handler(req, res) {
             console.error('Błąd panelu Make:', error.message);
             const status = error.code === 'MAKE_NOT_CONFIGURED' ? 503 : 502;
             return res.status(status).json({ error: error.message, code: error.code || 'MAKE_API_ERROR' });
+        }
+    }
+
+    if (req.method === 'GET' && req.query.view === 'social-summary') {
+        if (req.headers.authorization !== `Bearer ${process.env.WEEKLY_REPORT_SECRET}`) {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
+        try {
+            const summary = await buildSocialSummary();
+            res.setHeader('Cache-Control', 'private, no-store');
+            return res.status(200).json(summary);
+        } catch (error) {
+            console.error('Błąd social-summary:', error.message);
+            return res.status(502).json({ error: error.message });
         }
     }
 
