@@ -71,6 +71,14 @@ function render(center) {
   <meta name="twitter:image" content="${config.baseUrl}${config.defaultImage}">
   <script src="https://cdn.tailwindcss.com"></script>
   <script>tailwind.config={darkMode:'class'}</script>
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-3RQ9R0N0K8"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-3RQ9R0N0K8');
+  </script>
   <script src="https://unpkg.com/@phosphor-icons/web"></script>
 </head>
 <body class="min-h-screen bg-slate-50 text-slate-900 antialiased dark:bg-slate-950 dark:text-white">
