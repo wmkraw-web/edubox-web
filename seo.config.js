@@ -16,6 +16,7 @@ module.exports = {
     { path: 'centrum-grafika.html', changefreq: 'weekly', priority: '0.8', seoTitle: 'Grafiki i materiały dla szkoły | EduBox AI', seoDescription: 'Dyplomy, plakaty, prezentacje, obrazy i wideo dla nauczycieli. Otwórz centrum materiałów graficznych EduBox AI.' },
     { path: 'standardy-ochrony-maloletnich.html', changefreq: 'monthly', priority: '0.7', ogType: 'article' },
     { path: 'polityka-prywatnosci.html', changefreq: 'monthly', priority: '0.5', ogType: 'article' },
+    { path: 'dlaczego-pro.html', changefreq: 'monthly', priority: '0.7' },
     { path: 'asystent-pedagoga.html' },
     { path: 'awans.html' },
     { path: 'chunking.html' },
