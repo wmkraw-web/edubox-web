@@ -42,6 +42,7 @@
         <div id="platform-tabs" class="hidden flex gap-2 mb-6">
             <button data-platform="pinterest" class="platform-tab bg-white text-slate-950 px-4 py-2 rounded-full text-sm font-black inline-flex items-center gap-2"><i class="ph-fill ph-pinterest-logo"></i>Pinterest</button>
             <button data-platform="youtube" class="platform-tab bg-slate-800 text-slate-300 px-4 py-2 rounded-full text-sm font-bold inline-flex items-center gap-2"><i class="ph-fill ph-youtube-logo"></i>YouTube</button>
+            <button data-platform="facebook" class="platform-tab bg-slate-800 text-slate-300 px-4 py-2 rounded-full text-sm font-bold inline-flex items-center gap-2"><i class="ph-fill ph-facebook-logo"></i>Facebook</button>
         </div>
 
         <section id="message" class="glass rounded-2xl p-5 mb-6" aria-live="polite"></section>
@@ -128,6 +129,11 @@
                 ['Subskrybenci', account.subscribers ?? 'ukryte', 'text-rose-300'],
                 ['Wyświetlenia (kanał)', account.totalViews ?? '—', 'text-cyan-300'],
                 ['Liczba filmów', account.videoCount ?? '—', 'text-slate-300'],
+            ] : platform === 'facebook' ? [
+                ['Strona', account.name || '—', 'text-white'],
+                ['Obserwujący', account.fans ?? '—', 'text-cyan-300'],
+                ['Posty (ostatnie)', state.itemsCount ?? '—', 'text-rose-300'],
+                ['Ostatnia aktualizacja', formatDate(state.updatedAt), 'text-slate-300'],
             ] : [
                 ['Konto', account.username ? '@' + account.username : '—', 'text-white'],
                 ['Obserwujący', account.followers ?? '—', 'text-cyan-300'],
@@ -172,7 +178,7 @@
 
         function renderItems(platform, rawItems) {
             const heading = document.getElementById('pins-heading');
-            heading.textContent = platform === 'youtube' ? 'Ostatnie filmy' : 'Ostatnie piny';
+            heading.textContent = platform === 'youtube' ? 'Ostatnie filmy' : platform === 'facebook' ? 'Ostatnie posty' : 'Ostatnie piny';
             heading.classList.toggle('hidden', rawItems.length === 0);
 
             document.getElementById('pins-list').innerHTML = rawItems.map((item, idx) => {
@@ -191,6 +197,25 @@
                             <a href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer" class="font-bold text-sm text-white line-clamp-2 hover:text-cyan-300">${escapeHtml(item.title)}</a>
                             <div class="flex flex-wrap gap-3 text-xs text-cyan-300 font-bold mt-2">${metrics}</div>
                             <p class="text-xs text-slate-500 mt-2">${escapeHtml(formatDate(item.publishedAt))}</p>
+                            <button data-idx="${idx}" class="analyze-item-btn mt-3 inline-flex items-center gap-1.5 self-start bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-200 text-xs font-bold px-3 py-1.5 rounded-lg transition-colors"><i class="ph-bold ph-magnifying-glass"></i>Analizuj</button>
+                        </div>
+                    </div>`;
+                }
+                if (platform === 'facebook') {
+                    const metrics = [
+                        item.impressions !== null ? `<span title="Wyświetlenia"><i class="ph-bold ph-eye"></i> ${escapeHtml(String(item.impressions))}</span>` : '',
+                        item.engaged !== null ? `<span title="Zaangażowani użytkownicy"><i class="ph-bold ph-users"></i> ${escapeHtml(String(item.engaged))}</span>` : '',
+                        item.clicks !== null ? `<span title="Kliknięcia"><i class="ph-bold ph-cursor-click"></i> ${escapeHtml(String(item.clicks))}</span>` : '',
+                    ].filter(Boolean).join(' ');
+                    return `
+                    <div class="pin-card glass rounded-2xl overflow-hidden flex flex-col">
+                        <a href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer">
+                            ${item.media ? `<img src="${escapeHtml(item.media)}" alt="" class="w-full h-40 object-cover" loading="lazy">` : `<div class="w-full h-40 bg-slate-800 flex items-center justify-center text-slate-600"><i class="ph-bold ph-thumbs-up text-4xl"></i></div>`}
+                        </a>
+                        <div class="p-4 flex flex-col flex-1">
+                            <a href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer" class="font-bold text-sm text-white line-clamp-2 hover:text-cyan-300">${escapeHtml(item.title)}</a>
+                            <div class="flex flex-wrap gap-3 text-xs text-cyan-300 font-bold mt-2">${metrics}</div>
+                            <p class="text-xs text-slate-500 mt-2">${escapeHtml(formatDate(item.createdAt))}</p>
                             <button data-idx="${idx}" class="analyze-item-btn mt-3 inline-flex items-center gap-1.5 self-start bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-200 text-xs font-bold px-3 py-1.5 rounded-lg transition-colors"><i class="ph-bold ph-magnifying-glass"></i>Analizuj</button>
                         </div>
                     </div>`;
@@ -225,7 +250,7 @@
                     error.status = response.status;
                     throw error;
                 }
-                const items = Array.isArray(data.pins) ? data.pins : (Array.isArray(data.videos) ? data.videos : []);
+                const items = Array.isArray(data.pins) ? data.pins : (Array.isArray(data.videos) ? data.videos : (Array.isArray(data.posts) ? data.posts : []));
                 state.itemsCount = items.length;
                 state.updatedAt = data.updatedAt;
                 state.lastPlatform = data.platform;
@@ -260,6 +285,9 @@
             const lines = items.slice(0, 25).map((item, i) => {
                 if (platform === 'youtube') {
                     return `${i + 1}. "${item.title}" | ${item.views ?? '?'} wyświetleń | ${item.likes ?? '?'} polubień | ${item.comments ?? '?'} komentarzy | ${item.publishedAt ? item.publishedAt.slice(0, 10) : '?'}`;
+                }
+                if (platform === 'facebook') {
+                    return `${i + 1}. "${item.title}" | ${item.impressions ?? '?'} wyświetleń | ${item.engaged ?? '?'} zaangażowanych | ${item.clicks ?? '?'} kliknięć | ${item.createdAt ? item.createdAt.slice(0, 10) : '?'}`;
                 }
                 return `${i + 1}. "${item.title}" | opublikowano: ${item.createdAt ? item.createdAt.slice(0, 10) : '?'}`;
             });
@@ -371,7 +399,9 @@ Pisz po polsku, konkretnie, bez lania wody i bez ogólników możliwych do powie
         });
 
         function itemMetricValue(platform, item) {
-            return platform === 'youtube' ? (item.views ?? 0) : null;
+            if (platform === 'youtube') return item.views ?? 0;
+            if (platform === 'facebook') return item.impressions ?? item.engaged ?? 0;
+            return null;
         }
 
         async function analyzeSingleItem(idx) {
@@ -388,6 +418,8 @@ Pisz po polsku, konkretnie, bez lania wody i bez ogólników możliwych do powie
 
             const details = platform === 'youtube'
                 ? `Tytuł: "${item.title}"\nWyświetlenia: ${item.views ?? '?'} (najlepszy wynik na liście: ${best ?? '?'})\nPolubienia: ${item.likes ?? '?'}\nKomentarze: ${item.comments ?? '?'}\nData publikacji: ${item.publishedAt ? item.publishedAt.slice(0, 10) : '?'}`
+                : platform === 'facebook'
+                ? `Treść posta: "${item.title}"\nWyświetlenia: ${item.impressions ?? '?'} (najlepszy wynik na liście: ${best ?? '?'})\nZaangażowani użytkownicy: ${item.engaged ?? '?'}\nKliknięcia: ${item.clicks ?? '?'}\nData publikacji: ${item.createdAt ? item.createdAt.slice(0, 10) : '?'}`
                 : `Tytuł: "${item.title}"\nData publikacji: ${item.createdAt ? item.createdAt.slice(0, 10) : '?'}`;
 
             const system = `Jesteś doświadczonym analitykiem marketingu treści dla nauczycieli (EduBox AI). Dostajesz JEDNĄ konkretną pozycję (post/film) do szczegółowej analizy, z kontekstem jak wypada na tle najlepszego wyniku z listy. Bądź maksymalnie konkretny i praktyczny - zero ogólników.

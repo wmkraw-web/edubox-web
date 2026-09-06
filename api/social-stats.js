@@ -169,6 +169,80 @@ async function fetchYouTubeStats() {
     };
 }
 
+// WYMAGANE ZMIENNE ŚRODOWISKOWE (Facebook):
+//   FACEBOOK_PAGE_ACCESS_TOKEN   - długożyjący token strony (Graph API), wymieniony z tokenu
+//                                  użytkownika - patrz instrukcja od Kreion
+//   FACEBOOK_PAGE_ID             - ID strony na Facebooku
+const FB_GRAPH_VERSION = 'v21.0';
+
+async function fetchFacebookStats() {
+    const token = process.env.FACEBOOK_PAGE_ACCESS_TOKEN;
+    const pageId = process.env.FACEBOOK_PAGE_ID;
+    if (!token) throw new Error('Brak FACEBOOK_PAGE_ACCESS_TOKEN w zmiennych środowiskowych Vercela.');
+    if (!pageId) throw new Error('Brak FACEBOOK_PAGE_ID w zmiennych środowiskowych Vercela.');
+
+    const pageUrl = `https://graph.facebook.com/${FB_GRAPH_VERSION}/${encodeURIComponent(pageId)}?fields=name,fan_count,picture&access_token=${token}`;
+    const pageRes = await fetch(pageUrl);
+    if (!pageRes.ok) {
+        const detail = await pageRes.text().catch(() => '');
+        throw new Error(`Facebook: nie udało się pobrać strony (HTTP ${pageRes.status}). ${detail}`.trim());
+    }
+    const page = await pageRes.json();
+
+    // Najpierw próbujemy pobrać posty RAZEM z metrykami (jedno zapytanie, mniej wywołań do API).
+    // Meta co jakiś czas zmienia dostępne nazwy metryk - jeśli to zapytanie zawiedzie, spadamy
+    // do wersji bez metryk, żeby lista postów i tak się pokazała zamiast całkowitego błędu.
+    const withInsightsFields = 'id,message,created_time,permalink_url,full_picture,insights.metric(post_impressions,post_engaged_users,post_clicks)';
+    const basicFields = 'id,message,created_time,permalink_url,full_picture';
+    let posts = [];
+    let insightsUnavailable = false;
+
+    let postsRes = await fetch(`https://graph.facebook.com/${FB_GRAPH_VERSION}/${encodeURIComponent(pageId)}/posts?fields=${withInsightsFields}&limit=25&access_token=${token}`);
+    if (!postsRes.ok) {
+        insightsUnavailable = true;
+        postsRes = await fetch(`https://graph.facebook.com/${FB_GRAPH_VERSION}/${encodeURIComponent(pageId)}/posts?fields=${basicFields}&limit=25&access_token=${token}`);
+    }
+    if (!postsRes.ok) {
+        const detail = await postsRes.text().catch(() => '');
+        throw new Error(`Facebook: nie udało się pobrać postów (HTTP ${postsRes.status}). ${detail}`.trim());
+    }
+    const postsData = await postsRes.json();
+    const items = Array.isArray(postsData.data) ? postsData.data : [];
+
+    posts = items.map((post) => {
+        const metrics = {};
+        if (post.insights && Array.isArray(post.insights.data)) {
+            post.insights.data.forEach((m) => {
+                const value = Array.isArray(m.values) && m.values.length ? m.values[0].value : null;
+                metrics[m.name] = typeof value === 'number' ? value : null;
+            });
+        }
+        const rawMessage = (post.message || '').trim();
+        return {
+            id: post.id,
+            title: rawMessage ? (rawMessage.length > 120 ? rawMessage.slice(0, 117) + '...' : rawMessage) : '(post bez tekstu)',
+            createdAt: post.created_time || null,
+            media: post.full_picture || null,
+            url: post.permalink_url || `https://www.facebook.com/${post.id}`,
+            impressions: metrics.post_impressions ?? null,
+            engaged: metrics.post_engaged_users ?? null,
+            clicks: metrics.post_clicks ?? null,
+        };
+    });
+
+    return {
+        platform: 'facebook',
+        account: {
+            name: page.name || null,
+            picture: page.picture?.data?.url || null,
+            fans: typeof page.fan_count === 'number' ? page.fan_count : null,
+        },
+        posts,
+        analyticsError: insightsUnavailable ? 'Szczegółowe metryki postów (wyświetlenia/zaangażowanie) chwilowo niedostępne - pokazuję samą listę postów.' : null,
+        updatedAt: new Date().toISOString(),
+    };
+}
+
 export default async function handler(req, res) {
     if (req.method !== 'GET') {
         return res.status(405).json({ error: 'Metoda niedozwolona' });
@@ -185,6 +259,10 @@ export default async function handler(req, res) {
         }
         if (platform === 'youtube') {
             const data = await fetchYouTubeStats();
+            return res.status(200).json(data);
+        }
+        if (platform === 'facebook') {
+            const data = await fetchFacebookStats();
             return res.status(200).json(data);
         }
         return res.status(400).json({ error: `Nieobsługiwana platforma: ${platform}` });
