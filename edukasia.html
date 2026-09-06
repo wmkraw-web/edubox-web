@@ -84,9 +84,9 @@
             .success-card { border: 4px solid #fbcfe8 !important; box-shadow: none !important; transform: scale(1.1); margin: 2cm auto; }
             * { text-shadow: none !important; }
 
-            .pecs-print-container { display: flex !important; flex-wrap: wrap !important; gap: 5mm !important; justify-content: flex-start !important; padding: 10mm !important; }
-            .pecs-card-print { width: 50mm !important; height: 50mm !important; border: 2px solid black !important; display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: space-between !important; padding: 5mm !important; page-break-inside: avoid !important; box-sizing: border-box !important; }
-            .pecs-img-print { max-height: 25mm !important; max-width: 35mm !important; object-fit: contain !important; }
+            .aac-print-container { display: flex !important; flex-wrap: wrap !important; gap: 5mm !important; justify-content: flex-start !important; padding: 10mm !important; }
+            .aac-card-print { width: 50mm !important; height: 50mm !important; border: 2px solid black !important; display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: space-between !important; padding: 5mm !important; page-break-inside: avoid !important; box-sizing: border-box !important; }
+            .aac-img-print { max-height: 25mm !important; max-width: 35mm !important; object-fit: contain !important; }
             
             .rzepy-page { width: 210mm !important; height: 297mm !important; display: flex !important; flex-direction: column !important; page-break-after: always !important; }
             .rzepy-board { height: 50% !important; border-bottom: 2px dashed #999 !important; padding: 10mm !important; }
@@ -237,7 +237,7 @@
             const [isGeneratingStory, setIsGeneratingStory] = useState(false);
             const [storyError, setStoryError] = useState('');
 
-            const [pecsCards, setPecsCards] = useState([
+            const [aacCards, setAacCards] = useState([
                 { id: 1, word: 'Sok', img: '🧃' },
                 { id: 2, word: 'Książka', img: '📖' },
                 { id: 3, word: 'Zabawa', img: '🧸' }
@@ -322,15 +322,15 @@
                 if (file) {
                     const reader = new FileReader();
                     reader.onload = (event) => {
-                        setPecsCards(pecsCards.map(c => c.id === cardId ? { ...c, img: event.target.result } : c));
+                        setAacCards(aacCards.map(c => c.id === cardId ? { ...c, img: event.target.result } : c));
                     };
                     reader.readAsDataURL(file);
                 }
             };
 
-            const addPecsCard = () => setPecsCards([...pecsCards, { id: Date.now(), word: 'Nowe', img: '❓' }]);
-            const removePecsCard = (id) => setPecsCards(pecsCards.filter(c => c.id !== id));
-            const updatePecsCard = (id, field, value) => setPecsCards(pecsCards.map(c => c.id === id ? { ...c, [field]: value } : c));
+            const addAacCard = () => setAacCards([...aacCards, { id: Date.now(), word: 'Nowe', img: '❓' }]);
+            const removeAacCard = (id) => setAacCards(aacCards.filter(c => c.id !== id));
+            const updateAacCard = (id, field, value) => setAacCards(aacCards.map(c => c.id === id ? { ...c, [field]: value } : c));
 
             // --- GIEŁDA WZORÓW ACTIONS ---
             const sharePattern = async () => {
@@ -338,10 +338,10 @@
                     async (newCount) => {
                         setUsageCount(newCount);
                         try {
-                            const name = `Zestaw Kart PECS (${pecsCards.length} szt.)`;
-                            const config = { pecsCards };
+                            const name = `Zestaw Kart AAC (${aacCards.length} szt.)`;
+                            const config = { aacCards };
                             
-                            await window.EduBoxCore.saveToGielda('gielda_wzorow_edukasia', 'Karty PECS', name, config);
+                            await window.EduBoxCore.saveToGielda('gielda_wzorow_edukasia', 'Karty AAC', name, config);
                             showToast("✨ Udostępniono zestaw w Giełdzie Wzorów!");
                         } catch (e) {
                             showToast(e.message || "🚨 Błąd podczas zapisu w chmurze.");
@@ -354,10 +354,10 @@
 
             const loadPattern = (pattern) => {
                 const c = pattern.config;
-                if(c && c.pecsCards) {
-                    setPecsCards(c.pecsCards);
-                    setActiveTab('pecs');
-                    showToast("✨ Załadowano Zestaw PECS z Giełdy!");
+                if(c && (c.aacCards || c.pecsCards)) {
+                    setAacCards(c.aacCards || c.pecsCards);
+                    setActiveTab('karty');
+                    showToast("✨ Załadowano Zestaw Kart AAC z Giełdy!");
                 }
             };
 
@@ -647,7 +647,7 @@ IMG4: [prompt 4]`;
                                     { id: 'aac', label: 'Mówik AAC', icon: '🗣️', color: 'indigo' },
                                     { id: 'sukces', label: 'Sukcesy', icon: '🏆', color: 'rose' },
                                     { id: 'bajka', label: 'Bajki AI', icon: '🎨', color: 'amber' },
-                                    { id: 'pecs', label: 'Karty PECS', icon: '🔲', color: 'emerald' },
+                                    { id: 'karty', label: 'Karty AAC', icon: '🔲', color: 'emerald' },
                                     { id: 'rzepy', label: 'Rzepy', icon: '🧩', color: 'purple' },
                                     { id: 'gielda', label: 'Baza Wzorów', icon: '☁️', color: 'fuchsia' },
                                     { id: 'portfolio', label: 'Inne Aplikacje', icon: '🧭', color: 'slate' }
@@ -771,49 +771,49 @@ IMG4: [prompt 4]`;
                                 </div>
                             )}
 
-                            {/* WIDOK: PECS */}
-                            {activeTab === 'pecs' && (
+                            {/* WIDOK: KARTY AAC */}
+                            {activeTab === 'karty' && (
                                 <div className="glass-panel p-6 sm:p-8 rounded-[2rem] fade-in border border-emerald-500/30">
                                     <div className="flex justify-between items-center mb-6 print-hidden">
-                                        <h2 className="text-2xl font-black text-emerald-400 flex items-center gap-2"><Icon name="Grid"/> Kreator PECS (5x5 cm)</h2>
+                                        <h2 className="text-2xl font-black text-emerald-400 flex items-center gap-2"><Icon name="Grid"/> Kreator Kart AAC (5x5 cm)</h2>
                                         <button onClick={handlePrintWithLimit} className="bg-emerald-600 text-white px-4 py-2 rounded-xl font-bold flex items-center gap-2 btn-bounce">
                                             <Icon name="Printer"/> Drukuj Karty {!isPremium && `(${Math.max(0, 5 - usageCount)})`}
                                         </button>
                                     </div>
                                     
                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6 print-hidden">
-                                        {pecsCards.map(card => (
+                                        {aacCards.map(card => (
                                             <div key={card.id} className="bg-slate-900 border border-slate-700 p-4 rounded-xl flex items-center gap-4">
                                                 <div className="w-16 h-16 bg-white rounded-lg flex items-center justify-center overflow-hidden shrink-0 border-2 border-slate-400">
                                                     {card.img.length > 5 ? <img src={card.img} className="w-full h-full object-cover" /> : <span className="text-3xl">{card.img}</span>}
                                                 </div>
                                                 <div className="flex-1 space-y-2">
-                                                    <input type="text" value={card.word} onChange={(e) => updatePecsCard(card.id, 'word', e.target.value)} className="w-full bg-slate-800 text-white text-sm px-2 py-1 rounded outline-none border border-slate-600 focus:border-emerald-500 uppercase font-bold" />
+                                                    <input type="text" value={card.word} onChange={(e) => updateAacCard(card.id, 'word', e.target.value)} className="w-full bg-slate-800 text-white text-sm px-2 py-1 rounded outline-none border border-slate-600 focus:border-emerald-500 uppercase font-bold" />
                                                     <div className="flex gap-2">
-                                                        <input type="text" value={card.img.length < 5 ? card.img : '📷'} onChange={(e) => updatePecsCard(card.id, 'img', e.target.value)} className="w-10 text-center bg-slate-800 text-white text-sm px-1 py-1 rounded outline-none border border-slate-600" title="Wpisz Emoji" />
+                                                        <input type="text" value={card.img.length < 5 ? card.img : '📷'} onChange={(e) => updateAacCard(card.id, 'img', e.target.value)} className="w-10 text-center bg-slate-800 text-white text-sm px-1 py-1 rounded outline-none border border-slate-600" title="Wpisz Emoji" />
                                                         <label className="flex-1 text-center bg-slate-800 hover:bg-slate-700 text-emerald-400 text-xs py-1 rounded cursor-pointer border border-slate-600 font-bold flex items-center justify-center gap-1">
                                                             <Icon name="Image" className="w-3 h-3"/> Własne
                                                             <input type="file" className="hidden" accept="image/*" onChange={(e) => handleImageUpload(e, card.id)} />
                                                         </label>
                                                     </div>
                                                 </div>
-                                                <button onClick={() => removePecsCard(card.id)} className="text-slate-500 hover:text-red-500 p-2"><Icon name="Trash"/></button>
+                                                <button onClick={() => removeAacCard(card.id)} className="text-slate-500 hover:text-red-500 p-2"><Icon name="Trash"/></button>
                                             </div>
                                         ))}
-                                        <button onClick={addPecsCard} className="bg-emerald-900/30 border-2 border-dashed border-emerald-500/50 hover:bg-emerald-900/50 text-emerald-400 p-4 rounded-xl flex flex-col items-center justify-center gap-2 font-bold min-h-[100px] transition-colors btn-bounce">
+                                        <button onClick={addAacCard} className="bg-emerald-900/30 border-2 border-dashed border-emerald-500/50 hover:bg-emerald-900/50 text-emerald-400 p-4 rounded-xl flex flex-col items-center justify-center gap-2 font-bold min-h-[100px] transition-colors btn-bounce">
                                             <Icon name="Plus"/> Dodaj Kartę
                                         </button>
                                     </div>
 
                                     <div className="hidden print:block">
-                                        <div className="pecs-print-container">
-                                            {pecsCards.map(card => (
-                                                <div key={`print-${card.id}`} className="pecs-card-print">
+                                        <div className="aac-print-container">
+                                            {aacCards.map(card => (
+                                                <div key={`print-${card.id}`} className="aac-card-print">
                                                     <div style={{ fontSize: '12pt', fontWeight: 'bold', textTransform: 'uppercase', textAlign: 'center', lineHeight: '1.1', height: '10mm', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%' }}>
                                                         {card.word}
                                                     </div>
                                                     <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                                        {card.img.length > 5 ? <img src={card.img} className="pecs-img-print" /> : <span style={{ fontSize: '35pt' }}>{card.img}</span>}
+                                                        {card.img.length > 5 ? <img src={card.img} className="aac-img-print" /> : <span style={{ fontSize: '35pt' }}>{card.img}</span>}
                                                     </div>
                                                 </div>
                                             ))}
@@ -871,11 +871,11 @@ IMG4: [prompt 4]`;
                             {activeTab === 'gielda' && (
                                 <div className="glass-panel p-6 sm:p-8 rounded-[2rem] fade-in border border-fuchsia-500/30 print-hidden h-[800px] flex flex-col">
                                     <div className="flex justify-between items-center mb-6">
-                                        <h2 className="text-3xl font-black text-fuchsia-400 flex items-center gap-3"><Icon name="Cloud" className="w-8 h-8"/> Baza PECS (Giełda)</h2>
+                                        <h2 className="text-3xl font-black text-fuchsia-400 flex items-center gap-3"><Icon name="Cloud" className="w-8 h-8"/> Baza Kart AAC (Giełda)</h2>
                                     </div>
                                     
                                     <button onClick={sharePattern} className="w-full bg-fuchsia-600 hover:bg-fuchsia-500 text-white p-4 rounded-xl font-bold text-sm mb-8 shadow-lg transition-all btn-bounce flex justify-center items-center gap-2">
-                                        <Icon name="CloudArrowUp" className="w-5 h-5"/> Udostępnij swój obecny zestaw PECS
+                                        <Icon name="CloudArrowUp" className="w-5 h-5"/> Udostępnij swój obecny zestaw kart AAC
                                     </button>
                                     
                                     <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4">Zestawy udostępnione przez innych</h3>
