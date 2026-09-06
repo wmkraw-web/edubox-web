@@ -257,9 +257,27 @@
             const box = document.getElementById('ai-analysis-result');
             const doItems = Array.isArray(result.doThis) ? result.doThis : [];
             const avoidItems = Array.isArray(result.avoidThis) ? result.avoidThis : [];
+            const retryItems = Array.isArray(result.retryCandidates) ? result.retryCandidates : [];
+
+            const retryHtml = retryItems.length ? `
+                <div class="mb-6">
+                    <p class="text-xs font-black uppercase tracking-wider text-cyan-300 mb-3"><i class="ph-bold ph-arrow-clockwise mr-1"></i>Materiały do poprawy i ponownej próby</p>
+                    <div class="space-y-3">
+                        ${retryItems.map(item => `
+                            <div class="bg-slate-950/55 border border-cyan-500/20 rounded-xl p-4">
+                                <p class="text-sm font-bold text-white">"${escapeHtml(item.title || '')}" <span class="text-xs font-normal text-slate-500">- ${escapeHtml(String(item.metric ?? ''))}</span></p>
+                                ${item.diagnosis ? `<p class="text-xs text-slate-400 mt-2"><span class="text-rose-300 font-bold">Dlaczego prawdopodobnie nie zadziałało:</span> ${escapeHtml(item.diagnosis)}</p>` : ''}
+                                ${item.newTitle ? `<p class="text-xs text-slate-300 mt-2"><span class="text-emerald-300 font-bold">Nowy tytuł/kąt do przetestowania:</span> "${escapeHtml(item.newTitle)}"</p>` : ''}
+                                ${item.changeToTest ? `<p class="text-xs text-slate-300 mt-1"><span class="text-emerald-300 font-bold">Konkretna zmiana:</span> ${escapeHtml(item.changeToTest)}</p>` : ''}
+                                <p class="text-xs text-cyan-200 mt-2 bg-cyan-500/10 rounded-lg px-3 py-2"><i class="ph-bold ph-flask mr-1"></i>Wrzuć ponownie z tą zmianą, zanotuj datę, i porównaj wynik z oryginałem po ok. tygodniu - to pokaże, czy zmiana faktycznie coś dała.</p>
+                            </div>`).join('')}
+                    </div>
+                </div>` : '';
+
             box.innerHTML = `
                 <h3 class="text-lg font-black text-white mb-4 flex items-center gap-2"><i class="ph-bold ph-sparkle text-cyan-300"></i>Analiza AI</h3>
                 ${result.patterns ? `<p class="text-sm text-slate-300 leading-relaxed mb-5">${escapeHtml(result.patterns)}</p>` : ''}
+                ${retryHtml}
                 <div class="grid md:grid-cols-2 gap-4 mb-5">
                     <div class="bg-emerald-500/10 border border-emerald-500/25 rounded-xl p-4">
                         <p class="text-xs font-black uppercase tracking-wider text-emerald-300 mb-2"><i class="ph-bold ph-check-circle mr-1"></i>Co robić</p>
@@ -287,9 +305,20 @@
             button.disabled = true;
             label.textContent = 'Analizuję...';
 
-            const system = `Jesteś analitykiem marketingu treści dla nauczycieli (EduBox AI - darmowe narzędzia AI dla nauczycieli). Dostajesz listę ostatnich postów/filmów z jednej platformy społecznościowej wraz z ich metrykami. Przeanalizuj to KONKRETNIE na podstawie podanych danych - nie ogólnikami, odwołuj się do faktycznych tytułów/wyników z listy tam, gdzie to pomaga zilustrować wzorzec. Zwróć WYŁĄCZNIE czysty obiekt JSON:
-{"patterns": "2-4 zdania: co łączy najlepiej działające pozycje, a co najgorzej działające", "doThis": ["3-5 krótkich, konkretnych punktów co robić dalej"], "avoidThis": ["2-4 krótkie punkty czego unikać"], "automationAdvice": "1-3 zdania: jak zmienić prompty/tematy w automatycznych publikacjach (Make.com), żeby lepiej trafiały", "manualAdvice": "1-3 zdania: jaką strategię przyjąć przy treściach publikowanych ręcznie, inną niż w automatyzacji"}
-Pisz po polsku, konkretnie, bez lania wody.`;
+            const system = `Jesteś doświadczonym analitykiem marketingu treści dla nauczycieli (EduBox AI - darmowe narzędzia AI dla nauczycieli). Dostajesz listę ostatnich postów/filmów z jednej platformy społecznościowej wraz z ich metrykami (wyświetlenia/polubienia/komentarze/daty).
+
+Twoja analiza MUSI być konkretna i szczegółowa - zakaz ogólników typu "twórz lepsze treści" albo "unikaj słabych tytułów" bez wyjaśnienia DLACZEGO akurat ten tytuł jest słaby i CO dokładnie w nim zmienić. Zawsze odwołuj się do faktycznych tytułów i liczb z podanej listy.
+
+Szczególnie ważne - zidentyfikuj 2-4 pozycje z NAJNIŻSZYMI wynikami (najlepiej takie z zerowymi lub bliskimi zeru wyświetleniami) i dla KAŻDEJ z osobna zaproponuj:
+1. diagnosis: konkretną, specyficzną dla TEGO tytułu przyczynę słabego wyniku (nie ogólnikową) - np. czy tytuł jest zbyt ogólny/abstrakcyjny, czy temat nie ma pilnej potrzeby, czy brakuje w tytule konkretnej korzyści/liczby/emocji, itp.
+2. newTitle: konkretną, gotową do użycia propozycję NOWEGO tytułu/kąta dla tego samego tematu (nie ogólnikowej rady, tylko realny przykładowy tytuł)
+3. changeToTest: jedną konkretną, pojedynczą zmienną do przetestowania przy ponownej publikacji (np. "zmień tylko tytuł, zostaw resztę bez zmian, żeby wiedzieć że to tytuł zrobił różnicę" albo "dodaj konkretną liczbę/czas do tytułu" albo "zmień miniaturkę na zbliżenie efektu końcowego")
+
+Chodzi o to, żeby użytkownik mógł dosłownie wrzucić ten sam materiał jeszcze raz z JEDNĄ konkretną zmianą i po tygodniu porównać wynik z oryginałem - więc changeToTest musi być pojedynczą, testowalną zmianą, nie kilkoma naraz.
+
+Zwróć WYŁĄCZNIE czysty obiekt JSON:
+{"patterns": "3-5 zdań: co konkretnie łączy najlepiej działające pozycje (odwołaj się do ich tytułów), a co najgorzej działające", "retryCandidates": [{"title": "dokładny tytuł z listy", "metric": "np. 0 wyświetleń", "diagnosis": "...", "newTitle": "...", "changeToTest": "..."}], "doThis": ["4-6 konkretnych punktów, każdy odwołujący się do realnego przykładu z listy tam gdzie to możliwe"], "avoidThis": ["3-5 konkretnych punktów z wyjaśnieniem dlaczego"], "automationAdvice": "2-4 zdania: konkretnie jak zmienić prompty/tematy w automatycznych publikacjach (Make.com), z przykładem", "manualAdvice": "2-4 zdania: jaką strategię przyjąć przy treściach publikowanych ręcznie, inną niż w automatyzacji, z przykładem"}
+Pisz po polsku, konkretnie, bez lania wody i bez ogólników możliwych do powiedzenia o dowolnym koncie.`;
 
             try {
                 const response = await fetch('/api/chat', {
