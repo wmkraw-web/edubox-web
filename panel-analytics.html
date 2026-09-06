@@ -61,6 +61,13 @@
         <section id="pins-list" class="grid md:grid-cols-2 xl:grid-cols-3 gap-4"></section>
     </main>
 
+    <div id="item-modal" class="hidden fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="glass rounded-2xl max-w-lg w-full max-h-[85vh] overflow-y-auto p-6 relative">
+            <button id="item-modal-close" class="absolute top-4 right-4 text-slate-400 hover:text-white text-xl leading-none">✕</button>
+            <div id="item-modal-content"></div>
+        </div>
+    </div>
+
     <script>
         const state = { authHeader: null, platform: 'pinterest' };
 
@@ -168,7 +175,7 @@
             heading.textContent = platform === 'youtube' ? 'Ostatnie filmy' : 'Ostatnie piny';
             heading.classList.toggle('hidden', rawItems.length === 0);
 
-            document.getElementById('pins-list').innerHTML = rawItems.map(item => {
+            document.getElementById('pins-list').innerHTML = rawItems.map((item, idx) => {
                 if (platform === 'youtube') {
                     const metrics = [
                         item.views !== null ? `<span title="Wyświetlenia"><i class="ph-bold ph-eye"></i> ${escapeHtml(String(item.views))}</span>` : '',
@@ -176,23 +183,29 @@
                         item.comments !== null ? `<span title="Komentarze"><i class="ph-bold ph-chat-circle"></i> ${escapeHtml(String(item.comments))}</span>` : '',
                     ].filter(Boolean).join(' ');
                     return `
-                    <a href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer" class="pin-card glass rounded-2xl overflow-hidden flex flex-col">
-                        ${item.thumbnail ? `<img src="${escapeHtml(item.thumbnail)}" alt="" class="w-full h-40 object-cover" loading="lazy">` : `<div class="w-full h-40 bg-slate-800 flex items-center justify-center text-slate-600"><i class="ph-bold ph-video-camera text-4xl"></i></div>`}
-                        <div class="p-4">
-                            <p class="font-bold text-sm text-white line-clamp-2">${escapeHtml(item.title)}</p>
+                    <div class="pin-card glass rounded-2xl overflow-hidden flex flex-col">
+                        <a href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer">
+                            ${item.thumbnail ? `<img src="${escapeHtml(item.thumbnail)}" alt="" class="w-full h-40 object-cover" loading="lazy">` : `<div class="w-full h-40 bg-slate-800 flex items-center justify-center text-slate-600"><i class="ph-bold ph-video-camera text-4xl"></i></div>`}
+                        </a>
+                        <div class="p-4 flex flex-col flex-1">
+                            <a href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer" class="font-bold text-sm text-white line-clamp-2 hover:text-cyan-300">${escapeHtml(item.title)}</a>
                             <div class="flex flex-wrap gap-3 text-xs text-cyan-300 font-bold mt-2">${metrics}</div>
                             <p class="text-xs text-slate-500 mt-2">${escapeHtml(formatDate(item.publishedAt))}</p>
+                            <button data-idx="${idx}" class="analyze-item-btn mt-3 inline-flex items-center gap-1.5 self-start bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-200 text-xs font-bold px-3 py-1.5 rounded-lg transition-colors"><i class="ph-bold ph-magnifying-glass"></i>Analizuj</button>
                         </div>
-                    </a>`;
+                    </div>`;
                 }
                 return `
-                <a href="${escapeHtml(item.pinUrl)}" target="_blank" rel="noopener noreferrer" class="pin-card glass rounded-2xl overflow-hidden flex flex-col">
-                    ${item.media ? `<img src="${escapeHtml(item.media)}" alt="" class="w-full h-40 object-cover" loading="lazy">` : `<div class="w-full h-40 bg-slate-800 flex items-center justify-center text-slate-600"><i class="ph-bold ph-image text-4xl"></i></div>`}
-                    <div class="p-4">
-                        <p class="font-bold text-sm text-white line-clamp-2">${escapeHtml(item.title)}</p>
+                <div class="pin-card glass rounded-2xl overflow-hidden flex flex-col">
+                    <a href="${escapeHtml(item.pinUrl)}" target="_blank" rel="noopener noreferrer">
+                        ${item.media ? `<img src="${escapeHtml(item.media)}" alt="" class="w-full h-40 object-cover" loading="lazy">` : `<div class="w-full h-40 bg-slate-800 flex items-center justify-center text-slate-600"><i class="ph-bold ph-image text-4xl"></i></div>`}
+                    </a>
+                    <div class="p-4 flex flex-col flex-1">
+                        <a href="${escapeHtml(item.pinUrl)}" target="_blank" rel="noopener noreferrer" class="font-bold text-sm text-white line-clamp-2 hover:text-cyan-300">${escapeHtml(item.title)}</a>
                         <p class="text-xs text-slate-500 mt-2">${escapeHtml(formatDate(item.createdAt))}</p>
+                        <button data-idx="${idx}" class="analyze-item-btn mt-3 inline-flex items-center gap-1.5 self-start bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-200 text-xs font-bold px-3 py-1.5 rounded-lg transition-colors"><i class="ph-bold ph-magnifying-glass"></i>Analizuj</button>
                     </div>
-                </a>`;
+                </div>`;
             }).join('');
         }
 
@@ -338,6 +351,80 @@ Pisz po polsku, konkretnie, bez lania wody i bez ogólników możliwych do powie
                 label.textContent = 'Analizuj z AI';
             }
         }
+
+        // Analiza AI pojedynczej pozycji - klik "Analizuj" na konkretnej karcie. Dla kontekstu
+        // podajemy też, jak ta pozycja wypada na tle najlepszej z aktualnie wczytanej listy, żeby
+        // AI mogło ocenić dystans, a nie tylko samą liczbę w oderwaniu od reszty.
+        function openItemModal(html) {
+            document.getElementById('item-modal-content').innerHTML = html;
+            document.getElementById('item-modal').classList.remove('hidden');
+        }
+        function closeItemModal() {
+            document.getElementById('item-modal').classList.add('hidden');
+        }
+        document.getElementById('item-modal-close').addEventListener('click', closeItemModal);
+        document.getElementById('item-modal').addEventListener('click', (event) => {
+            if (event.target.id === 'item-modal') closeItemModal();
+        });
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') closeItemModal();
+        });
+
+        function itemMetricValue(platform, item) {
+            return platform === 'youtube' ? (item.views ?? 0) : null;
+        }
+
+        async function analyzeSingleItem(idx) {
+            const items = state.lastItems || [];
+            const platform = state.lastPlatform || state.platform;
+            const item = items[idx];
+            if (!item) return;
+
+            openItemModal(`<div class="flex items-center gap-3 text-slate-300"><i class="ph-bold ph-circle-notch animate-spin text-xl"></i>Analizuję "${escapeHtml(item.title)}"...</div>`);
+
+            const metricValues = items.map(i => itemMetricValue(platform, i)).filter(v => v !== null);
+            const best = metricValues.length ? Math.max(...metricValues) : null;
+            const thisValue = itemMetricValue(platform, item);
+
+            const details = platform === 'youtube'
+                ? `Tytuł: "${item.title}"\nWyświetlenia: ${item.views ?? '?'} (najlepszy wynik na liście: ${best ?? '?'})\nPolubienia: ${item.likes ?? '?'}\nKomentarze: ${item.comments ?? '?'}\nData publikacji: ${item.publishedAt ? item.publishedAt.slice(0, 10) : '?'}`
+                : `Tytuł: "${item.title}"\nData publikacji: ${item.createdAt ? item.createdAt.slice(0, 10) : '?'}`;
+
+            const system = `Jesteś doświadczonym analitykiem marketingu treści dla nauczycieli (EduBox AI). Dostajesz JEDNĄ konkretną pozycję (post/film) do szczegółowej analizy, z kontekstem jak wypada na tle najlepszego wyniku z listy. Bądź maksymalnie konkretny i praktyczny - zero ogólników.
+
+Zwróć WYŁĄCZNIE czysty obiekt JSON:
+{"diagnosis": "3-5 zdań: dlaczego ta konkretna pozycja mogła osiągnąć taki wynik - odwołaj się do samego tytułu/tematu/daty, nie do ogólnych zasad", "titleAlternatives": ["2-3 konkretne, gotowe do użycia alternatywne tytuły dla TEGO SAMEGO tematu"], "thumbnailOrFormatTip": "1-2 zdania konkretnej rady dot. miniaturki/formatu/długości", "testPlan": "1-2 zdania: jak dokładnie przetestować zmianę (jedna zmienna na raz) i po jakim czasie sprawdzić wynik"}
+Pisz po polsku, konkretnie.`;
+
+            try {
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt: `Platforma: ${platform}\n${details}`, system, temperature: 0.5, format: 'json', model: 'gpt-4o-mini' }),
+                });
+                if (!response.ok) throw new Error(`Błąd AI (HTTP ${response.status}).`);
+                const data = await response.json();
+                const result = JSON.parse(data.text);
+                const alternatives = Array.isArray(result.titleAlternatives) ? result.titleAlternatives : [];
+                openItemModal(`
+                    <h3 class="text-lg font-black text-white mb-1 pr-8">${escapeHtml(item.title)}</h3>
+                    <p class="text-xs text-slate-500 mb-4">${thisValue !== null ? `${escapeHtml(String(thisValue))} wyświetleń` : ''}</p>
+                    ${result.diagnosis ? `<p class="text-sm text-slate-300 leading-relaxed mb-4">${escapeHtml(result.diagnosis)}</p>` : ''}
+                    ${alternatives.length ? `<div class="bg-emerald-500/10 border border-emerald-500/25 rounded-xl p-4 mb-4"><p class="text-xs font-black uppercase tracking-wider text-emerald-300 mb-2">Alternatywne tytuły do przetestowania</p><ul class="text-sm text-slate-200 space-y-1.5 list-disc list-inside">${alternatives.map(t => `<li>${escapeHtml(t)}</li>`).join('')}</ul></div>` : ''}
+                    ${result.thumbnailOrFormatTip ? `<div class="bg-slate-950/55 rounded-xl p-4 mb-4"><p class="text-xs font-black uppercase tracking-wider text-amber-300 mb-2">Miniaturka / format</p><p class="text-sm text-slate-300 leading-relaxed">${escapeHtml(result.thumbnailOrFormatTip)}</p></div>` : ''}
+                    ${result.testPlan ? `<p class="text-xs text-cyan-200 bg-cyan-500/10 rounded-lg px-3 py-2"><i class="ph-bold ph-flask mr-1"></i>${escapeHtml(result.testPlan)}</p>` : ''}
+                `);
+            } catch (error) {
+                openItemModal(`<p class="text-sm text-amber-200"><i class="ph-bold ph-warning-circle mr-2"></i>Nie udało się przygotować analizy: ${escapeHtml(error.message)}</p>`);
+            }
+        }
+
+        document.getElementById('pins-list').addEventListener('click', (event) => {
+            const button = event.target.closest('.analyze-item-btn');
+            if (!button) return;
+            event.preventDefault();
+            analyzeSingleItem(Number(button.dataset.idx));
+        });
 
         document.getElementById('ai-analyze-button').addEventListener('click', analyzeWithAI);
         document.getElementById('refresh-button').addEventListener('click', loadData);
