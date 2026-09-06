@@ -50,6 +50,13 @@
 
         <section id="analytics-note" class="hidden mb-6"></section>
 
+        <section id="ai-analysis-trigger" class="hidden mb-6">
+            <button id="ai-analyze-button" class="inline-flex items-center gap-2 bg-gradient-to-r from-indigo-600 to-cyan-500 hover:opacity-90 text-white font-black px-5 py-3 rounded-xl transition-opacity">
+                <i class="ph-bold ph-sparkle"></i><span id="ai-analyze-label">Analizuj z AI</span>
+            </button>
+        </section>
+        <section id="ai-analysis-result" class="hidden glass rounded-2xl p-6 mb-8"></section>
+
         <h2 id="pins-heading" class="hidden text-sm font-black uppercase tracking-widest text-slate-400 mb-3">Ostatnie piny</h2>
         <section id="pins-list" class="grid md:grid-cols-2 xl:grid-cols-3 gap-4"></section>
     </main>
@@ -84,6 +91,8 @@
             document.getElementById('refresh-button').classList.add('hidden');
             document.getElementById('logout-button').classList.add('hidden');
             document.getElementById('platform-tabs').classList.add('hidden');
+            document.getElementById('ai-analysis-trigger').classList.add('hidden');
+            document.getElementById('ai-analysis-result').classList.add('hidden');
             document.getElementById('message').innerHTML = `
                 <div class="max-w-md mx-auto py-3">
                     <div class="h-12 w-12 rounded-2xl bg-rose-500/15 text-rose-300 flex items-center justify-center text-2xl mb-4"><i class="ph-bold ph-lock-key"></i></div>
@@ -206,6 +215,8 @@
                 const items = Array.isArray(data.pins) ? data.pins : (Array.isArray(data.videos) ? data.videos : []);
                 state.itemsCount = items.length;
                 state.updatedAt = data.updatedAt;
+                state.lastPlatform = data.platform;
+                state.lastItems = items;
                 renderAccount(data.platform, data.account || {});
                 renderAnalytics(data.analytics, data.analyticsError);
                 renderItems(data.platform, items);
@@ -213,6 +224,8 @@
                 document.getElementById('refresh-button').classList.remove('hidden');
                 document.getElementById('logout-button').classList.remove('hidden');
                 document.getElementById('platform-tabs').classList.remove('hidden');
+                document.getElementById('ai-analysis-result').classList.add('hidden');
+                document.getElementById('ai-analysis-trigger').classList.toggle('hidden', items.length < 3);
             } catch (error) {
                 if (error.status === 401) {
                     renderLogin('Login lub hasło są niepoprawne. Spróbuj ponownie.');
@@ -226,6 +239,78 @@
             }
         }
 
+        // Analiza AI - patrzy na już wczytane dane (tytuły + realne wyniki) i zwraca konkretny,
+        // podzielony na sekcje raport, zamiast zostawiać same suche liczby. Korzysta z tego samego
+        // współdzielonego endpointu /api/chat co wszystkie inne narzędzia EduBox (gpt-4o-mini) -
+        // zero nowej infrastruktury, licznik użycia współdzielony z resztą strony.
+        function buildAnalysisPrompt(platform, items) {
+            const lines = items.slice(0, 25).map((item, i) => {
+                if (platform === 'youtube') {
+                    return `${i + 1}. "${item.title}" | ${item.views ?? '?'} wyświetleń | ${item.likes ?? '?'} polubień | ${item.comments ?? '?'} komentarzy | ${item.publishedAt ? item.publishedAt.slice(0, 10) : '?'}`;
+                }
+                return `${i + 1}. "${item.title}" | opublikowano: ${item.createdAt ? item.createdAt.slice(0, 10) : '?'}`;
+            });
+            return `Platforma: ${platform}\n${lines.join('\n')}`;
+        }
+
+        function renderAnalysisResult(result) {
+            const box = document.getElementById('ai-analysis-result');
+            const doItems = Array.isArray(result.doThis) ? result.doThis : [];
+            const avoidItems = Array.isArray(result.avoidThis) ? result.avoidThis : [];
+            box.innerHTML = `
+                <h3 class="text-lg font-black text-white mb-4 flex items-center gap-2"><i class="ph-bold ph-sparkle text-cyan-300"></i>Analiza AI</h3>
+                ${result.patterns ? `<p class="text-sm text-slate-300 leading-relaxed mb-5">${escapeHtml(result.patterns)}</p>` : ''}
+                <div class="grid md:grid-cols-2 gap-4 mb-5">
+                    <div class="bg-emerald-500/10 border border-emerald-500/25 rounded-xl p-4">
+                        <p class="text-xs font-black uppercase tracking-wider text-emerald-300 mb-2"><i class="ph-bold ph-check-circle mr-1"></i>Co robić</p>
+                        <ul class="text-sm text-slate-200 space-y-1.5 list-disc list-inside">${doItems.map(t => `<li>${escapeHtml(t)}</li>`).join('')}</ul>
+                    </div>
+                    <div class="bg-rose-500/10 border border-rose-500/25 rounded-xl p-4">
+                        <p class="text-xs font-black uppercase tracking-wider text-rose-300 mb-2"><i class="ph-bold ph-x-circle mr-1"></i>Czego unikać</p>
+                        <ul class="text-sm text-slate-200 space-y-1.5 list-disc list-inside">${avoidItems.map(t => `<li>${escapeHtml(t)}</li>`).join('')}</ul>
+                    </div>
+                </div>
+                <div class="grid md:grid-cols-2 gap-4">
+                    ${result.automationAdvice ? `<div class="bg-slate-950/55 rounded-xl p-4"><p class="text-xs font-black uppercase tracking-wider text-indigo-300 mb-2"><i class="ph-bold ph-robot mr-1"></i>Dla automatyzacji (Make)</p><p class="text-sm text-slate-300 leading-relaxed">${escapeHtml(result.automationAdvice)}</p></div>` : ''}
+                    ${result.manualAdvice ? `<div class="bg-slate-950/55 rounded-xl p-4"><p class="text-xs font-black uppercase tracking-wider text-amber-300 mb-2"><i class="ph-bold ph-hand-tap mr-1"></i>Dla postów ręcznych</p><p class="text-sm text-slate-300 leading-relaxed">${escapeHtml(result.manualAdvice)}</p></div>` : ''}
+                </div>`;
+            box.classList.remove('hidden');
+        }
+
+        async function analyzeWithAI() {
+            const items = state.lastItems || [];
+            const platform = state.lastPlatform || state.platform;
+            if (items.length < 3) return;
+
+            const button = document.getElementById('ai-analyze-button');
+            const label = document.getElementById('ai-analyze-label');
+            button.disabled = true;
+            label.textContent = 'Analizuję...';
+
+            const system = `Jesteś analitykiem marketingu treści dla nauczycieli (EduBox AI - darmowe narzędzia AI dla nauczycieli). Dostajesz listę ostatnich postów/filmów z jednej platformy społecznościowej wraz z ich metrykami. Przeanalizuj to KONKRETNIE na podstawie podanych danych - nie ogólnikami, odwołuj się do faktycznych tytułów/wyników z listy tam, gdzie to pomaga zilustrować wzorzec. Zwróć WYŁĄCZNIE czysty obiekt JSON:
+{"patterns": "2-4 zdania: co łączy najlepiej działające pozycje, a co najgorzej działające", "doThis": ["3-5 krótkich, konkretnych punktów co robić dalej"], "avoidThis": ["2-4 krótkie punkty czego unikać"], "automationAdvice": "1-3 zdania: jak zmienić prompty/tematy w automatycznych publikacjach (Make.com), żeby lepiej trafiały", "manualAdvice": "1-3 zdania: jaką strategię przyjąć przy treściach publikowanych ręcznie, inną niż w automatyzacji"}
+Pisz po polsku, konkretnie, bez lania wody.`;
+
+            try {
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt: buildAnalysisPrompt(platform, items), system, temperature: 0.5, format: 'json', model: 'gpt-4o-mini' }),
+                });
+                if (!response.ok) throw new Error(`Błąd AI (HTTP ${response.status}).`);
+                const data = await response.json();
+                const parsed = JSON.parse(data.text);
+                renderAnalysisResult(parsed);
+            } catch (error) {
+                document.getElementById('ai-analysis-result').innerHTML = `<p class="text-sm text-amber-200"><i class="ph-bold ph-warning-circle mr-2"></i>Nie udało się przygotować analizy: ${escapeHtml(error.message)}</p>`;
+                document.getElementById('ai-analysis-result').classList.remove('hidden');
+            } finally {
+                button.disabled = false;
+                label.textContent = 'Analizuj z AI';
+            }
+        }
+
+        document.getElementById('ai-analyze-button').addEventListener('click', analyzeWithAI);
         document.getElementById('refresh-button').addEventListener('click', loadData);
         document.getElementById('logout-button').addEventListener('click', () => renderLogin('Wylogowano z panelu.'));
         document.querySelectorAll('.platform-tab').forEach(button => button.addEventListener('click', () => {
