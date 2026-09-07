@@ -77,6 +77,8 @@
             const [selectedAppIndex, setSelectedAppIndex] = useState('random');
             const [promotedApp, setPromotedApp] = useState(null); // aplikacja faktycznie wypromowana w ostatnio wygenerowanym poście
             const [linkCopied, setLinkCopied] = useState(false);
+            const [titles, setTitles] = useState([]); // 3 propozycje tytułów do nałożenia na zdjęcie/wideo przed publikacją
+            const [copiedTitleIdx, setCopiedTitleIdx] = useState(null);
 
             useEffect(() => {
                 let attempts = 0;
@@ -113,6 +115,7 @@
                 setErrorMsg('');
                 setPostContent('');
                 setImageUrl('');
+                setTitles([]);
 
                 // Wybór promowanej aplikacji: konkretna (z listy) albo losowa - przydatne przy
                 // hurtowym generowaniu treści na wiele dni z automatyzacji.
@@ -134,10 +137,13 @@
                     W treści posta naturalnie zachęć do jej wypróbowania (np. "Link w pierwszym komentarzu 👇" albo "Sprawdź -> link poniżej").
                     WAŻNE: NIE wymyślaj i NIE wpisuj żadnego adresu URL w treści posta - prawdziwy link zostanie doklejony automatycznie pod postem przez system.
 
+                    Dodatkowo zaproponuj 3 krótkie, chwytliwe tytuły (max 6-8 słów każdy) do nałożenia jako napis na zdjęciu/wideo przed publikacją - różne kąty (np. pytanie, obietnica korzyści, ciekawostka).
+
                     ZWRÓĆ ODPOWIEDŹ W FORMACIE JSON:
                     {
                         "post_text": "Gotowa treść posta na social media, z naturalnym wezwaniem do działania, BEZ wpisanego adresu URL.",
-                        "image_prompt": "Krótki opis po angielsku do generatora obrazków opisujący co Ewa robi na zdjęciu pasującym do tego posta (np. Ewa siedzi przy biurku i trzyma sprawdzian, Ewa pije kawę w pokoju nauczycielskim). Pisz TYLKO samą akcję/tło."
+                        "image_prompt": "Krótki opis po angielsku do generatora obrazków opisujący co Ewa robi na zdjęciu pasującym do tego posta (np. Ewa siedzi przy biurku i trzyma sprawdzian, Ewa pije kawę w pokoju nauczycielskim). Pisz TYLKO samą akcję/tło.",
+                        "titles": ["Tytuł 1", "Tytuł 2", "Tytuł 3"]
                     }`;
                     const userPrompt = `Napisz post rozwiązujący problem: ${topic}`;
                     // Uderzamy do właściwego endpointu dla tekstów (OpenAI) - wspólny z resztą narzędzi,
@@ -165,6 +171,7 @@
                     let jsonStr = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
                     const parsedData = JSON.parse(jsonStr);
                     setPostContent(parsedData.post_text);
+                    setTitles(Array.isArray(parsedData.titles) ? parsedData.titles : []);
                     // 2. ZAPYTANIE DO FAL AI (FLUX) O ZDJĘCIE EWY
                     // Tu wkodowujemy na sztywno wygląd Ewy z powitanie.mp4, żeby FAL generował ją spójnie!
                     const baseEwaPrompt = "SOLO PORTRAIT, ONLY ONE PERSON. A 32-year-old beautiful Polish female teacher named Ewa, short wavy blonde hair, wearing a stylish grey suit and a white shirt. Friendly expression, looking directly at the camera, photorealistic, 8k, highly detailed, alone in the scene.";
@@ -208,6 +215,11 @@
                 navigator.clipboard.writeText(promotedAppUrl);
                 setLinkCopied(true);
                 setTimeout(() => setLinkCopied(false), 2000);
+            };
+            const copyTitle = (title, idx) => {
+                navigator.clipboard.writeText(title);
+                setCopiedTitleIdx(idx);
+                setTimeout(() => setCopiedTitleIdx(null), 2000);
             };
             return (
                 <div className="min-h-screen p-4 md:p-8 font-sans">
@@ -329,6 +341,23 @@
                                                             {postContent}
                                                         </p>
                                                     </div>
+                                                    {titles.length > 0 && (
+                                                        <div className="bg-slate-900 border border-pink-500/40 rounded-xl p-4">
+                                                            <p className="text-xs font-bold text-pink-300 uppercase mb-3 flex items-center gap-2">
+                                                                <i className="ph-bold ph-text-aa"></i> Propozycje tytułów (na zdjęcie/wideo)
+                                                            </p>
+                                                            <div className="space-y-2">
+                                                                {titles.map((t, idx) => (
+                                                                    <div key={idx} className="flex items-center justify-between gap-2 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2">
+                                                                        <span className="text-sm text-slate-200">{t}</span>
+                                                                        <button onClick={() => copyTitle(t, idx)} className="shrink-0 bg-pink-600 hover:bg-pink-500 text-white px-2 py-1 rounded-md text-xs font-bold flex items-center gap-1 transition-colors">
+                                                                            <i className={copiedTitleIdx === idx ? "ph-bold ph-check" : "ph-bold ph-copy"}></i> {copiedTitleIdx === idx ? 'Skopiowano' : 'Kopiuj'}
+                                                                        </button>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                     {promotedAppUrl && (
                                                         <div className="bg-slate-900 border border-pink-500/40 rounded-xl p-4 flex items-center justify-between gap-3">
                                                             <div className="min-w-0">

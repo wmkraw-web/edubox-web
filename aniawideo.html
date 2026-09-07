@@ -83,6 +83,8 @@
 
             const [isWritingScript, setIsWritingScript] = useState(false);
             const [scriptError, setScriptError] = useState('');
+            const [titles, setTitles] = useState([]); // 3 propozycje tytułów do nałożenia na miniaturkę/wideo przed publikacją
+            const [copiedTitleIdx, setCopiedTitleIdx] = useState(null);
 
             const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
             const [videoStatusMsg, setVideoStatusMsg] = useState('');
@@ -156,6 +158,7 @@
                 if (!topic.trim() || apps.length === 0) return;
                 setIsWritingScript(true);
                 setScriptError('');
+                setTitles([]);
                 try {
                     const app = selectedAppIndex === 'random'
                         ? apps[Math.floor(Math.random() * apps.length)]
@@ -165,23 +168,41 @@
 Piszesz TYLKO tekst DO WYPOWIEDZENIA na głos (nie post pisany) - naturalny, mówiony język polski, jakbyś zwracała się bezpośrednio do widza.
 Promujesz KONKRETNIE narzędzie: "${app.title}" - ${app.desc}. Adres: eduboxpro.pl/${app.url}.
 Struktura: 1-2 zdania o problemie/temacie, 1-2 zdania co narzędzie robi, na końcu zaproszenie w stylu "Sprawdź na eduboxpro.pl/${app.url}".
-Maksymalnie 45 słów łącznie - to ma być krótkie wideo, nie referat. Bez wstępów typu "cześć, tu Ania" (to zostanie dodane osobno). Zwróć WYŁĄCZNIE czysty tekst do przeczytania, bez cudzysłowów.`;
+Maksymalnie 45 słów łącznie - to ma być krótkie wideo, nie referat. Bez wstępów typu "cześć, tu Ania" (to zostanie dodane osobno).
+
+Dodatkowo zaproponuj 3 krótkie, chwytliwe tytuły (max 6-8 słów każdy) do nałożenia jako napis na miniaturce/wideo przed publikacją - różne kąty (np. pytanie, obietnica korzyści, ciekawostka).
+
+ZWRÓĆ WYŁĄCZNIE JSON w formacie:
+{
+  "script": "czysty tekst do przeczytania, bez cudzysłowów",
+  "titles": ["Tytuł 1", "Tytuł 2", "Tytuł 3"]
+}`;
 
                     const res = await fetch('/api/chat', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ prompt: `Temat: ${topic}`, system: systemPrompt, temperature: 0.8 })
+                        body: JSON.stringify({ prompt: `Temat: ${topic}`, system: systemPrompt, temperature: 0.8, format: 'json' })
                     });
                     if (!res.ok) throw new Error(`Błąd serwera tekstu (HTTP ${res.status}).`);
                     const data = await res.json();
-                    const text = (data.text || '').trim();
-                    if (!text) throw new Error('Serwer nie zwrócił scenariusza.');
-                    setCustomScript(`Cześć, tu Ania z EduBox! ${text}`);
+                    const rawText = (data.text || '').trim();
+                    if (!rawText) throw new Error('Serwer nie zwrócił scenariusza.');
+                    const jsonStr = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
+                    const parsed = JSON.parse(jsonStr);
+                    if (!parsed.script) throw new Error('Serwer nie zwrócił scenariusza.');
+                    setCustomScript(`Cześć, tu Ania z EduBox! ${parsed.script}`);
+                    setTitles(Array.isArray(parsed.titles) ? parsed.titles : []);
                 } catch (err) {
                     setScriptError(err.message || 'Nie udało się napisać scenariusza.');
                 } finally {
                     setIsWritingScript(false);
                 }
+            };
+
+            const copyTitle = (title, idx) => {
+                navigator.clipboard.writeText(title);
+                setCopiedTitleIdx(idx);
+                setTimeout(() => setCopiedTitleIdx(null), 2000);
             };
 
             const sleep = (ms) => new Promise(r => setTimeout(r, ms));
@@ -207,8 +228,8 @@ Maksymalnie 45 słów łącznie - to ma być krótkie wideo, nie referat. Bez ws
                     const talkId = createData.talkId;
                     setVideoStatusMsg('Ania nagrywa... (zwykle 15-40 sekund)');
 
-                    // Odpytujemy o status co 3s, maksymalnie 2 minuty
-                    const maxAttempts = 40;
+                    // Odpytujemy o status co 3s, maksymalnie 5 minut (D-ID czasem renderuje dłużej niż zwykle)
+                    const maxAttempts = 100;
                     for (let i = 0; i < maxAttempts; i++) {
                         await sleep(3000);
                         const statusRes = await fetch('/api/ewa-generate', {
@@ -230,7 +251,7 @@ Maksymalnie 45 słów łącznie - to ma być krótkie wideo, nie referat. Bez ws
                         }
                         setVideoStatusMsg(`Ania nagrywa... (${statusData.status || 'przetwarzanie'})`);
                     }
-                    throw new Error('Przekroczono czas oczekiwania (2 min). Sprawdź panel D-ID - zlecenie mogło się jeszcze dokończyć.');
+                    throw new Error('Przekroczono czas oczekiwania (5 min). Sprawdź panel D-ID - zlecenie mogło się jeszcze dokończyć.');
                 } catch (err) {
                     setVideoError(err.message || 'Nieznany błąd podczas generowania wideo.');
                     setIsGeneratingVideo(false);
@@ -312,6 +333,24 @@ Maksymalnie 45 słów łącznie - to ma być krótkie wideo, nie referat. Bez ws
                                                 {isWritingScript ? 'Ania pisze...' : 'Napisz scenariusz'}
                                             </button>
                                             {scriptError && <p className="text-red-400 text-xs">{scriptError}</p>}
+                                        </div>
+                                    )}
+
+                                    {titles.length > 0 && (
+                                        <div className="mt-4 bg-slate-900 border border-teal-600/40 rounded-xl p-4">
+                                            <p className="text-xs font-bold text-teal-300 uppercase mb-3 flex items-center gap-2">
+                                                <i className="ph-bold ph-text-aa"></i> Propozycje tytułów (na miniaturkę/wideo)
+                                            </p>
+                                            <div className="space-y-2">
+                                                {titles.map((t, idx) => (
+                                                    <div key={idx} className="flex items-center justify-between gap-2 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2">
+                                                        <span className="text-sm text-slate-200">{t}</span>
+                                                        <button onClick={() => copyTitle(t, idx)} className="shrink-0 bg-teal-600 hover:bg-teal-500 text-white px-2 py-1 rounded-md text-xs font-bold flex items-center gap-1 transition-colors">
+                                                            <i className={copiedTitleIdx === idx ? "ph-bold ph-check" : "ph-bold ph-copy"}></i> {copiedTitleIdx === idx ? 'Skopiowano' : 'Kopiuj'}
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
                                         </div>
                                     )}
 
