@@ -1,4 +1,4 @@
 window.PORADA_DNIA = {
-  "text": "Stwórz plan lekcji z elastycznymi przerwami, aby umożliwić uczniom chwilę odpoczynku i przemyślenia materiału, co poprawi ich skupienie i efektywność nauki.",
-  "date": "2026-09-07"
+  "text": "Wykorzystaj AI do automatyzacji powtarzalnych zadań, co pozwoli Ci skupić się na bardziej kreatywnej pracy z uczniami i poprawi jakość komunikacji z rodzicami.",
+  "date": "2026-09-08"
 };
