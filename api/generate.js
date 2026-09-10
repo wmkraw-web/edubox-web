@@ -50,7 +50,7 @@ export default async function handler(req, res) {
   }
 
   // Odczytujemy wszystkie parametry, w tym nowe (init_image dla zdjęć, size/width/height dla wymiarów)
-  const { prompt, negative_prompt, aspect_ratio, init_image, image_strength, size, width, height, seed } = req.body;
+  const { prompt, negative_prompt, aspect_ratio, init_image, image_strength, size, width, height, seed, model, style } = req.body;
 
   if (!prompt) {
     return res.status(400).json({ message: 'Brak polecenia (promptu)' });
@@ -78,9 +78,28 @@ export default async function handler(req, res) {
     };
 
     // ---------------------------------------------------------
-    // TRYB 2: GENEROWANIE ZE ZDJĘCIA (Model: FAST SDXL)
+    // TRYB 0: GRAFIKA PROJEKTOWA (Model: Recraft V3) - ozdobne ramki dyplomów i motywy okazji.
+    // Recraft jest zbudowany do płaskich ilustracji/ramek i trzyma się układu
+    // "ozdobna ramka + pusty środek" dużo lepiej niż FLUX. Nieco droższy za obrazek.
     // ---------------------------------------------------------
-    if (init_image) {
+    if (model === 'recraft') {
+      endpointUrl = 'https://fal.run/fal-ai/recraft-v3';
+      let recraftSize = 'square_hd';
+      if (size && /^\d+x\d+$/i.test(String(size))) {
+        const [rw, rh] = String(size).split(/x/i).map(Number);
+        recraftSize = { width: Math.min(2048, Math.max(1024, Math.round(rw))), height: Math.min(2048, Math.max(1024, Math.round(rh))) };
+      } else if (aspect_ratio === '9:16' || aspect_ratio === '3:4') {
+        recraftSize = 'portrait_4_3';
+      } else if (aspect_ratio === '16:9' || aspect_ratio === '4:3') {
+        recraftSize = 'landscape_4_3';
+      }
+      payload = {
+        prompt: prompt,
+        image_size: recraftSize,
+        style: (typeof style === 'string' && style) ? style : 'digital_illustration',
+        enable_safety_checker: true
+      };
+    } else if (init_image) {
       // SDXL jest znacznie lepszy w trzymaniu się kompozycji wzoru bez niszczenia twarzy/proporcji.
       // UWAGA: "strength" honoruje teraz to, co faktycznie przyjdzie z frontendu (image_strength) -
       // wcześniej był tu na sztywno 0.65, więc suwak/wybór "trzymaj się wzoru" vs "tylko inspiracja"
@@ -100,7 +119,8 @@ export default async function handler(req, res) {
     }
 
     // Seed (opcjonalny) - pozwala powtórzyć lub świadomie zmienić wariant tej samej grafiki.
-    if (typeof seed === 'number' && Number.isFinite(seed)) payload.seed = Math.floor(seed);
+    // Recraft V3 nie przyjmuje seeda - i tak losuje inaczej za każdym razem.
+    if (model !== 'recraft' && typeof seed === 'number' && Number.isFinite(seed)) payload.seed = Math.floor(seed);
 
     // Wysłanie zapytania do chmury FAL
     const response = await fetch(endpointUrl, {
