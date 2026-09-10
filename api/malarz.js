@@ -3,7 +3,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { prompt, style, format, customText, init_image, image_strength } = req.body;
+  const { prompt, style, format, customText, init_image, image_strength, model } = req.body;
   const falKey = process.env.FAL_KEY;
 
   if (!falKey) {
@@ -50,24 +50,46 @@ export default async function handler(req, res) {
   // UWAGA: celowo NIE wysyłamy tu "style_preset" (wcześniej było na sztywno "line-art" niezależnie
   // od wyboru użytkownika, co ignorowało np. styl Disney/akwarela) - opis stylu jest już w finalPrompt
   // (styleModifier), tak samo jak w trybie tekstowym, więc SDXL trzyma się wybranego stylu poprawnie.
-  const endpointUrl = init_image
-    ? "https://fal.run/fal-ai/fast-sdxl/image-to-image"
-    : "https://fal.run/fal-ai/flux/schnell";
+  // Wybór modelu:
+  // - model:'recraft' + brak zdjęcia -> Recraft V3 (grafika projektowa: medale, ramki,
+  //   dekoracje, dyplomy - trzyma kompozycję i "puste miejsce na tekst" dużo lepiej niż FLUX).
+  // - init_image -> Fast-SDXL image-to-image (przemalowanie wgranego zdjęcia w stylu).
+  // - domyślnie -> FLUX Dev (28 kroków). Wcześniej był FLUX schnell (4 kroki, najsłabszy,
+  //   psuł anatomię i kadrowanie) - stąd "tani" wygląd dekoracji.
+  let endpointUrl;
+  let payload;
 
-  const payload = init_image
-    ? {
-        prompt: finalPrompt,
-        image_url: init_image,
-        strength: typeof image_strength === 'number' ? image_strength : 0.65,
-        image_size: imageSize,
-        num_inference_steps: 30,
-        enable_safety_checker: true
-      }
-    : {
-        prompt: finalPrompt,
-        image_size: imageSize,
-        num_inference_steps: 4
-      };
+  if (model === 'recraft' && !init_image) {
+    endpointUrl = "https://fal.run/fal-ai/recraft-v3";
+    let recraftStyle = 'digital_illustration';
+    if (style === 'wektor') recraftStyle = 'vector_illustration';
+    else if (style === 'akwarela') recraftStyle = 'digital_illustration/hand_drawn';
+    payload = {
+      prompt: finalPrompt,
+      image_size: imageSize,
+      style: recraftStyle,
+      enable_safety_checker: true
+    };
+  } else if (init_image) {
+    endpointUrl = "https://fal.run/fal-ai/fast-sdxl/image-to-image";
+    payload = {
+      prompt: finalPrompt,
+      image_url: init_image,
+      strength: typeof image_strength === 'number' ? image_strength : 0.65,
+      image_size: imageSize,
+      num_inference_steps: 30,
+      enable_safety_checker: true
+    };
+  } else {
+    endpointUrl = "https://fal.run/fal-ai/flux/dev";
+    payload = {
+      prompt: finalPrompt,
+      image_size: imageSize,
+      num_inference_steps: 28,
+      guidance_scale: 3.5,
+      enable_safety_checker: true
+    };
+  }
 
   try {
     const response = await fetch(endpointUrl, {
