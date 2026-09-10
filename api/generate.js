@@ -50,7 +50,7 @@ export default async function handler(req, res) {
   }
 
   // Odczytujemy wszystkie parametry, w tym nowe (init_image dla zdjęć, size/width/height dla wymiarów)
-  const { prompt, negative_prompt, aspect_ratio, init_image, image_strength, size, width, height } = req.body;
+  const { prompt, negative_prompt, aspect_ratio, init_image, image_strength, size, width, height, seed } = req.body;
 
   if (!prompt) {
     return res.status(400).json({ message: 'Brak polecenia (promptu)' });
@@ -98,6 +98,9 @@ export default async function handler(req, res) {
       };
       if (negative_prompt) payload.negative_prompt = negative_prompt;
     }
+
+    // Seed (opcjonalny) - pozwala powtórzyć lub świadomie zmienić wariant tej samej grafiki.
+    if (typeof seed === 'number' && Number.isFinite(seed)) payload.seed = Math.floor(seed);
 
     // Wysłanie zapytania do chmury FAL
     const response = await fetch(endpointUrl, {
