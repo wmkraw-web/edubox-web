@@ -194,6 +194,17 @@
             prompt: 'Border decorated with leaves, ladybugs, bees, flowers, recycling arrows, planet Earth and a sun. Two small cartoon kids planting a tree in a bottom corner. Green, sky blue and yellow colors.' }
         ];
 
+        // Ozdobne ramki AI dla dyplomów robionych od zera - nie ruszaja tekstow uzytkownika,
+        // maluja tylko ramke z pustym srodkiem (ten sam silnik co motywy okazji).
+        const FRAME_STYLES = [
+          { id: 'kids',    emoji: '🎨', label: 'Dziecięca',  hint: 'balloons, stars, crayons, confetti and playful clouds, cheerful bright primary colors' },
+          { id: 'elegant', emoji: '👑', label: 'Elegancka',  hint: 'thin gold filigree lines, small laurel branches and delicate corner flourishes, navy and gold, minimal' },
+          { id: 'floral',  emoji: '🌸', label: 'Kwiatowa',   hint: 'watercolor flowers, green leaves and botanical vines, soft pastel pink, green and cream' },
+          { id: 'geo',     emoji: '🔷', label: 'Geometria',  hint: 'modern flat geometric shapes, dots and thin lines in a memphis style, teal, coral and mustard' },
+          { id: 'gold',    emoji: '🏅', label: 'Uroczysta',  hint: 'ornate baroque gold frame with ribbons, medallions and rosettes, deep red and gold' },
+          { id: 'forest',  emoji: '🍃', label: 'Leśna',      hint: 'oak leaves, acorns, mushrooms, ferns and tiny woodland flowers, warm green and amber' }
+        ];
+
         const EXTENDED_COLORS = [
             '#0f172a', '#ffffff', '#ef4444', '#f97316', '#f59e0b', 
             '#84cc16', '#22c55e', '#06b6d4', '#3b82f6', '#6366f1', 
@@ -268,7 +279,7 @@
             const [titleBoxOpacity, setTitleBoxOpacity] = useState(0); 
             const [titleBoxOffset, setTitleBoxOffset] = useState(0);
             const [boxWidth, setBoxWidth] = useState(85); 
-            const [boxOpacity, setBoxOpacity] = useState(90); 
+            const [boxOpacity, setBoxOpacity] = useState(100); 
             const [boxOffset, setBoxOffset] = useState(0);
             
             const [bgImageOpacity, setBgImageOpacity] = useState(100);
@@ -293,6 +304,7 @@
             const [aiPrompt, setAiPrompt] = useState('');
             const [occasionSeed, setOccasionSeed] = useState(() => Math.floor(Math.random() * 1e9));
             const [lastOccasionId, setLastOccasionId] = useState(null);
+            const [lastFrameStyle, setLastFrameStyle] = useState(null);
             const [customImage, setCustomImage] = useState(null);
             const [isGenerating, setIsGenerating] = useState(false);
 
@@ -459,7 +471,7 @@
                 setIsGenerating(true);
                 try {
                     const land = diplomaOrientation === 'horizontal';
-                    const fullPrompt = `A DECORATIVE ORNAMENTAL BORDER FRAME for a children's award diploma page, ${land ? 'landscape' : 'portrait'} orientation. A thick decorated border runs along all four edges of the image. ${preset.prompt} The characters are SMALL and sit ONLY in the bottom-left and bottom-right corners. The entire middle of the image is one large FLAT EMPTY blank area of plain cream-colored paper: absolutely no scenery, no landscape, no houses, no sky, no background picture, nothing at all in the center, just empty blank paper. It must look like a printable ornamental page frame / border clipart, NOT an illustrated scene. Bright cheerful flat vector style, bold clean shapes, thick outlines, detail only on the border. Completely WORDLESS: no text, no letters, no words, no numbers, no watermark anywhere.`;
+                    const fullPrompt = `A DECORATIVE ORNAMENTAL BORDER FRAME for a children's award diploma page, ${land ? 'landscape' : 'portrait'} orientation. A thick decorated border runs along all four edges of the image. ${preset.prompt} The characters are SMALL and sit ONLY in the bottom-left and bottom-right corners. Keep the border lighter and simpler along the bottom edge. The entire middle of the image is one large FLAT EMPTY blank area of plain cream-colored paper: absolutely no scenery, no landscape, no houses, no sky, no background picture, nothing at all in the center, just empty blank paper. It must look like a printable ornamental page frame / border clipart, NOT an illustrated scene. Bright cheerful flat vector style, bold clean shapes, thick outlines, detail only on the border. Completely WORDLESS: no text, no letters, no words, no numbers, no watermark anywhere.`;
                     const res = await fetch('/api/generate', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -508,6 +520,20 @@
                 setOccasionSeed(seed);
                 setLastOccasionId(preset.id);
                 await runOccasionGeneration(preset, seed);
+            };
+
+            const generateCustomFrame = async (styleId) => {
+                const st = FRAME_STYLES.find(s => s.id === styleId) || FRAME_STYLES[0];
+                setLastFrameStyle(styleId);
+                setLastOccasionId(null);
+                setGraphicLayout('full_background');
+                setBgImageOpacity(100);
+                setTitleBoxOpacity(100);
+                setBoxOpacity(100);
+                setBorderWidth(0);
+                const seed = Math.floor(Math.random() * 1e9);
+                setOccasionSeed(seed);
+                await runOccasionGeneration({ prompt: `Border decorated with ${st.hint}. No large characters anywhere.` }, seed);
             };
 
             const regenerateOccasionVariant = async () => {
@@ -924,6 +950,21 @@
                                                 </div>
 
                                                 <div className="border-t border-slate-700/50 pt-4">
+                                                    <div className="bg-slate-900/60 p-4 rounded-2xl border border-emerald-500/30 mb-6">
+                                                        <label className="text-[11px] font-bold text-emerald-300 uppercase tracking-widest mb-1 flex items-center justify-center gap-2"><i className="ph-bold ph-frame-corners"></i> Ozdobna ramka AI (Twoje teksty bez zmian)</label>
+                                                        <p className="text-[10px] text-slate-400 text-center mb-3 leading-relaxed">Do dyplomu robionego od zera: AI namaluje samą ozdobną ramkę z pustym środkiem. Twój tytuł, imię i uzasadnienie zostają.</p>
+                                                        <div className="grid grid-cols-3 gap-2">
+                                                            {FRAME_STYLES.map(fs => (
+                                                                <button key={fs.id} onClick={() => generateCustomFrame(fs.id)} disabled={isGenerating} className={`p-2 rounded-lg border text-[10px] font-bold transition-all disabled:opacity-40 ${lastFrameStyle === fs.id ? 'bg-emerald-600 border-emerald-400 text-white' : 'bg-slate-900 border-slate-700 text-slate-300 hover:border-emerald-500 hover:bg-slate-800'}`}>{fs.emoji} {fs.label}</button>
+                                                            ))}
+                                                        </div>
+                                                        {customImage && graphicLayout === 'full_background' && (
+                                                            <button onClick={() => generateCustomFrame(lastFrameStyle || 'kids')} disabled={isGenerating} className="w-full mt-2 bg-slate-800 hover:bg-slate-700 border border-emerald-500/40 text-emerald-300 py-2 rounded-lg font-bold text-[10px] uppercase tracking-widest transition-colors disabled:opacity-40 flex items-center justify-center gap-2 btn-bounce">
+                                                                <i className="ph-bold ph-shuffle"></i> Inny wariant ramki
+                                                            </button>
+                                                        )}
+                                                    </div>
+
                                                     <div className="bg-gradient-to-br from-indigo-900/30 to-purple-900/20 p-5 rounded-2xl border border-indigo-500/40 mb-6">
                                                         <label className="text-[11px] font-bold text-indigo-300 uppercase tracking-widest mb-1 flex items-center justify-center gap-2"><i className="ph-bold ph-sparkle"></i> Gotowy motyw okazji (AI)</label>
                                                         <p className="text-[10px] text-slate-400 text-center mb-4 leading-relaxed">Jedno kliknięcie: AI maluje całe ozdobne tło dyplomu (ramka, postacie, motywy) i ustawia teksty. Potem tylko wpisz imię dziecka w zakładce „Teksty".</p>
@@ -1122,7 +1163,7 @@
                                     /* WIDOK: DYPLOM */
                                     <div 
                                         id="print-area"
-                                        className={`relative flex flex-col justify-between rounded-[1rem] sm:rounded-[2rem] px-8 pt-8 pb-24 md:px-12 md:pt-12 md:pb-28 text-center shadow-[0_0_40px_rgba(0,0,0,0.5)] transition-all overflow-hidden bg-cover bg-center bg-no-repeat mx-auto
+                                        className={`relative flex flex-col justify-between rounded-[1rem] sm:rounded-[2rem] p-8 md:p-12 text-center shadow-[0_0_40px_rgba(0,0,0,0.5)] transition-all overflow-hidden bg-cover bg-center bg-no-repeat mx-auto
                                         ${diplomaOrientation === 'horizontal' ? 'w-full aspect-[1.414]' : 'h-[600px] md:h-[800px] aspect-[0.707]'}`}
                                         style={{ backgroundColor: diplomaBgColor, backgroundImage: (!customImage || graphicLayout !== 'full_background') ? 'radial-gradient(ellipse at 50% 28%, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0) 62%)' : 'none', borderWidth: `${borderWidth}px`, borderStyle: borderStyle, borderColor: diplomaBorderColor, color: diplomaTextColor }}
                                     >
@@ -1174,9 +1215,9 @@
                                             </div>
                                         </div>
 
-                                        {/* Szyba: Treść główna */}
+                                        {/* Szyba: Treść główna (imię, uzasadnienie, podpisy razem na jednym kaflu) */}
                                         <div 
-                                            className="z-20 relative mx-auto flex flex-col items-center justify-center transition-all pt-5 pb-14 px-6 md:pt-9 md:pb-16 md:px-14 rounded-[1.5rem] md:rounded-[2rem] border-2 flex-1 min-h-0 overflow-hidden"
+                                            className="z-20 relative mx-auto flex flex-col items-center transition-all pt-5 pb-5 px-6 md:pt-9 md:pb-7 md:px-14 rounded-[1.5rem] md:rounded-[2rem] border-2 flex-1 min-h-0 overflow-hidden"
                                             style={{ 
                                                 width: `${boxWidth}%`, transform: `translateY(${boxOffset}px)`, 
                                                 backgroundColor: `rgba(255,255,255,${boxOpacity/100})`, 
@@ -1184,19 +1225,19 @@
                                                 boxShadow: '0 22px 48px -14px rgba(0,0,0,0.25)', borderColor: `${diplomaBorderColor}33`
                                             }}
                                         >
-                                            <h2 style={{ fontSize: `${textFormats.name.size}px`, color: textFormats.name.color, fontWeight: textFormats.name.bold ? 'bold' : 'normal', fontStyle: textFormats.name.italic ? 'italic' : 'normal' }} className="border-b-2 border-slate-300/50 inline-block px-4 md:px-16 pb-2 md:pb-4 mb-3 md:mb-6 leading-tight w-full select-none max-w-full whitespace-pre-wrap break-words">{studentName}</h2>
-                                            <p style={{ fontSize: `${textFormats.reason.size}px`, color: textFormats.reason.color, fontWeight: textFormats.reason.bold ? 'bold' : 'normal', fontStyle: textFormats.reason.italic ? 'italic' : 'normal' }} className="leading-snug md:leading-relaxed max-w-3xl select-none opacity-90 max-w-full whitespace-pre-wrap break-words">{diplomaReason}</p>
-                                        </div>
-
-                                        {/* Stopka z podpisami */}
-                                        <div className="z-30 absolute left-6 right-6 bottom-5 md:left-16 md:right-16 md:bottom-9 flex justify-between items-end select-none">
-                                            <div className="text-center w-32 md:w-56 border-t-2 pt-2 md:pt-3" style={{ borderColor: `${diplomaTextColor}40` }}>
-                                                <div className="font-bold text-xs md:text-lg mb-1" style={{ color: diplomaTextColor }}>{diplomaDate}</div>
-                                                <div className="text-[6px] md:text-[9px] font-black uppercase opacity-60 tracking-wider" style={{ color: diplomaTextColor }}>Miejscowość i data</div>
+                                            <div className="flex-1 min-h-0 overflow-hidden flex flex-col items-center justify-center w-full">
+                                                <h2 style={{ fontSize: `${textFormats.name.size}px`, color: textFormats.name.color, fontWeight: textFormats.name.bold ? 'bold' : 'normal', fontStyle: textFormats.name.italic ? 'italic' : 'normal' }} className="border-b-2 border-slate-300/50 inline-block px-4 md:px-16 pb-2 md:pb-4 mb-3 md:mb-5 leading-tight w-full select-none max-w-full whitespace-pre-wrap break-words">{studentName}</h2>
+                                                <p style={{ fontSize: `${textFormats.reason.size}px`, color: textFormats.reason.color, fontWeight: textFormats.reason.bold ? 'bold' : 'normal', fontStyle: textFormats.reason.italic ? 'italic' : 'normal' }} className="leading-snug md:leading-relaxed select-none opacity-90 max-w-full whitespace-pre-wrap break-words">{diplomaReason}</p>
                                             </div>
-                                            <div className="text-center w-32 md:w-56 border-t-2 pt-2 md:pt-3" style={{ borderColor: `${diplomaTextColor}40` }}>
-                                                <div className="font-bold text-xs md:text-lg mb-1 opacity-90" style={{ color: diplomaTextColor }}>{diplomaSignature}</div>
-                                                <div className="text-[6px] md:text-[9px] font-black uppercase opacity-60 tracking-wider" style={{ color: diplomaTextColor }}>Podpis Nauczyciela</div>
+                                            <div className="shrink-0 w-full mt-3 pt-1 flex justify-between items-end select-none gap-4">
+                                                <div className="text-center flex-1 max-w-[45%] border-t-2 pt-1.5 md:pt-2" style={{ borderColor: `${diplomaTextColor}45` }}>
+                                                    <div className="font-bold text-[10px] md:text-base mb-0.5 leading-tight" style={{ color: diplomaTextColor }}>{diplomaDate}</div>
+                                                    <div className="text-[6px] md:text-[8px] font-black uppercase opacity-60 tracking-wider" style={{ color: diplomaTextColor }}>Miejscowość i data</div>
+                                                </div>
+                                                <div className="text-center flex-1 max-w-[45%] border-t-2 pt-1.5 md:pt-2" style={{ borderColor: `${diplomaTextColor}45` }}>
+                                                    <div className="font-bold text-[10px] md:text-base mb-0.5 leading-tight opacity-90" style={{ color: diplomaTextColor }}>{diplomaSignature}</div>
+                                                    <div className="text-[6px] md:text-[8px] font-black uppercase opacity-60 tracking-wider" style={{ color: diplomaTextColor }}>Podpis Nauczyciela</div>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
