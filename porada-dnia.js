@@ -1,4 +1,4 @@
 window.PORADA_DNIA = {
-  "text": "Regularnie organizuj krótkie spotkania z uczniami, aby zbierać ich opinie i sugestie, co poprawi komunikację i zaangażowanie w proces nauczania.",
-  "date": "2026-09-10"
+  "text": "Wprowadź regularne krótkie sesje refleksyjne z uczniami, aby lepiej zrozumieć ich potrzeby i oczekiwania, co zwiększy zaangażowanie w naukę.",
+  "date": "2026-09-11"
 };
