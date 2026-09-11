@@ -297,10 +297,14 @@
             };
 
             const fetchTripData = async (usrPrompt, sysPrompt) => {
+                // Model "strong" (łańcuch gpt-5/gpt-4.1/gpt-4o) bywa wolniejszy niż dawny gpt-4o-mini,
+                // dlatego limit czasu podniesiono z 15 s do 45 s - inaczej normalna, nieco dłuższa
+                // odpowiedź AI byłaby ucinana zanim zdąży wrócić. Usunięto też martwy fallback na
+                // Gemini z pustym kluczem API (zawsze kończył się błędem autoryzacji, nigdy nie działał) -
+                // błąd propagujemy wprost, żeby user widział prawdziwy komunikat.
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 45000);
                 try {
-                    // Główne zapytanie do serwera
-                    const controller = new AbortController();
-                    const timeoutId = setTimeout(() => controller.abort(), 15000);
                     const res = await fetch('/api/chat', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -313,41 +317,14 @@
                         }),
                         signal: controller.signal
                     });
-                    clearTimeout(timeoutId);
-                    
-                    if (!res.ok) throw new Error(`Serwer główny: HTTP ${res.status}`);
+                    if (!res.ok) {
+                        const errData = await res.json().catch(() => ({}));
+                        throw new Error(errData.details || errData.message || `Serwer główny: HTTP ${res.status}`);
+                    }
                     const data = await res.json();
                     return parseAIResponse(data.text);
-                    
-                } catch (e) {
-                    console.warn("Przełączam na model awaryjny:", e.message);
-                    const apiKey = ""; 
-                    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
-                    
-                    const payload = {
-                        contents: [{ parts: [{ text: usrPrompt }] }],
-                        systemInstruction: { parts: [{ text: sysPrompt }] },
-                        generationConfig: {
-                            responseMimeType: "application/json",
-                            responseSchema: {
-                                type: "OBJECT",
-                                properties: {
-                                    librusMessage: { type: "STRING" },
-                                    fieldGame: { type: "STRING" }
-                                },
-                                required: ["librusMessage", "fieldGame"]
-                            }
-                        }
-                    };
-
-                    const data = await fetchWithExponentialBackoff(url, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    }, 20000);
-                    
-                    const responseText = data.candidates[0].content.parts[0].text;
-                    return JSON.parse(responseText);
+                } finally {
+                    clearTimeout(timeoutId);
                 }
             };
 

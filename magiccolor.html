@@ -425,59 +425,31 @@
                     }
                     throw new Error("Chat API failed");
                 } catch(e) {
-                    console.warn("Używam awaryjnego tłumacza (Canvas Mode)");
-                    try {
-                        const apiKey = ""; 
-                        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
-                        const res = await fetch(url, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                contents: [{ parts: [{ text: polishText }] }],
-                                systemInstruction: { parts: [{ text: "Translate the following Polish coloring book subject into a highly concise, purely visual English description. Return ONLY the English phrase, no quotes." }] },
-                                generationConfig: { temperature: 0.1 }
-                            })
-                        });
-                        if (res.ok) {
-                            const data = await res.json();
-                            return data.candidates[0].content.parts[0].text.trim().replace(/['"\n]/g, '');
-                        }
-                        return polishText; // Fallback
-                    } catch (err) {
-                        return polishText;
-                    }
+                    // Usunięto martwy fallback na Gemini z pustym kluczem API (zawsze kończył się
+                    // błędem autoryzacji) - w razie porażki tłumaczenia generujemy z oryginalnego tekstu.
+                    console.warn("Tłumaczenie promptu nie powiodło się, używam oryginalnego tekstu.");
+                    return polishText;
                 }
             };
 
             const secureApiImageCall = async (payloadData) => {
+                // Limit podniesiony z 20 s do 45 s - FLUX Dev (28 kroków) na wolniejszym starcie potrafi
+                // zająć więcej niż 20 s, a usunięty niżej martwy fallback na Imagen (pusty klucz API,
+                // zawsze 401) i tak nigdy nie działał, więc zbyt krótki timeout tylko psuł generowanie.
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 45000);
                 try {
-                    const controller = new AbortController();
-                    const timeoutId = setTimeout(() => controller.abort(), 20000);
                     const res = await fetch('/api/generate', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(payloadData),
                         signal: controller.signal
                     });
-                    clearTimeout(timeoutId);
-                    
                     if (res.ok) return await res.json();
-                    throw new Error(`Status API: ${res.status}`);
-                } catch (e) {
-                    console.warn("Przełączam na model awaryjny obrazu (Canvas):", e.message);
-                    const apiKey = ""; 
-                    const url = `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${apiKey}`;
-                    
-                    const payload = {
-                        instances: { prompt: payloadData.prompt },
-                        parameters: { sampleCount: 1 } 
-                    };
-
-                    return await fetchWithExponentialBackoff(url, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    }, 25000);
+                    const errData = await res.json().catch(() => ({}));
+                    throw new Error(errData.error || errData.message || `Status API: ${res.status}`);
+                } finally {
+                    clearTimeout(timeoutId);
                 }
             };
 
@@ -507,10 +479,11 @@
                             const hiddenInstruction = `Monochrome coloring book page of ${englishSubject}. ${styleModifier}. Strictly black outlines on pure white background. Flat 2D vector art. No shading, no grayscale, no halftones, no colors.`;
                             const negativePrompt = "shading, gradients, grayscale, sketch, pencil, realistic, 3d, colors, shadows, halftone, text, watermark, painted, complex background";
 
+                            // Uwaga: negative_prompt i dawny style_preset byly ignorowane przez backend przy
+                            // domyslnym FLUX Dev (uzywane tylko w trybie SDXL image-to-image) - usunieto martwe
+                            // parametry, ograniczenia stylu sa juz w hiddenInstruction powyzej.
                             const payload = {
-                                prompt: hiddenInstruction, 
-                                negative_prompt: negativePrompt, 
-                                style_preset: 'line-art',
+                                prompt: hiddenInstruction,
                                 aspect_ratio: '1:1',
                                 width: 1024,
                                 height: 1024

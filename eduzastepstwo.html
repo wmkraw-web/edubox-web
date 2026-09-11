@@ -296,36 +296,10 @@ STYL: Pisz bezpośrednio do nauczyciela. Zadbaj, żeby treści były w 100% dost
                     return parseAIResponse(data.text);
                     
                 } catch (e) {
-                    console.warn("Przełączam na model awaryjny:", e.message);
-                    const apiKey = ""; 
-                    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
-                    
-                    const payload = {
-                        contents: [{ parts: [{ text: usrPrompt }] }],
-                        systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
-                        generationConfig: {
-                            responseMimeType: "application/json",
-                            responseSchema: {
-                                type: "OBJECT",
-                                properties: {
-                                    title: { type: "STRING" },
-                                    warmup: { type: "STRING" },
-                                    main: { type: "STRING" },
-                                    summary: { type: "STRING" }
-                                },
-                                required: ["title", "warmup", "main", "summary"]
-                            }
-                        }
-                    };
-
-                    const data = await fetchWithExponentialBackoff(url, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    }, 20000);
-                    
-                    const responseText = data.candidates[0].content.parts[0].text;
-                    return JSON.parse(responseText);
+                    // Usunięto martwy fallback na Gemini z pustym kluczem API (zawsze kończył się
+                    // błędem autoryzacji, nigdy realnie nie działał) - propagujemy prawdziwy błąd.
+                    console.error("Błąd generowania scenariusza zastępstwa:", e);
+                    throw e;
                 }
             };
 

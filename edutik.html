@@ -286,35 +286,10 @@
                     return parseAIResponse(data.text);
                     
                 } catch (e) {
-                    console.warn("Przełączam na model awaryjny tekstu:", e.message);
-                    const apiKey = ""; 
-                    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
-                    
-                    const payload = {
-                        contents: [{ parts: [{ text: userPrompt }] }],
-                        systemInstruction: { parts: [{ text: systemInstruction }] },
-                        generationConfig: {
-                            responseMimeType: "application/json",
-                            responseSchema: {
-                                type: "OBJECT",
-                                properties: {
-                                    title: { type: "STRING" },
-                                    content: { type: "STRING" },
-                                    imagePrompt: { type: "STRING" }
-                                },
-                                required: ["title", "content", "imagePrompt"]
-                            }
-                        }
-                    };
-
-                    const data = await fetchWithExponentialBackoff(url, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    }, 20000);
-                    
-                    const responseText = data.candidates[0].content.parts[0].text;
-                    return JSON.parse(responseText);
+                    // Usunięto martwy fallback na Gemini z pustym kluczem API (zawsze kończył się
+                    // błędem autoryzacji, nigdy realnie nie działał) - propagujemy prawdziwy błąd.
+                    console.error("Błąd generowania tekstu:", e);
+                    throw e;
                 }
             };
 
@@ -331,22 +306,13 @@
                     clearTimeout(timeoutId);
                     
                     if (res.ok) return await res.json();
-                    throw new Error(`Status API: ${res.status}`);
+                    const errData = await res.json().catch(() => ({}));
+                    throw new Error(errData.error || errData.message || `Status API: ${res.status}`);
                 } catch (e) {
-                    console.warn("Przełączam na model awaryjny obrazu:", e.message);
-                    const apiKey = ""; 
-                    const url = `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${apiKey}`;
-                    
-                    const payload = {
-                        instances: { prompt: payloadData.prompt },
-                        parameters: { sampleCount: 1 } 
-                    };
-
-                    return await fetchWithExponentialBackoff(url, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    }, 25000); // Wydłużony czas, obrazy ładują się dłużej
+                    // Usunięto martwy fallback na Google Imagen z pustym kluczem API (zawsze kończył
+                    // się błędem autoryzacji, nigdy realnie nie działał) - propagujemy prawdziwy błąd.
+                    console.error("Błąd generowania obrazu:", e);
+                    throw e;
                 }
             };
 

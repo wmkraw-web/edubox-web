@@ -260,64 +260,27 @@
                     }
                     throw new Error("Chat API failed");
                 } catch(e) {
-                    console.warn("Używam awaryjnego tłumacza (Canvas Mode)");
-                    try {
-                        const apiKey = ""; 
-                        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
-                        const res = await fetch(url, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                contents: [{ parts: [{ text: polishText }] }],
-                                systemInstruction: { parts: [{ text: "Translate the following Polish AAC symbol request into a highly concise, purely visual English description (max 8 words). Just the object or action. Return ONLY the English phrase, no quotes." }] },
-                                generationConfig: { temperature: 0.1 }
-                            })
-                        });
-                        if (res.ok) {
-                            const data = await res.json();
-                            return data.candidates[0].content.parts[0].text.trim().replace(/['"\n]/g, '');
-                        }
-                        return polishText; // Fallback: jeśli wszystko zawiedzie, zwracamy tekst bazowy
-                    } catch (err) {
-                        return polishText;
-                    }
+                    // Usunięto martwy fallback na Gemini z pustym kluczem API (zawsze kończył się błędem
+                    // autoryzacji) - jeśli tłumaczenie zawiedzie, generujemy po prostu z oryginalnego
+                    // polskiego tekstu zamiast udawać, że jest awaryjna ścieżka, która i tak nigdy nie działała.
+                    console.warn("Tłumaczenie promptu nie powiodło się, używam oryginalnego tekstu.");
+                    return polishText;
                 }
             };
 
             // ETAP 2: Wywołanie Grafiki
             const secureApiCall = async (payloadData) => {
-                try {
-                    // FIX: Twój serwer do obrazów oczekuje "płaskiego" obiektu (od razu "prompt"), a nie zagnieżdżonego "payload"
-                    const res = await fetch('/api/generate', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payloadData) 
-                    });
-                    
-                    if (res.ok) return await res.json();
-                    if (res.status === 404 || res.status === 405) throw new Error("USE_FALLBACK");
-                    
-                    const errData = await res.json();
-                    throw new Error(errData.error || `Status API: ${res.status}`);
-                    
-                } catch (e) {
-                    if (e.message === "USE_FALLBACK" || e.message.includes("Failed to fetch") || e.message.includes("Unexpected token")) {
-                        const apiKey = ""; 
-                        const url = `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${apiKey}`;
-                        const previewPayload = {
-                            instances: { prompt: payloadData.prompt },
-                            parameters: { sampleCount: 1 }
-                        };
-                        const fallbackRes = await fetch(url, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(previewPayload)
-                        });
-                        if (!fallbackRes.ok) throw new Error("Błąd podczas połączenia z silnikiem graficznym Google.");
-                        return await fallbackRes.json();
-                    }
-                    throw e;
-                }
+                // Usunięto martwy fallback na Google Imagen z pustym kluczem API (zawsze kończył
+                // się błędem autoryzacji, nigdy realnie nie działał) - błąd propagujemy wprost,
+                // żeby user widział prawdziwy komunikat zamiast czekać na gwarantowaną porażkę.
+                const res = await fetch('/api/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payloadData)
+                });
+                if (res.ok) return await res.json();
+                const errData = await res.json().catch(() => ({}));
+                throw new Error(errData.error || errData.message || `Status API: ${res.status}`);
             };
 
             const generateSymbolCard = async () => {
@@ -393,26 +356,29 @@
                     setGenerationStep('generating');
                     
                     let styleModifier = "";
-                    let apiStylePreset = "digital-art"; 
+                    let recraftStyle = "digital_illustration";
 
                     if (ageGroup === 'maluchy') {
                         styleModifier = "Extremely cute flat 2D vector clipart, very thick smooth outlines, solid bright colors, minimalist kawaii style, pure white background.";
+                        recraftStyle = "vector_illustration";
                     } else if (ageGroup === 'przedszkolaki') {
                         styleModifier = "Premium high-quality children's book illustration, flat vector art, clear outlines, wholesome, aesthetic, pure white background.";
+                        recraftStyle = "digital_illustration";
                     } else if (ageGroup === 'szkolne') {
                         styleModifier = "Professional educational textbook illustration, flat vector style, highly clear and descriptive, pure white background.";
+                        recraftStyle = "digital_illustration";
                     }
 
                     // Totalna izolacja słów. Usunięto odniesienia rasowe (np. "caucasian"), które powodują 400 Bad Request na filtrach bezpieczeństwa API!
                     const hiddenInstruction = `A single, isolated educational illustration on a pure white background. EXACT SUBJECT TO DRAW: "${englishSubject}". CRITICAL RULES: 1. ABSOLUTELY NO TEXT, NO WORDS, NO LETTERS, NO NUMBERS anywhere on the image. Pure visual art only. 2. Focus ONLY on the main subject. No random floating objects, no extra background clutter, no scenery. Style: ${styleModifier}`;
-                    
-                    // Najsilniejszy negatywny prompt - zero litości dla bazgrołów
-                    const negativePrompt = "text, letters, words, spelling, writing, typography, signature, watermark, messy, multiple subjects, clutter, floating objects, background scenery, 3d render, realistic, ugly, deformed";
 
+                    // Recraft V3 (grafika wektorowa/design) trzyma czyste, jednolite tło i proste kontury
+                    // dużo lepiej niż ogólny FLUX - kluczowe dla kart AAC. Recraft nie obsługuje negative_prompt
+                    // ani style_preset (były to martwe parametry - api/generate.js i tak ich nie czytał).
                     const payload = {
-                        prompt: hiddenInstruction, 
-                        negative_prompt: negativePrompt, 
-                        style_preset: apiStylePreset,
+                        prompt: hiddenInstruction,
+                        model: 'recraft',
+                        style: recraftStyle,
                         aspect_ratio: '1:1',
                         width: 1024,
                         height: 1024

@@ -271,52 +271,24 @@
                     }
                     return JSON.parse(jsonStr);
                 } catch (e) {
-                    console.warn("Przełączam na model awaryjny (Canvas Fallback):", e);
-                    const apiKey = ""; 
-                    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
-                    const res = await fetch(url, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            contents: [{ parts: [{ text: userPrompt }] }],
-                            systemInstruction: { parts: [{ text: systemInstruction }] },
-                            generationConfig: { temperature: 0.5, responseMimeType: "application/json" }
-                        })
-                    });
-                    if (!res.ok) throw new Error("Oba modele AI niedostępne");
-                    const data = await res.json();
-                    return JSON.parse(data.candidates[0].content.parts[0].text);
+                    // Usunięto martwy fallback na Gemini z pustym kluczem API (zawsze kończył się
+                    // błędem autoryzacji, nigdy realnie nie działał) - propagujemy prawdziwy błąd.
+                    console.error("Błąd generowania treści terapeutycznej:", e);
+                    throw e;
                 }
             };
 
             const secureApiImageCall = async (payloadData) => {
-                try {
-                    const res = await fetch('/api/generate', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payloadData) 
-                    });
-                    if (res.ok) return await res.json();
-                    if (res.status === 404 || res.status === 405) throw new Error("USE_FALLBACK");
-                    const errData = await res.json();
-                    throw new Error(errData.error || `Status API: ${res.status}`);
-                } catch (e) {
-                    if (e.message === "USE_FALLBACK" || e.message.includes("Failed to fetch") || e.message.includes("Unexpected token")) {
-                        const apiKey = ""; 
-                        const url = `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${apiKey}`;
-                        const fallbackRes = await fetch(url, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                instances: { prompt: payloadData.prompt },
-                                parameters: { sampleCount: 1, aspectRatio: "1:1" }
-                            })
-                        });
-                        if (!fallbackRes.ok) throw new Error("Błąd silnika graficznego Google.");
-                        return await fallbackRes.json();
-                    }
-                    throw e;
-                }
+                // Usunięto martwy fallback na Google Imagen z pustym kluczem API (zawsze kończył
+                // się błędem autoryzacji) - błąd propagujemy wprost zamiast udawanej ścieżki awaryjnej.
+                const res = await fetch('/api/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payloadData)
+                });
+                if (res.ok) return await res.json();
+                const errData = await res.json().catch(() => ({}));
+                throw new Error(errData.error || errData.message || `Status API: ${res.status}`);
             };
 
             // === LOGIC ===
