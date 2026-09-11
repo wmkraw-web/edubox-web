@@ -268,7 +268,7 @@
                 const ageLabel = ageLabels[ageGroup] || 'małe dziecko objęte wczesnym wspomaganiem';
 
                 let base = `Jesteś doświadczonym specjalistą zespołu Wczesnego Wspomagania Rozwoju Dziecka (WWRD): pedagogiem specjalnym, psychologiem i logopedą w jednym. Wygeneruj profesjonalny materiał typu: ${docType}, dla: ${ageLabel}. Pisz językiem formalnym i pedagogicznym, ale ciepłym wobec dziecka i jego rodziny - to nie jest szkoła, to najmłodsze dzieci i ich opiekunowie. Nie używaj gwiazdek **. Trwa rok szkolny 2026/2027.
-PODSTAWA PRAWNA I KONTEKST: Rozporządzenie Ministra Edukacji Narodowej z 24 sierpnia 2017 r. w sprawie organizowania wczesnego wspomagania rozwoju dzieci (Dz.U. z 2017 r. poz. 1635, z późn. zm. - w tym doprecyzowane od roku szkolnego 2025/2026 wymogi kwalifikacyjne osób prowadzących zajęcia oraz zadania zespołu wobec rodziny dziecka). WWRD obejmuje dzieci niepełnosprawne od chwili wykrycia niepełnosprawności do rozpoczęcia nauki w szkole, w wymiarze 4-8 godzin miesięcznie, w formie zajęć indywidualnych lub w grupie 2-3 dzieci. Ścisła współpraca z rodziną dziecka to fundament tej formy wsparcia, nie dodatek.
+PODSTAWA PRAWNA I KONTEKST: Rozporządzenie Ministra Edukacji Narodowej z 24 sierpnia 2017 r. w sprawie organizowania wczesnego wspomagania rozwoju dzieci (Dz.U. z 2017 r. poz. 1635, z późn. zm. - w tym doprecyzowane od roku szkolnego 2025/2026 wymogi kwalifikacyjne osób prowadzących zajęcia oraz zadania zespołu wobec rodziny dziecka). WWRD obejmuje dzieci niepełnosprawne od chwili wykrycia niepełnosprawności do rozpoczęcia nauki w szkole, w wymiarze 4-8 godzin miesięcznie, w formie zajęć indywidualnych lub w grupie 2-3 dzieci. Ścisła współpraca z rodziną dziecka to fundament tej formy wsparcia, nie dodatek. Zajęcia WWRD są jednym z dodatkowych instrumentów wsparcia we wczesnym okresie życia dziecka w ramach programu kompleksowego wsparcia dla rodzin "Za życiem" (Ustawa z 4 listopada 2016 r. o wsparciu kobiet w ciąży i rodzin "Za życiem", Dz.U. z 2016 r. poz. 1860, z późn. zm.) - jeśli z treści materiałów wynika, że dotyczy to konkretnego dziecka, możesz to odnotować, ale NIGDY nie zgaduj kwot świadczeń ani szczegółowych uprawnień rodziny, bo zależą one od indywidualnej sytuacji i lokalnych procedur (WOKRO, ośrodek pomocy społecznej).
 ${lengthInstruction}
 `;
 
@@ -349,6 +349,16 @@ ${lengthInstruction}
             const [wwrdDocType, setWwrdDocType] = useState('diagnoza_funkcjonalna');
             const [wwrdAgeGroup, setWwrdAgeGroup] = useState('3-5');
             const [wwrdCel, setWwrdCel] = useState('');
+            // Prywatna lista podopiecznych WWRD - WYŁĄCZNIE localStorage (dane o niepełnosprawności
+            // dziecka to dane wrażliwe RODO), nigdy nie synchronizowana z chmurą/Firebase. Rozwiązuje
+            // realny problem nauczyciela prowadzącego zajęcia z kilkorgiem/kilkunastorgiem dzieci
+            // (np. w ramach programu "Za życiem") - bez tego trzeba by wpisywać rozpoznanie/mocne
+            // strony/trudności każdego dziecka od nowa przy każdym dokumencie.
+            const [wwrdChildren, setWwrdChildren] = useState(() => {
+                try { return JSON.parse(localStorage.getItem('eduboxWwrdChildren') || '[]'); } catch (e) { return []; }
+            });
+            const [wwrdSelectedChildId, setWwrdSelectedChildId] = useState('');
+            const [wwrdNewChildName, setWwrdNewChildName] = useState('');
             const [genericInput, setGenericInput] = useState('');
             const [uploadedFilesText, setUploadedFilesText] = useState('');
 
@@ -398,6 +408,54 @@ ${lengthInstruction}
             }, []);
 
             const showToast = (msg) => { setToastMessage(msg); setTimeout(() => setToastMessage(''), 3000); };
+
+            // Zapis listy podopiecznych WWRD do localStorage przy każdej zmianie (dodanie, edycja,
+            // usunięcie dziecka, dopisanie wpisu do historii po wygenerowaniu dokumentu).
+            useEffect(() => {
+                localStorage.setItem('eduboxWwrdChildren', JSON.stringify(wwrdChildren));
+            }, [wwrdChildren]);
+
+            const handleSelectWwrdChild = (childId) => {
+                setWwrdSelectedChildId(childId);
+                if (!childId) return;
+                const child = wwrdChildren.find(c => c.id === childId);
+                if (child) {
+                    setWwrdAgeGroup(child.ageGroup || '3-5');
+                    setDiagnoza(child.diagnoza || '');
+                    setMocneStrony(child.mocneStrony || '');
+                    setTrudnosci(child.trudnosci || '');
+                }
+            };
+
+            const handleSaveNewWwrdChild = () => {
+                if (!wwrdNewChildName.trim()) { showToast('Podaj imię lub inicjały dziecka!'); return; }
+                const newChild = {
+                    id: 'child_' + Date.now(),
+                    name: wwrdNewChildName.trim(),
+                    ageGroup: wwrdAgeGroup,
+                    diagnoza, mocneStrony, trudnosci,
+                    history: [],
+                    createdAt: Date.now()
+                };
+                setWwrdChildren(prev => [...prev, newChild]);
+                setWwrdSelectedChildId(newChild.id);
+                setWwrdNewChildName('');
+                showToast(`✅ Dodano ${newChild.name} do listy podopiecznych.`);
+            };
+
+            const handleUpdateWwrdChildProfile = () => {
+                if (!wwrdSelectedChildId) return;
+                setWwrdChildren(prev => prev.map(c => c.id === wwrdSelectedChildId ? { ...c, ageGroup: wwrdAgeGroup, diagnoza, mocneStrony, trudnosci } : c));
+                showToast('✅ Zaktualizowano profil dziecka.');
+            };
+
+            const handleDeleteWwrdChild = (childId) => {
+                const child = wwrdChildren.find(c => c.id === childId);
+                if (!window.confirm(`Usunąć ${child ? child.name : 'to dziecko'} z listy podopiecznych? Historia dokumentów tego dziecka też zniknie z tej przeglądarki.`)) return;
+                setWwrdChildren(prev => prev.filter(c => c.id !== childId));
+                if (wwrdSelectedChildId === childId) setWwrdSelectedChildId('');
+                showToast('Usunięto podopiecznego z listy.');
+            };
 
             const updateAndCheckLimit = () => {
                 if (isPro) return true;
@@ -468,7 +526,8 @@ ${lengthInstruction}
                     if (activeModule === 'dokumenty') {
                         finalPrompt = `Dokument: ${docType}\nDiagnoza: ${diagnoza}\nMocne strony: ${mocneStrony}\nTrudności: ${trudnosci}\n\nDODATKOWE PLIKI OD NAUCZYCIELA:\n${uploadedFilesText}`;
                     } else if (activeModule === 'wwrd') {
-                        finalPrompt = `Dokument: ${wwrdDocType}\nWiek dziecka: ${wwrdAgeGroup} lat\nRozpoznanie / orzeczenie dziecka: ${diagnoza}\nMocne strony dziecka: ${mocneStrony}\nTrudności / obszary wymagające wsparcia: ${trudnosci}\nCel zajęć / temat do opracowania: ${wwrdCel}\n\nDODATKOWE PLIKI (opinia poradni, wcześniejszy IPWW, wyniki diagnozy itp.):\n${uploadedFilesText}`;
+                        const wwrdChildName = wwrdSelectedChildId ? (wwrdChildren.find(c => c.id === wwrdSelectedChildId)?.name || '') : '';
+                        finalPrompt = `Dokument: ${wwrdDocType}\n${wwrdChildName ? `Imię / inicjały dziecka: ${wwrdChildName}\n` : ''}Wiek dziecka: ${wwrdAgeGroup} lat\nRozpoznanie / orzeczenie dziecka: ${diagnoza}\nMocne strony dziecka: ${mocneStrony}\nTrudności / obszary wymagające wsparcia: ${trudnosci}\nCel zajęć / temat do opracowania: ${wwrdCel}\n\nDODATKOWE PLIKI (opinia poradni, wcześniejszy IPWW, wyniki diagnozy itp.):\n${uploadedFilesText}`;
                     } else if (activeModule === 'rymowanki') {
                         finalPrompt = `Napisz rymowankę edukacyjną dla dzieci na temat: ${genericInput}`;
                     } else if (activeModule === 'historyjki') {
@@ -508,6 +567,18 @@ ${lengthInstruction}
                     
                     setGeneratedText(cleanText);
                     setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
+
+                    // Dopisanie wpisu do historii dokumentów wybranego podopiecznego WWRD (lokalnie,
+                    // zeby nauczyciel prowadzacy kilkoro/kilkanascioro dzieci widzial co i kiedy dla
+                    // kogo juz wygenerowal, bez grzebania w niczym innym).
+                    if (activeModule === 'wwrd' && wwrdSelectedChildId) {
+                        const docLabel = WWRD_DOC_TYPES.find(d => d.id === wwrdDocType)?.label || wwrdDocType;
+                        const entryDate = new Date().toISOString().split('T')[0];
+                        setWwrdChildren(prev => prev.map(c => c.id === wwrdSelectedChildId
+                            ? { ...c, history: [...(c.history || []), { date: entryDate, docType: wwrdDocType, label: docLabel }] }
+                            : c
+                        ));
+                    }
 
                     // OBIEG DLA OBRAZKÓW W HISTORYJKACH 
                     if (activeModule === 'historyjki') {
@@ -680,7 +751,7 @@ CRITICAL RULE: Define ONE specific character and start ALL 3 prompts with this e
                         <div className="p-6 flex-1 overflow-y-auto custom-scrollbar">
                             <div className="mb-6 bg-slate-800/50 border border-slate-700 rounded-xl p-3 flex gap-2 items-start">
                                 <span className="text-base flex-shrink-0">ℹ️</span>
-                                <p className="text-[11px] text-slate-400 leading-relaxed"><strong className="text-slate-200">Jak to działa:</strong> wybierz moduł niżej. „Asystent Dokumentów" tworzy IPET/WOPFU/Opinie o funkcjonowaniu ucznia (ocena funkcjonalna)/Arkusze obserwacji, „Wczesne Wspomaganie (WWRD)" tworzy diagnozy funkcjonalne, IPWW, scenariusze zajęć, arkusze obserwacji, oceny efektywności i notatki dla rodziców najmłodszych dzieci (typ dokumentu wybierasz wewnątrz), pozostałe (Historyjki, Rymowanki, TUS, Komunikacja z Rodzicem) generują gotową treść z krótkiego opisu sytuacji.</p>
+                                <p className="text-[11px] text-slate-400 leading-relaxed"><strong className="text-slate-200">Jak to działa:</strong> wybierz moduł niżej. „Asystent Dokumentów" tworzy IPET/WOPFU/Opinie o funkcjonowaniu ucznia (ocena funkcjonalna)/Arkusze obserwacji, „Wczesne Wspomaganie (WWRD)" tworzy diagnozy funkcjonalne, IPWW, scenariusze zajęć, arkusze obserwacji, oceny efektywności i notatki dla rodziców najmłodszych dzieci - ma też prywatną listę „Moi podopieczni" (zapisaną tylko w tej przeglądarce), więc jeśli prowadzisz zajęcia z kilkorgiem dzieci, nie wpisujesz ich danych za każdym razem od nowa, pozostałe (Historyjki, Rymowanki, TUS, Komunikacja z Rodzicem) generują gotową treść z krótkiego opisu sytuacji.</p>
                             </div>
                             <div className="mb-8">
                                 <h2 className="font-bold text-white mb-3 flex items-center gap-2"><span>🛡️</span> Wersja PRO</h2>
@@ -788,6 +859,44 @@ CRITICAL RULE: Define ONE specific character and start ALL 3 prompts with this e
                                             </div>
                                         ) : activeModule === 'wwrd' ? (
                                             <div className="space-y-6">
+                                                <div className="card-bg p-4 rounded-2xl border-2 border-emerald-900/40">
+                                                    <label className="text-xs font-bold text-emerald-400 uppercase tracking-wider block mb-2">🧒 Moi podopieczni (zapisane tylko w tej przeglądarce)</label>
+                                                    <div className="flex flex-wrap gap-2 items-center">
+                                                        <select value={wwrdSelectedChildId} onChange={(e) => handleSelectWwrdChild(e.target.value)} className="input-bg rounded-xl p-3 text-sm flex-1 min-w-[220px]">
+                                                            <option value="">— Nowe / bez wybierania z listy —</option>
+                                                            {wwrdChildren.map(c => (
+                                                                <option key={c.id} value={c.id}>{c.name} ({c.ageGroup} lat)</option>
+                                                            ))}
+                                                        </select>
+                                                        {wwrdSelectedChildId && (
+                                                            <>
+                                                                <button onClick={handleUpdateWwrdChildProfile} className="bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-bold px-4 py-3 rounded-xl transition-colors">💾 Zapisz zmiany w profilu</button>
+                                                                <button onClick={() => handleDeleteWwrdChild(wwrdSelectedChildId)} className="bg-slate-800 hover:bg-red-900/50 text-red-400 text-xs font-bold px-4 py-3 rounded-xl border border-red-900/40 transition-colors">🗑️ Usuń</button>
+                                                            </>
+                                                        )}
+                                                    </div>
+
+                                                    {wwrdSelectedChildId && (() => {
+                                                        const selectedChild = wwrdChildren.find(c => c.id === wwrdSelectedChildId);
+                                                        return selectedChild && selectedChild.history && selectedChild.history.length > 0 ? (
+                                                            <div className="mt-3 pt-3 border-t border-slate-800">
+                                                                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Historia dokumentów tego dziecka</p>
+                                                                <div className="flex flex-wrap gap-2">
+                                                                    {selectedChild.history.slice().reverse().map((h, idx) => (
+                                                                        <span key={idx} className="text-[10px] bg-slate-800 text-slate-300 px-2.5 py-1 rounded-full border border-slate-700">{h.date} · {h.label}</span>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                        ) : null;
+                                                    })()}
+
+                                                    <div className="mt-3 pt-3 border-t border-slate-800 flex flex-wrap gap-2">
+                                                        <input type="text" value={wwrdNewChildName} onChange={(e) => setWwrdNewChildName(e.target.value)} placeholder="Imię / inicjały nowego dziecka (np. Zosia K.)" className="input-bg rounded-xl p-3 text-sm flex-1 min-w-[200px]" />
+                                                        <button onClick={handleSaveNewWwrdChild} className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-4 py-3 rounded-xl whitespace-nowrap transition-colors">+ Zapisz jako nowe dziecko</button>
+                                                    </div>
+                                                    <p className="text-[10px] text-slate-500 mt-2">Wybierz dziecko z listy, żeby automatycznie wypełnić rozpoznanie / mocne strony / trudności poniżej. Dane zostają wyłącznie w tej przeglądarce - nigdy nie trafiają do chmury.</p>
+                                                </div>
+
                                                 <div className="card-bg p-3 rounded-2xl flex flex-wrap gap-2">
                                                     {WWRD_DOC_TYPES.map(doc => (
                                                         <div key={doc.id} className="flex-1 min-w-[200px]">
