@@ -178,8 +178,9 @@ Użyj sztywnego języka. Podaj Porządek zebrania, Przebieg (np. "Wychowawca zap
 Używaj trybu bezosobowego ("Doszło do...", "Uczeń naruszył..."). Unikaj emocji. Wymień wnioski/zalecenia.`,
             sprawozdanie: `Jesteś szkolnym biurokratą. Przekształć notatkę z wycieczki w oficjalne SPRAWOZDANIE Z WYCIECZKI. 
 Dopisz "urzędnicze" cele edukacyjne (realizacja podstawy, integracja). Użyj oficjalnego języka do opisu przebiegu.`,
-            opinia_ppp: `Jesteś doświadczonym pedagogiem szkolnym. Przekształć luźne uwagi wychowawcy w profesjonalną OPINIĘ O UCZNIU DO PORADNI PSYCHOLOGICZNO-PEDAGOGICZNEJ.
-Zachowaj układ: 1. Funkcjonowanie poznawcze (skupienie, tempo pracy), 2. Funkcjonowanie emocjonalno-społeczne (relacje z rówieśnikami, radzenie sobie ze złością), 3. Mocne strony ucznia, 4. Podjęte działania pomocowe w szkole. Używaj fachowej terminologii (np. "deficyty koncentracji uwagi", "wzmożona labilność emocjonalna").`,
+            opinia_ppp: `Jesteś doświadczonym pedagogiem szkolnym. Przekształć luźne uwagi wychowawcy w profesjonalną OPINIĘ SZKOŁY O FUNKCJONOWANIU UCZNIA DO PORADNI PSYCHOLOGICZNO-PEDAGOGICZNEJ.
+WAŻNY KONTEKST PRAWNY: Od 1 września 2026 r. obowiązuje Rozporządzenie Ministra Edukacji z 2 marca 2026 r. (Dz.U. 2026 poz. 428) - tzw. ocena funkcjonalna. Opinia ma opisywać RZECZYWISTE funkcjonowanie ucznia (obserwacje, nie domysły), nie tylko deficyty.
+Zachowaj układ: 1. Aktywność i uczestniczenie (jak uczeń radzi sobie w codziennych sytuacjach szkolnych i w grupie), 2. Funkcjonowanie poznawcze, ruchowe, komunikacyjne i emocjonalno-społeczne (skupienie, tempo pracy, relacje z rówieśnikami, radzenie sobie ze złością), 3. Trudności edukacyjno-wychowawcze i dotychczasowe dostosowania, 4. Mocne strony ucznia i warunki najlepszego funkcjonowania, 5. Podjęte działania pomocowe w szkole i ich efekty. Używaj fachowej terminologii (np. "deficyty koncentracji uwagi", "wzmożona labilność emocjonalna"), ale pisz WYCZERPUJĄCO - to dokument urzędowy trafiający do poradni, nie skrót.`,
             nagroda: `Jesteś wicedyrektorem szkoły. Przekształć krótkie hasła o sukcesach nauczyciela w piękny, urzędowy WNIOSEK O PRZYZNANIE NAGRODY DYREKTORA/BURMISTRZA za osiągnięcia dydaktyczno-wychowawcze. 
 Używaj podniosłego języka, np.: "wykazuje się ponadprzeciętnym zaangażowaniem", "innowacyjne metody pracy", "aktywizuje środowisko lokalne".`,
             wezwanie: `Jesteś stanowczym dyrektorem. Stwórz oficjalne WEZWANIE RODZICÓW/OPIEKUNÓW PRAWNYCH do szkoły na podstawie podanego powodu. 
@@ -203,6 +204,7 @@ Ton pisma ma być oficjalny, kategoryczny, powołujący się na współpracę ze
             const requestedMode = new URLSearchParams(window.location.search).get('mode');
             const [activeTab, setActiveTab] = useState(() => TABS.some(tab => tab.id === requestedMode) ? requestedMode : 'zgoda');
             const [inputText, setInputText] = useState('');
+            const [detailLevel, setDetailLevel] = useState('szczegolowy'); // 'normalny' | 'szczegolowy'
             const [generatedText, setGeneratedText] = useState('');
             const [isGenerating, setIsGenerating] = useState(false);
             const [error, setError] = useState('');
@@ -289,7 +291,10 @@ Ton pisma ma być oficjalny, kategoryczny, powołujący się na współpracę ze
                 setGeneratedText('');
 
                 try {
-                    const systemInstruction = PROMPTS[activeTab];
+                    const detailInstruction = detailLevel === 'szczegolowy'
+                        ? 'Wymagam BARDZO SZCZEGÓŁOWEGO, rozbudowanego dokumentu - pełne, wyczerpujące akapity z uzasadnieniem, nie ograniczaj się do minimum.'
+                        : 'Wymagam zwięzłego dokumentu w standardowej, normalnej długości - konkretnie, bez zbędnego rozwlekania.';
+                    const systemInstruction = `${PROMPTS[activeTab]}\n\n${detailInstruction}`;
                     const finalPrompt = `Stwórz dokument na podstawie tych informacji. Pamiętaj aby usunąć z niego wrażliwe dane ucznia i zastąpić je inicjałami lub wykropkowaniem:\n\n"""\n${inputText}\n"""`;
 
                     if (window.location.hostname === '' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
@@ -302,7 +307,8 @@ Ton pisma ma być oficjalny, kategoryczny, powołujący się na współpracę ze
                         body: JSON.stringify({ 
                             system: systemInstruction,
                             prompt: finalPrompt,
-                            temperature: 0.2
+                            temperature: 0.2,
+                            model: 'strong'
                         })
                     });
                     
@@ -462,6 +468,11 @@ Ton pisma ma być oficjalny, kategoryczny, powołujący się na współpracę ze
                                         <label className="block text-white font-bold mb-3 flex items-center justify-between">
                                             <span>Skrótowe wytyczne dla AI:</span>
                                         </label>
+
+                                        <div className="flex bg-slate-900 p-1 rounded-xl border border-slate-700 mb-4">
+                                            <button onClick={() => setDetailLevel('normalny')} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-colors ${detailLevel === 'normalny' ? 'bg-slate-700 text-white' : 'text-slate-400'}`}>Normalny</button>
+                                            <button onClick={() => setDetailLevel('szczegolowy')} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-colors ${detailLevel === 'szczegolowy' ? 'bg-amber-600 text-white' : 'text-slate-400'}`}>Szczegółowy</button>
+                                        </div>
                                         
                                         <textarea 
                                             value={inputText}
