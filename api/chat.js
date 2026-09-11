@@ -97,6 +97,23 @@ async function handleTts(req, res) {
   }
 }
 
+// Vercel: pozwól dłuższym generacjom (mocny model na długim dokumencie) dojść do końca
+// zamiast być ucinane na domyślnym 10 s planu Hobby.
+export const maxDuration = 60;
+
+// Whitelist modeli - klient NIE może zażądać dowolnego (droższego) modelu.
+const KNOWN_MODELS = new Set([
+  'gpt-4o-mini', 'gpt-4o', 'gpt-4.1-mini', 'gpt-4.1', 'gpt-5-mini', 'gpt-5', 'o4-mini'
+]);
+
+// Zwraca listę modeli do wypróbowania po kolei. Przy błędzie "nieznany model"
+// schodzimy na pewny gpt-4o-mini, więc zmiana oferty OpenAI nie wywala narzędzi.
+function resolveModelChain(model) {
+  if (model === 'strong') return ['gpt-5', 'gpt-4.1', 'gpt-4o', 'gpt-4o-mini'];
+  if (typeof model === 'string' && KNOWN_MODELS.has(model)) return [model, 'gpt-4o-mini'];
+  return ['gpt-4.1-mini', 'gpt-4o-mini']; // domyślny - lepszy niz stary gpt-4o-mini
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Metoda niedozwolona' });
@@ -106,42 +123,56 @@ export default async function handler(req, res) {
     return handleTts(req, res);
   }
 
-  const { prompt, system, temperature = 0.5, format = "text", model = "gpt-4o-mini" } = req.body;
+  const { prompt, system, temperature = 0.5, format = "text", model } = req.body;
 
   if (!prompt) {
     return res.status(400).json({ message: 'Brak polecenia (promptu)' });
   }
 
-  try {
-    const payload = {
-      model: model,
+  const modelChain = resolveModelChain(model);
+
+  const buildPayload = (m) => {
+    const p = {
+      model: m,
       messages: [
         { role: "system", content: system },
         { role: "user", content: prompt }
       ],
       temperature: temperature
     };
+    if (format === "json") p.response_format = { type: "json_object" };
+    return p;
+  };
 
-    if (format === "json") {
-      payload.response_format = { type: "json_object" };
+  try {
+    let data = null;
+    let lastErr = "Nieznany błąd od OpenAI";
+
+    for (let i = 0; i < modelChain.length; i++) {
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
+        },
+        body: JSON.stringify(buildPayload(modelChain[i]))
+      });
+
+      const j = await response.json();
+      if (response.ok) { data = j; break; }
+
+      lastErr = j.error?.message || lastErr;
+      // Przechodzimy do kolejnego modelu TYLKO gdy problem dotyczy samego modelu.
+      const modelIssue = /model|not found|does not exist|invalid|unsupported|deprecat|access/i.test(lastErr);
+      if (!modelIssue || i === modelChain.length - 1) throw new Error(lastErr);
     }
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
-      },
-      body: JSON.stringify(payload)
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data.error?.message || "Nieznany błąd od OpenAI");
+    const text = data?.choices?.[0]?.message?.content;
+    if (typeof text !== 'string') {
+      throw new Error('OpenAI nie zwrócił treści (możliwy filtr bezpieczeństwa treści).');
     }
 
-    res.status(200).json({ text: data.choices[0].message.content });
+    res.status(200).json({ text });
   } catch (error) {
     console.error("Szczegóły błędu w API:", error);
     res.status(500).json({ message: 'Błąd serwera API', details: error.message });

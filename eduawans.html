@@ -584,23 +584,23 @@
                     contextInstruction = "Napisz na podstawie tego refleksyjny Wniosek/Ewaluację dla nauczyciela (np. 'Podjęte działania sprawiły, że...', 'Dzięki temu proces nauczania stał się...').";
                 }
 
-                const prompt = `Jesteś ekspertem ds. awansu zawodowego nauczycieli w Polsce. ${contextInstruction} \n\nSzkic od nauczyciela: "${aiInput}"`;
+                const systemPrompt = `Jesteś ekspertem ds. awansu zawodowego nauczycieli w Polsce. Trwa rok szkolny 2026/2027. Obowiązują przepisy o awansie po reformie z 2022 r. (rozporządzenie MEN z 6 września 2022 r., Dz.U. 2022 poz. 1914) - ścieżka: nauczyciel początkujący -> mianowany -> dyplomowany, z przygotowaniem do zawodu zamiast stażu na kontraktowego. Dla nauczycieli, którzy rozpoczęli staż wg starych zasad, obowiązują przepisy przejściowe (staż na dotychczasowych zasadach można kontynuować/ukończyć do 31 sierpnia 2027 r.). Nie odwołuj się do zniesionego stopnia nauczyciela kontraktowego jako obecnego. ${contextInstruction}`;
 
                 try {
                     if (window.location.hostname === '' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
                          throw new Error("TestLocal");
                     }
 
-                    const response = await fetch('/api/gemini', {
+                    const response = await fetch('/api/chat', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ prompt: prompt })
+                        body: JSON.stringify({ prompt: `Szkic od nauczyciela: "${aiInput}"`, system: systemPrompt, temperature: 0.5, model: 'strong' })
                     });
-                    
-                    if(!response.ok) throw new Error("Błąd z serwera");
 
-                    const data = await response.json();
-                    let text = data.candidates?.[0]?.content?.parts?.[0]?.text || data.text || "Brak odpowiedzi";
+                    const data = await response.json().catch(() => ({}));
+                    if (!response.ok) throw new Error(data.message || data.details || "Błąd z serwera");
+
+                    let text = (data.text || "").trim() || "Brak odpowiedzi";
                     setAiOutput(text);
                 } catch (error) {
                     if (error.message === "TestLocal") {

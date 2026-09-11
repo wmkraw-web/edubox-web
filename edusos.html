@@ -169,7 +169,6 @@ Podziel poradę na 3 sekcje:
             // === APP STATE ===
             const [activeMode, setActiveMode] = useState('zachowanie'); // 'zachowanie' | 'rodzic'
             const [inputText, setInputText] = useState('');
-            const [useWebSearch, setUseWebSearch] = useState(true);
             const [adviceData, setAdviceData] = useState(null); // { text: string, sources: array }
             const [isGenerating, setIsGenerating] = useState(false);
 
@@ -217,56 +216,18 @@ Podziel poradę na 3 sekcje:
             };
 
             // === API FUNCTIONS ===
-            const fetchEduBoxSOS = async (promptText, systemInstruction, enableSearch) => {
+            const fetchEduBoxSOS = async (promptText, systemInstruction) => {
                 const finalPrompt = `Sytuacja/Problem do rozwiązania:\n"""\n${promptText}\n"""`;
-                const payload = {
-                    contents: [{ parts: [{ text: finalPrompt }] }],
-                    systemInstruction: { parts: [{ text: systemInstruction }] },
-                    generationConfig: { temperature: 0.5 }
-                };
-
-                if (enableSearch) {
-                    payload.tools = [{ google_search: {} }];
-                }
-
-                // Domyślnie używamy Twojego endpointu do Gemini na Vercel (zgodnie z oryginałem), 
-                // lub fallback do standardowego gpt-4o-mini z Canvas, jeśli to zawiedzie.
-                try {
-                    const res = await fetch('/api/gemini', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ payload, type: 'text' })
-                    });
-                    
-                    if (!res.ok) throw new Error(`API Error: ${res.status}`);
-                    const data = await res.json();
-                    
-                    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-                    const attributions = data.candidates?.[0]?.groundingMetadata?.groundingAttributions || [];
-                    
-                    const extractedSources = [];
-                    const seenUris = new Set();
-                    attributions.forEach(attr => {
-                        const web = attr.web;
-                        if (web && web.uri && !seenUris.has(web.uri)) {
-                            seenUris.add(web.uri);
-                            extractedSources.push({ title: web.title || web.uri, uri: web.uri });
-                        }
-                    });
-                    
-                    return { text, sources: extractedSources };
-                } catch (e) {
-                    console.warn("Przełączam na zapasowy model GPT (bez linków) z powodu błędu Gemini API:", e);
-                    // Fallback to GPT endpoint if Gemini fails
-                    const fallbackRes = await fetch('/api/chat', {
-                        method: 'POST', 
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ prompt: finalPrompt, system: systemInstruction, temperature: 0.5, model: "gpt-4o-mini" })
-                    });
-                    if (!fallbackRes.ok) throw new Error("Oba modele AI niedostępne.");
-                    const fallbackData = await fallbackRes.json();
-                    return { text: fallbackData.text || fallbackData.message, sources: [] };
-                }
+                const res = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt: finalPrompt, system: systemInstruction, temperature: 0.5, model: 'strong' })
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) throw new Error(data.message || data.details || `Błąd serwera AI (${res.status}).`);
+                const text = data.text;
+                if (!text || !text.trim()) throw new Error('Pusta odpowiedź z AI.');
+                return { text, sources: [] };
             };
 
             // === LOGIC ===
@@ -280,7 +241,7 @@ Podziel poradę na 3 sekcje:
                         setAdviceData(null);
                         
                         try {
-                            const result = await fetchEduBoxSOS(inputText, PROMPTS[activeMode], useWebSearch);
+                            const result = await fetchEduBoxSOS(inputText, PROMPTS[activeMode]);
                             setAdviceData(result);
                             setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
                         } catch (err) {
@@ -483,17 +444,6 @@ Podziel poradę na 3 sekcje:
                                         : "Np. Mama Oli przyszła rano z pretensjami, że nikt się nią nie zajmuje. Neguje, że Ola bije inne dzieci i twierdzi, że to inni ją prowokują."}
                                     className="w-full h-32 bg-slate-900/60 border border-slate-600 text-white rounded-2xl p-5 focus:outline-none focus:border-pink-500 transition-colors custom-scrollbar resize-y text-sm sm:text-base mb-6"
                                 ></textarea>
-
-                                {/* Toggle Search */}
-                                <div className="flex items-center gap-4 bg-slate-900/50 p-4 rounded-xl border border-slate-700 mb-6">
-                                    <button onClick={() => setUseWebSearch(!useWebSearch)} className={`w-12 h-6 rounded-full transition-colors flex items-center px-1 ${useWebSearch ? 'bg-pink-500' : 'bg-slate-700'}`}>
-                                        <div className={`w-4 h-4 bg-white rounded-full transition-transform ${useWebSearch ? 'translate-x-6' : 'translate-x-0'}`}></div>
-                                    </button>
-                                    <div>
-                                        <label className="text-sm font-bold text-white block">Wyszukiwanie w Sieci (Grounding)</label>
-                                        <span className="text-[10px] text-slate-400">Pozwala sztucznej inteligencji znaleźć darmowe linki z rozwiązaniami w internecie.</span>
-                                    </div>
-                                </div>
 
                                 <div className="flex justify-end">
                                     <button 

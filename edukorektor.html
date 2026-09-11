@@ -294,51 +294,25 @@ WYMOGI STYLU I STRUKTURY:
                 try {
                     const finalPrompt = `Wygeneruj Ocenę Kształtującą.\n\nPRACA UCZNIA:\n"""\n${studentText}\n"""\n\nKRYTERIA/UWAGI NAUCZYCIELA (opcjonalnie):\n"""\n${teacherNotes || "Brak dodatkowych uwag. Oceń ogólnie poprawność i treść."}\n"""`;
 
-                    const payload = {
-                        contents: [{ parts: [{ text: finalPrompt }] }],
-                        systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
-                        generationConfig: { temperature: 0.4 } 
-                    };
+                    const response = await fetch('/api/chat', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ prompt: finalPrompt, system: SYSTEM_PROMPT, temperature: 0.4, model: 'strong' })
+                    });
+                    const data = await response.json().catch(() => ({}));
+                    if (!response.ok) throw new Error(data.message || data.details || `Błąd serwera API: ${response.status}`);
 
-                    let data;
-                    if (window.location.hostname.includes('vercel.app') || (window.location.hostname !== '' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1')) {
-                        const response = await fetch('/api/gemini', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ payload, type: 'text' })
-                        });
-                        if (!response.ok) throw new Error(`Błąd serwera API: ${response.status}`);
-                        data = await response.json();
-                    } else {
-                        const apiKey = ""; 
-                        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
-                        const response = await fetch(url, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(payload)
-                        });
-                        if (!response.ok) throw new Error(`Błąd API: ${response.status}`);
-                        data = await response.json();
-                    }
-
-                    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-                    
-                    if (text) {
+                    const text = data.text;
+                    if (text && text.trim()) {
                         setGeneratedText(text);
                         setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
                     } else {
-                        throw new Error("Pusta odpowiedź z API.");
+                        throw new Error("Pusta odpowiedź z AI.");
                     }
 
                 } catch (err) {
                     console.error("Błąd generowania:", err);
-                    setError('Brak podłączenia do AI. Wyświetlam opinię pokazową (Demo).');
-                    
-                    setTimeout(() => {
-                        const demoText = `Cześć! Dziękuję za oddanie wypracowania o "Kamieniach na szaniec". Przeczytałem je z dużą uwagą.\n\n🟢 MOCNE STRONY:\n• Świetnie uchwyciłeś główny motyw przyjaźni między bohaterami. Widać, że znasz treść lektury.\n• Podoba mi się Twoje bogate słownictwo w drugim akapicie (użyłeś świetnych synonimów).\n\n🔴 DO POPRAWY:\n• Zwróć uwagę na ortografię. Pojawiły się błędy w pisowni wyrazów z "rz" i "ż" (np. "bohaterzy", "narząd").\n• Praca kończy się dość nagle. Zabrało krótkiego podsumowania Twoich rozważań.\n\n💡 WSKAZÓWKA NA PRZYSZŁOŚĆ:\nPrzed oddaniem kolejnej pracy spróbuj przeczytać tekst na głos – to pomoże Ci wyłapać ucięte zdania. Warto też mieć pod ręką słownik ortograficzny, gdy nie jesteś pewien pisowni trudniejszego słowa.\n\nDobra robota, trzymaj tak dalej!`;
-                        setGeneratedText(demoText);
-                        setIsGenerating(false);
-                    }, 1500);
+                    setError('Nie udało się połączyć z AI. Spróbuj ponownie za chwilę.');
                 } finally {
                     setIsGenerating(false);
                 }

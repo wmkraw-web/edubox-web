@@ -90,8 +90,6 @@ module.exports = {
     { path: 'panel-analytics.html', reason: 'Prywatny panel statystyk społecznościowych (Basic Auth)' },
     { path: 'menu.html', reason: 'Fragment nawigacji, nie samodzielna strona' },
     { path: 'teczka.html', reason: 'Prywatna lokalna Teczka użytkownika, bez treści publicznej' },
-    { path: 'test-edubiurokrata.html', reason: 'Strona testowa' },
-    { path: 'api/index.html', reason: 'Techniczna kopia strony głównej w katalogu API' },
   ],
   robotsDisallow: [
     '/api/',
@@ -104,7 +102,6 @@ module.exports = {
     '/panel-link.html',
     '/panel-analytics.html',
     '/teczka.html',
-    '/test-edubiurokrata.html',
   ],
   blog: {
     page: 'blog.html',

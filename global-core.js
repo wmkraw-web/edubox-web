@@ -146,7 +146,6 @@ let isFlushingGlobalCounter = false;
 
 const TRACKED_AI_ENDPOINTS = new Set([
     '/api/chat',
-    '/api/gemini',
     '/api/generate',
     '/api/malarz',
     '/api/upscale',
