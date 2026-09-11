@@ -4,14 +4,14 @@
     <meta name="google" content="notranslate">
     <title>Asystent Pedagoga - Kombajn Modułowy PRO</title>
     <meta property="og:title" content="Asystent Pedagoga - Kombajn Modułowy PRO">
-    <meta property="og:description" content="Tworzy kompletne IPET-y, WOPFU i opinie o funkcjonowaniu ucznia (ocena funkcjonalna) w oparciu o prawo oświatowe. Za darmo, prosto z przeglądarki – EduBox AI.">
+    <meta property="og:description" content="Tworzy IPET-y, WOPFU, opinie o funkcjonowaniu ucznia oraz dokumentację Wczesnego Wspomagania (WWRD). Za darmo, prosto z przeglądarki – EduBox AI.">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://eduboxpro.pl/asystent-pedagoga.html">
     <meta property="og:image" content="https://eduboxpro.pl/okladka.jpg">
     <meta property="og:locale" content="pl_PL">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="Asystent Pedagoga - Kombajn Modułowy PRO">
-    <meta name="twitter:description" content="Tworzy kompletne IPET-y, WOPFU i opinie o funkcjonowaniu ucznia (ocena funkcjonalna) w oparciu o prawo oświatowe. Za darmo, prosto z przeglądarki – EduBox AI.">
+    <meta name="twitter:description" content="Tworzy IPET-y, WOPFU, opinie o funkcjonowaniu ucznia oraz dokumentację Wczesnego Wspomagania (WWRD). Za darmo, prosto z przeglądarki – EduBox AI.">
     <meta name="twitter:image" content="https://eduboxpro.pl/okladka.jpg">
 
     <!-- Google tag (gtag.js) -->
@@ -88,13 +88,13 @@
     </style>
 
   <link rel="canonical" href="https://eduboxpro.pl/asystent-pedagoga.html">
-  <meta name="description" content="Tworzy kompletne IPET-y, WOPFU i opinie o funkcjonowaniu ucznia (ocena funkcjonalna) w oparciu o prawo oświatowe. Za darmo, prosto z przeglądarki – EduBox AI.">
+  <meta name="description" content="Tworzy IPET-y, WOPFU, opinie o funkcjonowaniu ucznia oraz dokumentację Wczesnego Wspomagania (WWRD). Za darmo, prosto z przeglądarki – EduBox AI.">
   <link rel="icon" href="/favicon.ico" type="image/x-icon">  <script type="application/ld+json">
 {
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
   "name": "Asystent Pedagoga - Kombajn Modułowy PRO",
-  "description": "Tworzy kompletne IPET-y, WOPFU i opinie o funkcjonowaniu ucznia (ocena funkcjonalna) w oparciu o prawo oświatowe. Za darmo, prosto z przeglądarki – EduBox AI.",
+  "description": "Tworzy IPET-y, WOPFU, opinie o funkcjonowaniu ucznia oraz dokumentację Wczesnego Wspomagania (WWRD). Za darmo, prosto z przeglądarki – EduBox AI.",
   "url": "https://eduboxpro.pl/asystent-pedagoga.html",
   "applicationCategory": "EducationalApplication",
   "operatingSystem": "Web",
@@ -206,15 +206,35 @@
             { id: 'notatka', label: 'Arkusz Obserwacji' }
         ];
 
+        // Dokumenty Wczesnego Wspomagania Rozwoju Dziecka (WWRD) - odrebny rezim prawny od IPET/WOPFU
+        // (Rozporzadzenie MEN z 24 sierpnia 2017 r., Dz.U. poz. 1635, z pozn. zm.), dzieci od wykrycia
+        // niepelnosprawnosci do rozpoczecia nauki w szkole. Kolejnosc odzwierciedla naturalny cykl pracy
+        // zespolu: diagnoza -> program -> zajecia -> obserwacja -> ewaluacja -> kontakt z rodzina.
+        const WWRD_DOC_TYPES = [
+            { id: 'diagnoza_funkcjonalna', label: 'Wieloprofilowa Diagnoza Funkcjonalna' },
+            { id: 'ipww', label: 'IPWW (Indywidualny Program)' },
+            { id: 'scenariusz_wwrd', label: 'Scenariusz Zajęć WWRD' },
+            { id: 'arkusz_wwrd', label: 'Arkusz Obserwacji Dziecka' },
+            { id: 'ewaluacja_wwrd', label: 'Okresowa Ocena Efektywności' },
+            { id: 'notatka_rodzice_wwrd', label: 'Notatka dla Rodziców' }
+        ];
+
+        const WWRD_AGE_GROUPS = [
+            { id: '0-3', label: '0-3 lata' },
+            { id: '3-5', label: '3-5 lat' },
+            { id: '5-7', label: '5-7 lat' }
+        ];
+
         const MODULES = [
             { id: 'dokumenty', label: 'Asystent Dokumentów', icon: '📄' },
+            { id: 'wwrd', label: 'Wczesne Wspomaganie (WWRD)', icon: '🌱' },
             { id: 'historyjki', label: 'Historyjki Społeczne', icon: '🧩' },
             { id: 'rymowanki', label: 'Rymowanki Przedszkolne', icon: '🎈' },
             { id: 'tus', label: 'Kreator TUS', icon: '🫂' },
             { id: 'rodzice', label: 'Komunikacja z Rodzicem', icon: '🤝' }
         ];
 
-        const getSystemPrompt = (module, docType, customHeaders, formatLength) => {
+        const getSystemPrompt = (module, docType, customHeaders, formatLength, ageGroup) => {
             if (module === 'dokumenty') {
                 let lengthInstruction = formatLength === 'epic' 
                     ? "Wymagam BARDZO ROZBUDOWANEGO, wyczerpującego i profesjonalnego dokumentu. Każdy punkt musi być opisany w formie pełnych, bogatych w żargon pedagogiczny akapitów." 
@@ -236,6 +256,38 @@
                 
                 if (customHeaders && customHeaders.trim() !== '') {
                     base += `\n\nUWAGA KRYTYCZNA! Użytkownik podał własny wzór placówki. ZIGNORUJ standardowe wytyczne i użyj DOKŁADNIE tych nagłówków w dokumencie:\n"${customHeaders}"`;
+                }
+                return base;
+            }
+            if (module === 'wwrd') {
+                let lengthInstruction = formatLength === 'epic'
+                    ? "Wymagam BARDZO ROZBUDOWANEGO, wyczerpującego i profesjonalnego dokumentu. Każdy punkt musi być opisany w formie pełnych, bogatych w żargon pedagogiczny akapitów."
+                    : "Wymagam ZWIĘZŁEGO dokumentu (skrócona forma). Używaj punktatorów i krótkich, konkretnych zdań.";
+
+                const ageLabels = { '0-3': 'niemowlę/małe dziecko w wieku 0-3 lata', '3-5': 'dziecko w wieku 3-5 lat', '5-7': 'dziecko w wieku 5-7 lat (okres przedszkolny, przygotowanie do szkoły)' };
+                const ageLabel = ageLabels[ageGroup] || 'małe dziecko objęte wczesnym wspomaganiem';
+
+                let base = `Jesteś doświadczonym specjalistą zespołu Wczesnego Wspomagania Rozwoju Dziecka (WWRD): pedagogiem specjalnym, psychologiem i logopedą w jednym. Wygeneruj profesjonalny materiał typu: ${docType}, dla: ${ageLabel}. Pisz językiem formalnym i pedagogicznym, ale ciepłym wobec dziecka i jego rodziny - to nie jest szkoła, to najmłodsze dzieci i ich opiekunowie. Nie używaj gwiazdek **. Trwa rok szkolny 2026/2027.
+PODSTAWA PRAWNA I KONTEKST: Rozporządzenie Ministra Edukacji Narodowej z 24 sierpnia 2017 r. w sprawie organizowania wczesnego wspomagania rozwoju dzieci (Dz.U. z 2017 r. poz. 1635, z późn. zm. - w tym doprecyzowane od roku szkolnego 2025/2026 wymogi kwalifikacyjne osób prowadzących zajęcia oraz zadania zespołu wobec rodziny dziecka). WWRD obejmuje dzieci niepełnosprawne od chwili wykrycia niepełnosprawności do rozpoczęcia nauki w szkole, w wymiarze 4-8 godzin miesięcznie, w formie zajęć indywidualnych lub w grupie 2-3 dzieci. Ścisła współpraca z rodziną dziecka to fundament tej formy wsparcia, nie dodatek.
+${lengthInstruction}
+`;
+
+                if (docType === 'diagnoza_funkcjonalna') {
+                    base += "WYTYCZNE DLA DOKUMENTU: To WIELOPROFILOWA DIAGNOZA FUNKCJONALNA - wyjściowa, całościowa ocena funkcjonowania dziecka sporządzana przez zespół WWRD przed opracowaniem IPWW. Struktura MUSI obejmować odrębną ocenę w każdej sferze rozwoju: 1) motoryka duża (postawa, lokomocja, równowaga), 2) motoryka mała (chwyt, manipulacja, koordynacja wzrokowo-ruchowa), 3) rozwój poznawczy (uwaga, pamięć, myślenie, zabawa symboliczna/funkcjonalna), 4) komunikacja i mowa (rozumienie, mowa czynna/bierna, ewentualne wsparcie AAC), 5) funkcjonowanie emocjonalno-społeczne (relacja z opiekunem, reakcja na zmiany, regulacja emocji), 6) samoobsługa adekwatna do wieku. Dla KAŻDEJ sfery opisz: aktualny poziom funkcjonowania, mocne strony, obszary wymagające wsparcia. Zakończ syntetycznym wnioskiem funkcjonalnym (to NIE jest diagnoza medyczna) oraz rekomendacją priorytetowych kierunków dalszej pracy zespołu, która będzie podstawą do opracowania IPWW.";
+                } else if (docType === 'ipww') {
+                    base += "WYTYCZNE DLA DOKUMENTU: To INDYWIDUALNY PROGRAM WCZESNEGO WSPOMAGANIA (IPWW), opracowywany przez zespół WWRD na podstawie opinii poradni psychologiczno-pedagogicznej oraz wieloprofilowej diagnozy funkcjonalnej. Struktura MUSI obejmować: 1) krótką charakterystykę funkcjonowania dziecka i sytuacji rodziny (kontekst pracy), 2) cele terapeutyczne długoterminowe i krótkoterminowe w podziale na sfery rozwoju (motoryka duża/mała, komunikacja i mowa, poznanie, emocje i relacje, samoobsługa), 3) metody i formy pracy dopasowane do wieku i potrzeb dziecka (np. elementy integracji sensorycznej, metody komunikacji wspomagającej AAC/PECS, metody rozwijające więź i uwagę współdzieloną, zabawa jako główne narzędzie terapeutyczne), 4) planowany wymiar i częstotliwość zajęć (4-8 godzin w miesiącu, forma indywidualna lub grupa 2-3 dzieci), 5) zakres współpracy z rodziną - konkretne, praktyczne wskazówki i zadania domowe dla rodziców, 6) sposób i terminy okresowej oceny efektywności (rekomendowane nie rzadziej niż raz na pół roku). Podkreśl, że IPWW jest dokumentem żywym i podlega modyfikacji wraz z postępami dziecka.";
+                } else if (docType === 'scenariusz_wwrd') {
+                    base += `WYTYCZNE DLA DOKUMENTU: To SCENARIUSZ POJEDYNCZYCH ZAJĘĆ WWRD (ok. 30-45 minut, zajęcia indywidualne lub w małej grupie 2-3 dzieci) dla dziecka w grupie wiekowej: ${ageLabel}. Zajęcia mają formę ZABAWY, nie lekcji szkolnej - dziecko uczy się przez doświadczenie i relację, nie przez instrukcję. Struktura (użyj znaczników HTML <h2>, <p>, <ul>): 1. Powitanie i rytuał na rozpoczęcie (budowanie poczucia bezpieczeństwa i przewidywalności), 2. Rozgrzewka sensoryczno-ruchowa, 3. Część główna - 2-3 konkretne aktywności/zabawy realizujące wskazany cel rozwojowy, z dokładnym opisem przebiegu i roli terapeuty, 4. Wyciszenie i zakończenie z przewidywalnym rytuałem pożegnania, 5. Lista potrzebnych pomocy/zabawek (łatwo dostępnych, niekoniecznie specjalistycznych), 6. Wskazówka dla rodzica, jak przećwiczyć podobną aktywność w domu. Zwróć tylko sformatowany scenariusz.`;
+                } else if (docType === 'arkusz_wwrd') {
+                    base += "WYTYCZNE DLA DOKUMENTU: To ARKUSZ OBSERWACJI DZIECKA z zajęć WWRD - dokument źródłowy do bieżącej pracy zespołu oraz przyszłej ewaluacji i aktualizacji IPWW. Struktura MUSI obejmować: datę i kontekst zajęć (miejsce, osoby obecne, forma - indywidualne/grupowe), opis funkcjonowania dziecka w danym dniu w podziale na sfery (motoryka, poznanie, komunikacja, emocje i relacje, samoobsługa) w sposób OBIEKTYWNY i FAKTOGRAFICZNY (bez etykietowania i ocen wartościujących), reakcję dziecka na proponowane aktywności, zaobserwowane postępy względem wcześniejszych zajęć, oraz wnioski i konkretne rekomendacje na kolejne zajęcia.";
+                } else if (docType === 'ewaluacja_wwrd') {
+                    base += "WYTYCZNE DLA DOKUMENTU: To OKRESOWA OCENA EFEKTYWNOŚCI WCZESNEGO WSPOMAGANIA (ewaluacja realizacji IPWW, zalecana nie rzadziej niż raz na pół roku). Struktura MUSI obejmować: 1) przypomnienie celów założonych w IPWW, 2) ocenę stopnia ich realizacji w każdej sferze rozwoju (motoryka duża/mała, komunikacja i mowa, poznanie, emocje i relacje, samoobsługa) z konkretnymi przykładami postępu, 3) czynniki sprzyjające i utrudniające postępy (w tym zaangażowanie rodziny), 4) wniosek, czy dotychczasowe metody pracy są skuteczne czy wymagają modyfikacji, 5) rekomendacje do aktualizacji IPWW na kolejny okres, 6) jeśli dziecko zbliża się do wieku szkolnego - adnotację, że ta ocena efektywności będzie istotnym elementem przyszłej opinii szkoły o funkcjonowaniu dziecka (tzw. ocena funkcjonalna, Dz.U. z 2026 r. poz. 428, obowiązująca od 1 września 2026 r.).";
+                } else if (docType === 'notatka_rodzice_wwrd') {
+                    base += "WYTYCZNE DLA DOKUMENTU: To krótka, ciepła NOTATKA DLA RODZICÓW podsumowująca zajęcia WWRD - ma budować partnerstwo z rodziną, nie brzmieć jak dokument urzędowy. Struktura: 1) co dziś ćwiczyliśmy i jak dziecko sobie poradziło (język prosty, bez żargonu specjalistycznego), 2) mały sukces albo pozytywny moment z zajęć, 3) 1-2 konkretne, łatwe do wykonania w domu ćwiczenia lub zabawy utrwalające dzisiejszy temat, 4) ciepła zachęta i podziękowanie za zaangażowanie rodziny. Jeśli trzeba wspomnieć trudność - użyj metody 'kanapki' (pozytyw-trudność-pozytyw).";
+                }
+
+                if (customHeaders && customHeaders.trim() !== '') {
+                    base += `\n\nUWAGA KRYTYCZNA! Użytkownik podał własny wzór placówki. ZIGNORUJ standardowe wytyczne co do struktury i użyj DOKŁADNIE tych nagłówków w dokumencie:\n"${customHeaders}"`;
                 }
                 return base;
             }
@@ -294,6 +346,9 @@
             const [mocneStrony, setMocneStrony] = useState('');
             const [trudnosci, setTrudnosci] = useState('');
             const [formatLength, setFormatLength] = useState('epic');
+            const [wwrdDocType, setWwrdDocType] = useState('diagnoza_funkcjonalna');
+            const [wwrdAgeGroup, setWwrdAgeGroup] = useState('3-5');
+            const [wwrdCel, setWwrdCel] = useState('');
             const [genericInput, setGenericInput] = useState('');
             const [uploadedFilesText, setUploadedFilesText] = useState('');
 
@@ -398,7 +453,7 @@
                     return;
                 }
 
-                if (activeModule !== 'dokumenty' && !genericInput.trim()) { setError("Wpisz temat lub problem w puste pole!"); return; }
+                if (activeModule !== 'dokumenty' && activeModule !== 'wwrd' && !genericInput.trim()) { setError("Wpisz temat lub problem w puste pole!"); return; }
                 
                 if (!updateAndCheckLimit()) return;
 
@@ -412,6 +467,8 @@
                     let finalPrompt = "";
                     if (activeModule === 'dokumenty') {
                         finalPrompt = `Dokument: ${docType}\nDiagnoza: ${diagnoza}\nMocne strony: ${mocneStrony}\nTrudności: ${trudnosci}\n\nDODATKOWE PLIKI OD NAUCZYCIELA:\n${uploadedFilesText}`;
+                    } else if (activeModule === 'wwrd') {
+                        finalPrompt = `Dokument: ${wwrdDocType}\nWiek dziecka: ${wwrdAgeGroup} lat\nRozpoznanie / orzeczenie dziecka: ${diagnoza}\nMocne strony dziecka: ${mocneStrony}\nTrudności / obszary wymagające wsparcia: ${trudnosci}\nCel zajęć / temat do opracowania: ${wwrdCel}\n\nDODATKOWE PLIKI (opinia poradni, wcześniejszy IPWW, wyniki diagnozy itp.):\n${uploadedFilesText}`;
                     } else if (activeModule === 'rymowanki') {
                         finalPrompt = `Napisz rymowankę edukacyjną dla dzieci na temat: ${genericInput}`;
                     } else if (activeModule === 'historyjki') {
@@ -425,12 +482,12 @@
                     }
 
                     const textPayload = {
-                        system: getSystemPrompt(activeModule, docType, naglowki, formatLength),
+                        system: getSystemPrompt(activeModule, activeModule === 'wwrd' ? wwrdDocType : docType, naglowki, formatLength, wwrdAgeGroup),
                         prompt: finalPrompt,
                         temperature: 0.4,
-                        // Dokumenty urzedowe (IPET/WOPFU/opinie/orzeczenia) - mocniejszy model niz
-                        // domyslny, slabszy model gubi sie w wymaganej strukturze prawnej.
-                        model: activeModule === 'dokumenty' ? 'strong' : undefined
+                        // Dokumenty urzedowe (IPET/WOPFU/opinie/orzeczenia oraz diagnozy/IPWW/ewaluacje WWRD) -
+                        // mocniejszy model niz domyslny, slabszy model gubi sie w wymaganej strukturze prawnej.
+                        model: (activeModule === 'dokumenty' || activeModule === 'wwrd') ? 'strong' : undefined
                     };
 
                     const textRes = await fetch('/api/chat', {
@@ -555,7 +612,7 @@ CRITICAL RULE: Define ONE specific character and start ALL 3 prompts with this e
                             title: publishTitle,
                             content: generatedText,
                             module: activeModule,
-                            docType: activeModule === 'dokumenty' ? docType : null,
+                            docType: activeModule === 'dokumenty' ? docType : (activeModule === 'wwrd' ? wwrdDocType : null),
                             createdAt: serverTimestamp(),
                             userId: user.uid
                         });
@@ -623,7 +680,7 @@ CRITICAL RULE: Define ONE specific character and start ALL 3 prompts with this e
                         <div className="p-6 flex-1 overflow-y-auto custom-scrollbar">
                             <div className="mb-6 bg-slate-800/50 border border-slate-700 rounded-xl p-3 flex gap-2 items-start">
                                 <span className="text-base flex-shrink-0">ℹ️</span>
-                                <p className="text-[11px] text-slate-400 leading-relaxed"><strong className="text-slate-200">Jak to działa:</strong> wybierz moduł niżej. „Asystent Dokumentów" tworzy IPET/WOPFU/Opinie o funkcjonowaniu ucznia (ocena funkcjonalna)/Arkusze obserwacji (typ dokumentu wybierasz wewnątrz), pozostałe (Historyjki, Rymowanki, TUS, Komunikacja z Rodzicem) generują gotową treść z krótkiego opisu sytuacji.</p>
+                                <p className="text-[11px] text-slate-400 leading-relaxed"><strong className="text-slate-200">Jak to działa:</strong> wybierz moduł niżej. „Asystent Dokumentów" tworzy IPET/WOPFU/Opinie o funkcjonowaniu ucznia (ocena funkcjonalna)/Arkusze obserwacji, „Wczesne Wspomaganie (WWRD)" tworzy diagnozy funkcjonalne, IPWW, scenariusze zajęć, arkusze obserwacji, oceny efektywności i notatki dla rodziców najmłodszych dzieci (typ dokumentu wybierasz wewnątrz), pozostałe (Historyjki, Rymowanki, TUS, Komunikacja z Rodzicem) generują gotową treść z krótkiego opisu sytuacji.</p>
                             </div>
                             <div className="mb-8">
                                 <h2 className="font-bold text-white mb-3 flex items-center gap-2"><span>🛡️</span> Wersja PRO</h2>
@@ -727,6 +784,72 @@ CRITICAL RULE: Define ONE specific character and start ALL 3 prompts with this e
                                                 <div>
                                                     <label className="text-xs font-bold text-rose-400 uppercase tracking-wider block mb-2">Trudności do pokonania</label>
                                                     <textarea value={trudnosci} onChange={(e) => setTrudnosci(e.target.value)} placeholder="Z czym ma problemy..." className="w-full h-24 input-bg rounded-xl p-4 text-sm resize-none border-rose-900/30 focus:border-rose-500"></textarea>
+                                                </div>
+                                            </div>
+                                        ) : activeModule === 'wwrd' ? (
+                                            <div className="space-y-6">
+                                                <div className="card-bg p-3 rounded-2xl flex flex-wrap gap-2">
+                                                    {WWRD_DOC_TYPES.map(doc => (
+                                                        <div key={doc.id} className="flex-1 min-w-[200px]">
+                                                            <input type="radio" id={doc.id} checked={wwrdDocType === doc.id} onChange={() => setWwrdDocType(doc.id)} className="doc-radio" />
+                                                            <label htmlFor={doc.id} className="doc-label text-center h-full flex items-center justify-center">{doc.label}</label>
+                                                        </div>
+                                                    ))}
+                                                </div>
+
+                                                <div className="card-bg p-3 rounded-2xl">
+                                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">Wiek dziecka</label>
+                                                    <div className="flex bg-slate-900 p-1 rounded-xl border border-slate-700">
+                                                        {WWRD_AGE_GROUPS.map(ag => (
+                                                            <button key={ag.id} onClick={() => setWwrdAgeGroup(ag.id)} className={`flex-1 py-2.5 text-xs font-bold rounded-lg transition-colors ${wwrdAgeGroup === ag.id ? 'bg-emerald-600 text-white' : 'text-slate-400'}`}>{ag.label}</button>
+                                                        ))}
+                                                    </div>
+                                                    <p className="text-[10px] text-slate-500 mt-2">Wiek wpływa na dobór metod, aktywności i język dokumentu.</p>
+                                                </div>
+
+                                                <div className="card-bg p-3 rounded-2xl">
+                                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">Poziom szczegółowości dokumentu</label>
+                                                    <div className="flex bg-slate-900 p-1 rounded-xl border border-slate-700">
+                                                        <button onClick={() => setFormatLength('zwiezle')} className={`flex-1 py-2.5 text-xs font-bold rounded-lg transition-colors ${formatLength === 'zwiezle' ? 'bg-slate-700 text-white' : 'text-slate-400'}`}>Normalny</button>
+                                                        <button onClick={() => setFormatLength('epic')} className={`flex-1 py-2.5 text-xs font-bold rounded-lg transition-colors ${formatLength === 'epic' ? 'bg-red-600 text-white' : 'text-slate-400'}`}>Szczegółowy</button>
+                                                    </div>
+                                                    <p className="text-[10px] text-slate-500 mt-2">„Szczegółowy" - pełne, rozbudowane akapity z uzasadnieniem (zalecane dla dokumentów zespołu). „Normalny" - krótsza, bardziej zwięzła forma.</p>
+                                                </div>
+
+                                                <div className="mt-4">
+                                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">Własne pliki do analizy (PDF, TXT)</label>
+                                                    <div className="upload-box relative">
+                                                        <input type="file" multiple accept=".pdf,.txt" onChange={handleFileUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+                                                        <div className="flex flex-col items-center gap-2 text-slate-400">
+                                                            <span className="text-2xl">📂</span>
+                                                            <span className="text-sm font-bold text-white">Kliknij lub upuść opinię poradni / wcześniejszy IPWW tutaj</span>
+                                                            <span className="text-xs">Sztuczna Inteligencja przeczyta je i uwzględni w Twoim dokumencie!</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div>
+                                                    <label className="text-xs font-bold text-sky-400 uppercase tracking-wider block mb-2">Cel zajęć / temat do opracowania</label>
+                                                    <textarea value={wwrdCel} onChange={(e) => setWwrdCel(e.target.value)} placeholder="Np. rozwijanie komunikacji, praca nad chwytem pęsetkowym, tolerancja bodźców dotykowych..." className="w-full h-24 input-bg rounded-xl p-4 text-sm resize-none border-sky-900/30 focus:border-sky-500"></textarea>
+                                                </div>
+
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-slate-800">
+                                                    <div>
+                                                        <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">Rozpoznanie / orzeczenie dziecka</label>
+                                                        <textarea value={diagnoza} onChange={(e) => setDiagnoza(e.target.value)} placeholder="Np. opóźniony rozwój psychoruchowy, MPD, zespół Downa..." className="w-full h-28 input-bg rounded-xl p-4 text-sm resize-none"></textarea>
+                                                    </div>
+                                                    <div>
+                                                        <label className="text-xs font-bold text-amber-400 uppercase tracking-wider block mb-2">Wzór (Szablon)</label>
+                                                        <textarea value={naglowki} onChange={(e) => setNaglowki(e.target.value)} placeholder="Wklej puste nagłówki z druczku placówki..." className="w-full h-28 input-bg rounded-xl p-4 text-sm resize-none border-amber-900/50 focus:border-amber-500"></textarea>
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <label className="text-xs font-bold text-emerald-400 uppercase tracking-wider block mb-2">Mocne strony dziecka</label>
+                                                    <textarea value={mocneStrony} onChange={(e) => setMocneStrony(e.target.value)} placeholder="W czym dziecko jest dobre, co lubi..." className="w-full h-24 input-bg rounded-xl p-4 text-sm resize-none border-emerald-900/30 focus:border-emerald-500"></textarea>
+                                                </div>
+                                                <div>
+                                                    <label className="text-xs font-bold text-rose-400 uppercase tracking-wider block mb-2">Trudności / obszary wymagające wsparcia</label>
+                                                    <textarea value={trudnosci} onChange={(e) => setTrudnosci(e.target.value)} placeholder="Z czym dziecko ma trudności..." className="w-full h-24 input-bg rounded-xl p-4 text-sm resize-none border-rose-900/30 focus:border-rose-500"></textarea>
                                                 </div>
                                             </div>
                                         ) : (

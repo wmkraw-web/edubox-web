@@ -77,7 +77,7 @@ category, tags`.
 - **terapia** (14): EduKasia, Asystent Dostosowań, EduDialog AI (NVC + PPP),
   EduTerapia PRO (TUS), EduWizualizator (AAC), EduChunk, EduBajka, EduSymbol
   (AAC), EduSOS, EduPiktogram, EduOddech, EduDyplom Wideo, EduPodsumowanie.
-- **biurokracja** (17): Asystent Pedagoga (IPET/WOPFU), EduReforma,
+- **biurokracja** (17): Asystent Pedagoga (IPET/WOPFU/WWRD), EduReforma,
   Kreator/EduAwans, EduWycieczka, EduPrawo, EduBiurokrata, EduSprawozdawca,
   EduOcena, EduKorektor, EduWpisy, EduPDF, EduRaport, EduNotariusz.
 - **zajecia** (22): EduScenariusz, Edukacja Obywatelska AI, EduZadania,
