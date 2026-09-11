@@ -12,7 +12,7 @@ export default async function handler(req, res) {
     return res.status(429).json({ error: 'Zbyt wiele generacji obrazków w krótkim czasie. Spróbuj ponownie za kilka minut.' });
   }
 
-  const { prompt, style, format, customText, init_image, image_strength, model } = req.body;
+  const { prompt, style, format, customText, init_image, image_strength, model, seed } = req.body;
   const falKey = process.env.FAL_KEY;
 
   if (!falKey) {
@@ -98,6 +98,13 @@ export default async function handler(req, res) {
       guidance_scale: 3.5,
       enable_safety_checker: true
     };
+  }
+
+  // Seed (opcjonalny) - pozwala kilku wywołaniom (np. okładka + strony bajki, kolejne kadry
+  // komiksu) startować z tego samego "punktu losowości", co znacznie poprawia spójność
+  // wyglądu tej samej postaci między niezależnymi generacjami. Recraft V3 nie przyjmuje seeda.
+  if (model !== 'recraft' && typeof seed === 'number' && Number.isFinite(seed)) {
+    payload.seed = Math.floor(seed);
   }
 
   try {

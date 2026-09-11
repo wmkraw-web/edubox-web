@@ -219,7 +219,7 @@
             } catch(e) { throw new Error("Brak połączenia z AI. " + e.message); }
         };
 
-        const fetchImageAI = async (imagePrompt) => {
+        const fetchImageAI = async (imagePrompt, seed) => {
             try {
                 const res = await fetch('/api/malarz', {
                     method: 'POST',
@@ -228,7 +228,8 @@
                         prompt: `${imagePrompt}. Beautiful cute 3D Pixar Disney style illustration for a children's fairy tale book, 8k resolution, highly detailed, vivid colors, emotional, masterpiece, magical lighting.`, 
                         style: 'disney', 
                         format: 'kwadrat', 
-                        customText: '' 
+                        customText: '',
+                        seed
                     })
                 });
                 if (res.ok) {
@@ -353,16 +354,21 @@
 Twoim zadaniem jest napisanie 3-stronicowej bajki terapeutycznej pomagającej dziecku poradzić sobie ze zgłoszonym problemem.
 Główny bohater nosi imię podane przez użytkownika (lub jest to anonimowe dziecko). Bajka ma mieć piękny, poetycki, ale zrozumiały język, zawierać metaforę problemu i pokazać jak bohater go pokonuje.
 
+STABILIZACJA WYGLĄDU BOHATERA (KRYTYCZNE - bez tego bohater wygląda inaczej na każdym obrazku):
+1. Wymyśl JEDEN, precyzyjny opis wyglądu głównego bohatera po angielsku (wiek, płeć, kolor włosów/fryzura, ubranie, ewentualnie gatunek jeśli to zwierzątko/stworek) i zapisz go w polu "character_description".
+2. Wklej TEN SAM opis kropka w kropkę na początku 'cover_prompt' oraz KAŻDEGO 'image_prompt' - opisując dodatkowo co bohater robi w danej scenie i jakie jest tło.
+
 Dla okładki oraz dla KAŻDEJ Z 3 STRON musisz wygenerować angielski 'image_prompt', opisujący to, co dzieje się w danej scenie. Opis obrazka ma być szczegółowy (dla generatora AI).
 
 ZWRÓĆ DOKŁADNIE TEN JSON:
 {
   "title": "Magiczny tytuł bajki",
-  "cover_prompt": "English prompt for the book cover illustration, cute 3d pixar style",
+  "character_description": "Fixed English description of the main character's appearance, reused in every image prompt below",
+  "cover_prompt": "[wklej character_description] on the cover, English prompt for the book cover illustration, cute 3d pixar style",
   "pages": [
-    { "text": "Tekst pierwszej strony (wprowadzenie do świata i bohatera)...", "image_prompt": "English prompt for scene 1..." },
-    { "text": "Tekst drugiej strony (moment zwrotny i problem)...", "image_prompt": "English prompt for scene 2..." },
-    { "text": "Tekst trzeciej strony (rozwiązanie i morał)...", "image_prompt": "English prompt for scene 3..." }
+    { "text": "Tekst pierwszej strony (wprowadzenie do świata i bohatera)...", "image_prompt": "[wklej character_description] English prompt for scene 1..." },
+    { "text": "Tekst drugiej strony (moment zwrotny i problem)...", "image_prompt": "[wklej character_description] English prompt for scene 2..." },
+    { "text": "Tekst trzeciej strony (rozwiązanie i morał)...", "image_prompt": "[wklej character_description] English prompt for scene 3..." }
   ]
 }`;
                 const prompt = `Imię bohatera: ${childName || (gender === 'Chłopiec' ? 'Chłopiec' : 'Dziewczynka')}. 
@@ -376,14 +382,21 @@ Napisz piękną historię.`;
                     const aiText = await fetchTextAI(prompt, sysPrompt);
                     const parsedJson = parseAIResponse(aiText);
                     
+                    // STABILIZACJA POSTACI cz.2: sam identyczny opis tekstowy nie gwarantuje
+                    // identycznego wyglądu w niezależnych generacjach FLUX - dorzucamy WSPÓLNY seed
+                    // dla okładki i wszystkich stron (ten sam "punkt startowy" losowości), co razem
+                    // z opisem z character_description znacznie poprawia spójność bohatera.
+                    const baseSeed = Math.floor(Math.random() * 1000000000);
+                    parsedJson.baseSeed = baseSeed;
+
                     setGenStatus('Krok 2: Malowanie okładki książki (Pixar 3D Studio)...');
-                    parsedJson.coverUrl = await fetchImageAI(parsedJson.cover_prompt);
+                    parsedJson.coverUrl = await fetchImageAI(parsedJson.cover_prompt, baseSeed);
 
                     setGenStatus('Krok 3: Rysowanie ilustracji do poszczególnych stron (Ok. 30-40 sekund)...');
                     const pagesWithImages = await Promise.all(
                         parsedJson.pages.map(async (page, index) => {
                             setGenStatus(`Krok 3: Rysowanie ilustracji do strony ${index + 1}/3...`);
-                            const imgUrl = await fetchImageAI(page.image_prompt);
+                            const imgUrl = await fetchImageAI(page.image_prompt, baseSeed);
                             return { ...page, imgUrl: imgUrl || 'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?q=80&w=400&auto=format&fit=crop' }; 
                         })
                     );
