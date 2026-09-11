@@ -28,11 +28,17 @@ użytkownikami per-narzędzie), liczników użycia, ewentualnych bibliotek
 wzorów (np. EduDialog).
 
 **Zewnętrzne API:**
-- OpenAI (`gpt-4o-mini` domyślnie, `gpt-4o` gdzie ważna dokładność) przez
-  `/api/chat.js` — jeden wspólny endpoint dla WSZYSTKICH narzędzi tekstowych.
-  Body: `{ prompt, system, temperature, format: "json"|"text", model }`.
-- Fal.ai (Flux) — generowanie obrazów, przez `/api/generate.js` i
-  `/api/ewa-generate.js` (klucz `FAL_KEY`).
+- OpenAI przez `/api/chat.js` — jeden wspólny endpoint dla WSZYSTKICH narzędzi
+  tekstowych. Body: `{ prompt, system, temperature, format: "json"|"text", model }`.
+  `model` NIE trafia bezpośrednio do OpenAI — `resolveModelChain()` mapuje go
+  na łańcuch modeli z automatycznym fallbackiem: `model: "strong"` (dokumenty
+  urzędowe/prawne) próbuje `gpt-5 → gpt-4.1 → gpt-4o → gpt-4o-mini`; znany
+  model z `KNOWN_MODELS` próbuje siebie, potem `gpt-4o-mini`; nieznany/pominięty
+  → domyślnie `gpt-4.1-mini → gpt-4o-mini`. Klient nie może więc zażądać
+  dowolnego (drogiego) modelu — whitelist chroni przed nadużyciem.
+- Fal.ai (Flux Dev domyślnie, Recraft V3 dla grafiki projektowej przez
+  `model: "recraft"`) — generowanie obrazów, przez `/api/generate.js`,
+  `/api/malarz.js` i `/api/ewa-generate.js` (klucz `FAL_KEY`).
 - ElevenLabs — **tylko** wewnątrz pipeline'u Make.com/json2video (patrz
   niżej). Brak bezpośredniego klucza/dostępu z naszego własnego backendu.
 - D-ID (talking-avatar video, plan "Lekki" ~5,9 USD/mies.) — nowa integracja,
@@ -74,7 +80,7 @@ category, tags`.
 - **biurokracja** (17): Asystent Pedagoga (IPET/WOPFU), EduReforma,
   Kreator/EduAwans, EduWycieczka, EduPrawo, EduBiurokrata, EduSprawozdawca,
   EduOcena, EduKorektor, EduWpisy, EduPDF, EduRaport, EduNotariusz.
-- **zajecia** (22): EduScenariusz, Edukacja 2025, EduZadania,
+- **zajecia** (22): EduScenariusz, Edukacja Obywatelska AI, EduZadania,
   EduSprawdzian Maker, EduKalendarz, EduZastępstwo, EduTimer, EduTik PRO
   (wierszyki/piosenki), **EduRymy AI** (słownik rymów — osobne narzędzie od
   EduTik, dwuetapowa weryfikacja rymów), EduPrezentacja, EduKomiks,
