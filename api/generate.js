@@ -43,10 +43,22 @@ function computeImageSize({ width, height, size, aspect_ratio }) {
   return 'square_hd';
 }
 
+import { isRateLimited } from './_lib/rateLimit.js';
+
+// Dyfuzja 28-30 krokow (FLUX Dev / SDXL) regularnie przekracza domyslne 10 s planu Hobby.
+export const maxDuration = 60;
+
 export default async function handler(req, res) {
   // Akceptujemy tylko zapytania POST
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Metoda niedozwolona' });
+  }
+
+  // Endpoint byl calkowicie otwarty (bez auth, bez limitu) - koszt Fal.ai bez zadnej bariery
+  // poza omijalnym localStorage na froncie. 25 generacji / 10 min / IP to bezpieczny zapas
+  // dla normalnego uzycia, a odcina proste petle/naduzycia.
+  if (isRateLimited(req, { name: 'generate', windowMs: 10 * 60 * 1000, max: 25 })) {
+    return res.status(429).json({ message: 'Zbyt wiele generacji obrazków w krótkim czasie. Spróbuj ponownie za kilka minut.' });
   }
 
   // Odczytujemy wszystkie parametry, w tym nowe (init_image dla zdjęć, size/width/height dla wymiarów)

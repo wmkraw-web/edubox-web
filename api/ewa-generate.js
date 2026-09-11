@@ -141,6 +141,11 @@ async function handleVideoStatus(req, res) {
   });
 }
 
+// Renderowanie wideo D-ID i dyfuzja obrazu potrafią trwać dłużej niż domyślne 10 s planu Hobby.
+import { isRateLimited } from './_lib/rateLimit.js';
+
+export const maxDuration = 60;
+
 export default async function handler(req, res) {
   // Akceptujemy tylko zapytania POST
   if (req.method !== 'POST') {
@@ -148,13 +153,22 @@ export default async function handler(req, res) {
   }
 
   // Rozgałęzienie do wideo (D-ID) - zanim jeszcze wejdziemy w logikę obrazków fal.ai poniżej.
+  // UWAGA: video-status jest odpytywane co 3s przez KILKADZIESIĄT prób podczas jednego renderu
+  // (patrz aniawideo.html) - celowo NIE limitujemy tej ścieżki, tylko faktyczne zlecenia.
   if (req.body?.type === 'video-create') {
+    if (isRateLimited(req, { name: 'ewa-video-create', windowMs: 10 * 60 * 1000, max: 10 })) {
+      return res.status(429).json({ message: 'Zbyt wiele zleceń wideo w krótkim czasie. Spróbuj ponownie za kilka minut.' });
+    }
     try { return await handleVideoCreate(req, res); }
     catch (error) { console.error('Błąd D-ID (create):', error); return res.status(500).json({ message: error.message }); }
   }
   if (req.body?.type === 'video-status') {
     try { return await handleVideoStatus(req, res); }
     catch (error) { console.error('Błąd D-ID (status):', error); return res.status(500).json({ message: error.message }); }
+  }
+
+  if (isRateLimited(req, { name: 'ewa-generate', windowMs: 10 * 60 * 1000, max: 25 })) {
+    return res.status(429).json({ message: 'Zbyt wiele generacji obrazków w krótkim czasie. Spróbuj ponownie za kilka minut.' });
   }
 
   // Odczytujemy wszystkie parametry, w tym nowe (init_image dla zdjęć, size/width/height dla wymiarów)
@@ -169,13 +183,16 @@ export default async function handler(req, res) {
 
   try {
     // ---------------------------------------------------------
-    // TRYB 1: GENEROWANIE Z TEKSTU (Model: FLUX Schnell)
+    // TRYB 1: GENEROWANIE Z TEKSTU (Model: FLUX Dev)
     // ---------------------------------------------------------
-    let endpointUrl = 'https://fal.run/fal-ai/flux/schnell';
+    // UWAGA: wcześniej flux/schnell (4 kroki - najsłabszy, gorzej trzyma anatomię
+    // i kadrowanie). Podniesione do flux/dev (28 kroków), tak jak reszta strony.
+    let endpointUrl = 'https://fal.run/fal-ai/flux/dev';
     let payload = {
       prompt: prompt,
       image_size: falImageSize,
-      num_inference_steps: 4,
+      num_inference_steps: 28,
+      guidance_scale: 3.5,
       num_images: 1,
       enable_safety_checker: true
     };
@@ -189,7 +206,7 @@ export default async function handler(req, res) {
       payload = {
         prompt: prompt,
         image_url: init_image,
-        strength: 0.65, // 65% to idealny balans dla SDXL (trzyma twarz, ale zmienia styl)
+        strength: typeof image_strength === 'number' ? image_strength : 0.65,
         image_size: falImageSize,
         style_preset: "line-art", // Parametr, którego Flux nie obsługuje, a SDXL tak!
         num_inference_steps: 30, // Większa precyzja
@@ -225,6 +242,16 @@ export default async function handler(req, res) {
     }
 
     const data = await response.json();
+
+    // Zabezpieczenie przed "czarnym obrazkiem" - modele SDXL/Flux w razie wykrycia potencjalnie
+    // niebezpiecznej treści (częsty "fałszywy alarm" przy zdjęciach osób/dzieci w trybie
+    // image-to-image) nie zwracają błędu, tylko podmieniają wynik na całkowicie czarny obrazek
+    // i ustawiają flagę has_nsfw_concepts. Bez tej kontroli taki czarny obrazek wyglądałby jak
+    // poprawny wynik (ten sam guard co w api/generate.js i api/malarz.js).
+    const flagged = Array.isArray(data.has_nsfw_concepts) && data.has_nsfw_concepts[0];
+    if (flagged) {
+        return res.status(422).json({ message: 'Obrazek został zablokowany przez automatyczny filtr bezpieczeństwa AI (częsty "fałszywy alarm" przy zdjęciach osób/dzieci). Spróbuj innego zdjęcia albo mniej dosłownego opisu.' });
+    }
 
     // Zwracamy adres URL wygenerowanego obrazka do frontendu
     if (data.images && data.images.length > 0) {

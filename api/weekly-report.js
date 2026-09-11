@@ -221,6 +221,10 @@ function isWithinLastDays(dateText, days) {
     return parsed.getTime() >= cutoff;
 }
 
+// Agregacja wielu scenariuszy Make + YouTube + Facebook + arkuszy Google potrafi
+// przekroczyc domyslne 10 s planu Hobby.
+export const maxDuration = 60;
+
 export default async function handler(req, res) {
     if (req.method === 'GET' && req.query.view === 'make-health') {
         if (!isPanelAuthorized(req)) {

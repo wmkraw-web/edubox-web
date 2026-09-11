@@ -1,6 +1,15 @@
+// Dyfuzja 28-30 krokow (FLUX Dev / SDXL / Recraft) regularnie przekracza domyslne 10 s planu Hobby.
+import { isRateLimited } from './_lib/rateLimit.js';
+
+export const maxDuration = 60;
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  if (isRateLimited(req, { name: 'malarz', windowMs: 10 * 60 * 1000, max: 25 })) {
+    return res.status(429).json({ error: 'Zbyt wiele generacji obrazków w krótkim czasie. Spróbuj ponownie za kilka minut.' });
   }
 
   const { prompt, style, format, customText, init_image, image_strength, model } = req.body;

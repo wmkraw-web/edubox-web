@@ -3,9 +3,17 @@
 // (co uniemożliwia zastosowanie wybranego stylu artystycznego - SDXL image-to-image mocno trzyma się
 // oryginalnych pikseli), najpierw prosimy model z widzeniem (GPT-4o-mini) o opisanie kompozycji, a
 // dopiero ten opis trafia do zwykłego generowania z tekstu (flux/dev) razem z wybranym stylem.
+import { isRateLimited } from './_lib/rateLimit.js';
+
+export const maxDuration = 30;
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  if (isRateLimited(req, { name: 'describe-image', windowMs: 10 * 60 * 1000, max: 30 })) {
+    return res.status(429).json({ error: 'Zbyt wiele żądań w krótkim czasie. Spróbuj ponownie za kilka minut.' });
   }
 
   const { image_url } = req.body;

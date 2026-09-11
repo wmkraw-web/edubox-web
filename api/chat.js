@@ -1,3 +1,5 @@
+import { isRateLimited } from './_lib/rateLimit.js';
+
 const TTS_RATE_WINDOW_MS = 5 * 60 * 1000;
 const TTS_RATE_MAX_REQUESTS = 12;
 const TTS_MAX_TEXT_LENGTH = 1800;
@@ -121,6 +123,12 @@ export default async function handler(req, res) {
 
   if (req.body?.mode === 'tts') {
     return handleTts(req, res);
+  }
+
+  // Endpoint tekstowy obsługuje ~50 narzędzi i był całkowicie otwarty (bez auth, bez limitu).
+  // 60 zapytań / 10 min / IP to duży zapas dla normalnego użycia jednej osoby.
+  if (isRateLimited(req, { name: 'chat-text', windowMs: 10 * 60 * 1000, max: 60 })) {
+    return res.status(429).json({ message: 'Zbyt wiele zapytań w krótkim czasie. Spróbuj ponownie za kilka minut.' });
   }
 
   const { prompt, system, temperature = 0.5, format = "text", model } = req.body;
