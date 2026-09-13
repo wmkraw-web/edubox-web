@@ -66,6 +66,7 @@
         function App() {
             const [topic, setTopic] = useState('');
             const [platform, setPlatform] = useState('Facebook Grupy');
+            const [includeImage, setIncludeImage] = useState(true);
             const [loading, setLoading] = useState(false);
             const [postContent, setPostContent] = useState('');
             const [imageUrl, setImageUrl] = useState('');
@@ -123,6 +124,13 @@
                     ? apps[Math.floor(Math.random() * apps.length)]
                     : apps[Number(selectedAppIndex)];
                 const appFullUrl = `${SITE_ORIGIN}/${app.url}`;
+
+                let platformHint = '';
+                if (platform.startsWith('Pinterest')) {
+                    platformHint = 'UWAGA: to opis PINA na Pinterest - pisz krotko i rzeczowo, z 2-3 slowami kluczowymi na samym poczatku (Pinterest to wyszukiwarka, nie feed spolecznosciowy). Ogranicz emotikony do minimum.';
+                } else if (platform.startsWith('YouTube')) {
+                    platformHint = 'UWAGA: to opis pod filmem na YouTube - pierwsze 2 zdania sa najwazniejsze (widoczne zanim widz kliknie "pokaz wiecej"), na koncu dodaj naturalne wezwanie do dzialania.';
+                }
                 setPromotedApp(app);
                 setLinkCopied(false);
 
@@ -136,6 +144,7 @@
                     Promujesz KONKRETNIE tę aplikację: "${app.title}" - ${app.desc}
                     W treści posta naturalnie zachęć do jej wypróbowania (np. "Link w pierwszym komentarzu 👇" albo "Sprawdź -> link poniżej").
                     WAŻNE: NIE wymyślaj i NIE wpisuj żadnego adresu URL w treści posta - prawdziwy link zostanie doklejony automatycznie pod postem przez system.
+                    ${platformHint}
 
                     Dodatkowo zaproponuj 3 krótkie, chwytliwe tytuły (max 6-8 słów każdy) do nałożenia jako napis na zdjęciu/wideo przed publikacją - różne kąty (np. pytanie, obietnica korzyści, ciekawostka).
 
@@ -174,6 +183,7 @@
                     setTitles(Array.isArray(parsedData.titles) ? parsedData.titles : []);
                     // 2. ZAPYTANIE DO FAL AI (FLUX) O ZDJĘCIE EWY
                     // Tu wkodowujemy na sztywno wygląd Ewy z powitanie.mp4, żeby FAL generował ją spójnie!
+                    if (includeImage) {
                     const baseEwaPrompt = "SOLO PORTRAIT, ONLY ONE PERSON. A 32-year-old beautiful Polish female teacher named Ewa, short wavy blonde hair, wearing a stylish grey suit and a white shirt. Friendly expression, looking directly at the camera, photorealistic, 8k, highly detailed, alone in the scene.";
                     const finalImagePrompt = `${baseEwaPrompt} ${parsedData.image_prompt}. NO TEXT, NO WATERMARKS.`;
                     const imgResponse = await fetch('/api/ewa-generate', {
@@ -196,6 +206,7 @@
                         setImageUrl(url);
                     } else {
                         throw new Error('Nie udało się wygenerować zdjęcia z FAL AI.');
+                    }
                     }
                 } catch (err) {
                     console.error(err);
@@ -252,6 +263,8 @@
                                         <option>Facebook - Grupy dla Nauczycieli</option>
                                         <option>Instagram - Profil EduBox</option>
                                         <option>LinkedIn - Profil Profesjonalny</option>
+                                        <option>Pinterest - Piny EduBox</option>
+                                        <option>YouTube - Opis pod filmem</option>
                                         <option>Blog EduBoxPRO</option>
                                     </select>
                                     <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Którą aplikację promujemy?</label>
@@ -271,6 +284,10 @@
                                             )
                                         ))}
                                     </select>
+                                    <label className="flex items-center gap-3 mb-6 bg-slate-900 border border-slate-700 rounded-xl p-3 cursor-pointer select-none">
+                                        <input type="checkbox" checked={includeImage} onChange={e => setIncludeImage(e.target.checked)} className="w-5 h-5 accent-pink-600" />
+                                        <span className="text-sm font-bold text-slate-200">Generuj też zdjęcie Ewy</span>
+                                    </label>
                                     <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Jaki problem rozwiązujemy?</label>
                                     <textarea
                                         value={topic}
@@ -284,7 +301,7 @@
                                         className="w-full bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-500 hover:to-rose-500 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         {loading ? <i className="ph-bold ph-spinner animate-spin text-xl"></i> : <i className="ph-bold ph-magic-wand text-xl"></i>}
-                                        {loading ? 'Ewa przygotowuje materiał...' : apps.length === 0 && !appsError ? 'Ładowanie listy aplikacji...' : 'Wygeneruj Post i Zdjęcie'}
+                                        {loading ? 'Ewa przygotowuje materiał...' : apps.length === 0 && !appsError ? 'Ładowanie listy aplikacji...' : includeImage ? 'Wygeneruj Post i Zdjęcie' : 'Wygeneruj Sam Post'}
                                     </button>
                                     {errorMsg && (
                                         <div className="mt-4 p-3 bg-red-900/50 border border-red-500/50 text-red-300 rounded-xl text-sm">
@@ -321,7 +338,8 @@
                                                 <p className="text-sm text-slate-400 mb-6">Promowana aplikacja: <span className="text-pink-400 font-bold">{promotedApp.title}</span></p>
                                             )}
                                             <div className="flex flex-col md:flex-row gap-8">
-                                                {/* Wygenerowane zdjęcie (FAL AI) - format 4:5, pod Pinterest/Facebook */}
+                                                {/* Wygenerowane zdjęcie (FAL AI) - format 4:5, pod Pinterest/Facebook. Kolumna calkowicie pomijana, gdy user wybral "Sam Post". */}
+                                                {(includeImage || imageUrl) && (
                                                 <div className="w-full md:w-1/2">
                                                     <div className="aspect-[4/5] bg-slate-900 rounded-xl border-2 border-slate-700 overflow-hidden relative">
                                                         {imageUrl ? (
@@ -334,8 +352,9 @@
                                                     </div>
                                                     <p className="text-xs text-slate-500 mt-2 text-center">Kliknij prawym przyciskiem myszy, aby zapisać zdjęcie Ewy.</p>
                                                 </div>
+                                                )}
                                                 {/* Tekst posta */}
-                                                <div className="w-full md:w-1/2 flex flex-col gap-4">
+                                                <div className={`w-full flex flex-col gap-4 ${(includeImage || imageUrl) ? 'md:w-1/2' : ''}`}>
                                                     <div className="bg-slate-900 border border-slate-700 rounded-xl p-5 flex-1">
                                                         <p className="text-slate-200 whitespace-pre-wrap font-medium leading-relaxed">
                                                             {postContent}
