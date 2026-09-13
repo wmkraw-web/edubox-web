@@ -1,4 +1,4 @@
 window.PORADA_DNIA = {
-  "text": "Wprowadź regularne, krótkie spotkania z uczniami, aby omawiać ich postępy i potrzeby – to zbuduje zaufanie i poprawi komunikację.",
-  "date": "2026-09-12"
+  "text": "Codziennie poświęć kilka minut na refleksję nad przebiegiem lekcji i komunikacją z uczniami, aby dostosować swoje metody nauczania do ich potrzeb.",
+  "date": "2026-09-13"
 };
