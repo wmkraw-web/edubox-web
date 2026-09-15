@@ -1,4 +1,4 @@
 window.PORADA_DNIA = {
-  "text": "Codziennie poświęć 5 minut na refleksję nad zajęciami – co się sprawdziło, a co można ulepszyć, aby stale rozwijać swoje umiejętności i wzbogacać doświadczenia uczniów.",
-  "date": "2026-09-14"
+  "text": "Regularnie organizuj krótkie, angażujące rozmowy z uczniami, aby lepiej zrozumieć ich potrzeby i budować zaufanie w klasie.",
+  "date": "2026-09-15"
 };
