@@ -7,7 +7,7 @@
     <meta name="description" content="Prywatny panel do zarządzania pakietami materiałów do pobrania EduBox AI.">
     <meta name="robots" content="noindex, nofollow, noarchive">
 
-    <!-- TWOJA BAZA FIREBASE -->
+    <!-- TWOJA BAZA FIREBASE (tylko katalog metadanych w Firestore - pliki idą przez /api/verify-code) -->
     <script>
       window.__firebase_config = JSON.stringify({
         apiKey: "AIzaSyDL_mvepNJjMmZYQzifN2cXzoKwCE8jNd0",
@@ -40,57 +40,25 @@
 <body class="min-h-screen flex flex-col">
     <div id="root" class="flex-grow flex flex-col relative z-10"></div>
 
-    <script type="text/babel">
-        const { useState, useEffect, useRef } = React;
-
-        function App() {
-            return (
-                <div className="max-w-6xl mx-auto w-full px-4 sm:px-6 py-10">
-                    <a href="/index.html" className="inline-flex items-center gap-2 text-indigo-400 hover:text-indigo-300 text-sm font-bold mb-6">
-                        <i className="ph-bold ph-arrow-left"></i> EduBox AI
-                    </a>
-                    <h1 className="text-3xl sm:text-4xl font-black text-slate-50">📦 Panel Materiałów</h1>
-                    <p className="text-slate-400 mt-2">Zakładaj foldery tematyczne, wgrywaj pliki i publikuj pakiety w katalogu <a href="/materialy.html" className="underline text-indigo-400 hover:text-indigo-300">materialy.html</a>.</p>
-
-                    <div className="flex items-start gap-3 bg-indigo-500/10 border border-indigo-500/30 rounded-2xl p-4 my-6">
-                        <i className="ph-bold ph-shield-check text-indigo-400 text-xl shrink-0 mt-0.5"></i>
-                        <p className="text-xs text-indigo-100/80 leading-relaxed">
-                            Ten panel jest dostępny wyłącznie po zalogowaniu hasłem na poziomie serwera (ta sama para login/hasło co pozostałe prywatne narzędzia EduBox). Wszystko co tu zapiszesz od razu pojawia się w publicznym katalogu — bez potrzeby wdrożenia kodu.
-                        </p>
-                    </div>
-
-                    <PanelMaterialy />
-                </div>
-            );
-        }
-
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
-    </script>
-
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, serverTimestamp, query, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
         const firebaseConfig = JSON.parse(window.__firebase_config);
         const appId = window.__app_id;
         const fbApp = initializeApp(firebaseConfig);
         const auth = getAuth(fbApp);
         const db = getFirestore(fbApp);
-        const storage = getStorage(fbApp);
 
         window.__materialyReady = new Promise((resolve) => {
-            onAuthStateChanged(auth, (user) => { if (user) resolve({ db, storage, appId, uid: user.uid }); });
+            onAuthStateChanged(auth, (user) => { if (user) resolve({ db, appId, uid: user.uid }); });
             signInAnonymously(auth).catch((e) => console.error("Firebase Auth Error:", e));
         });
 
         window.__materialyApi = {
             collectionRef: (deps) => collection(deps.db, 'artifacts', deps.appId, 'public', 'data', 'materialy_katalog'),
             query, orderBy, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp,
-            storageRef: (deps, path) => ref(deps.storage, path),
-            uploadBytes, getDownloadURL, deleteObject,
         };
     </script>
 
@@ -115,6 +83,72 @@
             return 'ph-file text-slate-400';
         }
 
+        function createBasicHeader(user, pass) {
+            const bytes = new TextEncoder().encode(`${user}:${pass}`);
+            let binary = '';
+            bytes.forEach((byte) => { binary += String.fromCharCode(byte); });
+            return `Basic ${btoa(binary)}`;
+        }
+
+        function fileToBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => {
+                    const result = reader.result || '';
+                    const commaIndex = result.indexOf(',');
+                    resolve(commaIndex >= 0 ? result.slice(commaIndex + 1) : result);
+                };
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        }
+
+        async function apiCall(authHeader, action, payload) {
+            const res = await fetch('/api/verify-code', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json', Authorization: authHeader },
+                body: JSON.stringify({ action, ...payload }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                const error = new Error(data.error || `Błąd serwera (HTTP ${res.status}).`);
+                error.status = res.status;
+                throw error;
+            }
+            return data;
+        }
+
+        function LoginForm({ onZaloguj }) {
+            const [user, setUser] = useState('');
+            const [pass, setPass] = useState('');
+            const [blad, setBlad] = useState('');
+
+            const submit = (e) => {
+                e.preventDefault();
+                if (!user || !pass) { setBlad('Podaj login i hasło.'); return; }
+                onZaloguj(createBasicHeader(user, pass));
+            };
+
+            return (
+                <div className="max-w-md mx-auto mt-20 card-bg rounded-2xl p-8 fade-in">
+                    <div className="h-12 w-12 rounded-2xl bg-indigo-500/15 text-indigo-300 flex items-center justify-center text-2xl mb-4"><i className="ph-bold ph-lock-key"></i></div>
+                    <h1 className="text-2xl font-black text-white">Panel Materiałów</h1>
+                    <p className="text-sm text-slate-400 mt-2 leading-relaxed">Użyj tego samego loginu i hasła co w prywatnych narzędziach Ewy i Ani. Dane nie są nigdzie zapisywane — znikną po zamknięciu tej karty.</p>
+                    <form onSubmit={submit} className="mt-5 space-y-3">
+                        <label className="block"><span className="text-xs font-bold text-slate-400">Login</span>
+                            <input value={user} onChange={(e) => setUser(e.target.value)} type="text" autoComplete="username" className="input-bg mt-1 w-full rounded-xl px-4 py-3" />
+                        </label>
+                        <label className="block"><span className="text-xs font-bold text-slate-400">Hasło</span>
+                            <input value={pass} onChange={(e) => setPass(e.target.value)} type="password" autoComplete="current-password" className="input-bg mt-1 w-full rounded-xl px-4 py-3" />
+                        </label>
+                        {blad && <p className="text-sm text-red-400"><i className="ph-bold ph-warning-circle mr-1"></i>{blad}</p>}
+                        <button type="submit" className="btn-bounce w-full inline-flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 px-5 py-3 rounded-xl font-black transition-colors"><i className="ph-bold ph-sign-in"></i>Wejdź do panelu</button>
+                    </form>
+                </div>
+            );
+        }
+
         function PusteFolderyChip({ nazwa, aktywna, onClick, onRename, onDelete }) {
             return (
                 <div className={`chip flex items-center gap-1.5 rounded-full pl-4 pr-1.5 py-1.5 text-sm font-bold border ${aktywna ? 'bg-indigo-600/20 border-indigo-500/50 text-indigo-300' : 'bg-slate-800/60 border-slate-700 text-slate-300'}`}>
@@ -125,7 +159,7 @@
             );
         }
 
-        function FormularzPakietu({ deps, edytowany, onZapisano, onAnuluj, folderyIstniejace }) {
+        function FormularzPakietu({ authHeader, onAuthError, deps, edytowany, onZapisano, onAnuluj, folderyIstniejace }) {
             const [tytul, setTytul] = useState(edytowany ? edytowany.title : '');
             const [opis, setOpis] = useState(edytowany ? edytowany.opis : '');
             const [folder, setFolder] = useState(edytowany ? edytowany.kategoria : (folderyIstniejace[0] || ''));
@@ -137,9 +171,7 @@
             const [blad, setBlad] = useState('');
             const fileRef = useRef(null);
 
-            const handlePliki = (e) => {
-                setPliki(Array.from(e.target.files || []));
-            };
+            const handlePliki = (e) => setPliki(Array.from(e.target.files || []));
 
             const zapisz = async () => {
                 setBlad('');
@@ -157,10 +189,9 @@
                         const plik = pliki[i];
                         setPostep(`Wgrywam plik ${i + 1} z ${pliki.length}: ${plik.name}…`);
                         const sciezka = `materialy/${Date.now()}_${plik.name}`;
-                        const storageRef = api.storageRef(deps, sciezka);
-                        await api.uploadBytes(storageRef, plik);
-                        const url = await api.getDownloadURL(storageRef);
-                        plikiZapisane = [...plikiZapisane, { name: plik.name, url, size: plik.size, path: sciezka }];
+                        const dataBase64 = await fileToBase64(plik);
+                        await apiCall(authHeader, 'materialy-upload', { path: sciezka, contentType: plik.type || 'application/octet-stream', dataBase64 });
+                        plikiZapisane = [...plikiZapisane, { name: plik.name, size: plik.size, path: sciezka }];
                     }
 
                     setPostep('Zapisuję dane pakietu…');
@@ -176,6 +207,7 @@
                     onZapisano();
                 } catch (e) {
                     console.error(e);
+                    if (e.status === 401) { onAuthError(); return; }
                     setBlad('Nie udało się zapisać: ' + e.message);
                 } finally {
                     setWgrywanie(false);
@@ -223,7 +255,7 @@
                                 </ul>
                             )}
                             {edytowany && edytowany.pliki && edytowany.pliki.length > 0 && (
-                                <p className="text-xs text-slate-500 mt-2">Już zapisane pliki: {edytowany.pliki.map(p => p.name).join(', ')}</p>
+                                <p className="text-xs text-slate-500 mt-2">Już zapisane pliki: {edytowany.pliki.map((p) => p.name).join(', ')}</p>
                             )}
                         </div>
                         {blad && <p className="text-sm text-red-400 flex items-center gap-1"><i className="ph-bold ph-warning-circle"></i>{blad}</p>}
@@ -257,7 +289,7 @@
             );
         }
 
-        function PanelMaterialy() {
+        function PanelMaterialy({ authHeader, onWyloguj }) {
             const [deps, setDeps] = useState(null);
             const [pakiety, setPakiety] = useState([]);
             const [aktywnyFolder, setAktywnyFolder] = useState('');
@@ -285,7 +317,10 @@
                 const api = window.__materialyApi;
                 try {
                     for (const p of (pakiet.pliki || [])) {
-                        if (p.path) { try { await api.deleteObject(api.storageRef(deps, p.path)); } catch (e) { console.warn('Nie udało się usunąć pliku ze Storage', e); } }
+                        if (p.path) {
+                            try { await apiCall(authHeader, 'materialy-delete', { path: p.path }); }
+                            catch (e) { if (e.status === 401) { onWyloguj(); return; } console.warn('Nie udało się usunąć pliku', e); }
+                        }
                     }
                     await api.deleteDoc(api.doc(api.collectionRef(deps), pakiet.id));
                 } catch (e) { alert('Błąd usuwania: ' + e.message); }
@@ -323,18 +358,23 @@
                         <div className="flex flex-wrap gap-2">
                             <button onClick={() => setAktywnyFolder('')} className={`chip rounded-full px-4 py-1.5 text-sm font-bold border ${!aktywnyFolder ? 'bg-indigo-600/20 border-indigo-500/50 text-indigo-300' : 'bg-slate-800/60 border-slate-700 text-slate-300'}`}>Wszystkie ({pakiety.length})</button>
                             {foldery.map((f) => (
-                                <PusteFolderyChip key={f} nazwa={`${f} (${pakiety.filter(p => p.kategoria === f).length})`} aktywna={aktywnyFolder === f} onClick={() => setAktywnyFolder(f)} onRename={() => zmienNazweFolderu(f)} onDelete={() => usunFolder(f)} />
+                                <PusteFolderyChip key={f} nazwa={`${f} (${pakiety.filter((p) => p.kategoria === f).length})`} aktywna={aktywnyFolder === f} onClick={() => setAktywnyFolder(f)} onRename={() => zmienNazweFolderu(f)} onDelete={() => usunFolder(f)} />
                             ))}
                         </div>
-                        {!pokazForm && (
-                            <button onClick={() => { setEdytowany(null); setPokazForm(true); }} className="btn-bounce inline-flex items-center gap-2 text-sm font-bold text-white bg-indigo-600 rounded-lg px-4 py-2.5 hover:bg-indigo-500 transition-colors">
-                                <i className="ph-bold ph-plus"></i>Dodaj pakiet
-                            </button>
-                        )}
+                        <div className="flex items-center gap-2">
+                            {!pokazForm && (
+                                <button onClick={() => { setEdytowany(null); setPokazForm(true); }} className="btn-bounce inline-flex items-center gap-2 text-sm font-bold text-white bg-indigo-600 rounded-lg px-4 py-2.5 hover:bg-indigo-500 transition-colors">
+                                    <i className="ph-bold ph-plus"></i>Dodaj pakiet
+                                </button>
+                            )}
+                            <button onClick={onWyloguj} className="btn-bounce inline-flex items-center gap-2 text-sm font-bold text-slate-300 bg-slate-800 rounded-lg px-4 py-2.5 hover:bg-slate-700 transition-colors"><i className="ph-bold ph-sign-out"></i>Wyloguj</button>
+                        </div>
                     </div>
 
                     {pokazForm && (
                         <FormularzPakietu
+                            authHeader={authHeader}
+                            onAuthError={onWyloguj}
                             deps={deps}
                             edytowany={edytowany}
                             folderyIstniejace={foldery}
@@ -364,7 +404,36 @@
             );
         }
 
-        window.PanelMaterialy = PanelMaterialy;
+        function App() {
+            const [authHeader, setAuthHeader] = useState(null);
+
+            return (
+                <div className="max-w-6xl mx-auto w-full px-4 sm:px-6 py-10">
+                    <a href="/index.html" className="inline-flex items-center gap-2 text-indigo-400 hover:text-indigo-300 text-sm font-bold mb-6">
+                        <i className="ph-bold ph-arrow-left"></i> EduBox AI
+                    </a>
+                    <h1 className="text-3xl sm:text-4xl font-black text-slate-50">📦 Panel Materiałów</h1>
+                    <p className="text-slate-400 mt-2">Zakładaj foldery tematyczne, wgrywaj pliki i publikuj pakiety w katalogu <a href="/materialy.html" className="underline text-indigo-400 hover:text-indigo-300">materialy.html</a>.</p>
+
+                    {authHeader ? (
+                        <>
+                            <div className="flex items-start gap-3 bg-indigo-500/10 border border-indigo-500/30 rounded-2xl p-4 my-6">
+                                <i className="ph-bold ph-shield-check text-indigo-400 text-xl shrink-0 mt-0.5"></i>
+                                <p className="text-xs text-indigo-100/80 leading-relaxed">
+                                    Pliki wgrywasz i usuwasz przez chroniony serwer (dane logowania nie są nigdzie zapisywane, znikają po zamknięciu karty). Wszystko co tu zapiszesz od razu pojawia się w publicznym katalogu.
+                                </p>
+                            </div>
+                            <PanelMaterialy authHeader={authHeader} onWyloguj={() => setAuthHeader(null)} />
+                        </>
+                    ) : (
+                        <LoginForm onZaloguj={setAuthHeader} />
+                    )}
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
     </script>
 </body>
 </html>

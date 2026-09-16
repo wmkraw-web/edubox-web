@@ -205,6 +205,7 @@ const checkAndExpireBonusPro = () => {
         if (new Date(bonusUntil).getTime() < Date.now()) {
             localStorage.removeItem('eduboxBonusUntil');
             localStorage.removeItem('eduboxProStatus');
+            localStorage.removeItem('eduboxProCode');
         }
     } catch (e) {}
 };

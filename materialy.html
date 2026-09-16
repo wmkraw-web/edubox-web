@@ -142,6 +142,37 @@
             return status === 'PRO' || status === 'active';
         }
 
+        // Pobranie pliku realnie sprawdzane po stronie serwera (nie tylko flaga w
+        // przeglądarce) - kod zapamiętany przy aktywacji PRO w menu.html jest wysyłany
+        // do /api/verify-code przy KAŻDYM pobraniu, więc bez ważnego kodu plik po
+        // prostu nie przyjdzie, nawet gdyby ktoś ręcznie ustawił flagę eduboxProStatus.
+        async function pobierzPlik(sciezka, nazwaPliku, onBlad) {
+            const kod = localStorage.getItem('eduboxProCode') || '';
+            try {
+                const res = await fetch('/api/verify-code', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'materialy-download', path: sciezka, code: kod }),
+                });
+                if (!res.ok) {
+                    const data = await res.json().catch(() => ({}));
+                    onBlad(data.error || 'Nie udało się pobrać pliku.');
+                    return;
+                }
+                const blob = await res.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = nazwaPliku;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                setTimeout(() => URL.revokeObjectURL(url), 2000);
+            } catch (e) {
+                onBlad('Błąd połączenia z serwerem.');
+            }
+        }
+
         function formatBytes(bytes) {
             if (!bytes) return '';
             const units = ['B', 'KB', 'MB', 'GB'];
@@ -158,6 +189,28 @@
             if (['zip', 'rar', '7z'].includes(ext)) return 'ph-file-zip text-amber-400';
             if (['png', 'jpg', 'jpeg', 'webp'].includes(ext)) return 'ph-file-image text-fuchsia-400';
             return 'ph-file text-slate-400';
+        }
+
+        function PrzyciskPobierz({ plik }) {
+            const [stan, setStan] = useState('gotowy'); // gotowy | pobieranie | blad
+            const [blad, setBlad] = useState('');
+
+            const klik = async () => {
+                setStan('pobieranie');
+                setBlad('');
+                await pobierzPlik(plik.path, plik.name, (msg) => { setBlad(msg); setStan('blad'); });
+                setStan((s) => (s === 'pobieranie' ? 'gotowy' : s));
+            };
+
+            return (
+                <div>
+                    <button onClick={klik} disabled={stan === 'pobieranie'}
+                        className="btn-bounce w-full inline-flex items-center justify-center gap-2 text-sm font-bold text-emerald-300 bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-4 py-2.5 hover:bg-emerald-500/20 transition-colors disabled:opacity-50">
+                        {stan === 'pobieranie' ? <><i className="ph-bold ph-circle-notch animate-spin"></i>Pobieranie…</> : <><i className="ph-bold ph-download-simple"></i>Pobierz {plik.name}</>}
+                    </button>
+                    {stan === 'blad' && <p className="text-xs text-red-400 mt-1 flex items-center gap-1"><i className="ph-bold ph-warning-circle"></i>{blad}</p>}
+                </div>
+            );
         }
 
         function KartaPakietu({ pakiet, odblokowane }) {
@@ -179,12 +232,7 @@
                     </ul>
                     {odblokowane ? (
                         <div className="space-y-2 mt-auto">
-                            {(pakiet.pliki || []).map((p, i) => (
-                                <a key={i} href={p.url} download={p.name} target="_blank" rel="noopener"
-                                   className="btn-bounce w-full inline-flex items-center justify-center gap-2 text-sm font-bold text-emerald-300 bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-4 py-2.5 hover:bg-emerald-500/20 transition-colors">
-                                    <i className="ph-bold ph-download-simple"></i>Pobierz {p.name}
-                                </a>
-                            ))}
+                            {(pakiet.pliki || []).map((p, i) => <PrzyciskPobierz key={i} plik={p} />)}
                         </div>
                     ) : (
                         <div className="mt-auto bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 text-xs text-amber-200/90 leading-relaxed flex items-start gap-2">
