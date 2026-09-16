@@ -161,7 +161,9 @@ async function handleMaterialyUpload(req, res) {
   if (!gcsRes.ok) {
     const details = await gcsRes.text().catch(() => '');
     console.error('materialy-upload gcs error', gcsRes.status, details);
-    return res.status(502).json({ error: 'Nie udało się wgrać pliku.' });
+    let szczegol = '';
+    try { szczegol = JSON.parse(details)?.error?.message || ''; } catch (e) { szczegol = details.slice(0, 200); }
+    return res.status(502).json({ error: `Nie udało się wgrać pliku (HTTP ${gcsRes.status})${szczegol ? ': ' + szczegol : ''}.` });
   }
 
   return res.status(200).json({ ok: true, path: objectPath });
