@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="pl" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel Materiałów — EduBox AI</title>
+    <meta name="description" content="Prywatny panel do zarządzania pakietami materiałów do pobrania EduBox AI.">
+    <meta name="robots" content="noindex, nofollow, noarchive">
+
+    <!-- TWOJA BAZA FIREBASE -->
+    <script>
+      window.__firebase_config = JSON.stringify({
+        apiKey: "AIzaSyDL_mvepNJjMmZYQzifN2cXzoKwCE8jNd0",
+        authDomain: "edubox-pro.firebaseapp.com",
+        projectId: "edubox-pro",
+        storageBucket: "edubox-pro.firebasestorage.app",
+        messagingSenderId: "570263845714",
+        appId: "1:570263845714:web:0b029211f7af071b66988b"
+      });
+      window.__app_id = "eduboxpro";
+    </script>
+
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin=""></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin=""></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #020617; color: #f8fafc; overflow-x: hidden; margin: 0; padding: 0; }
+        .card-bg { background-color: #0b1120; border: 1px solid #1e293b; }
+        .input-bg { background-color: #1e293b; border: 1px solid #334155; color: #f8fafc; transition: all 0.2s; }
+        .input-bg:focus { border-color: #6366f1; outline: none; box-shadow: 0 0 10px rgba(99, 102, 241, 0.25); }
+        .btn-bounce:active { transform: scale(0.95); transition: transform 0.1s; }
+        .fade-in { animation: fadeIn 0.3s ease-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+        .chip { transition: all 0.15s ease; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+    <div id="root" class="flex-grow flex flex-col relative z-10"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        function App() {
+            return (
+                <div className="max-w-6xl mx-auto w-full px-4 sm:px-6 py-10">
+                    <a href="/index.html" className="inline-flex items-center gap-2 text-indigo-400 hover:text-indigo-300 text-sm font-bold mb-6">
+                        <i className="ph-bold ph-arrow-left"></i> EduBox AI
+                    </a>
+                    <h1 className="text-3xl sm:text-4xl font-black text-slate-50">📦 Panel Materiałów</h1>
+                    <p className="text-slate-400 mt-2">Zakładaj foldery tematyczne, wgrywaj pliki i publikuj pakiety w katalogu <a href="/materialy.html" className="underline text-indigo-400 hover:text-indigo-300">materialy.html</a>.</p>
+
+                    <div className="flex items-start gap-3 bg-indigo-500/10 border border-indigo-500/30 rounded-2xl p-4 my-6">
+                        <i className="ph-bold ph-shield-check text-indigo-400 text-xl shrink-0 mt-0.5"></i>
+                        <p className="text-xs text-indigo-100/80 leading-relaxed">
+                            Ten panel jest dostępny wyłącznie po zalogowaniu hasłem na poziomie serwera (ta sama para login/hasło co pozostałe prywatne narzędzia EduBox). Wszystko co tu zapiszesz od razu pojawia się w publicznym katalogu — bez potrzeby wdrożenia kodu.
+                        </p>
+                    </div>
+
+                    <PanelMaterialy />
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, serverTimestamp, query, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
+
+        const firebaseConfig = JSON.parse(window.__firebase_config);
+        const appId = window.__app_id;
+        const fbApp = initializeApp(firebaseConfig);
+        const auth = getAuth(fbApp);
+        const db = getFirestore(fbApp);
+        const storage = getStorage(fbApp);
+
+        window.__materialyReady = new Promise((resolve) => {
+            onAuthStateChanged(auth, (user) => { if (user) resolve({ db, storage, appId, uid: user.uid }); });
+            signInAnonymously(auth).catch((e) => console.error("Firebase Auth Error:", e));
+        });
+
+        window.__materialyApi = {
+            collectionRef: (deps) => collection(deps.db, 'artifacts', deps.appId, 'public', 'data', 'materialy_katalog'),
+            query, orderBy, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp,
+            storageRef: (deps, path) => ref(deps.storage, path),
+            uploadBytes, getDownloadURL, deleteObject,
+        };
+    </script>
+
+    <script type="text/babel" data-type="module">
+        const { useState, useEffect, useRef } = React;
+
+        function formatBytes(bytes) {
+            if (!bytes) return '0 B';
+            const units = ['B', 'KB', 'MB', 'GB'];
+            let i = 0; let val = bytes;
+            while (val >= 1024 && i < units.length - 1) { val /= 1024; i += 1; }
+            return `${val.toFixed(val < 10 && i > 0 ? 1 : 0)} ${units[i]}`;
+        }
+
+        function iconForFile(name) {
+            const ext = (name.split('.').pop() || '').toLowerCase();
+            if (ext === 'pdf') return 'ph-file-pdf text-red-400';
+            if (['doc', 'docx'].includes(ext)) return 'ph-file-doc text-blue-400';
+            if (['mp3', 'wav', 'ogg', 'm4a'].includes(ext)) return 'ph-file-audio text-emerald-400';
+            if (['zip', 'rar', '7z'].includes(ext)) return 'ph-file-zip text-amber-400';
+            if (['png', 'jpg', 'jpeg', 'webp'].includes(ext)) return 'ph-file-image text-fuchsia-400';
+            return 'ph-file text-slate-400';
+        }
+
+        function PusteFolderyChip({ nazwa, aktywna, onClick, onRename, onDelete }) {
+            return (
+                <div className={`chip flex items-center gap-1.5 rounded-full pl-4 pr-1.5 py-1.5 text-sm font-bold border ${aktywna ? 'bg-indigo-600/20 border-indigo-500/50 text-indigo-300' : 'bg-slate-800/60 border-slate-700 text-slate-300'}`}>
+                    <button onClick={onClick} className="btn-bounce">{nazwa}</button>
+                    <button onClick={onRename} title="Zmień nazwę folderu" className="btn-bounce w-6 h-6 flex items-center justify-center rounded-full hover:bg-slate-700 text-slate-400"><i className="ph-bold ph-pencil-simple text-xs"></i></button>
+                    <button onClick={onDelete} title="Usuń folder i wszystkie pakiety w nim" className="btn-bounce w-6 h-6 flex items-center justify-center rounded-full hover:bg-red-900/50 text-red-400"><i className="ph-bold ph-trash text-xs"></i></button>
+                </div>
+            );
+        }
+
+        function FormularzPakietu({ deps, edytowany, onZapisano, onAnuluj, folderyIstniejace }) {
+            const [tytul, setTytul] = useState(edytowany ? edytowany.title : '');
+            const [opis, setOpis] = useState(edytowany ? edytowany.opis : '');
+            const [folder, setFolder] = useState(edytowany ? edytowany.kategoria : (folderyIstniejace[0] || ''));
+            const [nowyFolder, setNowyFolder] = useState('');
+            const [trybNowyFolder, setTrybNowyFolder] = useState(folderyIstniejace.length === 0);
+            const [pliki, setPliki] = useState([]);
+            const [wgrywanie, setWgrywanie] = useState(false);
+            const [postep, setPostep] = useState('');
+            const [blad, setBlad] = useState('');
+            const fileRef = useRef(null);
+
+            const handlePliki = (e) => {
+                setPliki(Array.from(e.target.files || []));
+            };
+
+            const zapisz = async () => {
+                setBlad('');
+                const finalFolder = (trybNowyFolder ? nowyFolder : folder).trim();
+                if (!tytul.trim()) { setBlad('Podaj tytuł pakietu.'); return; }
+                if (!finalFolder) { setBlad('Wybierz folder albo podaj nazwę nowego.'); return; }
+                if (!edytowany && pliki.length === 0) { setBlad('Dodaj przynajmniej jeden plik.'); return; }
+
+                setWgrywanie(true);
+                try {
+                    const api = window.__materialyApi;
+                    let plikiZapisane = edytowany ? (edytowany.pliki || []) : [];
+
+                    for (let i = 0; i < pliki.length; i += 1) {
+                        const plik = pliki[i];
+                        setPostep(`Wgrywam plik ${i + 1} z ${pliki.length}: ${plik.name}…`);
+                        const sciezka = `materialy/${Date.now()}_${plik.name}`;
+                        const storageRef = api.storageRef(deps, sciezka);
+                        await api.uploadBytes(storageRef, plik);
+                        const url = await api.getDownloadURL(storageRef);
+                        plikiZapisane = [...plikiZapisane, { name: plik.name, url, size: plik.size, path: sciezka }];
+                    }
+
+                    setPostep('Zapisuję dane pakietu…');
+                    if (edytowany) {
+                        await api.updateDoc(api.doc(api.collectionRef(deps), edytowany.id), {
+                            title: tytul.trim(), opis: opis.trim(), kategoria: finalFolder, pliki: plikiZapisane, updatedAt: api.serverTimestamp(),
+                        });
+                    } else {
+                        await api.addDoc(api.collectionRef(deps), {
+                            title: tytul.trim(), opis: opis.trim(), kategoria: finalFolder, pliki: plikiZapisane, createdAt: api.serverTimestamp(),
+                        });
+                    }
+                    onZapisano();
+                } catch (e) {
+                    console.error(e);
+                    setBlad('Nie udało się zapisać: ' + e.message);
+                } finally {
+                    setWgrywanie(false);
+                    setPostep('');
+                }
+            };
+
+            return (
+                <div className="card-bg rounded-2xl p-6 mb-8 fade-in">
+                    <h3 className="font-black text-lg text-slate-100 mb-4 flex items-center gap-2">
+                        <i className="ph-bold ph-plus-circle text-indigo-400"></i>
+                        {edytowany ? 'Edytuj pakiet' : 'Dodaj nowy pakiet'}
+                    </h3>
+                    <div className="space-y-4">
+                        <div>
+                            <label className="block text-xs font-bold uppercase tracking-wide text-slate-400 mb-1.5">Tytuł pakietu *</label>
+                            <input type="text" value={tytul} onChange={(e) => setTytul(e.target.value)} placeholder="np. Bezpieczeństwo i granice — przedszkole specjalne" className="input-bg w-full rounded-lg px-3 py-2.5 text-sm" />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold uppercase tracking-wide text-slate-400 mb-1.5">Opis</label>
+                            <textarea value={opis} onChange={(e) => setOpis(e.target.value)} rows={3} placeholder="Krótki opis zawartości pakietu, dla kogo jest, jak z niego korzystać" className="input-bg w-full rounded-lg px-3 py-2.5 text-sm resize-none"></textarea>
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold uppercase tracking-wide text-slate-400 mb-2">Folder / kategoria *</label>
+                            {folderyIstniejace.length > 0 && !trybNowyFolder && (
+                                <div className="flex flex-wrap gap-2 mb-2">
+                                    {folderyIstniejace.map((f) => (
+                                        <button key={f} type="button" onClick={() => setFolder(f)} className={`chip rounded-full px-3 py-1.5 text-xs font-bold border ${folder === f ? 'bg-indigo-600/30 border-indigo-500 text-indigo-200' : 'bg-slate-800 border-slate-700 text-slate-400'}`}>{f}</button>
+                                    ))}
+                                </div>
+                            )}
+                            <button type="button" onClick={() => setTrybNowyFolder(!trybNowyFolder)} className="text-xs font-bold text-indigo-400 hover:text-indigo-300 mb-2">
+                                {trybNowyFolder ? '← wybierz z istniejących folderów' : '+ nowy folder'}
+                            </button>
+                            {trybNowyFolder && (
+                                <input type="text" value={nowyFolder} onChange={(e) => setNowyFolder(e.target.value)} placeholder="np. Dzień Przedszkolaka, Grupa 3-4 lata…" className="input-bg w-full rounded-lg px-3 py-2.5 text-sm" />
+                            )}
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold uppercase tracking-wide text-slate-400 mb-1.5">{edytowany ? 'Dodaj kolejne pliki (opcjonalnie)' : 'Pliki pakietu *'}</label>
+                            <input ref={fileRef} type="file" multiple onChange={handlePliki} className="input-bg w-full rounded-lg px-3 py-2.5 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-indigo-600 file:text-white file:px-3 file:py-1.5 file:text-xs file:font-bold" />
+                            {pliki.length > 0 && (
+                                <ul className="mt-2 space-y-1">
+                                    {pliki.map((p, i) => (<li key={i} className="text-xs text-slate-400 flex items-center gap-2"><i className={`ph-bold ${iconForFile(p.name)}`}></i>{p.name} ({formatBytes(p.size)})</li>))}
+                                </ul>
+                            )}
+                            {edytowany && edytowany.pliki && edytowany.pliki.length > 0 && (
+                                <p className="text-xs text-slate-500 mt-2">Już zapisane pliki: {edytowany.pliki.map(p => p.name).join(', ')}</p>
+                            )}
+                        </div>
+                        {blad && <p className="text-sm text-red-400 flex items-center gap-1"><i className="ph-bold ph-warning-circle"></i>{blad}</p>}
+                        {postep && <p className="text-sm text-indigo-300 flex items-center gap-2"><i className="ph-bold ph-circle-notch animate-spin"></i>{postep}</p>}
+                    </div>
+                    <div className="flex items-center gap-3 mt-6">
+                        <button onClick={zapisz} disabled={wgrywanie} className="btn-bounce flex-1 inline-flex items-center justify-center gap-2 text-sm font-bold text-white bg-indigo-600 rounded-lg px-4 py-2.5 hover:bg-indigo-500 transition-colors disabled:opacity-40">
+                            <i className="ph-bold ph-floppy-disk"></i>{wgrywanie ? 'Zapisywanie…' : 'Zapisz pakiet'}
+                        </button>
+                        <button onClick={onAnuluj} disabled={wgrywanie} className="btn-bounce inline-flex items-center justify-center gap-2 text-sm font-bold text-slate-300 bg-slate-800 rounded-lg px-4 py-2.5 hover:bg-slate-700 transition-colors">Anuluj</button>
+                    </div>
+                </div>
+            );
+        }
+
+        function KartaPakietu({ pakiet, onEdytuj, onUsun }) {
+            return (
+                <div className="card-bg rounded-2xl p-5 flex flex-col fade-in">
+                    <h4 className="font-bold text-slate-100 mb-1">{pakiet.title}</h4>
+                    {pakiet.opis && <p className="text-sm text-slate-400 mb-3 flex-1">{pakiet.opis}</p>}
+                    <ul className="space-y-1 mb-4">
+                        {(pakiet.pliki || []).map((p, i) => (
+                            <li key={i} className="text-xs text-slate-400 flex items-center gap-2"><i className={`ph-bold ${iconForFile(p.name)}`}></i>{p.name} ({formatBytes(p.size)})</li>
+                        ))}
+                    </ul>
+                    <div className="flex items-center gap-2 mt-auto pt-3 border-t border-slate-800">
+                        <button onClick={() => onEdytuj(pakiet)} className="btn-bounce flex-1 inline-flex items-center justify-center gap-1.5 text-xs font-bold text-indigo-400 bg-indigo-500/10 border border-indigo-500/30 rounded-lg px-3 py-2 hover:bg-indigo-500/20"><i className="ph-bold ph-pencil-simple"></i>Edytuj</button>
+                        <button onClick={() => onUsun(pakiet)} className="btn-bounce inline-flex items-center justify-center gap-1.5 text-xs font-bold text-red-400 bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-2 hover:bg-red-500/20"><i className="ph-bold ph-trash"></i></button>
+                    </div>
+                </div>
+            );
+        }
+
+        function PanelMaterialy() {
+            const [deps, setDeps] = useState(null);
+            const [pakiety, setPakiety] = useState([]);
+            const [aktywnyFolder, setAktywnyFolder] = useState('');
+            const [pokazForm, setPokazForm] = useState(false);
+            const [edytowany, setEdytowany] = useState(null);
+
+            useEffect(() => { window.__materialyReady.then(setDeps); }, []);
+
+            useEffect(() => {
+                if (!deps) return;
+                const api = window.__materialyApi;
+                const q = api.query(api.collectionRef(deps), api.orderBy('createdAt', 'desc'));
+                const unsub = api.onSnapshot(q, (snap) => {
+                    const items = [];
+                    snap.forEach((d) => items.push({ id: d.id, ...d.data() }));
+                    setPakiety(items);
+                }, (err) => console.error('Firestore sync error', err));
+                return () => unsub();
+            }, [deps]);
+
+            const foldery = [...new Set(pakiety.map((p) => p.kategoria).filter(Boolean))];
+
+            const usunPakiet = async (pakiet) => {
+                if (!window.confirm(`Usunąć pakiet "${pakiet.title}" wraz ze wszystkimi jego plikami? Tej operacji nie można cofnąć.`)) return;
+                const api = window.__materialyApi;
+                try {
+                    for (const p of (pakiet.pliki || [])) {
+                        if (p.path) { try { await api.deleteObject(api.storageRef(deps, p.path)); } catch (e) { console.warn('Nie udało się usunąć pliku ze Storage', e); } }
+                    }
+                    await api.deleteDoc(api.doc(api.collectionRef(deps), pakiet.id));
+                } catch (e) { alert('Błąd usuwania: ' + e.message); }
+            };
+
+            const usunFolder = async (nazwa) => {
+                const wFolderze = pakiety.filter((p) => p.kategoria === nazwa);
+                if (!window.confirm(`Usunąć folder "${nazwa}" razem z ${wFolderze.length} pakietem/pakietami w środku? Tej operacji nie można cofnąć.`)) return;
+                for (const p of wFolderze) await usunPakiet(p);
+                if (aktywnyFolder === nazwa) setAktywnyFolder('');
+            };
+
+            const zmienNazweFolderu = async (staraNazwa) => {
+                const nowaNazwa = window.prompt('Nowa nazwa folderu:', staraNazwa);
+                if (!nowaNazwa || !nowaNazwa.trim() || nowaNazwa.trim() === staraNazwa) return;
+                const api = window.__materialyApi;
+                const wFolderze = pakiety.filter((p) => p.kategoria === staraNazwa);
+                for (const p of wFolderze) {
+                    await api.updateDoc(api.doc(api.collectionRef(deps), p.id), { kategoria: nowaNazwa.trim() });
+                }
+                if (aktywnyFolder === staraNazwa) setAktywnyFolder(nowaNazwa.trim());
+            };
+
+            const widoczne = aktywnyFolder ? pakiety.filter((p) => p.kategoria === aktywnyFolder) : pakiety;
+            const pogrupowane = {};
+            widoczne.forEach((p) => { const k = p.kategoria || 'Bez folderu'; (pogrupowane[k] = pogrupowane[k] || []).push(p); });
+
+            if (!deps) {
+                return <div className="text-slate-500 text-sm flex items-center gap-2"><i className="ph-bold ph-circle-notch animate-spin"></i>Łączenie z bazą…</div>;
+            }
+
+            return (
+                <div>
+                    <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+                        <div className="flex flex-wrap gap-2">
+                            <button onClick={() => setAktywnyFolder('')} className={`chip rounded-full px-4 py-1.5 text-sm font-bold border ${!aktywnyFolder ? 'bg-indigo-600/20 border-indigo-500/50 text-indigo-300' : 'bg-slate-800/60 border-slate-700 text-slate-300'}`}>Wszystkie ({pakiety.length})</button>
+                            {foldery.map((f) => (
+                                <PusteFolderyChip key={f} nazwa={`${f} (${pakiety.filter(p => p.kategoria === f).length})`} aktywna={aktywnyFolder === f} onClick={() => setAktywnyFolder(f)} onRename={() => zmienNazweFolderu(f)} onDelete={() => usunFolder(f)} />
+                            ))}
+                        </div>
+                        {!pokazForm && (
+                            <button onClick={() => { setEdytowany(null); setPokazForm(true); }} className="btn-bounce inline-flex items-center gap-2 text-sm font-bold text-white bg-indigo-600 rounded-lg px-4 py-2.5 hover:bg-indigo-500 transition-colors">
+                                <i className="ph-bold ph-plus"></i>Dodaj pakiet
+                            </button>
+                        )}
+                    </div>
+
+                    {pokazForm && (
+                        <FormularzPakietu
+                            deps={deps}
+                            edytowany={edytowany}
+                            folderyIstniejace={foldery}
+                            onZapisano={() => { setPokazForm(false); setEdytowany(null); }}
+                            onAnuluj={() => { setPokazForm(false); setEdytowany(null); }}
+                        />
+                    )}
+
+                    {Object.keys(pogrupowane).length === 0 ? (
+                        <div className="card-bg rounded-2xl p-10 text-center">
+                            <i className="ph-bold ph-folder-simple-dashed text-4xl text-slate-600 mb-3 block"></i>
+                            <p className="text-slate-400 text-sm">Brak pakietów. Dodaj pierwszy, żeby pojawił się w publicznym katalogu.</p>
+                        </div>
+                    ) : (
+                        Object.entries(pogrupowane).map(([nazwaFolderu, items]) => (
+                            <div key={nazwaFolderu} className="mb-8">
+                                <h3 className="text-sm font-black uppercase tracking-wider text-slate-500 mb-3 flex items-center gap-2"><i className="ph-fill ph-folder text-amber-500"></i>{nazwaFolderu}</h3>
+                                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                                    {items.map((p) => (
+                                        <KartaPakietu key={p.id} pakiet={p} onEdytuj={(pk) => { setEdytowany(pk); setPokazForm(true); }} onUsun={usunPakiet} />
+                                    ))}
+                                </div>
+                            </div>
+                        ))
+                    )}
+                </div>
+            );
+        }
+
+        window.PanelMaterialy = PanelMaterialy;
+    </script>
+</body>
+</html>

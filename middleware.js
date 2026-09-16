@@ -4,7 +4,7 @@
 // główna) działa bez żadnych zmian.
 
 export const config = {
-  matcher: ['/ewamarketing.html', '/ewa-marketing.html', '/aniawideo.html', '/api/ewa-generate', '/api/weekly-report', '/api/social-stats'],
+  matcher: ['/ewamarketing.html', '/ewa-marketing.html', '/aniawideo.html', '/panel-materialy.html', '/api/ewa-generate', '/api/weekly-report', '/api/social-stats'],
 };
 
 export default function middleware(request) {

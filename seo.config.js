@@ -28,6 +28,10 @@ module.exports = {
     { path: 'edudetox.html' },
     { path: 'edudialog.html' },
     { path: 'edudostosowania.html' },
+    {
+      path: 'edudruki.html',
+      seoDescription: 'Baza wzorów dokumentów urzędowych dla pedagoga specjalnego: IPET, WOPFU i inne, z podziałem na urzędowe/proponowane oraz możliwością dodania własnych druków placówki.',
+    },
     { path: 'edudyplom.html' },
     { path: 'edudyplomy.html' },
     { path: 'eduescape.html' },
@@ -78,6 +82,12 @@ module.exports = {
     { path: 'magiccolor.html' },
     { path: 'magicletters.html' },
     { path: 'studio.html' },
+    {
+      path: 'materialy.html',
+      changefreq: 'weekly',
+      priority: '0.7',
+      seoDescription: 'Gotowe pakiety tematyczne do pobrania: scenariusze, piosenki, karty i plansze dla przedszkola i szkoły. Wsparcie kawą odblokowuje pobieranie.',
+    },
   ],
   excludedPages: [
     { path: 'aniawideo.html', reason: 'Prywatny Generator Wideo Ani (Basic Auth)' },
@@ -88,6 +98,7 @@ module.exports = {
     { path: 'panel-jakosci.html', reason: 'Prywatny panel jakości automatyzacji Make' },
     { path: 'panel-link.html', reason: 'Wewnętrzny generator linków kampanii (UTM)' },
     { path: 'panel-analytics.html', reason: 'Prywatny panel statystyk społecznościowych (Basic Auth)' },
+    { path: 'panel-materialy.html', reason: 'Prywatny panel zarządzania pakietami materiałów (Basic Auth)' },
     { path: 'menu.html', reason: 'Fragment nawigacji, nie samodzielna strona' },
     { path: 'teczka.html', reason: 'Prywatna lokalna Teczka użytkownika, bez treści publicznej' },
   ],
@@ -101,6 +112,7 @@ module.exports = {
     '/panel-jakosci.html',
     '/panel-link.html',
     '/panel-analytics.html',
+    '/panel-materialy.html',
     '/teczka.html',
   ],
   blog: {
