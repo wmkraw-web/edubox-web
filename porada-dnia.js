@@ -1,4 +1,4 @@
 window.PORADA_DNIA = {
-  "text": "Regularnie organizuj krótkie, angażujące rozmowy z uczniami, aby lepiej zrozumieć ich potrzeby i budować zaufanie w klasie.",
-  "date": "2026-09-15"
+  "text": "Użyj narzędzi AI do tworzenia zindywidualizowanych materiałów edukacyjnych, co pozwoli dopasować naukę do potrzeb każdego ucznia i oszczędzi Twój czas na przygotowanie zajęć.",
+  "date": "2026-09-16"
 };
