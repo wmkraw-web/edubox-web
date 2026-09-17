@@ -1,4 +1,4 @@
 window.PORADA_DNIA = {
-  "text": "Użyj narzędzi AI do tworzenia zindywidualizowanych materiałów edukacyjnych, co pozwoli dopasować naukę do potrzeb każdego ucznia i oszczędzi Twój czas na przygotowanie zajęć.",
-  "date": "2026-09-16"
+  "text": "Stwórz harmonogram zajęć z blokami czasowymi na każdą aktywność, aby łatwiej zarządzać czasem i zwiększyć efektywność nauczania.",
+  "date": "2026-09-17"
 };
