@@ -1,6 +1,7 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
 import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
 import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp, doc, setDoc, increment } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+import DOMPurify from 'https://cdn.jsdelivr.net/npm/dompurify@3.2.7/dist/purify.es.mjs';
 
 // 1. WSPÓLNA KONFIGURACJA FIREBASE
 const FIREBASE_CONFIG = {
@@ -210,10 +211,34 @@ const checkAndExpireBonusPro = () => {
     } catch (e) {}
 };
 
+// Ucieczka znaków specjalnych HTML - pierwszy i obowiązkowy krok przed jakimkolwiek
+// wstawieniem tekstu z AI/użytkownika do DOM przez innerHTML/dangerouslySetInnerHTML.
+// Bez tego kroku znaczniki takie jak <img onerror=...> wykonują się w kontekście strony
+// (patrz audyt bezpieczeństwa - sekcja "DOM-based XSS").
+const escapeHtml = (value) => {
+    return String(value ?? '').replace(/[&<>"']/g, (char) => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[char]));
+};
+
+// Wiele narzędzi każe AI zwracać treść z gotowymi, prostymi znacznikami HTML
+// (np. "content": "...używaj <strong>, <br/>, <ul>..."). W takich przypadkach zwykła
+// ucieczka HTML zepsułaby zamierzone formatowanie - potrzebny jest prawdziwy sanitizer
+// z białą listą tagów/atrybutów (DOMPurify), a nie własny regex. Usuwa <script>,
+// onerror/onload i inne wektory DOM-based XSS, zostawiając wyłącznie dozwolone tagi.
+const sanitizeHtml = (rawHtml) => DOMPurify.sanitize(String(rawHtml ?? ''), {
+    ALLOWED_TAGS: ['b', 'i', 'em', 'strong', 'u', 'p', 'br', 'ul', 'ol', 'li',
+        'h1', 'h2', 'h3', 'h4', 'span', 'div', 'blockquote', 'table', 'thead',
+        'tbody', 'tr', 'td', 'th', 'small', 'mark'],
+    ALLOWED_ATTR: ['class']
+});
+
 // 2. GŁÓWNY OBIEKT EDUBOX CORE
 export const EduBoxCore = {
     TEXT_TRIAL_LIMIT,
     IMAGE_TRIAL_LIMIT,
+    escapeHtml,
+    sanitizeHtml,
     
     // Inicjalizacja (logowanie + pobranie menu)
     init: (onUserLoad) => {

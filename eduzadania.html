@@ -299,9 +299,7 @@
             };
 
             const copyToClipboard = () => {
-                const tempDiv = document.createElement("div");
-                tempDiv.innerHTML = formatAIResponse(aiResponse);
-                navigator.clipboard.writeText(tempDiv.innerText || tempDiv.textContent);
+                navigator.clipboard.writeText(aiResponse.replace('---KEY---', '\n\nKLUCZ ODPOWIEDZI:\n'));
                 showToast("✅ Skopiowano do schowka!");
             };
 
@@ -383,14 +381,16 @@ FORMAT ODPOWIEDZI (Używaj Markdown):
                 let studentPart = parts[0] || text;
                 let teacherPart = parts[1] || "";
 
+                // Ucieczka HTML PRZED nałożeniem znaczników markdown - ochrona przed
+                // DOM-based XSS z odpowiedzi AI (patrz audyt bezpieczeństwa).
                 const formatText = (t) => {
-                    let formatted = t
+                    let formatted = window.EduBoxCore.escapeHtml(t)
                         .replace(/### (.*?)\n/g, '<h3>$1</h3>')
                         .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
                         .replace(/\*(.*?)\*/g, '<em>$1</em>');
-                    
+
                     formatted = formatted.replace(/(\d+)\. (.*?)\n/g, '<li>$2</li>');
-                    
+
                     if (formatted.includes('<li>')) {
                         formatted = '<ol>' + formatted + '</ol>';
                     }

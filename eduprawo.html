@@ -179,13 +179,11 @@
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
 
-        const formatAIResponse = (text) => {
-            if (!text) return "";
-            return text
-                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                .replace(/\*(.*?)\*/g, '<em>$1</em>')
-                .replace(/\n/g, '<br/>');
-        };
+        // AI dostaje polecenie zwracania gotowych znaczników <strong> i realnych znaków
+        // nowej linii - dlatego zamieniamy \n na <br/>, a całość przepuszczamy przez
+        // DOMPurify (biała lista tagów), co usuwa ewentualny wstrzyknięty <img onerror=...>
+        // czy <script>, zachowując zamierzone formatowanie (ochrona przed DOM-based XSS).
+        const formatAIResponse = (text) => window.EduBoxCore.sanitizeHtml(String(text || '').replace(/\n/g, '<br/>'));
 
         // Zweryfikowana baza źródeł prawnych - AI może z niej TYLKO WYBIERAĆ, nigdy nie generuje własnych linków
         const LEGAL_SOURCES = {

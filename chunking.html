@@ -460,9 +460,12 @@
 
             const renderContentWithHighlights = (text, keywords) => {
                 if (!params.highlightKeywords || !keywords || keywords.length === 0) return text;
-                let resultText = text;
+                // Ucieczka HTML PRZED podświetleniem słów kluczowych - ochrona przed
+                // DOM-based XSS z odpowiedzi AI (patrz audyt bezpieczeństwa).
+                let resultText = window.EduBoxCore.escapeHtml(text);
                 [...keywords].sort((a,b) => b.length - a.length).forEach(kw => {
-                    const regex = new RegExp(`\\b(${kw})\\b`, 'gi');
+                    const escapedKw = window.EduBoxCore.escapeHtml(kw).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                    const regex = new RegExp(`\\b(${escapedKw})\\b`, 'gi');
                     resultText = resultText.replace(regex, '<strong>$1</strong>');
                 });
                 return <span dangerouslySetInnerHTML={{ __html: resultText }} />;

@@ -156,10 +156,11 @@
                 setTimeout(() => setToastMessage(null), 4000);
             };
 
-            const formatAIResponse = (text) => {
-                if (!text) return "";
-                return text.replace(/\n/g, '<br/>');
-            };
+            // AI dostaje polecenie zwracania gotowych znaczników <strong> i realnych znaków
+            // nowej linii - dlatego zamieniamy \n na <br/>, a całość przepuszczamy przez
+            // DOMPurify (biała lista tagów), co usuwa ewentualny wstrzyknięty kod
+            // (ochrona przed DOM-based XSS z odpowiedzi AI, patrz audyt bezpieczeństwa).
+            const formatAIResponse = (text) => window.EduBoxCore.sanitizeHtml(String(text || '').replace(/\n/g, '<br/>'));
 
             const handleVerifyCode = async () => {
                 const isValid = await window.EduBoxCore.verifyPremiumCode(accessCode);
