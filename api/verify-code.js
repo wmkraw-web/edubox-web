@@ -1,4 +1,5 @@
 import { getServiceAccountAccessToken } from './_lib/googleServiceAccountAuth.js';
+import { isRateLimited } from './_lib/rateLimit.js';
 
 // UWAGA: ten plik obsługuje TERAZ dwie sprawy pod jednym endpointem, celowo -
 // dokładnie ten sam kompromis co api/ewa-generate.js (obrazy fal.ai + wideo D-ID
@@ -205,6 +206,14 @@ async function handleMaterialyDelete(req, res) {
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Metoda niedozwolona' });
+  }
+
+  // Endpoint sprawdza kody PRO (i, dla akcji materialy-*, chroni pliki płatne) - bez limitu
+  // zapytań ktoś mógłby próbować "zgadnąć" PREMIUM_CODE skryptem wysyłającym tysiące prób.
+  // 20 prób / 10 min / IP to sporo dla kogoś, kto się pomylił przy przepisywaniu kodu,
+  // a praktycznie uniemożliwia brute-force (ten sam mechanizm co w chat.js/generate.js).
+  if (isRateLimited(req, { name: 'verify-code', windowMs: 10 * 60 * 1000, max: 20 })) {
+    return res.status(429).json({ valid: false, error: 'Zbyt wiele prób w krótkim czasie. Spróbuj ponownie za kilka minut.' });
   }
 
   const action = req.body && req.body.action;
