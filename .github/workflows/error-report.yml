@@ -1,0 +1,153 @@
+name: Raport błędów przeglądarki (bot błędów)
+
+on:
+  schedule:
+    - cron: '0 6 * * *'   # codziennie ok. 8:00 czasu polskiego (latem UTC+2), razem z alertem kosztowym
+  workflow_dispatch: {}    # pozwala odpalić ręcznie z zakładki Actions, do testów
+
+jobs:
+  error-report:
+    runs-on: ubuntu-latest
+    env:
+      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+      ALERT_EMAIL_TO: wmkraw@gmail.com
+    steps:
+      - name: Zbierz błędy z ostatnich 24h (global-core.js) i wyślij podsumowanie
+        run: |
+          node <<'EOF'
+          // Klucz Web API Firebase - ten sam, który JAWNIE siedzi w global-core.js (FIREBASE_CONFIG),
+          // bo trafia i tak do każdej przeglądarki odwiedzającej stronę. To NIE jest sekret serwerowy -
+          // logowanie anonimowe (bez hasła) jest jedyną "autoryzacją", jaką ten klucz daje, dokładnie
+          // tak samo jak każdemu odwiedzającemu eduboxpro.pl.
+          const FIREBASE_API_KEY = 'AIzaSyDL_mvepNJjMmZYQzifN2cXzoKwCE8jNd0';
+          const PROJECT_ID = 'edubox-pro';
+          const APP_ID = 'eduboxpro';
+
+          async function signInAnonymously() {
+            const res = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${FIREBASE_API_KEY}`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ returnSecureToken: true })
+            });
+            if (!res.ok) throw new Error('Logowanie anonimowe nie powiodło się: HTTP ' + res.status + ' ' + await res.text());
+            const data = await res.json();
+            return data.idToken;
+          }
+
+          // Bez filtra po dacie w samym zapytaniu (Firestore wymaga wtedy zgodnego orderBy) -
+          // pobieramy ostatnie zgłoszenia posortowane malejąco i sami odcinamy ostatnie 24h w JS.
+          async function fetchRecentDocs(idToken) {
+            const parent = `projects/${PROJECT_ID}/databases/(default)/documents/artifacts/${APP_ID}/public/data`;
+            const body = {
+              structuredQuery: {
+                from: [{ collectionId: 'error_reports' }],
+                orderBy: [{ field: { fieldPath: 'createdAt' }, direction: 'DESCENDING' }],
+                limit: 300
+              }
+            };
+            const res = await fetch(`https://firestore.googleapis.com/v1/${parent}:runQuery`, {
+              method: 'POST',
+              headers: { Authorization: `Bearer ${idToken}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify(body)
+            });
+            if (!res.ok) throw new Error('Odczyt błędów z Firestore nie powiódł się: HTTP ' + res.status + ' ' + await res.text());
+            const rows = await res.json();
+            return rows
+              .filter(r => r.document)
+              .map(r => {
+                const f = r.document.fields || {};
+                return {
+                  name: r.document.name, // pełna ścieżka zasobu - potrzebna do skasowania po podsumowaniu
+                  message: f.message?.stringValue || '(brak treści)',
+                  source: f.source?.stringValue || '',
+                  lineno: f.lineno?.integerValue || '?',
+                  page: f.page?.stringValue || '',
+                  createdAt: f.createdAt?.timestampValue || null
+                };
+              });
+          }
+
+          // Sprzątanie po podsumowaniu - żeby kolekcja error_reports nie rosła w nieskończoność.
+          // Celowo "best effort": jeśli reguły Firestore nie pozwolą anonimowemu kontu kasować
+          // (nie da się tego sprawdzić bez żywego środowiska), pojedyncze niepowodzenie kasowania
+          // NIE wywala reszty raportu - wpis po prostu zostanie sprzątnięty przy kolejnym uruchomieniu.
+          async function deleteDocs(idToken, docs) {
+            let deleted = 0, failed = 0;
+            for (const d of docs) {
+              try {
+                const res = await fetch(`https://firestore.googleapis.com/v1/${d.name}`, {
+                  method: 'DELETE',
+                  headers: { Authorization: `Bearer ${idToken}` }
+                });
+                if (res.ok) deleted++; else failed++;
+              } catch (e) {
+                failed++;
+              }
+            }
+            console.log(`Sprzątanie error_reports: skasowano ${deleted}, nie udało się ${failed}.`);
+          }
+
+          function groupErrors(docs) {
+            const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+            const recent = docs.filter(d => d.createdAt && new Date(d.createdAt).getTime() >= cutoff);
+            const groups = new Map();
+            for (const d of recent) {
+              const key = `${d.message}|${d.source}|${d.lineno}`;
+              if (!groups.has(key)) groups.set(key, { ...d, count: 0, pages: new Set() });
+              const g = groups.get(key);
+              g.count += 1;
+              if (d.page) g.pages.add(d.page);
+            }
+            return [...groups.values()].sort((a, b) => b.count - a.count);
+          }
+
+          async function main() {
+            const idToken = await signInAnonymously();
+            const docs = await fetchRecentDocs(idToken);
+            const grouped = groupErrors(docs);
+
+            console.log(`Sprawdzono ${docs.length} zapisanych zgłoszeń, ${grouped.length} unikalnych błędów w ostatnich 24h.`);
+
+            // Sprzątamy WSZYSTKIE pobrane wpisy (nie tylko z ostatnich 24h) - to już ostatnie 300
+            // najnowszych, więc starsze śmieci i tak nie zasługują na osobne uruchomienie.
+            await deleteDocs(idToken, docs);
+
+            if (grouped.length === 0) {
+              console.log('Brak błędów przeglądarki w ostatnich 24h - e-mail nie jest wysyłany.');
+              return;
+            }
+
+            const totalOccurrences = grouped.reduce((sum, g) => sum + g.count, 0);
+            const rowsHtml = grouped.slice(0, 20).map(g => `
+              <li style="margin-bottom:10px">
+                <strong>${g.message.replace(/</g, '&lt;')}</strong><br/>
+                <span style="color:#666;font-size:13px">${g.source || 'nieznany plik'}:${g.lineno} &bull; ${g.count}× &bull; strony: ${[...g.pages].join(', ') || 'b/d'}</span>
+              </li>
+            `).join('');
+
+            const html = `
+              <h2>EduBox AI - błędy przeglądarki z ostatnich 24h</h2>
+              <p>${grouped.length} unikalnych błędów, ${totalOccurrences} wystąpień łącznie:</p>
+              <ul>${rowsHtml}</ul>
+              <p style="color:#888;font-size:12px">Automatyczne zbieranie: global-core.js (window.onerror/unhandledrejection) &rarr; Firestore &rarr; .github/workflows/error-report.yml (codziennie).</p>
+            `;
+
+            const emailRes = await fetch('https://api.resend.com/emails', {
+              method: 'POST',
+              headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                from: 'EduBox AI Alerty <onboarding@resend.dev>',
+                to: [process.env.ALERT_EMAIL_TO],
+                subject: `Błędy przeglądarki: ${grouped.length} unikalnych w ostatnich 24h - EduBox AI`,
+                html
+              })
+            });
+            if (!emailRes.ok) {
+              console.error('Błąd wysyłki e-maila:', emailRes.status, await emailRes.text());
+              process.exit(1);
+            }
+            console.log('Raport błędów wysłany mailem.');
+          }
+
+          main().catch(e => { console.error(e); process.exit(1); });
+          EOF

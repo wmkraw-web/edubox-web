@@ -145,6 +145,16 @@ let isInitialized = false;
 let pendingGlobalCounterIncrement = 0;
 let isFlushingGlobalCounter = false;
 
+// --- Bot błędów: łapanie nieobsłużonych błędów JS na żywo, do szybszej diagnozy ---
+// Zbiera WYŁĄCZNIE dane techniczne (treść błędu, plik, linijka, adres strony) - żadnego
+// e-maila, IP ani treści, którą użytkownik wpisał w formularzu. Zapisuje do tej samej
+// publicznej kolekcji co Giełda Wzorów (artifacts/eduboxpro/public/data/...), a
+// .github/workflows/health-check.yml robi z tego okresowe podsumowanie mailem.
+let pendingErrorReports = [];
+let isFlushingErrorReports = false;
+const seenErrorSignatures = new Set();
+const MAX_ERROR_REPORTS_PER_LOAD = 5; // bezpiecznik na pętlę błędów (np. render w kółko)
+
 const TRACKED_AI_ENDPOINTS = new Set([
     '/api/chat',
     '/api/generate',
@@ -195,6 +205,64 @@ const flushGlobalCounter = async () => {
         isFlushingGlobalCounter = false;
     }
 };
+
+const buildErrorSignature = (message, source, lineno) => `${message}|${source}|${lineno}`;
+
+// Odkłada błąd do wysłania (jeśli Firebase jeszcze nie gotowe, poczeka do zalogowania
+// anonimowego - patrz onAuthStateChanged w EduBoxCore.init). Nigdy nie rzuca dalej -
+// błąd w samym łapaczu błędów nie może wywrócić strony.
+const queueClientError = (message, source, lineno, colno, stack) => {
+    try {
+        if (!message) return;
+        const signature = buildErrorSignature(message, source, lineno);
+        if (seenErrorSignatures.has(signature)) return; // ten sam błąd nie zasypuje bazy wielokrotnie
+        if (seenErrorSignatures.size >= MAX_ERROR_REPORTS_PER_LOAD) return;
+        seenErrorSignatures.add(signature);
+
+        // Tylko ścieżka pliku (bez domeny) i krótki stos wywołań - to informacje o KODZIE,
+        // nie o użytkowniku ani o tym, co wpisał w formularzu.
+        const relativeSource = typeof source === 'string' ? source.replace(window.location.origin, '') : '';
+        pendingErrorReports.push({
+            message: String(message).slice(0, 500),
+            source: relativeSource.slice(0, 200),
+            lineno: Number(lineno) || 0,
+            colno: Number(colno) || 0,
+            stack: typeof stack === 'string' ? stack.slice(0, 500) : '',
+            page: window.location.pathname,
+            createdAt: serverTimestamp()
+        });
+        flushErrorReports();
+    } catch (e) { /* patrz komentarz wyżej - celowo bez rzucania dalej */ }
+};
+
+const flushErrorReports = async () => {
+    if (!db || !currentUser || isFlushingErrorReports || pendingErrorReports.length === 0) return;
+    isFlushingErrorReports = true;
+    const batch = pendingErrorReports;
+    pendingErrorReports = [];
+    try {
+        const errorsRef = collection(db, 'artifacts', APP_ID, 'public', 'data', 'error_reports');
+        await Promise.all(batch.map(report => addDoc(errorsRef, report).catch(() => {})));
+    } finally {
+        isFlushingErrorReports = false;
+        if (pendingErrorReports.length > 0) flushErrorReports();
+    }
+};
+
+if (typeof window !== 'undefined') {
+    window.addEventListener('error', (event) => {
+        // "Script error." bez szczegółów = błąd ze skryptu spoza naszej domeny (np. rozszerzenie
+        // przeglądarki użytkownika) - przeglądarka celowo chowa detale, więc taki wpis i tak
+        // niczego by nie powiedział.
+        if (!event.message || event.message === 'Script error.') return;
+        queueClientError(event.message, event.filename, event.lineno, event.colno, event.error?.stack);
+    });
+    window.addEventListener('unhandledrejection', (event) => {
+        const reason = event.reason;
+        const message = reason instanceof Error ? reason.message : String(reason);
+        queueClientError(`Unhandled promise rejection: ${message}`, window.location.pathname, 0, 0, reason?.stack);
+    });
+}
 
 // Sprawdza i czyści wygasły bonusowy dostęp PRO (np. nagroda za polecenie znajomego).
 // Dotyczy WYŁĄCZNIE kont, które dostały czasowy bonus (eduboxBonusUntil ustawione) —
@@ -256,7 +324,7 @@ export const EduBoxCore = {
         
         onAuthStateChanged(auth, (user) => {
             currentUser = user;
-            if (user) flushGlobalCounter();
+            if (user) { flushGlobalCounter(); flushErrorReports(); }
             if(onUserLoad) onUserLoad(user);
         });
     },
