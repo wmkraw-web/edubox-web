@@ -3,6 +3,10 @@
 // gtag w <head> każdej strony) - ten skrypt tylko pyta o zgodę i, jeśli ją dostanie,
 // odblokowuje pomiar przez gtag('consent','update', ...). Bez zgody strona i tak
 // działa w 100% normalnie - to jedyny cel tego pliku, nic więcej nie robi.
+//
+// window.EduBoxCookieConsent.openSettings() pozwala użytkownikowi wrócić i zmienić
+// wcześniejszą decyzję (link "Ustawienia cookies" w stopce/menu) - bez tego, raz
+// podjęta decyzja byłaby niemożliwa do cofnięcia bez ręcznego czyszczenia przeglądarki.
 (function () {
   var STORAGE_KEY = 'eduboxCookieConsent';
 
@@ -20,13 +24,21 @@
     }
   }
 
+  function revokeAnalytics() {
+    if (typeof window.gtag === 'function') {
+      window.gtag('consent', 'update', { analytics_storage: 'denied' });
+    }
+  }
+
   function removeBanner() {
     var el = document.getElementById('edubox-cookie-banner');
     if (el) el.remove();
   }
 
-  function showBanner() {
+  function injectStyleOnce() {
+    if (document.getElementById('edubox-cookie-style')) return;
     var style = document.createElement('style');
+    style.id = 'edubox-cookie-style';
     style.textContent =
       '#edubox-cookie-banner{position:fixed;left:0;right:0;bottom:0;z-index:9999;' +
       'background:#0f172a;color:#e2e8f0;padding:14px 18px;box-shadow:0 -4px 20px rgba(0,0,0,.25);' +
@@ -41,6 +53,11 @@
       '.edubox-cookie-accept{background:#f59e0b;color:#0f172a}' +
       '.edubox-cookie-reject{background:#1e293b;color:#e2e8f0;border:1px solid #334155}';
     document.head.appendChild(style);
+  }
+
+  function showBanner() {
+    removeBanner(); // gdyby banner z jakiegoś powodu już wisiał (np. dwa kliknięcia "Ustawienia cookies")
+    injectStyleOnce();
 
     var banner = document.createElement('div');
     banner.id = 'edubox-cookie-banner';
@@ -64,6 +81,7 @@
     });
     document.getElementById('edubox-cookie-reject').addEventListener('click', function () {
       remember('denied');
+      revokeAnalytics(); // gdyby ktoś wcześniej zgodził się, a teraz zmienia zdanie na "nie"
       removeBanner();
     });
   }
@@ -75,6 +93,15 @@
     if (document.body) showBanner();
     else document.addEventListener('DOMContentLoaded', showBanner);
   }
+
+  // Publiczne API - link "Ustawienia cookies" w stopce wywołuje to, żeby użytkownik
+  // mógł wrócić i zmienić wcześniejszą decyzję.
+  window.EduBoxCookieConsent = {
+    openSettings: function () {
+      if (document.body) showBanner();
+      else document.addEventListener('DOMContentLoaded', showBanner);
+    }
+  };
 
   init();
 })();
