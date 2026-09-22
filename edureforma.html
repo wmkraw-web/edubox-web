@@ -15,9 +15,16 @@
 
     <!-- Google tag (gtag.js) -->
     <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-3RQ9R0N0K8"></script>
+    <script src="/cookie-consent.js" defer></script>
     <script>
       window.dataLayer = window.dataLayer || [];
       function gtag(){dataLayer.push(arguments);}
+      // Google Consent Mode v2 - domyslnie WYLACZONE, dopoki uzytkownik nie zgodzi sie
+      // w banerze cookies (menu.html). Zgodne z RODO / Prawem telekomunikacyjnym.
+      gtag('consent', 'default', { analytics_storage: 'denied', ad_storage: 'denied' });
+      if (localStorage.getItem('eduboxCookieConsent') === 'granted') {
+        gtag('consent', 'update', { analytics_storage: 'granted' });
+      }
       gtag('js', new Date());
       gtag('config', 'G-3RQ9R0N0K8');
     </script>
@@ -156,10 +163,11 @@
                 setTimeout(() => setToastMessage(null), 4000);
             };
 
-            const formatAIResponse = (text) => {
-                if (!text) return "";
-                return text.replace(/\n/g, '<br/>');
-            };
+            // AI dostaje polecenie zwracania gotowych znaczników <strong> i realnych znaków
+            // nowej linii - dlatego zamieniamy \n na <br/>, a całość przepuszczamy przez
+            // DOMPurify (biała lista tagów), co usuwa ewentualny wstrzyknięty kod
+            // (ochrona przed DOM-based XSS z odpowiedzi AI, patrz audyt bezpieczeństwa).
+            const formatAIResponse = (text) => window.EduBoxCore.sanitizeHtml(String(text || '').replace(/\n/g, '<br/>'));
 
             const handleVerifyCode = async () => {
                 const isValid = await window.EduBoxCore.verifyPremiumCode(accessCode);
