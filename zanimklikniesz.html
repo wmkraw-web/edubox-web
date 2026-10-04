@@ -4,14 +4,14 @@
     <meta name="google" content="notranslate">
     <title>ZanimKlikniesz - sprawdź link, SMS, ofertę lub sklep | EduBox AI</title>
     <meta property="og:title" content="ZanimKlikniesz - sprawdź link, SMS, ofertę lub sklep | EduBox AI">
-    <meta property="og:description" content="Wklej link, SMS, ogłoszenie albo zrzut ekranu i zobacz sygnały ostrzegawcze: lista CERT Polska, wiek strony, podszywanie się pod marki, analiza AI. Za darmo, bez logowania.">
+    <meta property="og:description" content="Wklej link, SMS, numer telefonu, ogłoszenie albo zrzut ekranu i zobacz sygnały ostrzegawcze: lista CERT Polska, wiek strony, podszywanie się pod marki, AI. Za darmo.">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://eduboxpro.pl/zanimklikniesz.html">
     <meta property="og:image" content="https://eduboxpro.pl/okladka.jpg">
     <meta property="og:locale" content="pl_PL">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="ZanimKlikniesz - sprawdź link, SMS, ofertę lub sklep | EduBox AI">
-    <meta name="twitter:description" content="Wklej link, SMS, ogłoszenie albo zrzut ekranu i zobacz sygnały ostrzegawcze: lista CERT Polska, wiek strony, podszywanie się pod marki, analiza AI. Za darmo, bez logowania.">
+    <meta name="twitter:description" content="Wklej link, SMS, numer telefonu, ogłoszenie albo zrzut ekranu i zobacz sygnały ostrzegawcze: lista CERT Polska, wiek strony, podszywanie się pod marki, AI. Za darmo.">
     <meta name="twitter:image" content="https://eduboxpro.pl/okladka.jpg">
 
     <!-- Google tag (gtag.js) -->
@@ -98,13 +98,13 @@
     </style>
 
   <link rel="canonical" href="https://eduboxpro.pl/zanimklikniesz.html">
-  <meta name="description" content="Wklej link, SMS, ogłoszenie albo zrzut ekranu i zobacz sygnały ostrzegawcze: lista CERT Polska, wiek strony, podszywanie się pod marki, analiza AI. Za darmo, bez logowania.">
+  <meta name="description" content="Wklej link, SMS, numer telefonu, ogłoszenie albo zrzut ekranu i zobacz sygnały ostrzegawcze: lista CERT Polska, wiek strony, podszywanie się pod marki, AI. Za darmo.">
   <link rel="icon" href="/favicon.ico" type="image/x-icon">  <script type="application/ld+json">
 {
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
   "name": "ZanimKlikniesz - sprawdź link, SMS, ofertę lub sklep",
-  "description": "Wklej link, SMS, ogłoszenie albo zrzut ekranu i zobacz sygnały ostrzegawcze: lista CERT Polska, wiek strony, podszywanie się pod marki, analiza AI. Za darmo, bez logowania.",
+  "description": "Wklej link, SMS, numer telefonu, ogłoszenie albo zrzut ekranu i zobacz sygnały ostrzegawcze: lista CERT Polska, wiek strony, podszywanie się pod marki, AI. Za darmo.",
   "url": "https://eduboxpro.pl/zanimklikniesz.html",
   "applicationCategory": "SecurityApplication",
   "operatingSystem": "Web",
@@ -192,6 +192,13 @@
             { label: 'SMS o dopłacie', mode: 'text', value: 'InPost: Twoja przesylka zostala wstrzymana z powodu niedoplaty 1,49 zl. Oplac w ciagu 24h, inaczej paczka wroci do nadawcy: https://inpost-pl-dostawa.top/oplata' },
             { label: 'Kupujący z OLX', mode: 'text', value: 'Dzień dobry, kupuję! Zapłaciłem już przez Kup z OLX, kurier odbierze paczkę jutro. Żeby odebrać pieniądze, proszę wejść w link i wpisać dane karty: olx-bezpieczna-wyplata.shop/odbior' },
             { label: 'Prośba o BLIK', mode: 'text', value: 'Hej, możesz mi pilnie pomóc? Jestem w sklepie i nie działa mi karta. Wyślij mi kod BLIK na 600 zł, jutro oddam, przysięgam. Tylko szybko proszę!' }
+        ];
+
+        const CONTACT_OPTIONS = [
+            { id: 'call_bank', icon: 'ph-bank', label: 'Telefon „z banku”, policji, urzędu' },
+            { id: 'call_missed', icon: 'ph-phone-x', label: 'Nieodebrane / głuchy telefon' },
+            { id: 'sms', icon: 'ph-chat-text', label: 'SMS' },
+            { id: 'messenger', icon: 'ph-whatsapp-logo', label: 'WhatsApp / Messenger' }
         ];
 
         const STEPS = ['Sprawdzam listę ostrzeżeń CERT Polska', 'Sprawdzam wiek strony i podszywanie się pod marki', 'Czytam stronę i dane firmy', 'Analizuję treść jak ekspert (AI)'];
@@ -396,6 +403,8 @@
             const [mode, setMode] = useState('link'); // link | text | image
             const [url, setUrl] = useState('');
             const [text, setText] = useState('');
+            const [phone, setPhone] = useState('');
+            const [contact, setContact] = useState('');
             const [image, setImage] = useState('');
             const [imageName, setImageName] = useState('');
             const [loading, setLoading] = useState(false);
@@ -441,7 +450,7 @@
                 }
             };
 
-            const canSubmit = !loading && ((mode === 'link' && url.trim()) || (mode === 'text' && text.trim()) || (mode === 'image' && image));
+            const canSubmit = !loading && ((mode === 'link' && url.trim()) || (mode === 'text' && text.trim()) || (mode === 'image' && image) || (mode === 'phone' && phone.trim()));
 
             const runCheck = async () => {
                 if (!canSubmit) return;
@@ -452,6 +461,7 @@
                     const payload = { mode: 'verify' };
                     if (mode === 'link') payload.url = url.trim();
                     if (mode === 'text') payload.text = text.trim();
+                    if (mode === 'phone') { payload.phone = phone.trim(); if (contact) payload.contact = contact; if (text.trim()) payload.text = text.trim(); }
                     if (mode === 'image') { payload.image = image; if (text.trim()) payload.text = text.trim(); }
                     const res = await fetch('/api/chat', {
                         method: 'POST',
@@ -493,6 +503,7 @@
             const tabs = [
                 { id: 'link', icon: 'ph-link', label: 'Link / strona' },
                 { id: 'text', icon: 'ph-chat-text', label: 'SMS / wiadomość / oferta' },
+                { id: 'phone', icon: 'ph-phone', label: 'Numer telefonu' },
                 { id: 'image', icon: 'ph-image', label: 'Zrzut ekranu' }
             ];
 
@@ -520,10 +531,10 @@
                                     Sprawdź, <span className="text-gradient">zanim klikniesz.</span>
                                 </h1>
                                 <p className="text-slate-300 text-lg max-w-2xl mx-auto leading-relaxed">
-                                    Link, SMS, ogłoszenie z Facebooka czy OLX, podejrzany sklep - wklej i zobacz sygnały ostrzegawcze. Bez logowania, bez zapisywania Twoich danych.
+                                    Link, SMS, numer telefonu, ogłoszenie z Facebooka czy OLX, podejrzany sklep - wklej i zobacz sygnały ostrzegawcze. Bez logowania, bez zapisywania Twoich danych.
                                 </p>
                                 <div className="mt-6 flex flex-wrap justify-center gap-2 text-[11px] font-semibold">
-                                    {['Lista CERT Polska', 'Wiek strony', 'Podszywanie się pod marki', 'Biała lista VAT', 'Analiza AI'].map(b => (
+                                    {['Lista CERT Polska', 'Wiek strony', 'Podszywanie się pod marki', 'Numery telefonu', 'Biała lista VAT', 'Analiza AI'].map(b => (
                                         <span key={b} className="px-3 py-1.5 rounded-full bg-slate-900/70 border border-slate-700 text-slate-300"><i className="ph-bold ph-check text-emerald-400 mr-1"></i>{b}</span>
                                     ))}
                                 </div>
@@ -531,7 +542,7 @@
 
                             {/* FORMULARZ */}
                             <section className="glass rounded-[2rem] p-5 sm:p-8 fade-in" style={{ animationDelay: '0.1s' }}>
-                                <div className="grid grid-cols-3 gap-2 mb-6 p-1.5 bg-slate-950/60 rounded-2xl border border-slate-800">
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-6 p-1.5 bg-slate-950/60 rounded-2xl border border-slate-800">
                                     {tabs.map(t => (
                                         <button key={t.id} onClick={() => { setMode(t.id); setError(''); }} className={`btn-bounce py-3 px-2 rounded-xl text-xs sm:text-sm font-bold flex flex-col sm:flex-row items-center justify-center gap-1.5 transition-all ${mode === t.id ? 'bg-gradient-to-r from-indigo-600 to-indigo-500 text-white shadow-lg shadow-indigo-900/50' : 'text-slate-400 hover:text-white hover:bg-slate-800/60'}`}>
                                             <i className={`ph-bold ${t.icon} text-lg`}></i><span>{t.label}</span>
@@ -557,6 +568,23 @@
                                                 <button key={ex.label} onClick={() => useExample(ex)} className="text-xs font-semibold px-3 py-1.5 rounded-full bg-slate-800/80 border border-slate-700 text-slate-300 hover:border-indigo-400 hover:text-white transition">{ex.label}</button>
                                             ))}
                                         </div>
+                                    </div>
+                                )}
+
+                                {mode === 'phone' && (
+                                    <div className="fade-in">
+                                        <label className="text-[10px] font-bold text-indigo-300 uppercase tracking-widest block mb-2">Numer telefonu</label>
+                                        <input type="tel" inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') runCheck(); }} placeholder="np. +44 7911 123456 albo 701 234 567" className="w-full bg-slate-950/70 border border-slate-700 text-white rounded-2xl px-5 py-4 text-lg focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/30 transition" />
+                                        <label className="text-[10px] font-bold text-indigo-300 uppercase tracking-widest block mt-5 mb-2">Jak się z Tobą skontaktowano? (opcjonalnie)</label>
+                                        <div className="flex flex-wrap gap-2">
+                                            {CONTACT_OPTIONS.map(o => (
+                                                <button key={o.id} onClick={() => setContact(contact === o.id ? '' : o.id)} className={`text-xs sm:text-sm font-semibold px-3 py-2 rounded-xl border transition ${contact === o.id ? 'bg-indigo-600/30 border-indigo-400 text-white' : 'bg-slate-900/60 border-slate-700 text-slate-300 hover:border-slate-500'}`}>
+                                                    <i className={`ph-bold ${o.icon} mr-1`}></i>{o.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                        <textarea value={text} onChange={(e) => setText(e.target.value)} rows={3} maxLength={3000} placeholder="(opcjonalnie) co powiedział lub napisał rozmówca? np. „ktoś bierze kredyt na Pana dane, proszę zainstalować aplikację”" className="mt-4 w-full bg-slate-950/70 border border-slate-700 text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-400"></textarea>
+                                        <p className="text-xs text-slate-500 mt-2"><i className="ph-bold ph-info mr-1"></i>Nie prowadzimy listy „oszukańczych numerów” - numer na ekranie można podrobić, więc liczy się to, czego od Ciebie chcą. Sprawdzamy kraj, rodzaj numeru (np. płatny 70x) i okoliczności.</p>
                                     </div>
                                 )}
 

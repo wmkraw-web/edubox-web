@@ -109,5 +109,38 @@ test('nieznany poziom ryzyka z AI -> medium; maxLevel', () => {
     assert.strictEqual(s.maxLevel('low', 'high', 'medium'), 'high');
 });
 
+const phoneSev = (n, c) => s.analyzePhone(n, c).signals.map(x => x.severity);
+
+test('zwykły polski numer komórkowy i stacjonarny - bez sygnałów', () => {
+    assert.deepStrictEqual(phoneSev('600 700 800'), []);
+    assert.deepStrictEqual(phoneSev('+48 22 123 45 67'), []);
+    assert.strictEqual(s.analyzePhone('600700800').check.status, 'ok');
+});
+
+test('numer o podwyższonej opłacie 70x', () => {
+    assert.deepStrictEqual(phoneSev('701 234 567'), ['medium']);
+    assert.deepStrictEqual(phoneSev('701 234 567', 'call_missed'), ['high']);
+});
+
+test('numery zagraniczne i wangiri', () => {
+    assert.deepStrictEqual(phoneSev('+44 7911 123456'), ['low']);
+    assert.deepStrictEqual(phoneSev('+44 7911 123456', 'sms'), ['medium']);
+    assert.deepStrictEqual(phoneSev('+216 20 123 456', 'call_missed'), ['high']);
+});
+
+test('krótkie numery: 8080 oficjalny, SMS Premium podejrzany', () => {
+    assert.strictEqual(s.analyzePhone('8080').check.status, 'ok');
+    assert.deepStrictEqual(phoneSev('72550', 'sms'), ['high']);
+});
+
+test('niepoprawny numer nie wywołuje błędu', () => {
+    assert.strictEqual(s.analyzePhone('12345678901234').check.status, 'na');
+});
+
+test('numery w tekście, bez mylenia z NIP-em i kontem', () => {
+    const found = s.extractPhones('Zadzwoń 600 700 800 lub +44 7911 123456. NIP 525-234-40-78, konto 37 1030 1508 0000 0005 0416 2044');
+    assert.deepStrictEqual(found, ['+48600700800', '+447911123456']);
+});
+
 console.log(`\n${passed} OK, ${failed} błędów`);
 if (failed) process.exitCode = 1;

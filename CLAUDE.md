@@ -155,7 +155,9 @@ w `apps.js` = bez limitów EduBox i bez odznak PRO na kafelku). Backend w
 funkcji Vercel). Sprawdza: lista CERT Polska (`hole.cert.pl`, cache 30 min), wiek domeny
 (RDAP przez katalog IANA; rdap.org blokuje serwery), podszywanie się pod ~40 marek,
 podgląd strony (ochrona SSRF), białą listę VAT (NIP/konto), opcjonalnie Google Safe
-Browsing (`GOOGLE_SAFE_BROWSING_KEY`), na końcu AI. **Zasada prawna: „ocena ryzyka, nie
+Browsing (`GOOGLE_SAFE_BROWSING_KEY`), numery telefonu (`libphonenumber-js`: kraj, 70x,
+VoIP, SMS Premium, wangiri + okoliczności kontaktu; **celowo bez bazy „oszukańczych
+numerów”** — spoofing i RODO), na końcu AI (pomijane, gdy podano sam numer). **Zasada prawna: „ocena ryzyka, nie
 wyrok”** — nigdy „to oszustwo” ani „bezpieczne”; twarde sprawdzenia mogą tylko PODNIEŚĆ
 poziom z AI (odporność na prompt injection w treści strony). Treści nie są zapisywane ani
 logowane. Testy: `node api/_lib/scamCheck.test.js`.

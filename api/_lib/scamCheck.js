@@ -12,6 +12,7 @@
 const dns = require('dns').promises;
 const net = require('net');
 const { isRateLimited } = require('./rateLimit.js');
+const { parsePhoneNumberFromString, findPhoneNumbersInText } = require('libphonenumber-js/max');
 
 const CERT_LIST_URL = 'https://hole.cert.pl/domains/v2/domains.txt';
 const CERT_TTL_MS = 30 * 60 * 1000;
@@ -462,7 +463,7 @@ ZASADY BEZWZGLĘDNE:
 5. Jeśli materiału jest za mało do oceny, napisz to uczciwie i ustaw ryzyko „medium” lub „low” z wyjaśnieniem.
 6. Pisz prostą polszczyzną, bez żargonu, krótko i konkretnie. Zwracaj się do użytkownika na „Ty”.
 
-Znane w Polsce schematy (rozpoznawaj je): dopłata do przesyłki (InPost, DPD, Poczta Polska); „Kup z OLX/Vinted” i fałszywy kurier lub link do „odbioru pieniędzy”; prośba o kod BLIK od „znajomego” z przejętego konta; fałszywy konsultant banku / policjant i instalacja AnyDesk/TeamViewer; inwestycje z wizerunkiem celebryty lub spółki skarbu państwa (Orlen, PGE, „Baltic Pipe”), krypto i forex z „opiekunem”; nadpłata lub faktura za prąd/gaz; zwrot podatku, mandat, e-TOLL, mObywatel; fałszywy sklep z rabatami 50–90%, często reklamowany na Facebooku/Instagramie, brak danych firmy, płatność tylko przelewem; zaliczka za wynajem mieszkania lub zwierzę „z zagranicy”; praca zdalna za lajki/oceny (task scam) z wpłatami; konkursy i „rocznice” sklepów (Biedronka, Lidl) z prośbą o dane; „na wnuczka” i romanse internetowe; fałszywe strony logowania do banku, Facebooka, poczty.
+Znane w Polsce schematy (rozpoznawaj je): dopłata do przesyłki (InPost, DPD, Poczta Polska); „Kup z OLX/Vinted” i fałszywy kurier lub link do „odbioru pieniędzy”; prośba o kod BLIK od „znajomego” z przejętego konta; fałszywy konsultant banku / policjant i instalacja AnyDesk/TeamViewer; inwestycje z wizerunkiem celebryty lub spółki skarbu państwa (Orlen, PGE, „Baltic Pipe”), krypto i forex z „opiekunem”; nadpłata lub faktura za prąd/gaz; zwrot podatku, mandat, e-TOLL, mObywatel; fałszywy sklep z rabatami 50–90%, często reklamowany na Facebooku/Instagramie, brak danych firmy, płatność tylko przelewem; zaliczka za wynajem mieszkania lub zwierzę „z zagranicy”; praca zdalna za lajki/oceny (task scam) z wpłatami; konkursy i „rocznice” sklepów (Biedronka, Lidl) z prośbą o dane; „na wnuczka” i romanse internetowe; fałszywe strony logowania do banku, Facebooka, poczty; podrobiony numer banku na ekranie telefonu (spoofing); „głuche” połączenia z zagranicy (wangiri) i numery 70x, żeby ofiara oddzwoniła; SMS-y z prośbą o odpowiedź na płatny numer.
 
 Typowe sygnały: presja czasu i straszenie; ceny zbyt piękne, żeby były prawdziwe; prośba o dane karty, kod BLIK, hasło, PESEL, zdjęcie dowodu; płatność tylko przelewem/BLIK-iem/krypto na prywatne konto; przeniesienie rozmowy na WhatsApp/Telegram; błędy językowe i automatyczne tłumaczenie; brak danych firmy (NIP, adres, regulamin, zwroty); skrócone lub dziwne linki; nowe konto/profil bez historii; komentarze wyłączone lub same zachwyty.
 
@@ -545,12 +546,158 @@ function formatAge(days) {
   return `ok. ${Math.floor(days / 365)} lat temu`;
 }
 
+// --- Numery telefonu ------------------------------------------------------------------
+// Celowo BEZ bazy "oszukańczych numerów": numer można podrobić (spoofing), więc wpis w bazie
+// mógłby oskarżyć niewinną osobę, a "czysty" wynik dawałby złudne poczucie bezpieczeństwa
+// (do tego RODO - numer to dana osobowa). Oceniamy tylko to, co mówi sam numer, i okoliczności.
+
+// Kierunki często używane w połączeniach "wangiri" (głuchy telefon, żeby ofiara oddzwoniła na drogi numer)
+// oraz sieci satelitarne/międzynarodowe o wysokich stawkach.
+const WANGIRI_CODES = new Set([
+  '216', '222', '223', '224', '225', '226', '227', '228', '229', '231', '232', '234', '235', '236', '237',
+  '242', '243', '247', '252', '261', '269', '290', '675', '682', '685', '686', '688', '690', '870', '881', '882', '883'
+]);
+
+const CONTACTS = {
+  call_bank: 'telefon od osoby podającej się za bank, policję, urząd lub znaną firmę',
+  call_missed: 'nieodebrane lub bardzo krótkie połączenie („głuchy telefon”)',
+  sms: 'SMS',
+  messenger: 'wiadomość w komunikatorze (WhatsApp, Messenger, Telegram)',
+  other: ''
+};
+
+const CONTACT_ADVICE = {
+  call_bank: [
+    'Rozłącz się i zadzwoń do banku (urzędu, firmy) sam - na numer z karty lub z oficjalnej strony, najlepiej z innego telefonu.',
+    'Nie instaluj żadnych aplikacji na prośbę rozmówcy i nie przelewaj pieniędzy na „bezpieczne konto”.',
+    'Nie podawaj kodów z SMS-ów, kodu BLIK, PIN-u ani haseł - prawdziwy konsultant nigdy o nie nie prosi.'
+  ],
+  call_missed: [
+    'Nie oddzwaniaj na nieznane numery zagraniczne ani zaczynające się od 70x.',
+    'Jeśli ktoś naprawdę czegoś od Ciebie chce, zadzwoni ponownie albo napisze.'
+  ],
+  sms: [
+    'Nie klikaj w linki z SMS-a - sprawdź sprawę w oficjalnej aplikacji lub na stronie, wpisując adres samodzielnie.',
+    'Podejrzany SMS prześlij bezpłatnie na numer 8080 (CERT Polska).'
+  ],
+  messenger: [
+    'Prośbę o pieniądze lub kod BLIK potwierdź zwykłym telefonem do tej osoby - konta w komunikatorach są często przejmowane.',
+    'Nie przechodź z rozmową z ogłoszenia (OLX, Vinted) na WhatsApp ani Telegram.'
+  ],
+  other: [],
+  // sam numer, bez wybranych okoliczności
+  '': [
+    'Jeśli ktoś z tego numeru prosi o pieniądze, kody z SMS-ów, BLIK, dane karty albo instalację aplikacji - to sygnał ostrzegawczy niezależnie od numeru.',
+    'Podejrzany SMS prześlij bezpłatnie na numer 8080, a podejrzaną rozmowę zgłoś na incydent.cert.pl.'
+  ]
+};
+
+const regionNames = (() => { try { return new Intl.DisplayNames(['pl'], { type: 'region' }); } catch { return null; } })();
+function countryName(code) {
+  try { return (regionNames && code && regionNames.of(code)) || code || 'inny kraj'; } catch { return code || 'inny kraj'; }
+}
+
+function extractPhones(text) {
+  try {
+    return findPhoneNumbersInText(String(text || ''), 'PL')
+      .filter(f => f.number && f.number.isValid())
+      .map(f => f.number.number)
+      .filter((n, i, arr) => arr.indexOf(n) === i)
+      .slice(0, 2);
+  } catch { return []; }
+}
+
+// Zwraca { signals, check, fact } dla jednego numeru.
+function analyzePhone(raw, contact) {
+  const signals = [];
+  const input = String(raw || '').trim();
+  const compact = input.replace(/[\s().-]/g, '');
+
+  // Krótkie numery (SMS Premium, usługi)
+  if (/^\d{4,5}$/.test(compact)) {
+    if (compact === '8080') {
+      return { signals, check: { name: `Numer ${compact}`, status: 'ok', detail: '8080 to oficjalny numer CERT Polska do bezpłatnego zgłaszania podejrzanych SMS-ów.' }, fact: 'Numer 8080 to oficjalny numer CERT Polska do zgłaszania SMS-ów.' };
+    }
+    if (/^[79]/.test(compact)) {
+      signals.push({ severity: contact === 'sms' || contact === 'call_missed' ? 'high' : 'medium', source: 'Numer telefonu', title: `Numer SMS Premium (${compact})`, detail: 'Krótkie numery zaczynające się od 7 lub 9 to płatne usługi SMS - jedna wiadomość może kosztować nawet kilkadziesiąt złotych. Nie wysyłaj SMS-ów na takie numery na prośbę nieznajomych, „konkursów” ani „weryfikacji”.' });
+      return { signals, check: { name: `Numer ${compact}`, status: 'bad', detail: 'Płatny numer SMS Premium.' }, fact: `Numer ${compact} to płatny krótki numer SMS Premium.` };
+    }
+    return { signals, check: { name: `Numer ${compact}`, status: 'warn', detail: 'Krótki numer usługowy - sprawdź u operatora, ile kosztuje SMS lub połączenie.' }, fact: `Numer ${compact} to krótki numer usługowy.` };
+  }
+
+  const p = parsePhoneNumberFromString(input, 'PL');
+  if (!p || !p.isValid()) {
+    return { signals, check: { name: `Numer ${input.slice(0, 25)}`, status: 'na', detail: 'Nie rozpoznaliśmy poprawnego numeru telefonu - sprawdź, czy jest wpisany w całości (z kierunkowym kraju, jeśli zaczyna się od +).' }, fact: '' };
+  }
+
+  const intl = p.formatInternational();
+  const cc = p.countryCallingCode;
+  const type = p.getType();
+
+  if (cc !== '48') {
+    const country = countryName(p.country);
+    const wangiri = WANGIRI_CODES.has(cc);
+    const severity = wangiri ? (contact === 'call_missed' ? 'high' : 'medium') : (contact === 'call_bank' || contact === 'sms' ? 'medium' : 'low');
+    signals.push({
+      severity,
+      source: 'Numer telefonu',
+      title: `Numer zagraniczny: +${cc} (${country})`,
+      detail: wangiri
+        ? 'Z tego kierunku często przychodzą „głuche” połączenia, które mają skłonić do oddzwonienia na bardzo drogi numer. Nie oddzwaniaj.'
+        : 'Polskie banki, kurierzy i urzędy kontaktują się zwykle z polskich numerów. Zagraniczny numer w wiadomości „od polskiej firmy” to sygnał ostrzegawczy.'
+    });
+    return { signals, check: { name: `Numer ${intl}`, status: severity === 'low' ? 'warn' : 'bad', detail: `Numer zagraniczny: ${country}.` }, fact: `Numer ${intl} jest zagraniczny (${country})${wangiri ? ' - kierunek typowy dla połączeń wangiri' : ''}.` };
+  }
+
+  if (type === 'PREMIUM_RATE') {
+    signals.push({ severity: contact === 'call_missed' || contact === 'sms' ? 'high' : 'medium', source: 'Numer telefonu', title: 'Numer o podwyższonej opłacie (70x)', detail: 'Połączenie z takim numerem kosztuje znacznie więcej niż zwykła rozmowa. Oszuści zachęcają do oddzwonienia lub „odebrania nagrody” właśnie pod takim numerem.' });
+    return { signals, check: { name: `Numer ${intl}`, status: 'bad', detail: 'Numer o podwyższonej opłacie.' }, fact: `Numer ${intl} to polski numer o podwyższonej opłacie (70x).` };
+  }
+  if (type === 'VOIP') {
+    signals.push({ severity: 'low', source: 'Numer telefonu', title: 'Numer internetowy (VoIP)', detail: 'Takich numerów używają call center, ale też oszuści, bo łatwo je założyć i porzucić.' });
+    return { signals, check: { name: `Numer ${intl}`, status: 'warn', detail: 'Polski numer internetowy (VoIP).' }, fact: `Numer ${intl} to polski numer internetowy (VoIP).` };
+  }
+  const labels = {
+    MOBILE: 'zwykły polski numer komórkowy',
+    FIXED_LINE: 'polski numer stacjonarny',
+    FIXED_LINE_OR_MOBILE: 'polski numer',
+    TOLL_FREE: 'bezpłatna infolinia (800)',
+    SHARED_COST: 'infolinia o współdzielonej opłacie (801/804)',
+    UAN: 'numer usługowy'
+  };
+  const label = labels[type] || 'polski numer';
+  return { signals, check: { name: `Numer ${intl}`, status: 'ok', detail: `${label.charAt(0).toUpperCase() + label.slice(1)}. Sam numer nie zdradza oszustwa - liczy się to, czego od Ciebie chcą.` }, fact: `Numer ${intl}: ${label}.` };
+}
+
+function contactSignal(contact) {
+  if (contact === 'call_bank') {
+    return { severity: 'medium', source: 'Okoliczności', title: 'Telefon „z banku”, policji lub urzędu', detail: 'To najczęstszy scenariusz oszustwa telefonicznego. Numer wyświetlany na ekranie można podrobić (spoofing) - nawet prawdziwy numer banku nie jest dowodem, że dzwoni bank.' };
+  }
+  return null;
+}
+
 // --- Główna procedura -----------------------------------------------------------------
 
-async function runChecks({ url, text, image }) {
+async function runChecks({ url, text, image, phone, contact }) {
   const signals = [];
   const checks = [];
   const facts = [];
+  contact = CONTACTS[contact] !== undefined ? contact : '';
+
+  // 0) numery telefonu (bez sieci): podany wprost albo znaleziony w tekście
+  const phoneList = phone ? [phone] : extractPhones(text);
+  for (const ph of phoneList) {
+    const r = analyzePhone(ph, contact);
+    signals.push(...r.signals);
+    checks.push(r.check);
+    if (r.fact) facts.push(r.fact);
+  }
+  if (contact && CONTACTS[contact]) facts.push(`Sposób kontaktu według użytkownika: ${CONTACTS[contact]}.`);
+  const cs = contactSignal(contact);
+  if (cs) signals.push(cs);
+  if (phoneList.length) {
+    checks.push({ name: 'Podszywanie się pod numer', status: 'na', detail: 'Numer na ekranie można podrobić, więc żaden numer - nawet prawdziwy numer banku - nie jest dowodem, kto naprawdę dzwoni lub pisze.' });
+  }
 
   const urls = [];
   const directUrl = url ? normalizeUrl(url) : null;
@@ -689,21 +836,29 @@ async function runChecks({ url, text, image }) {
     checks.push({ name: 'Google Safe Browsing', status: 'ok', detail: 'Brak ostrzeżeń Google.' });
   }
 
-  // 3) AI
+  // 3) AI - tylko gdy jest treść do oceny. Sam numer telefonu AI nic nie powie (wynik z reguł).
+  const phoneOnly = phoneList.length > 0 && !text && !image && !url;
   let ai = null;
-  try {
-    ai = sanitizeAi(await askAi({ text, imageDataUrl: image, facts, page }));
-    checks.push({ name: 'Analiza treści (AI)', status: RANK[ai.risk] === 2 ? 'bad' : RANK[ai.risk] === 1 ? 'warn' : 'ok', detail: ai.scamType ? `Przypomina schemat: ${ai.scamType}.` : 'Przeanalizowano język, prośby i sposób działania.' });
-  } catch (e) {
-    checks.push({ name: 'Analiza treści (AI)', status: 'na', detail: 'Analiza AI chwilowo niedostępna - wynik opiera się tylko na twardych sprawdzeniach.' });
+  if (!phoneOnly) {
+    try {
+      ai = sanitizeAi(await askAi({ text, imageDataUrl: image, facts, page }));
+      checks.push({ name: 'Analiza treści (AI)', status: RANK[ai.risk] === 2 ? 'bad' : RANK[ai.risk] === 1 ? 'warn' : 'ok', detail: ai.scamType ? `Przypomina schemat: ${ai.scamType}.` : 'Przeanalizowano język, prośby i sposób działania.' });
+    } catch (e) {
+      checks.push({ name: 'Analiza treści (AI)', status: 'na', detail: 'Analiza AI chwilowo niedostępna - wynik opiera się tylko na twardych sprawdzeniach.' });
+    }
   }
 
   // 4) poziom końcowy: twarde sprawdzenia mogą tylko PODNIEŚĆ ocenę AI
   const ruleLevel = signals.reduce((acc, s) => maxLevel(acc, s.severity === 'high' ? 'high' : s.severity === 'medium' ? 'medium' : 'low'), 'low');
   const mediumCount = signals.filter(s => s.severity === 'medium').length;
-  let level = maxLevel(ruleLevel, ai ? ai.risk : 'medium', mediumCount >= 3 ? 'high' : 'low');
-  // Bez AI i bez twardych dowodów nie dajemy "zielonego" wyniku.
-  if (!ai && level === 'low') level = 'medium';
+  let level = maxLevel(ruleLevel, ai ? ai.risk : (phoneOnly ? 'low' : 'medium'), mediumCount >= 3 ? 'high' : 'low');
+  // Bez AI i bez twardych dowodów nie dajemy "zielonego" wyniku (poza samym numerem - tam ocena jest z reguł).
+  if (!ai && !phoneOnly && level === 'low') level = 'medium';
+  const PHONE_HEADLINES = {
+    high: 'Numer i okoliczności mają cechy typowe dla oszustwa.',
+    medium: 'Zachowaj ostrożność - coś w numerze lub okolicznościach budzi wątpliwości.',
+    low: 'Sam numer nie zdradza oszustwa - liczy się to, czego od Ciebie chcą.'
+  };
 
   // Sam adres oficjalnej domeny znanej marki (np. allegro.pl), bez wklejonej treści i bez twardych
   // sygnałów: AI nie ma czego oceniać (serwisy blokują roboty), więc nie straszymy żółtym wynikiem.
@@ -726,10 +881,10 @@ async function runChecks({ url, text, image }) {
   return {
     level,
     scamType: ai?.scamType || '',
-    headline: officialOnly ? `Adres należy do oficjalnej domeny: ${officialBrand}.` : (ai?.headline || ''),
+    headline: officialOnly ? `Adres należy do oficjalnej domeny: ${officialBrand}.` : (ai?.headline || (phoneOnly ? PHONE_HEADLINES[level] : '')),
     signals: allSignals,
     positives: level === 'high' ? [] : (ai?.positives || []),
-    advice: [...extraAdvice, ...(ai?.advice || [])].slice(0, 5),
+    advice: [...extraAdvice, ...((contact || phoneOnly) ? (CONTACT_ADVICE[contact] || []) : []), ...(ai?.advice || [])].slice(0, 5),
     checks,
     checkedHosts: hostList
   };
@@ -750,8 +905,10 @@ async function handleVerify(req, res) {
   const url = typeof body.url === 'string' ? body.url.trim().slice(0, MAX_URL) : '';
   const text = typeof body.text === 'string' ? body.text.trim() : '';
   const image = typeof body.image === 'string' ? body.image : '';
+  const phone = typeof body.phone === 'string' ? body.phone.trim().slice(0, 40) : '';
+  const contact = typeof body.contact === 'string' && CONTACTS[body.contact] !== undefined ? body.contact : '';
 
-  if (!url && !text && !image) return res.status(400).json({ message: 'Wklej link, tekst albo dodaj zrzut ekranu.' });
+  if (!url && !text && !image && !phone) return res.status(400).json({ message: 'Wklej link, tekst, numer telefonu albo dodaj zrzut ekranu.' });
   if (text.length > MAX_TEXT) return res.status(400).json({ message: `Tekst może mieć maksymalnie ${MAX_TEXT} znaków.` });
   if (image && (!/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(image) || image.length > MAX_IMAGE_CHARS)) {
     return res.status(400).json({ message: 'Nieprawidłowy lub zbyt duży obraz.' });
@@ -759,7 +916,7 @@ async function handleVerify(req, res) {
   if (!process.env.OPENAI_API_KEY) return res.status(500).json({ message: 'Brak konfiguracji serwera.' });
 
   try {
-    const result = await runChecks({ url, text, image });
+    const result = await runChecks({ url, text, image, phone, contact });
     res.setHeader('Cache-Control', 'private, no-store');
     return res.status(200).json(result);
   } catch (e) {
@@ -773,5 +930,6 @@ module.exports = {
   runChecks,
   // eksporty do testów
   registrableDomain, analyzeHost, extractUrls, extractNips, extractAccounts, isValidNip, isValidNrb,
+  analyzePhone, extractPhones,
   certListed, isPrivateIp, sanitizeAi, soften, maxLevel
 };
