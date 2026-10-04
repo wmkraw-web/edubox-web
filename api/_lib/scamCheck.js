@@ -705,6 +705,17 @@ async function runChecks({ url, text, image }) {
   // Bez AI i bez twardych dowodów nie dajemy "zielonego" wyniku.
   if (!ai && level === 'low') level = 'medium';
 
+  // Sam adres oficjalnej domeny znanej marki (np. allegro.pl), bez wklejonej treści i bez twardych
+  // sygnałów: AI nie ma czego oceniać (serwisy blokują roboty), więc nie straszymy żółtym wynikiem.
+  // Ostrzegamy za to, że oszuści publikują też ogłoszenia i posty NA prawdziwych serwisach.
+  const officialOnly = officialBrand && !text && !image && hostInfos.every(h => h.official) && ruleLevel === 'low';
+  let extraAdvice = [];
+  if (officialOnly) {
+    level = 'low';
+    if (ai) ai.signals = ai.signals.filter(s => s.severity === 'high');
+    extraAdvice = [`To oficjalny adres ${officialBrand}. Pamiętaj, że oszuści publikują też ogłoszenia, posty i wiadomości NA prawdziwych serwisach - jeśli coś Cię niepokoi, wklej treść ogłoszenia lub wiadomości w zakładce „SMS / wiadomość / oferta”.`];
+  }
+
   // AI czasem mimo instrukcji powtarza fakty z twardych sprawdzeń - te pokazujemy tylko raz.
   const DUPLICATE_OF_FACTS = /(now[aey]?\s+(domen|stron)|wiek\s+domen|zarejestrowan|CERT|końcówk|lista ostrzeżeń)/i;
   const aiSignals = (ai ? ai.signals : []).filter(s => !DUPLICATE_OF_FACTS.test(s.title));
@@ -715,10 +726,10 @@ async function runChecks({ url, text, image }) {
   return {
     level,
     scamType: ai?.scamType || '',
-    headline: ai?.headline || '',
+    headline: officialOnly ? `Adres należy do oficjalnej domeny: ${officialBrand}.` : (ai?.headline || ''),
     signals: allSignals,
     positives: level === 'high' ? [] : (ai?.positives || []),
-    advice: ai?.advice || [],
+    advice: [...extraAdvice, ...(ai?.advice || [])].slice(0, 5),
     checks,
     checkedHosts: hostList
   };
