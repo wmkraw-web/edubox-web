@@ -160,7 +160,15 @@ VoIP, SMS Premium, wangiri + okoliczności kontaktu; **celowo bez bazy „oszuka
 numerów”** — spoofing i RODO), na końcu AI (pomijane, gdy podano sam numer). **Zasada prawna: „ocena ryzyka, nie
 wyrok”** — nigdy „to oszustwo” ani „bezpieczne”; twarde sprawdzenia mogą tylko PODNIEŚĆ
 poziom z AI (odporność na prompt injection w treści strony). Treści nie są zapisywane ani
-logowane. Testy: `node api/_lib/scamCheck.test.js`.
+logowane. Testy: `node api/_lib/scamCheck.test.js`. Link `zanimklikniesz.html?tab=link|text|phone|image`
+otwiera wybraną zakładkę.
+
+**Poradniki o oszustwach** (SEO, ruch z Google → ZanimKlikniesz): statyczne strony
+`oszustwo-*.html`, `jak-sprawdzic-sklep-internetowy.html`, `falszywe-inwestycje-reklamy.html`
+generowane przez `node scripts/generate-poradniki.js` z tablicy `GUIDES` (nie edytuj HTML
+ręcznie — zmiany w generatorze, potem `npm run seo:sitemap` i `npm test`). Nowy poradnik:
+dopisz do `GUIDES`, do `publicPages` w `seo.config.js` i do listy `GUIDES` w `zanimklikniesz.html`.
+Zasada jak w narzędziu: piszemy o oszustach podszywających się pod firmy, nigdy że firma oszukuje.
 
 **Generowanie treści przez AI — wypracowane wzorce:**
 - *Dwuetapowy generator + weryfikator* (EduRymy): pierwsze zapytanie
