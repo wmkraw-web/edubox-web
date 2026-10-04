@@ -1,4 +1,5 @@
 import { isRateLimited } from './_lib/rateLimit.js';
+import { handleVerify } from './_lib/scamCheck.js';
 
 const TTS_RATE_WINDOW_MS = 5 * 60 * 1000;
 const TTS_RATE_MAX_REQUESTS = 12;
@@ -123,6 +124,11 @@ export default async function handler(req, res) {
 
   if (req.body?.mode === 'tts') {
     return handleTts(req, res);
+  }
+
+  // ZanimKlikniesz (zanimklikniesz.html) - ocena ryzyka linku/oferty; osobny tryb zamiast 12. funkcji.
+  if (req.body?.mode === 'verify') {
+    return handleVerify(req, res);
   }
 
   // Endpoint tekstowy obsługuje ~50 narzędzi i był całkowicie otwarty (bez auth, bez limitu).

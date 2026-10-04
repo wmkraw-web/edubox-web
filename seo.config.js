@@ -66,6 +66,7 @@ module.exports = {
     { path: 'eduraport.html' },
     { path: 'edureforma.html' },
     { path: 'edurymy.html' },
+    { path: 'zanimklikniesz.html', changefreq: 'weekly', priority: '0.9' },
     { path: 'eduscenariusz.html' },
     { path: 'edusos.html' },
     { path: 'edusprawdzian.html' },
