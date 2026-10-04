@@ -1,8 +1,8 @@
 window.OGLOSZENIE = {
-  "id": "2026-09-01T20:26:33.958Z",
+  "id": "2026-10-04-zanimklikniesz",
   "active": true,
-  "title": "Nowość w EduBox AI!",
-  "message": "Bezpieczeństwo dzieci · Poradnik dla szkoły\n\nStandardy ochrony małoletnich — sprawdź przed nowym rokiem szkolnym\nObowiązki placówki, przegląd standardów, bezpieczeństwo w Internecie i sprawdzone źródła prawne. Bez logowania, z listą kontrolną do wydruku.",
-  "linkText": "",
-  "linkUrl": ""
+  "title": "Nowość: ZanimKlikniesz 🛡️",
+  "message": "Darmowe narzędzie dla każdego – nie tylko dla nauczycieli\n\nDostałeś SMS o dopłacie do paczki, telefon „z banku” albo podejrzaną ofertę na Facebooku? Wklej link, wiadomość, numer telefonu lub zrzut ekranu i w kilka sekund zobacz sygnały ostrzegawcze.\nLista ostrzeżeń CERT Polska, wiek strony, podszywanie się pod znane marki i analiza AI. Bez logowania. W środku także quiz „Oszustwo czy nie?” na lekcję.",
+  "linkText": "Sprawdź za darmo →",
+  "linkUrl": "zanimklikniesz.html?utm_source=eduboxpro&utm_medium=popup&utm_campaign=zanimklikniesz"
 };
