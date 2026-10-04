@@ -635,7 +635,9 @@ function analyzePhone(raw, contact) {
   const type = p.getType();
 
   if (cc !== '48') {
-    const country = countryName(p.country);
+    // Kierunki dzielone przez kilka krajów (np. +44 to też Guernsey/Jersey) - pokazujemy główny kraj.
+    const SHARED_CODES = { '44': 'Wielka Brytania', '1': 'USA lub Kanada', '7': 'Rosja lub Kazachstan' };
+    const country = SHARED_CODES[cc] || countryName(p.country);
     const wangiri = WANGIRI_CODES.has(cc);
     const severity = wangiri ? (contact === 'call_missed' ? 'high' : 'medium') : (contact === 'call_bank' || contact === 'sms' ? 'medium' : 'low');
     signals.push({
@@ -872,7 +874,7 @@ async function runChecks({ url, text, image, phone, contact }) {
   }
 
   // AI czasem mimo instrukcji powtarza fakty z twardych sprawdzeń - te pokazujemy tylko raz.
-  const DUPLICATE_OF_FACTS = /(now[aey]?\s+(domen|stron)|wiek\s+domen|zarejestrowan|CERT|końcówk|lista ostrzeżeń)/i;
+  const DUPLICATE_OF_FACTS = /(now[aey]?\s+(domen|stron)|wiek\s+domen|zarejestrowan|CERT|końcówk|lista ostrzeżeń|zagraniczn\w*\s+numer|numer\w*\s+zagraniczn|podając\w*\s+się\s+za\s+bank|„z banku”|podwyższonej opłac|SMS Premium)/i;
   const aiSignals = (ai ? ai.signals : []).filter(s => !DUPLICATE_OF_FACTS.test(s.title));
   const allSignals = [...signals, ...aiSignals]
     .sort((a, b) => RANK[b.severity] - RANK[a.severity])
