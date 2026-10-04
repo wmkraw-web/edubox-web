@@ -91,6 +91,39 @@ jobs:
             };
           }
 
+          // Które serie (kampanie UTM z Make) i źródła przyprowadzają ruch - żeby wiedzieć,
+          // co rozwijać, a co wyłączyć. Plus użycie ZanimKlikniesz (zdarzenia gtag z zanimklikniesz.html).
+          async function ga4Report(propertyId, accessToken, body) {
+            const res = await fetch(`https://analyticsdata.googleapis.com/v1beta/properties/${propertyId}:runReport`, {
+              method: 'POST',
+              headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ dateRanges: [{ startDate: '7daysAgo', endDate: 'today' }], ...body })
+            });
+            if (!res.ok) throw new Error('GA4 Data API error: ' + res.status + ' ' + await res.text());
+            return (await res.json()).rows || [];
+          }
+
+          async function fetchGA4Campaigns(propertyId, accessToken) {
+            const rows = await ga4Report(propertyId, accessToken, {
+              dimensions: [{ name: 'sessionCampaignName' }, { name: 'sessionSource' }],
+              metrics: [{ name: 'sessions' }],
+              orderBys: [{ metric: { metricName: 'sessions' }, desc: true }],
+              limit: 15
+            });
+            return rows.map(r => ({ campaign: r.dimensionValues[0].value, source: r.dimensionValues[1].value, sessions: Number(r.metricValues[0].value) }));
+          }
+
+          async function fetchGA4ZkEvents(propertyId, accessToken) {
+            const rows = await ga4Report(propertyId, accessToken, {
+              dimensions: [{ name: 'eventName' }],
+              metrics: [{ name: 'eventCount' }],
+              dimensionFilter: { filter: { fieldName: 'eventName', inListFilter: { values: ['zk_check', 'zk_share', 'zk_quiz_done', 'zk_print_rules'] } } }
+            });
+            const out = {};
+            for (const r of rows) out[r.dimensionValues[0].value] = Number(r.metricValues[0].value);
+            return out;
+          }
+
           // EduBoxCore.bumpGlobalCounter() w global-core.js już dziś, na żywo,
           // liczy każde udane wygenerowanie (tekst i obrazek) na narzędziach
           // korzystających ze wspólnego mechanizmu limitów. To pojedynczy,
@@ -182,6 +215,9 @@ jobs:
               try {
                 if (googleTokenError) throw new Error(googleTokenError);
                 ga4 = await fetchGA4(ga4PropertyId, googleToken);
+                // Dodatkowe sekcje są opcjonalne - ich błąd nie psuje podstawowych liczb ruchu.
+                try { ga4.campaigns = await fetchGA4Campaigns(ga4PropertyId, googleToken); } catch (e) { ga4.campaignsError = e.message; }
+                try { ga4.zk = await fetchGA4ZkEvents(ga4PropertyId, googleToken); } catch (e) { ga4.zkError = e.message; }
               } catch (e) { ga4Error = e.message; }
             }
 
@@ -224,6 +260,16 @@ jobs:
             let trafficHtml;
             if (ga4Configured && ga4) {
               trafficHtml = `<li>Ruch (7 dni): ${ga4.sessions} sesji &bull; ${ga4.activeUsers} użytkowników &bull; ${ga4.pageViews} odsłon</li>`;
+              if (ga4.campaigns && ga4.campaigns.length) {
+                const esc = s => String(s).replace(/[<>&]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]));
+                const label = c => c === '(direct)' ? 'wejścia bezpośrednie' : c === '(organic)' ? 'wyszukiwarki' : c === '(referral)' ? 'linki z innych stron' : c === '(not set)' ? 'bez oznaczenia' : c;
+                trafficHtml += `<li>Skąd przychodzą (seria / źródło, sesje):<ul>${ga4.campaigns.map(c => `<li>${esc(label(c.campaign))} / ${esc(c.source)}: <b>${c.sessions}</b></li>`).join('')}</ul></li>`;
+              } else if (ga4.campaignsError) {
+                trafficHtml += `<li>Serie: błąd pobierania (${ga4.campaignsError})</li>`;
+              }
+              if (ga4.zk) {
+                trafficHtml += `<li>ZanimKlikniesz (7 dni): ${ga4.zk.zk_check || 0} sprawdzeń &bull; ${ga4.zk.zk_quiz_done || 0} ukończonych quizów &bull; ${ga4.zk.zk_share || 0} udostępnień &bull; ${ga4.zk.zk_print_rules || 0} wydruków plakatu <span style="color:#64748b">(tylko osoby, które zgodziły się na statystyki)</span></li>`;
+              }
             } else if (ga4Configured && ga4Error) {
               trafficHtml = `<li>Ruch: błąd pobierania z GA4 (${ga4Error})</li>`;
             } else {
