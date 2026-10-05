@@ -163,9 +163,9 @@ poziom z AI (odporność na prompt injection w treści strony). Treści nie są 
 logowane. Testy: `node api/_lib/scamCheck.test.js`. Link `zanimklikniesz.html?tab=link|text|phone|image`
 otwiera wybraną zakładkę.
 
-**Google Analytics:** strony wysyłają dane do DWÓCH identyfikatorów: `G-3RQ9R0N0K8`
-(historyczny, w tagu gtag.js) i `G-CL194R0J5H` (strumień „EduBox AI” w panelu właściciela,
-od 5.10.2026). Nowa strona = skopiuj blok gtag z istniejącej (oba `gtag('config')`).
+**Google Analytics:** jedyny identyfikator to `G-CL194R0J5H` (strumień „EduBox AI” dla
+eduboxpro.pl, od 5.10.2026). Stary `G-3RQ9R0N0K8` (usługa z czasów domeny Vercel) usunięty
+ze stron – zawiera tylko dane historyczne do 5.10.2026. Nowa strona = skopiuj blok gtag z istniejącej.
 Przy zmianach CSP sprawdź w konsoli, czy żądania `google-analytics.com/g/collect` przechodzą.
 
 **Poradniki o oszustwach** (SEO, ruch z Google → ZanimKlikniesz): statyczne strony
