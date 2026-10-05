@@ -163,6 +163,11 @@ poziom z AI (odporność na prompt injection w treści strony). Treści nie są 
 logowane. Testy: `node api/_lib/scamCheck.test.js`. Link `zanimklikniesz.html?tab=link|text|phone|image`
 otwiera wybraną zakładkę.
 
+**Google Analytics:** strony wysyłają dane do DWÓCH identyfikatorów: `G-3RQ9R0N0K8`
+(historyczny, w tagu gtag.js) i `G-CL194R0J5H` (strumień „EduBox AI” w panelu właściciela,
+od 5.10.2026). Nowa strona = skopiuj blok gtag z istniejącej (oba `gtag('config')`).
+Przy zmianach CSP sprawdź w konsoli, czy żądania `google-analytics.com/g/collect` przechodzą.
+
 **Poradniki o oszustwach** (SEO, ruch z Google → ZanimKlikniesz): statyczne strony
 `oszustwo-*.html`, `jak-sprawdzic-sklep-internetowy.html`, `falszywe-inwestycje-reklamy.html`
 generowane przez `node scripts/generate-poradniki.js` z tablicy `GUIDES` (nie edytuj HTML
