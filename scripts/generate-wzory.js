@@ -12,8 +12,8 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..');
-const UPDATED = '6 października 2026';
-const UPDATED_ISO = '2026-10-06';
+const UPDATED = '5 października 2026';
+const UPDATED_ISO = '2026-10-05';
 const BASE = 'https://eduboxpro.pl';
 
 const PAGES = [
@@ -131,7 +131,7 @@ Wskazówki do dalszej pracy: Warto codziennie czytać z uczniem na głos przez 1
       campaign: 'oceny-opisowe',
       text: 'Wybierz z list poziom ucznia (edukacja polonistyczna, matematyczna, rozwój społeczno-emocjonalny), dopisz własne obserwacje, a AI złoży z tego spójny, życzliwy tekst oceny. Za darmo, bez rejestracji. Zamiast imienia wpisz inicjał.'
     },
-    related: ['ocena-zachowania-przyklady.html', 'wpisy-do-dziennika-przyklady.html']
+    related: ['ocena-zachowania-przyklady.html', 'wpisy-do-dziennika-przyklady.html', 'sprawozdanie-wychowawcy-przyklady.html']
   },
   {
     slug: 'ocena-zachowania-przyklady.html',
@@ -216,7 +216,7 @@ Wskazówki: Warto chwalić ucznia za każdą sytuację, w której zachował spok
       text: 'Otwiera się od razu w trybie oceny zachowania: wybierz poziom w trzech obszarach (obowiązki, relacje, kultura i bezpieczeństwo), dopisz własne obserwacje, a AI zredaguje spójny, życzliwy opis. Za darmo, bez rejestracji. Zamiast imienia wpisz inicjał.'
     },
     extraLink: { text: 'Trudna rozmowa z rodzicem? EduDialog pomoże napisać spokojną wiadomość →', url: 'edudialog.html?mode=nvc' },
-    related: ['ocena-opisowa-przyklady.html', 'wpisy-do-dziennika-przyklady.html']
+    related: ['ocena-opisowa-przyklady.html', 'wpisy-do-dziennika-przyklady.html', 'sprawozdanie-wychowawcy-przyklady.html']
   },
   {
     slug: 'wpisy-do-dziennika-przyklady.html',
@@ -306,7 +306,149 @@ Wskazówki: Warto chwalić ucznia za każdą sytuację, w której zachował spok
       campaign: 'wpisy-dziennik',
       text: 'Podaj temat i aktywności, wybierz grupę wiekową (żłobek, przedszkole, klasy 1–3, 4–8, świetlica) i ewentualne dostosowania SPE – dostaniesz 5 wariantów wpisu do wyboru.'
     },
-    related: ['ocena-opisowa-przyklady.html', 'ocena-zachowania-przyklady.html']
+    related: ['ocena-opisowa-przyklady.html', 'ocena-zachowania-przyklady.html', 'sprawozdanie-wychowawcy-przyklady.html']
+  },
+  {
+    slug: 'sprawozdanie-wychowawcy-przyklady.html',
+    title: 'Sprawozdanie wychowawcy za I półrocze – wzór i przykłady',
+    description: 'Wzór sprawozdania wychowawcy klasy za I półrocze: co powinno zawierać, przykład dla klasy 2 i klasy 6, gotowe wnioski do dalszej pracy i zwroty do skopiowania.',
+    kicker: 'Wzory i przykłady · Wychowawca klasy',
+    h1: 'Sprawozdanie wychowawcy klasy za I półrocze – wzór i przykłady',
+    short: 'Sprawozdanie wychowawcy za I półrocze podsumowuje pracę z klasą: wyniki i frekwencję, zachowanie, realizację programu wychowawczo-profilaktycznego, współpracę z rodzicami i specjalistami oraz wnioski na II półrocze. Nie ma jednego obowiązującego wzoru – zakres i formę ustala zwykle szkoła. Poniżej znajdziesz uniwersalny układ, dwa przykłady i bank zwrotów do skopiowania.',
+    rulesTitle: 'Co zwykle zawiera sprawozdanie wychowawcy',
+    rules: [
+      'Informacje ogólne: klasa, liczba uczniów i okres, którego dotyczy sprawozdanie.',
+      'Wyniki nauczania i frekwencję – w klasach 1–3 opisowo, w klasach 4–8 także średnią i rozkład ocen.',
+      'Zachowanie uczniów, najważniejsze trudności wychowawcze i podjęte działania.',
+      'Realizację programu wychowawczo-profilaktycznego i planu pracy wychowawcy klasy.',
+      'Uroczystości, wycieczki, konkursy i osiągnięcia uczniów.',
+      'Współpracę z rodzicami, pedagogiem, psychologiem i innymi specjalistami.',
+      'Pomoc psychologiczno-pedagogiczną – liczbowo i ogólnie, bez danych wrażliwych.',
+      'Wnioski do pracy w II półroczu, wynikające z opisanych problemów.'
+    ],
+    examplesNote: 'Dane w nawiasach kwadratowych zastąp danymi swojej klasy, a układ dopasuj do wzoru obowiązującego w Twojej szkole.',
+    examples: [
+      {
+        label: 'Przykład 1: klasa 2 (edukacja wczesnoszkolna)',
+        meta: 'I półrocze · sprawozdanie wychowawcy',
+        text: `Sprawozdanie z pracy wychowawczej w klasie [2a] za I półrocze roku szkolnego [2026/2027]
+
+1. Informacje ogólne
+Klasa liczy [22] uczniów: [10] dziewczynek i [12] chłopców. Zespół klasowy jest zżyty – dzieci chętnie się ze sobą bawią i współpracują, choć zdarzają się drobne konflikty podczas przerw.
+
+2. Wyniki nauczania i frekwencja
+Wszyscy uczniowie otrzymali śródroczne oceny opisowe. Większość dzieci osiąga dobre i bardzo dobre wyniki. [4] uczniów potrzebuje wsparcia w czytaniu i pisaniu – zostali objęci zajęciami dydaktyczno-wyrównawczymi. Frekwencja w klasie wyniosła [93]%.
+
+3. Zachowanie
+Uczniowie znają zasady obowiązujące w klasie i w większości ich przestrzegają. Nad kulturą wypowiedzi i spokojnym rozwiązywaniem sporów pracowano podczas zajęć integracyjnych i rozmów w kręgu.
+
+4. Realizacja programu wychowawczo-profilaktycznego
+Zrealizowano zaplanowane działania, m.in. zajęcia o bezpiecznej drodze do szkoły, o emocjach i o zdrowym odżywianiu. Klasa wzięła udział w akcji „Sprzątanie świata” i w szkolnym konkursie plastycznym.
+
+5. Uroczystości i wydarzenia
+Uczniowie uczestniczyli w obchodach Dnia Edukacji Narodowej i Narodowego Święta Niepodległości. W klasie zorganizowano andrzejki i wigilię klasową, a także wyjście do [teatru].
+
+6. Współpraca z rodzicami
+Odbyły się [2] zebrania z rodzicami oraz konsultacje indywidualne. Rodzice pomagali w organizacji uroczystości klasowych. Kontakt z rodzicami odbywał się na bieżąco przez dziennik elektroniczny.
+
+7. Pomoc psychologiczno-pedagogiczna
+[3] uczniów korzysta z pomocy psychologiczno-pedagogicznej, m.in. z zajęć korekcyjno-kompensacyjnych i logopedycznych. Współpracowano z pedagogiem szkolnym.
+
+8. Wnioski do pracy w II półroczu
+– Kontynuować ćwiczenia w czytaniu ze zrozumieniem, szczególnie z uczniami objętymi wsparciem.
+– Doskonalić umiejętność rozwiązywania konfliktów i pracy w grupie.
+– Zachęcać rodziców do udziału w życiu klasy.`
+      },
+      {
+        label: 'Przykład 2: klasa 6',
+        meta: 'I półrocze · sprawozdanie wychowawcy',
+        text: `Sprawozdanie z pracy wychowawczej w klasie [6b] za I półrocze roku szkolnego [2026/2027]
+
+1. Informacje ogólne
+Klasa liczy [26] uczniów: [12] dziewcząt i [14] chłopców. Zespół jest zróżnicowany pod względem możliwości edukacyjnych; w ciągu półrocza wyraźnie poprawiła się współpraca w grupie.
+
+2. Wyniki nauczania
+Średnia ocen klasy wynosi [4,12]. [3] uczniów uzyskało średnią co najmniej [4,75]. [2] uczniów otrzymało śródroczną ocenę niedostateczną z [matematyki] – zostali objęci zajęciami wyrównawczymi, a z rodzicami ustalono sposób uzupełnienia braków.
+
+3. Frekwencja
+Frekwencja w klasie wyniosła [91,5]%. U [2] uczniów odnotowano liczne nieusprawiedliwione nieobecności – przeprowadzono rozmowy z uczniami i rodzicami we współpracy z pedagogiem szkolnym.
+
+4. Zachowanie
+Śródroczne oceny zachowania: wzorowe – [4], bardzo dobre – [9], dobre – [8], poprawne – [4], nieodpowiednie – [1], naganne – [0]. Najczęstsze trudności to konflikty rówieśnicze i niewłaściwe słownictwo. Prowadzono rozmowy indywidualne i zajęcia integracyjne, współpracując z rodzicami.
+
+5. Realizacja programu wychowawczo-profilaktycznego
+Na godzinach wychowawczych realizowano tematy dotyczące bezpieczeństwa w sieci, asertywności, zdrowego stylu życia i przeciwdziałania przemocy rówieśniczej. Klasa uczestniczyła w spotkaniu z [dzielnicowym] i w programie profilaktycznym [nazwa programu].
+
+6. Osiągnięcia i wydarzenia
+Uczniowie brali udział w konkursach przedmiotowych i zawodach sportowych; [2] uczniów zakwalifikowało się do etapu rejonowego [konkursu]. Klasa przygotowała [apel z okazji Narodowego Święta Niepodległości] i uczestniczyła w wycieczce do [miejsce].
+
+7. Współpraca z rodzicami i specjalistami
+Odbyły się [2] zebrania z rodzicami oraz konsultacje indywidualne. Rodzice wspierali organizację wycieczki i imprez klasowych. [5] uczniów ma opinie poradni psychologiczno-pedagogicznej, [1] uczeń – orzeczenie o potrzebie kształcenia specjalnego; zalecenia są realizowane przez nauczycieli uczących w klasie.
+
+8. Wnioski do pracy w II półroczu
+– Systematycznie monitorować frekwencję i szybko reagować na nieusprawiedliwione nieobecności.
+– Kontynuować działania integrujące zespół klasowy i uczące rozwiązywania konfliktów.
+– Motywować uczniów z trudnościami do udziału w zajęciach wyrównawczych.
+– Wzmacniać odpowiedzialne korzystanie z internetu i telefonów komórkowych.`
+      }
+    ],
+    phrases: [
+      ['Informacje ogólne i klimat klasy', [
+        'Zespół klasowy jest zintegrowany, uczniowie chętnie ze sobą współpracują.',
+        'W klasie panuje życzliwa atmosfera sprzyjająca nauce.',
+        'Klasa jest zróżnicowana pod względem możliwości edukacyjnych i zainteresowań.',
+        'W ciągu półrocza wyraźnie poprawiła się współpraca w grupie.'
+      ]],
+      ['Wyniki i frekwencja', [
+        'Frekwencja w klasie wyniosła [ ]%.',
+        'Uczniowie mający trudności w nauce zostali objęci zajęciami dydaktyczno-wyrównawczymi.',
+        'Rodzice zostali poinformowani o przewidywanych ocenach zgodnie ze statutem szkoły.',
+        'Uczniowie osiągający wysokie wyniki rozwijają zainteresowania w kołach i konkursach.'
+      ]],
+      ['Program wychowawczo-profilaktyczny', [
+        'Tematy godzin wychowawczych zrealizowano zgodnie z planem pracy wychowawcy klasy.',
+        'Przeprowadzono zajęcia dotyczące bezpieczeństwa w sieci i przeciwdziałania cyberprzemocy.',
+        'Uczniowie uczestniczyli w spotkaniu z [policjantem / pielęgniarką szkolną].',
+        'Realizowano działania promujące zdrowy styl życia i aktywność fizyczną.'
+      ]],
+      ['Współpraca z rodzicami', [
+        'Odbyły się [ ] zebrania z rodzicami oraz konsultacje indywidualne.',
+        'Rodzice aktywnie wspierali organizację uroczystości i wycieczek klasowych.',
+        'Kontakt z rodzicami odbywał się na bieżąco przez dziennik elektroniczny.'
+      ]],
+      ['Pomoc psychologiczno-pedagogiczna', [
+        'Realizowano zalecenia zawarte w opiniach i orzeczeniach poradni psychologiczno-pedagogicznej.',
+        'Współpracowano z pedagogiem i psychologiem szkolnym.',
+        'Wymagania edukacyjne dostosowano do indywidualnych potrzeb i możliwości uczniów.'
+      ]],
+      ['Wnioski do dalszej pracy', [
+        'Kontynuować działania integrujące zespół klasowy.',
+        'Systematycznie monitorować frekwencję i punktualność uczniów.',
+        'Rozwijać umiejętność rozwiązywania konfliktów bez przemocy.',
+        'Motywować uczniów do udziału w konkursach i zajęciach dodatkowych.',
+        'Zacieśnić współpracę z rodzicami uczniów mających trudności.'
+      ]]
+    ],
+    mistakes: [
+      'Same ogólniki („klasa pracowała dobrze”) bez liczb i przykładów.',
+      'Nazwiska uczniów przy informacjach o trudnościach, zdrowiu czy diagnozach – w sprawozdaniu wystarczą liczby i ogólne informacje.',
+      'Wnioski niezwiązane z opisanymi problemami albo ich brak.',
+      'Kopiowanie zeszłorocznego sprawozdania bez aktualizacji danych.',
+      'Rozbudowane opisy zamiast krótkich, konkretnych punktów.'
+    ],
+    faq: [
+      ['Czy istnieje jeden obowiązujący wzór sprawozdania wychowawcy?', 'Nie. Przepisy nie narzucają jednego wzoru – zakres i formę sprawozdania ustala zwykle dyrektor szkoły. Sprawdź, czy w Twojej szkole obowiązuje własny formularz; jeśli tak, wypełnij jego punkty.'],
+      ['Kiedy przygotowuje się sprawozdanie za I półrocze?', 'Zwykle po klasyfikacji śródrocznej, na posiedzenie rady pedagogicznej podsumowujące I półrocze. Dokładny termin podaje dyrekcja.'],
+      ['Czy mogę napisać sprawozdanie z pomocą AI?', 'Tak, jako pomoc w redagowaniu: podaj liczby i ogólne informacje o klasie, bez nazwisk i danych wrażliwych uczniów. Przeczytaj i popraw wynik – za treść sprawozdania odpowiada wychowawca.'],
+      ['Czym różni się sprawozdanie półroczne od rocznego?', 'Półroczne podsumowuje I półrocze i kończy się wnioskami do pracy w II półroczu. Roczne obejmuje cały rok szkolny, a wnioski dotyczą kolejnego roku.']
+    ],
+    tool: {
+      name: 'EduSprawozdawca',
+      url: 'edusprawozdania.html',
+      campaign: 'sprawozdanie-wychowawcy',
+      text: 'Wybierz szkołę lub przedszkole, wklej nagłówki wymagane w Twojej placówce (jeśli są) i dopisz krótkie notatki – liczby, wydarzenia, problemy, bez nazwisk uczniów. AI ułoży z tego sprawozdanie półroczne lub roczne. Za darmo, bez rejestracji.'
+    },
+    related: ['ocena-opisowa-przyklady.html', 'ocena-zachowania-przyklady.html', 'wpisy-do-dziennika-przyklady.html']
   }
 ];
 
@@ -475,6 +617,6 @@ for (const p of PAGES) {
   for (const r of p.related) if (!bySlug(r)) throw new Error(`Nieznana strona w related: ${r}`);
   fs.writeFileSync(path.join(ROOT, p.slug), render(p));
 }
-console.log(`[Wzory] Wygenerowano ${PAGES.length} stron: ${PAGES.map(p => p.slug).join(', ')}`);
+console.log(`[Wzory] Wygenerowano stron: ${PAGES.length} (${PAGES.map(p => p.slug).join(', ')})`);
 
 module.exports = { PAGES };

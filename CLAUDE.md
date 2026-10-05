@@ -179,7 +179,8 @@ dopisz do `GUIDES`, do `publicPages` w `seo.config.js` i do listy `GUIDES` w `za
 Zasada jak w narzędziu: piszemy o oszustach podszywających się pod firmy, nigdy że firma oszukuje.
 
 **Wzory i przykłady** (SEO, ruch z Google → narzędzia): `ocena-opisowa-przyklady.html`,
-`ocena-zachowania-przyklady.html`, `wpisy-do-dziennika-przyklady.html` generowane przez
+`ocena-zachowania-przyklady.html`, `wpisy-do-dziennika-przyklady.html`,
+`sprawozdanie-wychowawcy-przyklady.html` (→ EduSprawozdawca) generowane przez
 `node scripts/generate-wzory.js` z tablicy `PAGES` (ten sam tryb pracy co poradniki; linki
 w stopce `index.html`). Przyciski „Kopiuj” wysyłają zdarzenie GA `wzor_copy` (`copy_type`:
 przyklad/zwrot), linki do narzędzi mają `utm_medium=wzor`. EduOcena ma dwa tryby
