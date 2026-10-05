@@ -283,6 +283,7 @@ function render(g) {
     }
     gtag('js', new Date());
     gtag('config', 'G-3RQ9R0N0K8');
+      gtag('config', 'G-CL194R0J5H'); // usługa GA4 „EduBox AI” widoczna w panelu właściciela
   </script>
   <script type="application/ld+json">${JSON.stringify(ld)}</script>
   <style>body{font-family:'Plus Jakarta Sans',system-ui,sans-serif}</style>

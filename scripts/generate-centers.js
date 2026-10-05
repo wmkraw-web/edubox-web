@@ -85,6 +85,7 @@ function render(center) {
     }
     gtag('js', new Date());
     gtag('config', 'G-3RQ9R0N0K8');
+      gtag('config', 'G-CL194R0J5H'); // usługa GA4 „EduBox AI” widoczna w panelu właściciela
   </script>
   <script src="https://unpkg.com/@phosphor-icons/web"></script>
 </head>
