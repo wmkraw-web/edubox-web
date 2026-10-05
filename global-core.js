@@ -332,7 +332,11 @@ export const EduBoxCore = {
     // Pobieranie menu
     loadMenu: () => {
         const container = document.getElementById('wspolne-menu-kontener');
-        if (container) {
+        // Menu wczytujemy najwyżej raz na stronę. Drugie wczytanie (np. w przeglądarce
+        // wbudowanej w Facebooka) ponownie uruchamiało skrypty menu i kończyło się błędem
+        // „Identifier 'pendingFolderSourceUrl' has already been declared” w raporcie błędów.
+        if (container && container.dataset.menuLoaded !== '1') {
+            container.dataset.menuLoaded = '1';
             fetch('/menu.html')
                 .then(r => r.text())
                 .then(html => {
