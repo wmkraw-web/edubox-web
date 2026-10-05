@@ -14,16 +14,27 @@ const FIREBASE_CONFIG = {
 };
 
 const APP_ID = "eduboxpro";
-const TEXT_TRIAL_LIMIT = 3;
+// Teksty: 5 darmowych generowań DZIENNIE, wspólnie dla całego EduBox (od 10.2026; wcześniej
+// jednorazowa pula 3, która zniechęcała nowych użytkowników). Grafiki: jednorazowa pula 1
+// (najdroższe w dobrej jakości). Nowy klucz = każdy dostaje świeży start po zmianie modelu.
+const TEXT_TRIAL_LIMIT = 5;
 const IMAGE_TRIAL_LIMIT = 1;
-const TEXT_TRIAL_KEY = 'eduboxTrialTextV1';
+const TEXT_TRIAL_KEY = 'eduboxDailyTextV2';
 const IMAGE_TRIAL_KEY = 'eduboxTrialImageV1';
+
+// Data lokalna (nie UTC), żeby pula odnawiała się o północy czasu polskiego.
+const localDate = () => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
 
 const readTrialCount = (key) => {
     try {
         const stored = localStorage.getItem(key);
         if (!stored) return 0;
         const parsed = JSON.parse(stored);
+        // Pula tekstowa jest dzienna: licznik z innego dnia = 0.
+        if (key === TEXT_TRIAL_KEY && (!parsed || parsed.date !== localDate())) return 0;
         const count = Number(typeof parsed === 'number' ? parsed : parsed.count);
         return Number.isFinite(count) && count > 0 ? Math.floor(count) : 0;
     } catch (e) {
@@ -32,31 +43,29 @@ const readTrialCount = (key) => {
 };
 
 const saveTrialCount = (key, count) => {
-    localStorage.setItem(key, JSON.stringify({ count }));
+    const value = key === TEXT_TRIAL_KEY ? { date: localDate(), count } : { count };
+    localStorage.setItem(key, JSON.stringify(value));
 };
 
 // Starsze aplikacje zapisują liczniki pod własnymi nazwami albo w formacie
-// { date, count }. Mostek poniżej kieruje je do tej samej, jednorazowej puli.
+// { date, count }. Mostek poniżej kieruje je do tej samej, wspólnej puli.
 // Dzięki temu nie trzeba ryzykownie przebudowywać działających generatorów.
+// Przesunięcie = (limit zapisany w aplikacji) - (limit puli). Od 10.2026 wszystkie aplikacje
+// tekstowe mają limit 5 = limit puli, więc przesunięcia tekstowe są zerowe.
 const LEGACY_TEXT_COUNTER_OFFSETS = new Map([
     ['edubox_edudetox_ai', 0],
     ['edubox_edukalendarz_ai', 0],
     ['edubox_edunotariusz_ai', 0],
     ['edubox_eduraport_ai', 0],
     ['edubox_eduwakacje_ai', 0],
-    ['edubox_eduwpisy_ai', 2]
+    ['edubox_eduwpisy_ai', 0]
 ]);
 const LEGACY_IMAGE_COUNTER_OFFSETS = new Map([
     ['edubox_edubajka_ai', 1],
     ['edubox_eduwystroj_ai', 2],
     ['edubox_edumalarz_ai', 2]
 ]);
-const LEGACY_DAILY_TEXT_PAGES = new Set([
-    'asystent-pedagoga.html', 'awans.html', 'eduawans.html', 'edubiurokrata.html',
-    'edubystrzak.html', 'edudialog.html', 'edudostosowania.html', 'edudyplomy.html',
-    'eduescape.html', 'edufiszki.html', 'edugazetka.html', 'edusprawozdania.html',
-    'test-edubiurokrata.html'
-]);
+// (Usunięto LEGACY_DAILY_TEXT_PAGES - od 10.2026 aplikacje dzienne nie potrzebują przesunięcia.)
 const LEGACY_IMAGE_DATE_PAGES = new Set([
     'asystent-pedagoga.html', 'edubajka.html', 'edugazetka.html'
 ]);
@@ -73,12 +82,13 @@ const installLegacyTrialBridge = () => {
 
         const nativeGetItem = storagePrototype.getItem;
         const nativeSetItem = storagePrototype.setItem;
+        // Aplikacje „dzienne” porównują datę z new Date().toISOString() - podajemy ją w tym samym formacie.
         const currentDate = () => new Date().toISOString().split('T')[0];
         const currentPage = () => (typeof location === 'undefined' ? '' : location.pathname.split('/').pop());
 
         storagePrototype.getItem = function(key) {
             if (key === 'eduboxUsage') {
-                return JSON.stringify({ date: currentDate(), count: Math.min(5, readTrialCount(TEXT_TRIAL_KEY) + 2) });
+                return JSON.stringify({ date: currentDate(), count: Math.min(TEXT_TRIAL_LIMIT, readTrialCount(TEXT_TRIAL_KEY)) });
             }
             if (key === 'eduboxImageUsage') {
                 return JSON.stringify({ date: currentDate(), count: Math.min(2, readTrialCount(IMAGE_TRIAL_KEY) + 1) });
@@ -100,9 +110,7 @@ const installLegacyTrialBridge = () => {
                 const parsed = JSON.parse(value || '{}');
                 count = Number(parsed.count);
                 trialKey = key === 'eduboxUsage' ? TEXT_TRIAL_KEY : IMAGE_TRIAL_KEY;
-                if (key === 'eduboxUsage' && (LEGACY_DAILY_TEXT_PAGES.has(currentPage()) || currentPage() === 'eduwpisy.html')) {
-                    count -= 2;
-                }
+                // Aplikacje z kluczem 'eduboxUsage' mają DAILY_LIMIT = 5 = limit puli, więc bez przesunięcia.
                 if (key === 'eduboxImageUsage' && LEGACY_IMAGE_DATE_PAGES.has(currentPage())) {
                     count -= 1;
                 }
@@ -118,7 +126,9 @@ const installLegacyTrialBridge = () => {
             }
 
             if (trialKey && Number.isFinite(count)) {
-                nativeSetItem.call(this, trialKey, JSON.stringify({ count: Math.max(0, Math.floor(count)) }));
+                const safeCount = Math.max(0, Math.floor(count));
+                const stored = trialKey === TEXT_TRIAL_KEY ? { date: localDate(), count: safeCount } : { count: safeCount };
+                nativeSetItem.call(this, trialKey, JSON.stringify(stored));
             }
             return nativeSetItem.call(this, key, value);
         };
@@ -353,8 +363,7 @@ export const EduBoxCore = {
         }
     },
 
-    // Jednorazowa, wspólna pula próbna dla wszystkich aplikacji tekstowych EduBox.
-    // Klucz wersjonowany daje każdemu użytkownikowi uczciwy, świeży start po wdrożeniu nowego modelu.
+    // Wspólna, DZIENNA pula darmowych generowań tekstu dla wszystkich aplikacji EduBox (5 dziennie).
     getUsageCount: () => readTrialCount(TEXT_TRIAL_KEY),
 
     // Mechanizm blokady limitów (do użycia pod przyciskiem 'Drukuj' itp.)
@@ -368,14 +377,14 @@ export const EduBoxCore = {
         
         let currentCount = EduBoxCore.getUsageCount();
         if (currentCount >= TEXT_TRIAL_LIMIT) {
-            onLimitReached(`⚠️ Darmowa pula startowa (${TEXT_TRIAL_LIMIT}/${TEXT_TRIAL_LIMIT}) została wykorzystana. Odblokuj PRO, aby korzystać dalej.`);
+            onLimitReached(`⚠️ Dzisiejsze ${TEXT_TRIAL_LIMIT} darmowych generowań zostało wykorzystane. Wróć jutro albo odblokuj PRO (bez limitów) – „kawa” pomaga utrzymać EduBox.`);
             return;
         }
-        
+
         const newCount = currentCount + 1;
         saveTrialCount(TEXT_TRIAL_KEY, newCount);
-        
-        onToastUpdate(`Darmowy start: wykorzystano ${newCount}/${TEXT_TRIAL_LIMIT} generowań tekstowych`);
+
+        onToastUpdate(`Dziś za darmo: wykorzystano ${newCount}/${TEXT_TRIAL_LIMIT} generowań tekstowych`);
         onSuccess(newCount);
     },
 

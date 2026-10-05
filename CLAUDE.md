@@ -107,10 +107,13 @@ kompilatora, który złapie błąd składni): wyciągnąć zawartość
 `@babel/core.transformSync(code, {presets:['@babel/preset-react']})`
 — nigdy liczenie nawiasów na oko, daje fałszywe pozytywy/negatywy.
 
-**Limity darmowe:** 5 generowań tekstowych / dzień (`EduBoxCore.
-executeWithLimitCheck`), 2 obrazkowe / dzień (`executeImageLimitCheck`),
-kod PRO znosi limit (`localStorage.eduboxProStatus`, weryfikacja przez
-`/api/verify-code.js`).
+**Limity darmowe (od 10.2026):** 5 generowań tekstu DZIENNIE, wspólnie dla całego EduBox
+(klucz `eduboxDailyTextV2` = {data lokalna, count}; `EduBoxCore.executeWithLimitCheck`) oraz
+1 grafika AI jednorazowo (`eduboxTrialImageV1`; `executeImageLimitCheck`). Starsze aplikacje
+z własnymi licznikami (`eduboxUsage`, `edubox_*_ai`) są podpięte „mostkiem” w global-core.js
+(przesunięcie = limit zapisany w aplikacji − limit puli; tekstowe = 0, bo wszystkie mają 5).
+Kod PRO znosi limit (`localStorage.eduboxProStatus`, weryfikacja przez `/api/verify-code.js`).
+ZanimKlikniesz nie ma limitu dziennego (`freeForever`).
 
 **Link wsparcia:** zawsze `https://buycoffee.to/magiccolor` (nazwa
 historyczna z czasów, gdy strona nazywała się "Magic Color" — NIE
