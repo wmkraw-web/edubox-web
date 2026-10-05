@@ -190,7 +190,7 @@ const shouldTrackSuccessfulAiRequest = (input, init = {}) => {
         if (method !== 'POST') return false;
 
         const body = parseRequestBody(init.body);
-        if (url.pathname === '/api/chat' && body?.mode === 'tts') return false;
+        if (url.pathname === '/api/chat' && (body?.mode === 'tts' || body?.mode === 'verify')) return false;
         if (url.pathname === '/api/ewa-generate' && body?.type === 'video-status') return false;
         return true;
     } catch (error) {
@@ -546,6 +546,9 @@ if (typeof window !== 'undefined' && !window.__eduboxGenerationFetchTrackerV1) {
         const response = await nativeFetch(input, init);
         if (response.ok && shouldTrackSuccessfulAiRequest(input, init)) {
             EduBoxCore.bumpGlobalCounter();
+            // Ten sam licznik w Google Analytics (zdarzenie niesie adres strony = narzędzie). Licznik
+            // w Firestore bywa blokowany regułami bazy, a GA zasila poniedziałkowy raport z Make.
+            try { if (typeof window.gtag === 'function') window.gtag('event', 'ai_generation'); } catch (e) {}
         }
         return response;
     };
