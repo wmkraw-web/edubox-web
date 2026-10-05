@@ -156,17 +156,29 @@
             // --- LOCAL STATES ---
             const [isGenerating, setIsGenerating] = useState(false);
             const [toastMessage, setToastMessage] = useState('');
-            const [botMessage, setBotMessage] = useState("Witaj! Maj i czerwiec to trudny czas. Wyklikaj oceny ucznia na suwakach, a ja zamienię je na piękny, dyplomatyczny tekst na świadectwo!");
+            const [botMessage, setBotMessage] = useState("Witaj! Wyklikaj poziom ucznia z list po lewej, a ja zamienię to na życzliwy, profesjonalny tekst oceny – z nauki albo zachowania.");
             
-            const [params, setParams] = useState({
+            // kind: 'nauka' (ocena z zajęć edukacyjnych) | 'zachowanie' (opisowa ocena zachowania).
+            // Link ?typ=zachowanie otwiera od razu tryb zachowania (strona ocena-zachowania-przyklady.html).
+            const DEFAULT_PARAMS = {
+                kind: 'nauka',
                 studentName: '',
                 gender: 'Chłopiec',
                 classLevel: 'Klasa 1',
-                polish: 'Czyta płynnie i rozumie tekst',
-                math: 'Biegle liczy w pamięci',
-                social: 'Zgodnie współpracuje w grupie',
+                polish: 'Czyta płynnie i ze zrozumieniem, pięknie pisze',
+                math: 'Biegle liczy w pamięci, logicznie myśli',
+                social: 'Uczynny, grzeczny, bardzo lubiany w grupie',
+                duties: 'Sumiennie wywiązuje się z obowiązków, zawsze przygotowany',
+                relations: 'Koleżeński, życzliwy, chętnie pomaga innym',
+                conduct: 'Kulturalny, przestrzega zasad i dba o bezpieczeństwo',
                 notes: ''
-            });
+            };
+            const [params, setParams] = useState(() => ({
+                ...DEFAULT_PARAMS,
+                kind: new URLSearchParams(window.location.search).get('typ') === 'zachowanie' ? 'zachowanie' : 'nauka'
+            }));
+            const isBehavior = params.kind === 'zachowanie';
+            const docTitle = isBehavior ? 'Ocena Zachowania' : 'Ocena Opisowa';
 
             const [generatedData, setGeneratedData] = useState(null);
 
@@ -220,7 +232,7 @@
                     async (newCount) => {
                         setUsageCount(newCount);
                         try {
-                            const name = `Ocena: ${params.studentName} (${params.classLevel})`;
+                            const name = `${isBehavior ? 'Zachowanie' : 'Ocena'}: ${params.studentName} (${params.classLevel})`;
                             const config = { params, generatedData };
                             
                             await window.EduBoxCore.saveToGielda('gielda_wzorow_eduocena', 'Ocena Opisowa', name, config);
@@ -237,7 +249,7 @@
             const loadPattern = (pattern) => {
                 const c = pattern.config;
                 if(c) {
-                    if(c.params) setParams(c.params);
+                    if(c.params) setParams({ ...DEFAULT_PARAMS, ...c.params });
                     if(c.generatedData) setGeneratedData(c.generatedData);
                     
                     setAppMode('editor');
@@ -264,11 +276,31 @@
             const generateEvaluation = async () => {
                 setIsGenerating(true);
                 setGeneratedData(null);
-                setBotMessage("Formułuję profesjonalną ocenę opisową. Będzie brzmiała dyplomatycznie, doceniając mocne strony i delikatnie wskazując obszary do pracy...");
-                
+                setBotMessage(isBehavior
+                    ? "Formułuję opisową ocenę zachowania. Opiszę konkretne zachowania, docenię mocne strony i życzliwie wskażę, nad czym warto popracować..."
+                    : "Formułuję profesjonalną ocenę opisową. Będzie brzmiała dyplomatycznie, doceniając mocne strony i delikatnie wskazując obszary do pracy...");
+
                 const grammarInstruction = params.gender === 'Chłopiec' 
                     ? "Pisz wyłącznie w formie męskiej (uczeń, opanował, czyta, potrafi)."
                     : "Pisz wyłącznie w formie żeńskiej (uczennica, opanowała, czyta, potrafi).";
+
+                const behaviorSystemPrompt = `Jesteś doświadczonym polskim wychowawcą edukacji wczesnoszkolnej. Twoim zadaniem jest napisanie opisowej oceny zachowania (śródrocznej lub rocznej).
+ZASADY KRYTYCZNE:
+1. Opisuj zachowania, a nie oceniaj dziecka jako osoby. Bez etykiet (np. "niegrzeczny", "agresywny", "leniwy") i bez porównywania z innymi dziećmi.
+2. Uwzględnij: wywiązywanie się z obowiązków ucznia, relacje z rówieśnikami i dorosłymi, kulturę osobistą, dbałość o bezpieczeństwo oraz radzenie sobie z emocjami. Zacznij od mocnych stron, trudności opisz życzliwie i konkretnie, zakończ krótką wskazówką do dalszej pracy.
+3. Nie dopisuj faktów, których nie podał nauczyciel. Nie wspominaj o diagnozach, zdrowiu ani sytuacji rodzinnej.
+4. ${grammarInstruction}
+5. Od jednego do trzech akapitów, językiem zrozumiałym dla rodzica. Brak formatowania markdown, akapity oddzielaj pustą linią.
+6. Zwróć WYŁĄCZNIE poprawny format JSON: { "title": "Ocena Zachowania", "content": "..." }`;
+
+                const behaviorUserPrompt = `Imię: ${params.studentName}
+Etap: ${params.classLevel}
+Obowiązki ucznia: ${params.duties}
+Relacje z rówieśnikami i dorosłymi: ${params.relations}
+Kultura osobista i bezpieczeństwo: ${params.conduct}
+Dodatkowe uwagi od nauczyciela: ${params.notes || 'Brak dodatkowych uwag.'}
+
+Na podstawie tych parametrów wygeneruj opisową ocenę zachowania, łącząc te elementy w logiczną całość.`;
 
                 const systemPrompt = `Jesteś wybitnym polskim nauczycielem edukacji wczesnoszkolnej. Twoim zadaniem jest napisanie oficjalnej Oceny Opisowej (rocznej/półrocznej) na świadectwo.
 ZASADY KRYTYCZNE:
@@ -287,7 +319,9 @@ Dodatkowe uwagi od nauczyciela: ${params.notes || 'Brak dodatkowych uwag.'}
 Na podstawie tych parametrów wygeneruj pełną ocenę opisową, łącząc te elementy w logiczną całość.`;
 
                 try {
-                    const payload = { system: systemPrompt, prompt: userPrompt, temperature: 0.4, format: "json", model: "strong" };
+                    const payload = isBehavior
+                        ? { system: behaviorSystemPrompt, prompt: behaviorUserPrompt, temperature: 0.4, format: "json", model: "strong" }
+                        : { system: systemPrompt, prompt: userPrompt, temperature: 0.4, format: "json", model: "strong" };
                     const res = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
                     const data = await res.json();
                     if (!res.ok) throw new Error(data.details || data.message || "Błąd z serwera API");
@@ -312,7 +346,7 @@ Na podstawie tych parametrów wygeneruj pełną ocenę opisową, łącząc te el
                         if (jsonStr.indexOf('{') !== -1) {
                             let extractedJson = jsonStr.substring(jsonStr.indexOf('{'), jsonStr.lastIndexOf('}') + 1);
                             parsedData = JSON.parse(extractedJson);
-                            if (!parsedData.title) parsedData.title = "Ocena Opisowa";
+                            if (!parsedData.title) parsedData.title = docTitle;
                             if (!parsedData.content) parsedData.content = cleanText;
                         } else {
                             throw new Error("Brak struktury JSON");
@@ -320,7 +354,7 @@ Na podstawie tych parametrów wygeneruj pełną ocenę opisową, łącząc te el
                     } catch (e) {
                         console.warn("AI zwróciło czysty tekst. Uruchamiam tryb awaryjny.", e);
                         parsedData = {
-                            title: "Ocena Opisowa",
+                            title: docTitle,
                             content: cleanText.replace(/```json/gi, '').replace(/```/g, '').trim()
                         };
                     }
@@ -462,7 +496,7 @@ Na podstawie tych parametrów wygeneruj pełną ocenę opisową, łącząc te el
 
                             <div className="glass-panel p-4 rounded-2xl border border-slate-700/50 flex gap-3 items-start">
                                 <span className="text-xl flex-shrink-0">ℹ️</span>
-                                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed"><strong className="text-white">Jak to działa:</strong> wpisz imię ucznia i wyklikaj z list rozwijanych jego poziom w każdej dziedzinie (polonistyczna, matematyczna, społeczno-emocjonalna itd.) - AI zamieni te wybory w spójny, dyplomatyczny tekst na świadectwo. Możesz dopisać dodatkowe uwagi w polu notatek niżej.</p>
+                                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed"><strong className="text-white">Jak to działa:</strong> wybierz rodzaj oceny (z nauki albo zachowania), wpisz inicjał ucznia i wyklikaj z list rozwijanych jego poziom - AI zamieni te wybory w spójny, dyplomatyczny tekst. Pozostałe obserwacje dopisz w polu uwag niżej (bez nazwisk i danych wrażliwych).</p>
                             </div>
 
                             {/* Podstawowe Informacje */}
@@ -470,7 +504,16 @@ Na podstawie tych parametrów wygeneruj pełną ocenę opisową, łącząc te el
                                 <h2 className="font-bold flex items-center text-slate-300 text-sm uppercase tracking-widest border-b border-slate-700/50 pb-4">
                                     <i className="ph-bold ph-user mr-2 text-violet-400 text-lg"></i> Dane Ucznia
                                 </h2>
-                                
+
+                                <div>
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Rodzaj oceny</label>
+                                    <div className="grid grid-cols-2 gap-2 p-1 bg-slate-900 border border-slate-700 rounded-xl">
+                                        {[['nauka', 'Z nauki'], ['zachowanie', 'Zachowanie']].map(([k, label]) => (
+                                            <button key={k} type="button" onClick={() => setParams({...params, kind: k})} className={`py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors ${params.kind === k ? 'bg-violet-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}>{label}</button>
+                                        ))}
+                                    </div>
+                                </div>
+
                                 <div>
                                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Imię ucznia (lub inicjał)</label>
                                     <input type="text" value={params.studentName} onChange={e => setParams({...params, studentName: e.target.value})} placeholder="np. Kasia" className="w-full p-4 bg-slate-900 border border-slate-700 rounded-xl outline-none text-white text-sm font-bold focus:border-violet-500 transition-colors" />
@@ -499,9 +542,40 @@ Na podstawie tych parametrów wygeneruj pełną ocenę opisową, łącząc te el
                             {/* Poziom Umiejętności */}
                             <div className="glass-panel p-6 md:p-8 rounded-[2rem] space-y-5">
                                 <h2 className="font-bold flex items-center text-slate-300 text-sm uppercase tracking-widest border-b border-slate-700/50 pb-4">
-                                    <i className="ph-bold ph-sparkle mr-2 text-indigo-400 text-lg"></i> Umiejętności
+                                    <i className="ph-bold ph-sparkle mr-2 text-indigo-400 text-lg"></i> {isBehavior ? 'Zachowanie' : 'Umiejętności'}
                                 </h2>
-                                
+
+                                {isBehavior ? (
+                                <>
+                                <div>
+                                    <label className="text-[10px] font-bold text-blue-400 uppercase tracking-wider block mb-2 flex items-center gap-2"><i className="ph-bold ph-backpack"></i> Obowiązki ucznia</label>
+                                    <select value={params.duties} onChange={e => setParams({...params, duties: e.target.value})} className="w-full p-3 bg-blue-900/10 border border-blue-500/30 rounded-xl outline-none text-white text-sm focus:border-blue-500 transition-colors appearance-none">
+                                        <option className="bg-slate-900">Sumiennie wywiązuje się z obowiązków, zawsze przygotowany</option>
+                                        <option className="bg-slate-900">Zwykle przygotowany, czasem potrzebuje przypomnienia</option>
+                                        <option className="bg-slate-900">Często nieprzygotowany, potrzebuje stałego wsparcia</option>
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider block mb-2 flex items-center gap-2"><i className="ph-bold ph-users-three"></i> Relacje z innymi</label>
+                                    <select value={params.relations} onChange={e => setParams({...params, relations: e.target.value})} className="w-full p-3 bg-emerald-900/10 border border-emerald-500/30 rounded-xl outline-none text-white text-sm focus:border-emerald-500 transition-colors appearance-none">
+                                        <option className="bg-slate-900">Koleżeński, życzliwy, chętnie pomaga innym</option>
+                                        <option className="bg-slate-900">Nieśmiały, cichy, potrzebuje zachęty do kontaktu</option>
+                                        <option className="bg-slate-900">Wchodzi w konflikty, reaguje impulsywnie</option>
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className="text-[10px] font-bold text-amber-400 uppercase tracking-wider block mb-2 flex items-center gap-2"><i className="ph-bold ph-shield-check"></i> Kultura i bezpieczeństwo</label>
+                                    <select value={params.conduct} onChange={e => setParams({...params, conduct: e.target.value})} className="w-full p-3 bg-amber-900/10 border border-amber-500/30 rounded-xl outline-none text-white text-sm focus:border-amber-500 transition-colors appearance-none">
+                                        <option className="bg-slate-900">Kulturalny, przestrzega zasad i dba o bezpieczeństwo</option>
+                                        <option className="bg-slate-900">Zna zasady, ale nie zawsze ich przestrzega</option>
+                                        <option className="bg-slate-900">Często łamie ustalone zasady, wymaga stałego nadzoru</option>
+                                    </select>
+                                </div>
+                                </>
+                                ) : (
+                                <>
                                 <div>
                                     <label className="text-[10px] font-bold text-blue-400 uppercase tracking-wider block mb-2 flex items-center gap-2"><i className="ph-bold ph-book-open"></i> Edukacja Polonistyczna</label>
                                     <select value={params.polish} onChange={e => setParams({...params, polish: e.target.value})} className="w-full p-3 bg-blue-900/10 border border-blue-500/30 rounded-xl outline-none text-white text-sm focus:border-blue-500 transition-colors appearance-none">
@@ -528,14 +602,16 @@ Na podstawie tych parametrów wygeneruj pełną ocenę opisową, łącząc te el
                                         <option className="bg-slate-900">Miewa wybuchy złości, wchodzi w konflikty</option>
                                     </select>
                                 </div>
+                                </>
+                                )}
 
                                 <div>
                                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Dodatkowe uwagi (Sukcesy lub Trudności)</label>
-                                    <textarea value={params.notes} onChange={e => setParams({...params, notes: e.target.value})} placeholder="np. Pięknie maluje, brał udział w konkursie recytatorskim..." className="w-full p-4 bg-slate-900 border border-slate-700 rounded-xl outline-none text-white text-sm resize-none focus:border-violet-500 transition-colors custom-scrollbar placeholder-slate-600" rows="3"/>
+                                    <textarea value={params.notes} onChange={e => setParams({...params, notes: e.target.value})} placeholder={isBehavior ? "np. Chętnie pełni dyżury, coraz lepiej radzi sobie z emocjami..." : "np. Pięknie maluje, brał udział w konkursie recytatorskim..."} className="w-full p-4 bg-slate-900 border border-slate-700 rounded-xl outline-none text-white text-sm resize-none focus:border-violet-500 transition-colors custom-scrollbar placeholder-slate-600" rows="3"/>
                                 </div>
 
                                 <button onClick={handleGenerateEvaluation} disabled={isGenerating} className="w-full bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white py-4 rounded-xl font-black text-sm tracking-widest shadow-[0_0_20px_rgba(139,92,246,0.3)] flex justify-center items-center gap-2 transition-all active:scale-95 uppercase disabled:opacity-50 btn-bounce">
-                                    <i className="ph-bold ph-sparkle text-lg"></i> Generuj Ocenę Opisową {!isPremium && `(${Math.max(0, 5 - usageCount)})`}
+                                    <i className="ph-bold ph-sparkle text-lg"></i> {isBehavior ? 'Generuj Ocenę Zachowania' : 'Generuj Ocenę Opisową'} {!isPremium && `(${Math.max(0, 5 - usageCount)})`}
                                 </button>
                             </div>
 

@@ -178,6 +178,15 @@ ręcznie — zmiany w generatorze, potem `npm run seo:sitemap` i `npm test`). No
 dopisz do `GUIDES`, do `publicPages` w `seo.config.js` i do listy `GUIDES` w `zanimklikniesz.html`.
 Zasada jak w narzędziu: piszemy o oszustach podszywających się pod firmy, nigdy że firma oszukuje.
 
+**Wzory i przykłady** (SEO, ruch z Google → narzędzia): `ocena-opisowa-przyklady.html`,
+`ocena-zachowania-przyklady.html`, `wpisy-do-dziennika-przyklady.html` generowane przez
+`node scripts/generate-wzory.js` z tablicy `PAGES` (ten sam tryb pracy co poradniki; linki
+w stopce `index.html`). Przyciski „Kopiuj” wysyłają zdarzenie GA `wzor_copy` (`copy_type`:
+przyklad/zwrot), linki do narzędzi mają `utm_medium=wzor`. EduOcena ma dwa tryby
+(`params.kind`: nauka/zachowanie); `eduocena.html?typ=zachowanie` otwiera ocenę zachowania.
+Treści prawne formułuj ostrożnie (statut szkoły decyduje o szczegółach), zawsze przypominaj
+o niewpisywaniu danych dzieci do AI.
+
 **Generowanie treści przez AI — wypracowane wzorce:**
 - *Dwuetapowy generator + weryfikator* (EduRymy): pierwsze zapytanie
   proponuje kandydatów swobodnie, DRUGIE, niezależne zapytanie (bez
