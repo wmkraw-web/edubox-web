@@ -312,6 +312,8 @@ Wskazówki: Warto chwalić ucznia za każdą sytuację, w której zachował spok
 
 const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const bySlug = slug => PAGES.find(p => p.slug === slug);
+// Zakresy typu „1–3” w nagłówkach nie łamią się między liniami (span nie zmienia kopiowanego tekstu).
+const nowrap = html => html.replace(/(\d+–\d+)/g,'<span class="whitespace-nowrap">$1</span>');
 
 function render(p) {
   const url = `${BASE}/${p.slug}`;
@@ -375,7 +377,7 @@ function render(p) {
 
   <main class="max-w-3xl mx-auto px-5 py-10">
     <p class="text-xs font-extrabold uppercase tracking-widest text-indigo-600 mb-3">${esc(p.kicker)}</p>
-    <h1 class="text-3xl md:text-4xl font-extrabold text-slate-900 leading-tight mb-3">${esc(p.h1)}</h1>
+    <h1 class="text-3xl md:text-4xl font-extrabold text-slate-900 leading-tight mb-3">${nowrap(esc(p.h1))}</h1>
     <p class="text-sm text-slate-500 mb-8">Ostatnia aktualizacja: ${UPDATED}</p>
 
     <section class="bg-indigo-50 border border-indigo-200 rounded-2xl p-5 mb-8">
@@ -435,7 +437,7 @@ ${p.faq.map(([q, a]) => `        <details class="bg-white border border-slate-20
     <section class="border-t border-slate-200 pt-6">
       <h2 class="text-sm font-extrabold uppercase tracking-widest text-slate-500 mb-3">Inne wzory i przykłady</h2>
       <ul class="space-y-2">
-${p.related.map(r => `        <li><a href="${r}" class="text-indigo-700 font-semibold hover:underline">${esc(bySlug(r).h1)}</a></li>`).join('\n')}
+${p.related.map(r => `        <li><a href="${r}" class="text-indigo-700 font-semibold hover:underline">${nowrap(esc(bySlug(r).h1))}</a></li>`).join('\n')}
         <li><a href="/index.html" class="text-indigo-700 font-semibold hover:underline">Wszystkie darmowe narzędzia EduBox AI</a></li>
       </ul>
       <p class="text-xs text-slate-500 mt-6 leading-relaxed">Przykłady mają charakter pomocniczy. Ocenę i dokumentację zawsze przygotowuje i zatwierdza nauczyciel, zgodnie ze statutem i zasadami swojej placówki. EduBox AI – darmowe narzędzia, które pomagają nauczycielom na co dzień.</p>
