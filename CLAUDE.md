@@ -236,6 +236,19 @@ z powtarzanym nagłówkiem, numery stron) i `printDoc` (czysty wydruk A4 / PDF).
 w Node: wczytanie pliku przez `vm` i generowanie na preview (`testModel`). Głęboki link:
 `asystent-pedagoga.html?doc=ipet|wopfu|opinia|gotowosc|notatka`.
 
+**Wzorzec generatorów dokumentów (od 10.2026, stosuj w kolejnych narzędziach):** AI zwraca czysty HTML
+(h1 + tabela metryczki + numerowane h2 + tabele + podpisy), `model: 'strong'` + `stream: true`
+(`EduDocTools.streamChat`), podgląd jako kartka A4 (`doc-paper.css`, klasa `doc-paper`) z
+`contentEditable` po zakończeniu pisania (nauczyciel poprawia na kartce, eksport bierze `innerHTML`
+z kartki), przyciski Kopiuj (`copyRich`) / Word (`downloadDocx`) / Drukuj-PDF (`printDoc`), żółte
+`[uzupełnij: …]`, zasady: bez zmyślonych faktów, bez danych osobowych, formy bezosobowe lub neutralne
+płciowo, bez żargonu diagnostycznego. Wdrożone: Asystent Pedagoga, EduDostosowania (§ 2 rozporządzenia
+o ocenianiu – 5 podstaw, uczeń zdolny = art. 44c ust. 1), EduDialog (NVC z tematem do e-dziennika,
+fragment opinii w obszarach ICF), EduSprawozdawca, EduBiurokrata (opinia do poradni korzysta z
+`asystent-dokumenty.js`), EduLekcja 360 (JSON → konspekt i karta pracy ucznia przez `lessonToHtml`).
+Wydruk z ciemnych paneli dawał jasnoszary tekst – w narzędziach bez białej kartki dodawaj do
+`@media print` regułę `#root * { color:#000 !important }` albo używaj `printDoc`.
+
 **Kody PRO za wsparcie (Buycoffee.to):** `api/coffee-check.js` wydaje kod `KAWA-…` (7 dni, weryfikacja
 w Make, scenariusz Coffee-Verify) albo – od 49 zł – `ROK-…` (365 dni od wygenerowania), który
 `api/verify-code.js` sprawdza bezpośrednio w arkuszu `Coffee_Codes` (A kod, F data). Logika planu:
