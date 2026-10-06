@@ -29,13 +29,22 @@ wzorów (np. EduDialog).
 
 **Zewnętrzne API:**
 - OpenAI przez `/api/chat.js` — jeden wspólny endpoint dla WSZYSTKICH narzędzi
-  tekstowych. Body: `{ prompt, system, temperature, format: "json"|"text", model }`.
+  tekstowych. Body: `{ prompt, system, temperature, format: "json"|"text", model, stream, verbosity }`.
   `model` NIE trafia bezpośrednio do OpenAI — `resolveModelChain()` mapuje go
-  na łańcuch modeli z automatycznym fallbackiem: `model: "strong"` (dokumenty
-  urzędowe/prawne) próbuje `gpt-5 → gpt-4.1 → gpt-4o → gpt-4o-mini`; znany
-  model z `KNOWN_MODELS` próbuje siebie, potem `gpt-4o-mini`; nieznany/pominięty
-  → domyślnie `gpt-4.1-mini → gpt-4o-mini`. Klient nie może więc zażądać
-  dowolnego (drogiego) modelu — whitelist chroni przed nadużyciem.
+  na łańcuch modeli z automatycznym fallbackiem (przy błędzie modelu oraz 429/5xx):
+  `model: "strong"` (dokumenty urzędowe/prawne) → `gpt-6.1-sol → gpt-5.4-mini → gpt-4.1 → gpt-4o-mini`
+  (wybór z testów 6.10.2026: najrzetelniejsze IPET/WOPFU/opinie; pełny IPET ≈ 0,30 zł, ~100 s);
+  `"balanced"` (dłuższe materiały robocze) → `gpt-5.4-mini → gpt-4.1-mini → gpt-4o-mini`;
+  znany model z `KNOWN_MODELS` próbuje siebie, potem `gpt-4o-mini`; nieznany/pominięty
+  oraz prośby o stary `gpt-4o-mini` → domyślnie `gpt-4.1-mini → gpt-4o-mini`. Klient nie
+  może więc zażądać dowolnego (drogiego) modelu — whitelist chroni przed nadużyciem.
+  Modele rozumujące (`gpt-5*`, `gpt-6*`, `o*`) NIE przyjmują `temperature` (wysyłamy
+  `reasoning_effort: "low"`, a dla wersji zwięzłych `verbosity: "low"`) — bez tego cicho
+  spadały na słabszy model. `stream: true` → odpowiedź `text/plain` płynie na bieżąco
+  (`EduDocTools.streamChat` w `doc-tools.js`). Logi `[usage] model in= out=` (tylko liczby
+  tokenów, nigdy treść) pozwalają liczyć koszty (Hobby trzyma logi 1 h). Tylko na preview
+  (chronione logowaniem Vercel): `testModel`/`testEffort`/`testVerbosity` oraz
+  `mode: "models-probe"` (lista modeli dostępnych dla klucza) – do porównań przy audytach.
 - Fal.ai (Flux Dev domyślnie, Recraft V3 dla grafiki projektowej przez
   `model: "recraft"`) — generowanie obrazów, przez `/api/generate.js`,
   `/api/malarz.js` i `/api/ewa-generate.js` (klucz `FAL_KEY`).
@@ -208,7 +217,22 @@ od 1.09.2026 – 9 obszarów z § 11 ust. 1 (Dz.U. 2026 poz. 1122); prace domowe
 (`api/_lib/pii.js`, testy `node api/_lib/pii.test.js`; celowo NIE usuwa telefonów/e-maili/kont – nauczyciel
 wpisuje własny kontakt do pism). Gdy coś usunięto, odpowiedź ma nagłówek `X-EduBox-PII-Removed`, a
 `global-core.js` pokazuje krótki komunikat. Giełda Wzorów w EduOcena publikuje inicjał zamiast imienia
-(także w treści oceny, z odmianą imienia). Treści AI nie są logowane.
+(także w treści oceny, z odmianą imienia). Treści AI nie są logowane. W Asystencie Pedagoga imię
+i nazwisko (pole lokalne lub lista „Moi podopieczni” WWRD) NIE trafia do AI – model pisze
+`[imię i nazwisko ucznia]`, a `EduDocTools.fillName()` podmienia to w przeglądarce (też w eksporcie).
+
+**Dokumenty SPE (Asystent Pedagoga, od 10.2026):** instrukcje dla AI są w `asystent-dokumenty.js`
+(zwykły skrypt, `window.EduAsystentDocs`: typy dokumentów, opcje formularza, `buildSystemPrompt`,
+`buildUserPrompt`, `checkCompleteness`) – każdy przepis sprawdzony w ISAP (m.in. § 6 KS, § 6–16
+pomocy pp z limitami uczestników, § 7 Dz.U. 2026 poz. 428 z obszarami ICF, 9 obszarów przedszkolnych
+z Dz.U. 2026 poz. 378, minimalny wymiar rewalidacji z ramowych planów Dz.U. 2026 poz. 1028). AI zwraca
+czysty HTML (h1, metryczka, numerowane h2 zgodne z przepisem, tabele, podpisy). `doc-tools.js`
+(`window.EduDocTools`) – wspólne dla generatorów dokumentów: `streamChat`, `normalize`, `fillName`,
+`markPlaceholders` (żółte `[uzupełnij: …]`), `copyRich` (wklejanie do Worda/Docs z tabelami),
+`downloadDocx` (biblioteka `docx@9.8.1` z jsdelivr, ładowana po kliknięciu: style nagłówków, tabele
+z powtarzanym nagłówkiem, numery stron) i `printDoc` (czysty wydruk A4 / PDF). Testy instrukcji
+w Node: wczytanie pliku przez `vm` i generowanie na preview (`testModel`). Głęboki link:
+`asystent-pedagoga.html?doc=ipet|wopfu|opinia|gotowosc|notatka`.
 
 **Kody PRO za wsparcie (Buycoffee.to):** `api/coffee-check.js` wydaje kod `KAWA-…` (7 dni, weryfikacja
 w Make, scenariusz Coffee-Verify) albo – od 49 zł – `ROK-…` (365 dni od wygenerowania), który

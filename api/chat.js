@@ -158,11 +158,14 @@ export default async function handler(req, res) {
   const piiRemoved = cleanPrompt.removed + cleanSystem.removed;
   if (piiRemoved > 0) res.setHeader('X-EduBox-PII-Removed', String(piiRemoved));
 
-  // TYMCZASOWE (tylko preview, do usunięcia przed merge): test dowolnego modelu i wysiłku rozumowania.
-  const isPreviewTest = process.env.VERCEL_ENV === 'preview' && typeof req.body.testModel === 'string';
-  const modelChain = isPreviewTest ? [req.body.testModel] : resolveModelChain(model);
-  const testEffort = process.env.VERCEL_ENV === 'preview' ? req.body.testEffort : undefined;
-  const testVerbosity = process.env.VERCEL_ENV === 'preview' ? req.body.testVerbosity : undefined;
+  // Tylko na preview (dostęp wyłącznie przez logowanie Vercel; w produkcji ignorowane): test dowolnego
+  // modelu, wysiłku rozumowania i zwięzłości - do porównań jakości przy kolejnych audytach narzędzi.
+  const isPreview = process.env.VERCEL_ENV === 'preview';
+  const modelChain = isPreview && typeof req.body.testModel === 'string' ? [req.body.testModel] : resolveModelChain(model);
+  const testEffort = isPreview ? req.body.testEffort : undefined;
+  // Zwięzłość odpowiedzi (GPT-5 i nowsze): "low" dla wersji skróconych dokumentów.
+  const rawVerbosity = isPreview && req.body.testVerbosity ? req.body.testVerbosity : req.body.verbosity;
+  const verbosity = ['low', 'medium', 'high'].includes(rawVerbosity) ? rawVerbosity : undefined;
   // Strumień: tekst płynie do przeglądarki na bieżąco (długie dokumenty mocnego modelu trwają ponad minutę).
   const wantsStream = req.body.stream === true && format !== 'json';
 
@@ -176,7 +179,7 @@ export default async function handler(req, res) {
     };
     if (isReasoningModel(m)) {
       p.reasoning_effort = testEffort || 'low';
-      if (testVerbosity) p.verbosity = testVerbosity;
+      if (verbosity && /^gpt-(5|6)/.test(m)) p.verbosity = verbosity;
     } else p.temperature = temperature;
     if (format === "json") p.response_format = { type: "json_object" };
     if (stream) { p.stream = true; p.stream_options = { include_usage: true }; }
@@ -192,8 +195,8 @@ export default async function handler(req, res) {
     body: JSON.stringify(buildPayload(m, stream))
   });
 
-  // TYMCZASOWE (tylko preview, do usunięcia przed merge): lista modeli dostępnych dla klucza.
-  if (req.body?.mode === 'models-probe' && process.env.VERCEL_ENV === 'preview') {
+  // Tylko na preview: lista modeli dostępnych dla klucza (sprawdzanie nowej oferty OpenAI przed zmianą łańcuchów).
+  if (req.body?.mode === 'models-probe' && isPreview) {
     const r = await fetch('https://api.openai.com/v1/models', { headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` } });
     const j = await r.json();
     return res.status(200).json({ ids: (j.data || []).map(x => x.id).filter(id => /^(gpt|o\d|chatgpt)/.test(id)).sort() });

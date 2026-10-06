@@ -35,6 +35,9 @@ const CHANGELOG = [
     'IPET: wytyczne uzupełnione o wszystkie elementy z § 6 ust. 1 rozporządzenia o kształceniu specjalnym oraz terminy z § 6 ust. 5 i 9.',
     'Wczesne wspomaganie: usunięta błędna informacja o nowelizacji – rozporządzenie z 2017 r. nie było zmieniane; obszary arkusza obserwacji zgodne z § 4.',
     'Prace domowe w generatorach lekcji zgodne z § 12a rozporządzenia o ocenianiu; dostosowanie wymagań opisane zgodnie z art. 44c ustawy o systemie oświaty i § 2 rozporządzenia o ocenianiu.',
+    'Asystent Pedagoga – nowe instrukcje dokumentów: IPET ze wszystkimi 8 elementami z § 6 ust. 1, nazwy i limity uczestników form pomocy psychologiczno-pedagogicznej zgodne z rozporządzeniem o pomocy pp, zajęcia rewalidacyjne opisywane odrębnie od pomocy pp, minimalny wymiar rewalidacji według nowych ramowych planów nauczania (Dz.U. 2026 poz. 1028, od 1 września 2026 r.).',
+    'WOPFU i opinia dla zespołu orzekającego opisują funkcjonowanie ucznia w obszarach aktywności i uczestniczenia ICF (§ 7 ust. 7 rozporządzenia o orzeczeniach i opiniach), z barierami i czynnikami ułatwiającymi.',
+    'Diagnoza dojrzałości szkolnej według nowej podstawy programowej wychowania przedszkolnego (Dz.U. 2026 poz. 378): 9 obszarów osiągnięć dziecka na koniec wychowania przedszkolnego.',
     'Wprowadzona cotygodniowa automatyczna kontrola statusu wszystkich aktów z listy poniżej.'
   ]]
 ];
@@ -143,7 +146,7 @@ ${actsHtml}
         <li class="flex gap-3"><span class="text-indigo-600 font-bold">•</span><span><strong>Bez rejestracji i bez konta.</strong> Nie znamy Twojego imienia ani adresu e-mail, chyba że sam/-a zapiszesz się na powiadomienia.</span></li>
         <li class="flex gap-3"><span class="text-indigo-600 font-bold">•</span><span><strong>Tekst trafia do dostawcy AI tylko po to, by przygotować odpowiedź</strong> (teksty: OpenAI, obrazy: Fal.ai). Nie zapisujemy go na naszych serwerach ani w logach.</span></li>
         <li class="flex gap-3"><span class="text-indigo-600 font-bold">•</span><span><strong>OpenAI (API) nie używa tych treści do trenowania modeli</strong> i – zgodnie ze swoimi zasadami – przechowuje je do 30 dni wyłącznie w celu wykrywania nadużyć. Przekazanie danych do USA odbywa się w ramach EU-U.S. Data Privacy Framework i standardowych klauzul umownych.</span></li>
-        <li class="flex gap-3"><span class="text-indigo-600 font-bold">•</span><span><strong>Automatyczna ochrona:</strong> zanim tekst trafi do AI, nasz serwer usuwa z niego numery PESEL. Przy publikacji w Giełdzie Wzorów EduOcena zamienia imię ucznia na inicjał.</span></li>
+        <li class="flex gap-3"><span class="text-indigo-600 font-bold">•</span><span><strong>Automatyczna ochrona:</strong> zanim tekst trafi do AI, nasz serwer usuwa z niego numery PESEL. Przy publikacji w Giełdzie Wzorów EduOcena zamienia imię ucznia na inicjał. W Asystencie Pedagoga imię i nazwisko ucznia w ogóle nie trafia do AI – wstawiamy je do gotowego dokumentu dopiero w Twojej przeglądarce.</span></li>
         <li class="flex gap-3"><span class="text-indigo-600 font-bold">•</span><span><strong>Twoja rola jest najważniejsza:</strong> nie wpisuj imion, nazwisk, PESEL-i, adresów ani diagnoz. Używaj inicjałów i ogólnych opisów, a dane ucznia uzupełniaj dopiero w dokumencie szkoły.</span></li>
       </ul>
       <div class="mt-5 bg-white border border-slate-200 rounded-2xl p-5">
