@@ -489,63 +489,27 @@
 Problem dziecka: ${storyProblem}
 
 ZASADY:
-1. ZABRONIONA JEST POEZJA, TRUDNE SŁOWA I METAFORY.
-2. Dokładnie 4 zwrotki. Każda zwrotka to DOKŁADNIE 2 krótkie linijki rymowane (AABB).
-3. Podziel zwrotki pisząc na początku każdej nowej: "[KADR]".`;
+1. Bez trudnych słów, metafor i przenośni – tylko proste, dosłowne zdania (to, co dziecko widzi i robi).
+2. Dokładnie 4 zwrotki: 1) sytuacja i uczucie, 2) ktoś pomaga / co mogę zrobić, 3) dziecko próbuje, 4) spokojny, dobry koniec.
+3. Każda zwrotka to DOKŁADNIE 2 krótkie linijki z prawdziwym rymem na końcu (np. "kotek/płotek").
+4. Na początku każdej zwrotki napisz: "[KADR]". Nie dodawaj tytułu ani komentarzy.`;
 
+                    // Rymy pisze mocny model (strumień -> GPT-6.1): słabsze modele dawały pseudo-rymy. Pisanie ~20–30 s.
                     const storyRes = await fetch('/api/chat', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ prompt: storyPrompt, system: "Jesteś bajkoterapeutą dziecięcym.", temperature: 0.4 })
+                        body: JSON.stringify({ prompt: storyPrompt, system: "Jesteś bajkoterapeutą dziecięcym. Piszesz prostym, dosłownym językiem i dbasz o prawdziwe polskie rymy.", model: 'strong', stream: true })
                     });
                     if (!storyRes.ok) throw new Error("Błąd podczas generowania tekstu bajki.");
-                    const storyData = await storyRes.json();
-                    
-                    const rawStory = storyData.text;
+                    const storyIsJson = (storyRes.headers.get('content-type') || '').includes('application/json');
+                    const rawStory = (storyIsJson ? ((await storyRes.json()).text || '') : await storyRes.text()).split('<!--EDUBOX_STREAM_ERROR-->').join('');
                     const storyParts = rawStory.split('[KADR]').map(p => p.trim()).filter(p => p.length > 5);
-                    
+
                     if(storyParts.length < 4) {
                         const lines = rawStory.split('\n').filter(l => l.trim().length > 0);
                         for(let i=0; i<4; i++) {
                             if(!storyParts[i]) storyParts[i] = lines[i] || "Bohater poradził sobie z problemem.";
                         }
-                    }
-
-                    const imageInstPrompt = `Dla historii o problemie: "${storyProblem}" stwórz 4 angielskie prompty dla generatora obrazów (1 dla każdej sceny bajki).
-CRITICAL RULES:
-1. MUSISZ opisać fizycznie głównego bohatera raz (np. "A 5-year-old girl with blonde hair wearing a blue dress") i wkleić ten SAM OPIS na sam początek każdego z 4 promptów! Postać musi wyglądać identycznie.
-2. Zwróć wynik DOKŁADNIE w takim formacie:
-IMG1: [prompt 1]
-IMG2: [prompt 2]
-IMG3: [prompt 3]
-IMG4: [prompt 4]`;
-
-                    const promptsRes = await fetch('/api/chat', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ prompt: imageInstPrompt, system: "You write strict english prompts for DALL-E.", temperature: 0.1 })
-                    });
-                    
-                    let imagePrompts = [
-                        "A cute cartoon child. Safe and calm. Flat vector style.",
-                        "A cute cartoon child. Safe and calm. Flat vector style.",
-                        "A cute cartoon child. Safe and calm. Flat vector style.",
-                        "A cute cartoon child. Safe and calm. Flat vector style."
-                    ];
-
-                    if (promptsRes.ok) {
-                        const promptsData = await promptsRes.json();
-                        const pText = promptsData.text;
-                        
-                        const p1 = pText.match(/IMG1:\s*(.*)/i);
-                        const p2 = pText.match(/IMG2:\s*(.*)/i);
-                        const p3 = pText.match(/IMG3:\s*(.*)/i);
-                        const p4 = pText.match(/IMG4:\s*(.*)/i);
-                        
-                        if(p1 && p1[1]) imagePrompts[0] = p1[1].trim();
-                        if(p2 && p2[1]) imagePrompts[1] = p2[1].trim();
-                        if(p3 && p3[1]) imagePrompts[2] = p3[1].trim();
-                        if(p4 && p4[1]) imagePrompts[3] = p4[1].trim();
                     }
 
                     let currentPanels = [];
@@ -554,35 +518,62 @@ IMG4: [prompt 4]`;
                     }
                     setGeneratedPanels([...currentPanels]);
 
-                    for (let i = 0; i < 4; i++) {
+                    // Opisy scen powstają z GOTOWEGO tekstu (każdy kadr pokazuje to, o czym mówi jego zwrotka).
+                    const imageInstPrompt = `Picture story for a 4-year-old autistic child (Polish), 4 panels:
+${storyParts.slice(0, 4).map((p, i) => `PANEL ${i + 1}: ${p}`).join('\n')}
+Problem (teacher's note): ${storyProblem}
+
+Write 4 English scene descriptions for the illustrator. Describe the main character ONCE precisely (age, gender if clear, hair, skin tone, exact clothes with colours) and put this SAME description at the start of every prompt. Then: ONE clear action, the character's facial expression and the place – simple, literal, uncluttered. No text.
+Return EXACTLY:
+IMG1: [prompt 1]
+IMG2: [prompt 2]
+IMG3: [prompt 3]
+IMG4: [prompt 4]`;
+
+                    const promptsRes = await fetch('/api/chat', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ prompt: imageInstPrompt, system: "You write precise English prompts for an illustrator of picture stories for autistic children.", temperature: 0.1 })
+                    });
+
+                    let imagePrompts = [
+                        `A 4-year-old child in a yellow sweater and blue trousers in this situation: ${storyProblem}. Slightly worried.`,
+                        `A 4-year-old child in a yellow sweater and blue trousers with a kind adult nearby, calming down.`,
+                        `A 4-year-old child in a yellow sweater and blue trousers trying again calmly.`,
+                        `A 4-year-old child in a yellow sweater and blue trousers smiling, safe and calm.`
+                    ];
+
+                    if (promptsRes.ok) {
+                        const promptsData = await promptsRes.json();
+                        const pText = promptsData.text || '';
+                        [1, 2, 3, 4].forEach((n, i) => {
+                            const m = pText.match(new RegExp(`IMG${n}:\\s*(.*)`, 'i'));
+                            if (m && m[1]) imagePrompts[i] = m[1].trim();
+                        });
+                    }
+
+                    // Prosty, spokojny styl (czytelny dla dzieci w spektrum). Kadr 1 = wzór wyglądu bohatera dla 2–4.
+                    const PANEL_STYLE = '. Simple calm flat illustration for a picture story for a young autistic child: clean outlines, soft colours, plain light background, only the elements needed, clear facial expression. ABSOLUTELY NO TEXT, NO LETTERS, NO WORDS.';
+                    const drawPanel = async (i, referenceUrl) => {
                         try {
-                            const finalImagePrompt = `${imagePrompts[i]}, children's book illustration, flat vector style. ABSOLUTELY NO TEXT, NO LETTERS, NO WORDS.`;
-                            
                             const imgRes = await fetch('/api/generate', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ prompt: finalImagePrompt, aspect_ratio: '1:1' })
+                                body: JSON.stringify({ prompt: imagePrompts[i] + PANEL_STYLE, aspect_ratio: '1:1', ...(referenceUrl && /^https:\/\//.test(referenceUrl) ? { reference_image: referenceUrl } : {}) })
                             });
-
-                            if (!imgRes.ok) throw new Error("Fal.ai odrzucił zapytanie");
+                            if (!imgRes.ok) throw new Error("Serwer obrazów odrzucił zapytanie");
                             const imgData = await imgRes.json();
-                            
-                            if (imgData.imageUrl) {
-                                currentPanels[i].image = imgData.imageUrl;
-                            } else {
-                                throw new Error("Brak imageUrl w odpowiedzi");
-                            }
-
+                            if (!imgData.imageUrl) throw new Error("Brak imageUrl w odpowiedzi");
+                            currentPanels[i].image = imgData.imageUrl;
                         } catch (imgError) {
                             console.error(`Błąd obrazka ${i+1}:`, imgError);
-                            currentPanels[i].image = `https://placehold.co/512x512/1e293b/f8fafc?text=Blad+Obrazka`;
+                            currentPanels[i].image = null;
                         }
-                        
                         currentPanels[i].isLoading = false;
-                        setGeneratedPanels([...currentPanels]); 
-                        
-                        await new Promise(r => setTimeout(r, 2500)); 
-                    }
+                        setGeneratedPanels([...currentPanels]);
+                    };
+                    await drawPanel(0);
+                    await Promise.all([1, 2, 3].map(i => drawPanel(i, currentPanels[0].image)));
 
                 } catch (err) {
                     if (err.message === "Local") {
@@ -738,7 +729,7 @@ IMG4: [prompt 4]`;
                                     {storyError && <div className="mb-4 text-red-400 text-sm font-bold p-3 bg-red-900/30 border border-red-500/50 rounded-xl text-center">{storyError}</div>}
                                     
                                     <button onClick={generateStoryAndImageWithLimit} disabled={isGeneratingStory || !storyProblem} className="w-full bg-amber-600 hover:bg-amber-500 text-white font-black py-4 rounded-xl disabled:bg-slate-700 shadow-lg btn-bounce transition-colors flex items-center justify-center gap-2">
-                                        {isGeneratingStory ? '✨ Piszę wiersz i ładuję kadry...' : `Stwórz Magiczny Komiks ${!isPremium ? '(' + Math.max(0, 5 - usageCount) + ')' : ''}`}
+                                        {isGeneratingStory ? '✨ Piszę wierszyk i rysuję kadry (ok. minuty)...' : 'Stwórz Magiczny Komiks'}
                                     </button>
                                     
                                     {generatedPanels.length > 0 && (
@@ -759,11 +750,15 @@ IMG4: [prompt 4]`;
                                                                     <span className="text-sm font-bold animate-pulse">Ładowanie kadru {idx + 1}... 🎨</span>
                                                                 </div>
                                                             ) : (
-                                                                <img 
-                                                                    src={panel.image} 
-                                                                    className="w-full h-56 md:h-72 object-cover border-b-2 border-amber-500/20 relative z-10" 
-                                                                    alt={`Kadr ${idx + 1}`} 
-                                                                />
+                                                                panel.image ? (
+                                                                    <img
+                                                                        src={panel.image}
+                                                                        className="w-full h-56 md:h-72 object-cover border-b-2 border-amber-500/20 relative z-10"
+                                                                        alt={`Kadr ${idx + 1}`}
+                                                                    />
+                                                                ) : (
+                                                                    <div className="w-full h-56 md:h-72 flex items-center justify-center text-center text-slate-500 text-sm p-6">Ten obrazek się nie udał – stwórz historyjkę ponownie.</div>
+                                                                )
                                                             )}
                                                             <div className="absolute top-4 left-4 bg-amber-500 text-slate-900 w-8 h-8 rounded-full flex items-center justify-center font-black shadow-lg z-20">{idx + 1}</div>
                                                         </div>
