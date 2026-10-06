@@ -66,7 +66,8 @@ function buildAttempts(o) {
   // Wspólny seed tego nie zapewniał – modele z edycją wielu obrazów trzymają twarz, fryzurę i ubranie.
   const refs = Array.isArray(o.referenceImages) ? o.referenceImages.filter(u => typeof u === 'string' && /^(https:\/\/|data:image\/)/.test(u)).slice(0, 4) : [];
   if (refs.length) {
-    const refPrompt = `${o.prompt}${negative} Use the attached image only as the character reference: keep the main character exactly the same (face, hair, clothes, colors, proportions and art style), but draw a completely new scene exactly as described above.`;
+    // Test 6.10.2026: bez zastrzeżeń model kopiował też minę (uśmiech w scenie strachu) i postacie z tła okładki.
+    const refPrompt = `${o.prompt}${negative} The attached image is ONLY a character reference: draw the same main character (identical face, hair, skin tone, clothes, colors and proportions) in the same art style. Do NOT copy the pose, facial expression, background or other characters from the reference – pose, emotion and setting must follow the description above. Other characters from the reference may appear only if the description mentions them. Draw a completely new scene.`;
     return [
       { label: 'gpt-image-2.5-ref', endpoint: ENDPOINTS.gptEdit, payload: { prompt: refPrompt, image_urls: refs, image_size: gptSize(ratio), quality: 'medium' } },
       { label: 'flux-2-pro-ref', endpoint: ENDPOINTS.flux2Edit, payload: { prompt: refPrompt, image_urls: refs, image_size: falPreset(ratio), enable_safety_checker: true } },

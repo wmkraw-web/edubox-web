@@ -24,7 +24,8 @@ export default async function handler(req, res) {
   let styleModifier = "";
   if (style === 'akwarela') styleModifier = "beautiful watercolor illustration, soft pastel colors, artistic, highly detailed";
   if (style === 'wektor') styleModifier = "flat vector illustration, clean lines, vibrant colors, 2D game asset style, no gradients";
-  if (style === 'disney') styleModifier = "3D Pixar Disney style render, cute, magical, highly detailed, vivid colors, volumetric lighting";
+  // Opis stylu bez nazw studiów filmowych (prawa do marek), ten sam efekt: bajkowa animacja 3D.
+  if (style === 'disney') styleModifier = "high-quality 3D animated family movie style render, cute stylized characters with big expressive eyes, magical, highly detailed, vivid colors, soft volumetric lighting";
   if (style === 'kolorowanka') styleModifier = "black and white line art, coloring book page, clear outlines, no shading, pure white background";
 
   // Modyfikatory formatu
@@ -42,6 +43,11 @@ export default async function handler(req, res) {
   } else if (format === 'naklejka') {
       formatModifier = "sticker design, isolated on pure white background, centered";
       imageSize = "square_hd";
+  } else if (format === 'poziom') {
+      // Ilustracja nad tekstem (strona książeczki A4) – szeroki kadr, bez ramek.
+      imageSize = "landscape_4_3";
+  } else if (format === 'pion') {
+      imageSize = "portrait_4_3";
   }
 
   // Zabezpieczenie przed "wymyślaniem" dziwnego języka przez AI
@@ -52,7 +58,7 @@ export default async function handler(req, res) {
       textModifier = `DO NOT include any text, letters, or words in the image.`;
   }
 
-  const finalPrompt = `Subject: ${prompt}. ${textModifier} ${styleModifier}. ${formatModifier}. High quality, professional educational material for kindergarten.`;
+  const finalPrompt = [`Subject: ${prompt}.`, textModifier, styleModifier && `${styleModifier}.`, formatModifier && `${formatModifier}.`, 'High quality, professional educational material for kindergarten.'].filter(Boolean).join(' ');
 
   // Dobór modelu (api/_lib/imageModels.js): model:'recraft' bez zdjęcia -> Recraft V4.1 (medale, ramki,
   // dyplomy – czysta kompozycja z miejscem na tekst); zdjęcie/rysunek użytkownika -> GPT Image 2.5 edit
