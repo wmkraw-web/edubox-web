@@ -18,7 +18,7 @@ export default async function handler(req, res) {
   }
 
   // Odczytujemy wszystkie parametry, w tym nowe (init_image dla zdjęć, size/width/height dla wymiarów)
-  const { prompt, negative_prompt, aspect_ratio, init_image, image_strength, size, width, height, seed, model, style } = req.body;
+  const { prompt, negative_prompt, aspect_ratio, init_image, image_strength, size, width, height, seed, model, style, reference_images, reference_image } = req.body;
 
   if (!prompt) {
     return res.status(400).json({ message: 'Brak polecenia (promptu)' });
@@ -59,6 +59,8 @@ export default async function handler(req, res) {
     const result = await runImageChain({
       prompt, negativePrompt: negative_prompt, aspect_ratio, size, width, height, seed, style,
       initImage: init_image, imageStrength: image_strength,
+      // Wzór postaci (np. okładka bajki) – kolejne obrazy z tym samym bohaterem.
+      referenceImages: Array.isArray(reference_images) ? reference_images : (reference_image ? [reference_image] : []),
       kind: model === 'recraft' ? 'design' : 'text'
     });
     return res.status(200).json({ imageUrl: result.url, model: result.model });

@@ -13,7 +13,7 @@ export default async function handler(req, res) {
     return res.status(429).json({ error: 'Zbyt wiele generacji obrazków w krótkim czasie. Spróbuj ponownie za kilka minut.' });
   }
 
-  const { prompt, style, format, customText, init_image, image_strength, model, seed } = req.body;
+  const { prompt, style, format, customText, init_image, image_strength, model, seed, reference_images, reference_image } = req.body;
   const falKey = process.env.FAL_KEY;
 
   if (!falKey) {
@@ -66,6 +66,7 @@ export default async function handler(req, res) {
     const result = await runImageChain({
       prompt: finalPrompt, preset: imageSize, seed,
       initImage: init_image, imageStrength: image_strength,
+      referenceImages: Array.isArray(reference_images) ? reference_images : (reference_image ? [reference_image] : []),
       kind: model === 'recraft' && !init_image ? 'design' : 'text',
       style: recraftStyle, falKey
     });

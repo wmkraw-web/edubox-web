@@ -62,12 +62,28 @@ function buildAttempts(o) {
       { label: 'sdxl-img2img', endpoint: ENDPOINTS.sdxlEdit, payload: { prompt: o.prompt, image_url: o.initImage, strength: typeof o.imageStrength === 'number' ? o.imageStrength : 0.65, image_size: falPreset(ratio), num_inference_steps: 30, enable_safety_checker: true, ...(o.negativePrompt ? { negative_prompt: o.negativePrompt } : {}), ...seed } }
     ];
   }
+  // Wzór postaci (okładka bajki, pierwszy kadr komiksu): kolejne obrazy z tym samym bohaterem w nowej scenie.
+  // Wspólny seed tego nie zapewniał – modele z edycją wielu obrazów trzymają twarz, fryzurę i ubranie.
+  const refs = Array.isArray(o.referenceImages) ? o.referenceImages.filter(u => typeof u === 'string' && /^(https:\/\/|data:image\/)/.test(u)).slice(0, 4) : [];
+  if (refs.length) {
+    const refPrompt = `${o.prompt}${negative} Use the attached image only as the character reference: keep the main character exactly the same (face, hair, clothes, colors, proportions and art style), but draw a completely new scene exactly as described above.`;
+    return [
+      { label: 'gpt-image-2.5-ref', endpoint: ENDPOINTS.gptEdit, payload: { prompt: refPrompt, image_urls: refs, image_size: gptSize(ratio), quality: 'medium' } },
+      { label: 'flux-2-pro-ref', endpoint: ENDPOINTS.flux2Edit, payload: { prompt: refPrompt, image_urls: refs, image_size: falPreset(ratio), enable_safety_checker: true } },
+      { label: 'gpt-image-2.5', endpoint: ENDPOINTS.gpt, payload: { prompt: o.prompt + negative, image_size: gptSize(ratio), quality: 'medium' } }
+    ];
+  }
   if (o.kind === 'design') {
     const style = typeof o.style === 'string' && o.style ? o.style : 'digital_illustration';
+    // Style wektorowe Recrafta zwracają plik SVG – narzędzia drukują i zapisują obrazy przez canvas/PDF,
+    // więc prosimy o raster z płaską, wektorową estetyką opisaną słowami.
+    const isVector = /^vector/.test(style);
+    const rasterStyle = isVector ? 'digital_illustration' : style;
+    const designPrompt = o.prompt + negative + (isVector ? ' Flat vector illustration style, clean geometric shapes, solid colors.' : '');
     return [
-      { label: 'recraft-v4.1', endpoint: ENDPOINTS.recraft, payload: { prompt: o.prompt + negative, image_size: falPreset(ratio), style } },
+      { label: 'recraft-v4.1', endpoint: ENDPOINTS.recraft, payload: { prompt: designPrompt, image_size: falPreset(ratio), style: rasterStyle } },
       { label: 'gpt-image-2.5', endpoint: ENDPOINTS.gpt, payload: { prompt: o.prompt + negative, image_size: gptSize(ratio), quality: 'medium' } },
-      { label: 'recraft-v3', endpoint: ENDPOINTS.recraftOld, payload: { prompt: o.prompt, image_size: falPreset(ratio), style, enable_safety_checker: true } }
+      { label: 'recraft-v3', endpoint: ENDPOINTS.recraftOld, payload: { prompt: designPrompt, image_size: falPreset(ratio), style: rasterStyle, enable_safety_checker: true } }
     ];
   }
   return [
