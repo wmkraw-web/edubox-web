@@ -398,6 +398,7 @@
                 try {
                     // 1. TEKSTY Z GPT
                     const systemPrompt = `Jesteś kreatywnym nauczycielem przygotowującym materiały na szkolną gazetkę ścienną (tablicę korkową).
+                    ZASADY RZETELNOŚCI: podawaj tylko pewne, powszechnie potwierdzone fakty; bez dokładnych liczb, dat i rekordów, których nie jesteś pewien; język i trudność dopasowane do wieku odbiorców; bez treści politycznych i reklam.
                     Zwróć WYŁĄCZNIE poprawny JSON:
                     {
                         "title": "CHWYTLIWY TYTUŁ (np. 'DZIEŃ RODZINY', 'KOSMOS', 'ZDROWE CIAŁO'). Zostanie on wydrukowany w formie wielkich liter.",
@@ -419,7 +420,8 @@
                     const resChat = await fetch('/api/chat', {
                         method: 'POST', 
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ prompt: userPrompt, system: systemPrompt, format: "json", temperature: 0.7, model: "gpt-4o-mini" })
+                        // 'balanced' (gpt-5.4-mini): ciekawostki trafiają na szkolną tablicę – mniej pomyłek w faktach niż dawny model.
+                        body: JSON.stringify({ prompt: userPrompt, system: systemPrompt, format: "json", model: "balanced" })
                     });
                     
                     if (!resChat.ok) throw new Error("Błąd podczas tworzenia scenariusza");
@@ -434,23 +436,21 @@
                     setLoadingStatus('2/2 Maluję plakaty do Twojej gazetki...');
                     const engStyle = translateStyle(artStyle);
                     
-                    for (let i = 0; i < gazetkaObj.posters.length; i++) {
-                        setLoadingProgress(25 + (i * 18));
-                        
-                        const fullPrompt = `${gazetkaObj.posters[i].imagePrompt}. STYLE: ${engStyle}. High quality masterpiece. ABSOLUTELY NO TEXT, NO WORDS, NO WATERMARK.`;
-
+                    // Plakaty są niezależne – rysujemy je równocześnie (~25 s zamiast ~80 s po kolei).
+                    setLoadingProgress(40);
+                    await Promise.all(gazetkaObj.posters.map(async (poster) => {
+                        const fullPrompt = `${poster.imagePrompt}. STYLE: ${engStyle}. High quality masterpiece. ABSOLUTELY NO TEXT, NO WORDS, NO WATERMARK.`;
                         try {
                             const responseImg = await fetch('/api/generate', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ 
+                                body: JSON.stringify({
                                     prompt: fullPrompt,
                                     negative_prompt: "text, words, letters, watermark, mutated, bad anatomy",
                                     aspect_ratio: '1:1',
                                     size: '1024x1024'
                                 })
                             });
-                            
                             if (responseImg.ok) {
                                 const dataImg = await responseImg.json();
                                 let imgUrl = dataImg.imageUrl || dataImg.image_url || dataImg.url || (dataImg.data && dataImg.data[0]?.url) || dataImg.image;
@@ -458,13 +458,13 @@
                                     if (imgUrl.length > 1000 && !imgUrl.startsWith('http') && !imgUrl.startsWith('data:')) {
                                         imgUrl = `data:image/png;base64,${imgUrl}`;
                                     }
-                                    gazetkaObj.posters[i].imageUrl = imgUrl;
+                                    poster.imageUrl = imgUrl;
                                 }
                             }
                         } catch(e) {
                             console.error("Błąd obrazka", e);
                         }
-                    }
+                    }));
 
                     setGazetkaData(gazetkaObj);
                     setLoadingProgress(100);
