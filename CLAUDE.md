@@ -32,8 +32,10 @@ wzorów (np. EduDialog).
   tekstowych. Body: `{ prompt, system, temperature, format: "json"|"text", model, stream, verbosity }`.
   `model` NIE trafia bezpośrednio do OpenAI — `resolveModelChain()` mapuje go
   na łańcuch modeli z automatycznym fallbackiem (przy błędzie modelu oraz 429/5xx):
-  `model: "strong"` (dokumenty urzędowe/prawne) → `gpt-6.1-sol → gpt-5.4-mini → gpt-4.1 → gpt-4o-mini`
-  (wybór z testów 6.10.2026: najrzetelniejsze IPET/WOPFU/opinie; pełny IPET ≈ 0,30 zł, ~100 s);
+  `model: "strong"` (dokumenty urzędowe/prawne) ze strumieniem → `gpt-6.1-sol → gpt-5.4-mini → gpt-4.1 → gpt-4o-mini`
+  (wybór z testów 6.10.2026: najrzetelniejsze IPET/WOPFU/opinie; pełny IPET ≈ 0,30 zł, ~100 s, ale pisze
+  wolno – dlatego tylko ze strumieniem); `strong` BEZ strumienia → `gpt-5.4-mini → gpt-4.1 → gpt-4o-mini`
+  (narzędzie przestawione na strumień automatycznie dostaje mocniejszy model);
   `"balanced"` (dłuższe materiały robocze) → `gpt-5.4-mini → gpt-4.1-mini → gpt-4o-mini`;
   znany model z `KNOWN_MODELS` próbuje siebie, potem `gpt-4o-mini`; nieznany/pominięty
   oraz prośby o stary `gpt-4o-mini` → domyślnie `gpt-4.1-mini → gpt-4o-mini`. Klient nie

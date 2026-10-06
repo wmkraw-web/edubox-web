@@ -111,10 +111,14 @@ const KNOWN_MODELS = new Set([
 
 // Zwraca listę modeli do wypróbowania po kolei (przy błędzie modelu lub przeciążeniu - następny).
 // "strong" = dokumenty urzędowe (IPET, WOPFU, opinie): gpt-6.1-sol pisał je najrzetelniej w testach
-// z 6.10.2026 (8/8 elementów § 6, poprawne formy pomocy pp); "balanced" = dłuższe materiały robocze.
+// z 6.10.2026 (8/8 elementów § 6, poprawne formy pomocy pp), ale pisze wolno (~20 słów/s) – dostają go
+// tylko narzędzia ze strumieniem (tekst widać po 2–3 s). "strong" bez strumienia → gpt-5.4-mini
+// (lepszy od dawnego gpt-4.1, a podobnie szybki). "balanced" = dłuższe materiały robocze.
 // Prośby o stary gpt-4o-mini (23 wywołania w narzędziach) dostają domyślny, lepszy łańcuch.
-function resolveModelChain(model) {
-  if (model === 'strong') return ['gpt-6.1-sol', 'gpt-5.4-mini', 'gpt-4.1', 'gpt-4o-mini'];
+function resolveModelChain(model, stream) {
+  if (model === 'strong') return stream
+    ? ['gpt-6.1-sol', 'gpt-5.4-mini', 'gpt-4.1', 'gpt-4o-mini']
+    : ['gpt-5.4-mini', 'gpt-4.1', 'gpt-4o-mini'];
   if (model === 'balanced') return ['gpt-5.4-mini', 'gpt-4.1-mini', 'gpt-4o-mini'];
   if (model !== 'gpt-4o-mini' && typeof model === 'string' && KNOWN_MODELS.has(model)) return [model, 'gpt-4o-mini'];
   return ['gpt-4.1-mini', 'gpt-4o-mini']; // domyślny - lepszy niz stary gpt-4o-mini
@@ -161,13 +165,13 @@ export default async function handler(req, res) {
   // Tylko na preview (dostęp wyłącznie przez logowanie Vercel; w produkcji ignorowane): test dowolnego
   // modelu, wysiłku rozumowania i zwięzłości - do porównań jakości przy kolejnych audytach narzędzi.
   const isPreview = process.env.VERCEL_ENV === 'preview';
-  const modelChain = isPreview && typeof req.body.testModel === 'string' ? [req.body.testModel] : resolveModelChain(model);
+  // Strumień: tekst płynie do przeglądarki na bieżąco (długie dokumenty mocnego modelu trwają ponad minutę).
+  const wantsStream = req.body.stream === true && format !== 'json';
+  const modelChain = isPreview && typeof req.body.testModel === 'string' ? [req.body.testModel] : resolveModelChain(model, wantsStream);
   const testEffort = isPreview ? req.body.testEffort : undefined;
   // Zwięzłość odpowiedzi (GPT-5 i nowsze): "low" dla wersji skróconych dokumentów.
   const rawVerbosity = isPreview && req.body.testVerbosity ? req.body.testVerbosity : req.body.verbosity;
   const verbosity = ['low', 'medium', 'high'].includes(rawVerbosity) ? rawVerbosity : undefined;
-  // Strumień: tekst płynie do przeglądarki na bieżąco (długie dokumenty mocnego modelu trwają ponad minutę).
-  const wantsStream = req.body.stream === true && format !== 'json';
 
   const buildPayload = (m, stream) => {
     const p = {
