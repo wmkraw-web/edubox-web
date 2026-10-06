@@ -275,16 +275,17 @@
                 return AD.buildSystemPrompt({ module, docType, length: formatLength, customHeaders });
             }
             if (module === 'historyjki') {
-                return `Jesteś pedagogiem specjalnym. Napisz 'Historyjkę Społeczną' dla dziecka na podany temat. Pisz w pierwszej osobie ("Ja"). Podziel tekst na 3 akapity: 1. PROBLEM, 2. STRATEGIA (jak sobie radzić), 3. POZYTYWNY EFEKT. Zwróć tylko i wyłącznie sam tekst w języku polskim, bez uwag dla ilustratora.`;
+                // Zasady historyjek społecznych (Social Stories, C. Gray): opis > polecenia, pierwsza osoba, pozytywny i dosłowny język.
+                return 'Jesteś pedagogiem specjalnym, który pisze historyjki społeczne według zasad Carol Gray dla dzieci w spektrum autyzmu i z trudnościami w rozumieniu sytuacji społecznych. Zasady: pisz w pierwszej osobie (\"ja\"), w czasie teraźniejszym, prostymi, krótkimi zdaniami; ok. 8–12 zdań. Większość zdań to zdania opisowe (co się dzieje, gdzie, kto, dlaczego) i perspektywiczne (co czują lub myślą inni); zdania wskazujące, co mogę zrobić, stanowią najwyżej jedną trzecią i są sformułowane pozytywnie (\"mogę spróbować…\", \"mogę poprosić…\"), nigdy jako zakaz czy groźba. Używaj słów \"zwykle\", \"czasami\" zamiast \"zawsze\" i \"nigdy\" – tekst musi być dosłownie prawdziwy. Zakończ spokojnym, pozytywnym zdaniem. Układ: tytuł w <h2>, potem 3 krótkie akapity <p>: 1) sytuacja, 2) co mogę zrobić, 3) jak będzie dobrze. Zwróć tylko ten HTML, bez uwag dla ilustratora.';
             }
             if (module === 'rymowanki') {
-                return `Jesteś wybitnym autorem prostych rymowanek dla dzieci. Pisz w układzie AABB lub ABAB. Zachowaj melodyjny, polski sylabotoniczny rytm. Długość: max 2-3 zwrotki. Zwróć SAM TEKST rymowanki. Absolutnie żadnych wstępów.`;
+                return 'Jesteś autorem prostych rymowanek dla dzieci w wieku przedszkolnym i wczesnoszkolnym. Pisz poprawną polszczyzną, w układzie AABB lub ABAB, z regularnym rytmem (najlepiej 8 sylab w wersie) i dokładnymi rymami – bez wymuszonych słów i zdrobnień na siłę. 2–3 zwrotki po 4 wersy, treść konkretna i zgodna z tematem, łatwa do zapamiętania i pokazania gestami. Zwróć SAM TEKST rymowanki z tytułem w pierwszej linii, bez wstępów.';
             }
             if (module === 'tus') {
-                return `Jesteś certyfikowanym trenerem TUS (Trening Umiejętności Społecznych). Skonstruuj SZCZEGÓŁOWY i praktyczny scenariusz zajęć (ok. 30 minut). Struktura (użyj znaczników HTML <h2>, <p>, <ul>): 1. Powitanie i Rundka, 2. Psychoedukacja, 3. Scenki, 4. Relaksacja, 5. Pożegnanie. Zwróć tylko sformatowany scenariusz.`;
+                return 'Jesteś doświadczonym trenerem TUS (trening umiejętności społecznych) w szkole. Przygotuj praktyczny scenariusz zajęć grupowych (45 minut, grupa 4–8 uczniów) na podany problem. Zwróć WYŁĄCZNIE HTML (h2, h3, p, ul, li, table, thead, tbody, tr, th, td, strong; bez Markdown). Układ: <h2>temat</h2>; krótka metryczka (cel główny, 2–3 cele operacyjne – co uczestnicy zrobią, wiek, potrzebne materiały); tabela przebiegu: Etap | Czas | Co robi prowadzący i uczestnicy (konkretne polecenia i pytania); etapy: powitanie i rundka, przypomnienie zasad grupy, psychoedukacja (krótko, z przykładem), modelowanie umiejętności krok po kroku, scenki – 2–3 sytuacje z podziałem ról i pytaniami do omówienia, informacja zwrotna (najpierw co się udało), relaksacja lub wyciszenie, zadanie na tydzień (zastosowanie umiejętności w realnej sytuacji), pożegnanie. Na końcu <h3>Wskazówki dla prowadzącego</h3>: jak dostosować zajęcia dla uczniów z autyzmem lub ADHD i jak reagować na trudne zachowania w grupie.';
             }
             if (module === 'rodzice') {
-                return `Jesteś empatycznym pedagogiem. Przetłumacz emocjonalny tekst na profesjonalną, formalną wiadomość e-dziennika do rodziców. Stosuj 'metodę kanapki' (pozytyw-problem-pozytyw). Zwróć tylko gotowy tekst.`;
+                return 'Jesteś wychowawcą, który pisze do rodziców spokojnie, życzliwie i konkretnie. Zamień notatki nauczyciela na wiadomość do e-dziennika: powitanie (\"Szanowni Państwo\"), najpierw konkretna mocna strona dziecka, potem opis sytuacji jako faktów bez ocen i etykiet (co, kiedy, jak często), zaproszenie do współpracy z propozycją konkretnego kroku (rozmowa, wspólne ustalenia, termin), ciepłe zakończenie i podpis [imię i nazwisko nauczyciela]. Komunikacja bez przemocy (NVC), metoda kanapki, maks. 150 słów, bez diagnoz i bez danych innych uczniów. Pisz w czasie teraźniejszym lub bezosobowo (np. „zauważam”, „proponuję”), żeby nie zakładać płci nauczyciela. Zwróć tylko gotowy tekst wiadomości.';
             }
             return "Jesteś ekspertem edukacyjnym.";
         };
@@ -590,7 +591,10 @@
                     const textPayload = {
                         system: getSystemPrompt(activeModule, docType, naglowki, formatLength, wwrdAgeGroup),
                         prompt: finalPrompt,
-                        temperature: 0.4
+                        temperature: 0.4,
+                        // Modele dobrane w testach 6.10.2026: rymy po polsku najlepiej pisze mocny model (krótki tekst = koszt
+                        // poniżej grosza), scenariusz TUS i historyjki społeczne – GPT-5.4 mini, wiadomość do rodzica – domyślny.
+                        model: activeModule === 'rymowanki' ? 'strong' : (activeModule === 'tus' || activeModule === 'historyjki') ? 'balanced' : undefined
                     };
 
                     const textRes = await fetch('/api/chat', {
@@ -605,7 +609,7 @@
                     let cleanText = textData.text || "";
                     cleanText = cleanText.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
                     
-                    if (activeModule === 'rymowanki' || activeModule === 'historyjki') {
+                    if (activeModule === 'rymowanki' || (activeModule === 'historyjki' && !/<p[ >]/i.test(cleanText))) {
                         cleanText = cleanText.replace(/\n/g, '<br/>');
                     }
                     
