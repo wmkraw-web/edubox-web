@@ -46,7 +46,7 @@ function computeImageSize({ width, height, size, aspect_ratio }) {
 import { isRateLimited } from './_lib/rateLimit.js';
 
 // Dyfuzja 28-30 krokow (FLUX Dev / SDXL) regularnie przekracza domyslne 10 s planu Hobby.
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 export default async function handler(req, res) {
   // Akceptujemy tylko zapytania POST
@@ -66,6 +66,35 @@ export default async function handler(req, res) {
 
   if (!prompt) {
     return res.status(400).json({ message: 'Brak polecenia (promptu)' });
+  }
+
+  // Tylko na preview (dostęp wyłącznie przez logowanie Vercel; w produkcji ignorowane): test dowolnego
+  // modelu fal.ai albo OpenAI Images – do porównań jakości przy audytach grafiki.
+  if (process.env.VERCEL_ENV === 'preview' && typeof req.body.testEndpoint === 'string') {
+    const ep = req.body.testEndpoint;
+    try {
+      if (ep.startsWith('openai-direct:')) {
+        const r = await fetch('https://api.openai.com/v1/images/generations', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model: ep.slice('openai-direct:'.length), prompt, size: req.body.testSize || '1024x1024', quality: req.body.testQuality || 'medium', n: 1, ...(req.body.testPayload || {}) })
+        });
+        const j = await r.json();
+        if (!r.ok) return res.status(r.status).json({ message: j.error?.message || 'Błąd OpenAI' });
+        const item = j.data?.[0] || {};
+        return res.status(200).json({ imageUrl: item.url || `data:image/png;base64,${item.b64_json}`, usage: j.usage || null });
+      }
+      const r = await fetch(`https://fal.run/${ep}`, {
+        method: 'POST',
+        headers: { 'Authorization': `Key ${process.env.FAL_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt, ...(req.body.testPayload || {}) })
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) return res.status(r.status).json({ message: JSON.stringify(j).slice(0, 600) });
+      return res.status(200).json({ imageUrl: j.images?.[0]?.url || j.image?.url || null, keys: Object.keys(j) });
+    } catch (e) {
+      return res.status(500).json({ message: e.message });
+    }
   }
 
   // Wymiary obrazka - honorujemy size/width/height jeśli podane, inaczej presety Fal.ai
