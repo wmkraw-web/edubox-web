@@ -614,17 +614,20 @@
                                 return;
                             }
                         }
-                        setLoadingMsg('Opracowuję precyzyjne instrukcje dla ilustratora...');
-                        
+                        // Opisy scen powstają z GOTOWEJ historyjki (3 akapity: sytuacja, co mogę zrobić, jak będzie dobrze),
+                        // więc obrazki pokazują dokładnie to, o czym czyta dziecko.
+                        setLoadingMsg('Przygotowuję opisy 3 obrazków do historyjki...');
+                        const storyPlain = DT.plainText(cleanText).slice(0, 2500);
                         let imagePromptsArray = [];
                         try {
                             const promptPayload = {
-                                system: "You are a backend API. Return a JSON array of exactly 3 strings. Example: [\"prompt 1\", \"prompt 2\", \"prompt 3\"]",
-                                prompt: `Create 3 English image prompts for a children's story about: "${genericInput}". 
-1. The problem scene.
-2. The coping strategy scene.
-3. The positive outcome scene.
-CRITICAL RULE: Define ONE specific character and start ALL 3 prompts with this exact description. No text.`,
+                                system: 'You write scene descriptions for the illustrator of a social story (Carol Gray) for autistic children. Return JSON: {"character": "...", "prompts": ["...", "...", "..."]}.',
+                                prompt: `Social story (Polish):
+"""${storyPlain}"""
+
+Create:
+- "character": ONE precise English description of the child telling the story (age 6–9 unless the story says otherwise; gender only if the story makes it clear, otherwise a gender-neutral child; hair, skin tone, exact clothes with colours).
+- "prompts": 3 English scene descriptions matching the 3 paragraphs: 1) the situation, 2) what I can do (show the coping step clearly), 3) the calm, positive outcome. Each starts with the character description word for word, then ONE clear action, the child's facial expression and the place. Simple, literal, uncluttered scenes. No text.`,
                                 format: "json",
                                 temperature: 0.2
                             };
@@ -637,42 +640,43 @@ CRITICAL RULE: Define ONE specific character and start ALL 3 prompts with this e
                             let pText = promptData.text || "[]";
                             pText = pText.replace(/```json/gi, '').replace(/```/g, '').trim();
                             let parsed = JSON.parse(pText);
-                            
-                            if (Array.isArray(parsed) && parsed.length >= 3) {
-                                imagePromptsArray = [parsed[0], parsed[1], parsed[2]];
-                            } else if (parsed.prompts && Array.isArray(parsed.prompts) && parsed.prompts.length >= 3) {
-                                imagePromptsArray = [parsed.prompts[0], parsed.prompts[1], parsed.prompts[2]];
+
+                            if (parsed.prompts && Array.isArray(parsed.prompts) && parsed.prompts.length >= 3) {
+                                imagePromptsArray = parsed.prompts.slice(0, 3);
+                            } else if (Array.isArray(parsed) && parsed.length >= 3) {
+                                imagePromptsArray = parsed.slice(0, 3);
                             } else {
-                                throw new Error("AI nie zwróciło tablicy 3 elementów.");
+                                throw new Error("AI nie zwróciło 3 opisów obrazków.");
                             }
                         } catch(err) {
                             imagePromptsArray = [
-                                `Children's book illustration. A 5-year-old boy facing a problem: ${genericInput}. Flat vector style.`,
-                                `Children's book illustration. A 5-year-old boy trying to cope with: ${genericInput}. Calming mood, flat vector style.`,
-                                `Children's book illustration. A happy 5-year-old boy who solved the problem: ${genericInput}. Joyful mood, flat vector style.`
+                                `A 7-year-old child in a yellow sweater and blue trousers in this situation: ${genericInput}. Slightly worried expression.`,
+                                `A 7-year-old child in a yellow sweater and blue trousers calmly using a coping strategy (deep breath, asking an adult for help) in this situation: ${genericInput}.`,
+                                `A 7-year-old child in a yellow sweater and blue trousers smiling and calm after the situation: ${genericInput}.`
                             ];
                         }
 
-                        const newImages = [];
-                        const antiTextClause = ", ABSOLUTELY NO TEXT, NO LETTERS, NO WORDS.";
-                        
-                        for (let i = 0; i < 3; i++) {
-                            setLoadingMsg(`Maluję obrazek (${i + 1} z 3) - ${i === 0 ? 'Problem' : i === 1 ? 'Strategia' : 'Efekt'}...`);
+                        // Prosty, spokojny styl (czytelny dla dzieci w spektrum). Obrazek 1 = wzór wyglądu dziecka dla 2. i 3.
+                        const STORY_STYLE = '. Simple calm flat illustration for a social story for autistic children: clean outlines, soft muted colours, plain light background, only the elements needed, clear facial expression. ABSOLUTELY NO TEXT, NO LETTERS, NO WORDS.';
+                        const drawStoryImage = async (scene, referenceUrl) => {
                             try {
-                                const finalImagePrompt = imagePromptsArray[i] + antiTextClause;
                                 const imgRes = await fetch('/api/generate', {
                                     method: 'POST',
                                     headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ prompt: finalImagePrompt, aspect_ratio: '1:1' })
+                                    body: JSON.stringify({ prompt: scene + STORY_STYLE, aspect_ratio: '1:1', ...(referenceUrl && /^https:\/\//.test(referenceUrl) ? { reference_image: referenceUrl } : {}) })
                                 });
+                                if (!imgRes.ok) return null;
+                                const imgData = await imgRes.json();
+                                return imgData.imageUrl || null;
+                            } catch (imgError) { console.error("Błąd obrazka historyjki", imgError); return null; }
+                        };
+                        setLoadingMsg('Rysuję 1. obrazek – wzór wyglądu dziecka...');
+                        const firstImage = await drawStoryImage(imagePromptsArray[0]);
+                        setLoadingMsg('Rysuję 2. i 3. obrazek z tym samym dzieckiem...');
+                        const otherImages = await Promise.all([drawStoryImage(imagePromptsArray[1], firstImage), drawStoryImage(imagePromptsArray[2], firstImage)]);
+                        // Pozycje zostają (1–3 odpowiadają akapitom), nieudany obrazek pokazuje się jako pusta ramka.
+                        const newImages = [firstImage, ...otherImages].some(Boolean) ? [firstImage, ...otherImages] : [];
 
-                                if (imgRes.ok) {
-                                    const imgData = await imgRes.json();
-                                    if (imgData.imageUrl) newImages.push(imgData.imageUrl);
-                                }
-                            } catch (imgError) { console.error("Krytyczny błąd", imgError); }
-                        }
-                        
                         if(newImages.length > 0) {
                             setGeneratedImages(newImages);
                             if (!imgIsPro) {
@@ -1171,8 +1175,12 @@ CRITICAL RULE: Define ONE specific character and start ALL 3 prompts with this e
                                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8 w-full print-images-grid mb-6">
                                                     {generatedImages.map((img, idx) => (
                                                         <div key={idx} className="flex flex-col items-center fade-in bg-slate-900/30 p-4 rounded-3xl border border-slate-800">
-                                                            <img src={img} alt="Ilustracja" className="w-full aspect-square object-cover rounded-2xl border border-slate-700 shadow-md" />
-                                                            <p className="text-center text-xs text-white mt-4 font-black uppercase tracking-widest bg-blue-600 px-5 py-2 rounded-full shadow-lg">{idx === 0 ? "1. Problem" : idx === 1 ? "2. Strategia" : "3. Efekt"}</p>
+                                                            {img ? (
+                                                                <img src={img} alt={`Ilustracja ${idx + 1}`} className="w-full aspect-square object-cover rounded-2xl border border-slate-700 shadow-md" />
+                                                            ) : (
+                                                                <div className="w-full aspect-square rounded-2xl border-2 border-dashed border-slate-600 flex items-center justify-center text-center text-slate-500 text-sm p-4">Ten obrazek się nie udał – wygeneruj historyjkę ponownie.</div>
+                                                            )}
+                                                            <p className="text-center text-xs text-white mt-4 font-black uppercase tracking-widest bg-blue-600 px-5 py-2 rounded-full shadow-lg">{idx === 0 ? "1. Sytuacja" : idx === 1 ? "2. Co mogę zrobić" : "3. Jak będzie dobrze"}</p>
                                                         </div>
                                                     ))}
                                                 </div>
