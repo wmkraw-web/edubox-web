@@ -51,7 +51,9 @@
       '.edubox-cookie-btn{border:0;border-radius:9999px;padding:9px 16px;font-size:13px;font-weight:700;cursor:pointer;transition:opacity .15s}' +
       '.edubox-cookie-btn:hover{opacity:.85}' +
       '.edubox-cookie-accept{background:#f59e0b;color:#0f172a}' +
-      '.edubox-cookie-reject{background:#1e293b;color:#e2e8f0;border:1px solid #334155}';
+      '.edubox-cookie-reject{background:#1e293b;color:#e2e8f0;border:1px solid #334155}' +
+      // Baner nie może trafić na wydruk (karty pracy, bajki, dokumenty) – inaczej drukuje się na każdej stronie.
+      '@media print{#edubox-cookie-banner{display:none!important}}';
     document.head.appendChild(style);
   }
 
