@@ -39,6 +39,15 @@ const CATEGORY_LABELS = {
 // Wydruk: czerń wymuszona na potomkach kontenera wydruku, dowolnym selektorem.
 const FORCES_BLACK = /\*\s*\{[^}]*color:\s*(?:#000|black)/i;
 
+// Od 10.2026 jasnoszary tekst na wydruku załatwia wspólna reguła w edubox-ui.css
+// (selektory [class*="text-slate-400"] itd. w @media print). Strona, która wczytuje
+// wspólną warstwę, ma więc ten problem rozwiązany bez własnej reguły – sprawdzamy,
+// czy ta reguła faktycznie w pliku jest, żeby jej usunięcie nie przeszło niezauważone.
+const SHARED_PRINT_FIX = /@media print[\s\S]*?\[class\*="text-slate-400"\]/.test(
+  fs.readFileSync(path.join(root, 'edubox-ui.css'), 'utf8')
+);
+const usesSharedLayer = (s) => /<link[^>]+edubox-ui\.css/.test(s);
+
 // Narzędzia, które drukują celowo w kolorze (girlandy, dekoracje, dyplomy z grafiką,
 // medale i zaproszenia) - wymuszanie czerni zepsułoby ich sens.
 const DECORATIVE = new Set([
@@ -72,11 +81,12 @@ const FEATURES = [
   {
     key: 'wydruk',
     label: 'Czysty wydruk',
-    why: 'printDoc albo reguła wymuszająca czerń w kontenerze wydruku. Środkowa kolumna = „zerknij”, NIE „zepsute”: strona bez takiej reguły bywa w porządku, gdy drukowaną treść renderuje ciemnym tekstem na białej kartce (np. edusprawdzian: `text-slate-900`). Tego nie da się rzetelnie wykryć z kodu – trzeba spojrzeć na podgląd wydruku.',
+    why: 'jasnoszary tekst (`text-slate-400` i pokrewne – 1284 wystąpienia) jest na wydruku praktycznie niewidoczny, a `body { color: black }` go nie przebija, bo klasa Tailwinda ma wyższą specyficzność. Od 10.2026 załatwia to wspólna reguła w `edubox-ui.css` w `@media print`, więc wystarcza podpięcie warstwy; `printDoc` albo własna reguła czerni też się liczą. Dekoratory drukują w kolorze – tam `text-white` celowo zostaje białe.',
     // Czerń może być wymuszona dowolnym selektorem potomków (#print-container *, main *,
     // .a4-page *, .print-area *) - szukamy wzorca, nie jednej konkretnej reguły.
-    test: (s) => /printDoc\(/.test(s) || FORCES_BLACK.test(s),
-    broken: (s) => /window\.print\(\)/.test(s) && !/printDoc\(/.test(s) && !FORCES_BLACK.test(s),
+    test: (s) => /printDoc\(/.test(s) || FORCES_BLACK.test(s) || (SHARED_PRINT_FIX && usesSharedLayer(s)),
+    broken: (s) => /window\.print\(\)/.test(s) && !/printDoc\(/.test(s) && !FORCES_BLACK.test(s)
+      && !(SHARED_PRINT_FIX && usesSharedLayer(s)),
     // Dekoratory drukują celowo w kolorze - czerń byłaby tam psuciem, nie naprawą.
     n_a: (s, file) => DECORATIVE.has(file)
   },

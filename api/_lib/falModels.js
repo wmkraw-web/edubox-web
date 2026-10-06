@@ -94,4 +94,35 @@ function falModel(kind, body) {
   return { url: BASE + slug, params, acceptsSeed: model.acceptsSeed, slug };
 }
 
-module.exports = { falModel, MODELS, SAFE_SLUG };
+// Dane do cyklicznego przeglądu (scripts/check-fal-models.js + workflow fal-models-check.yml).
+// Trzymane jako DANE, nie tylko w komentarzu, żeby skrypt mógł sprawdzić, kiedy ostatnio
+// ktoś na to patrzył, i przypomnieć mailem. Po przeglądzie: popraw ceny i przesuń reviewedAt.
+const REVIEW = {
+  reviewedAt: '2026-10-06',
+  // Co ile dni przypominać. Ceny u dostawców ruszają się rzadziej niż raz w miesiącu,
+  // ale rzadziej niż raz na kwartał łatwo przegapić nowy, wyraźnie tańszy model.
+  maxAgeDays: 90,
+  priceSource: 'https://fal.ai/pricing',
+  // Ceny z 6.10.2026 wzięte z agregatorów (fal.ai jest zablokowany w sandboxie) – przy
+  // przeglądzie potwierdź je u źródła i dopisz tu rzeczywistą wartość.
+  prices: {
+    'fal-ai/flux/dev': '~0,025 USD / obraz',
+    'fal-ai/recraft-v3': '~0,04 USD / obraz (wektor ~0,08)',
+    'fal-ai/fast-sdxl/image-to-image': 'rozliczane za megapiksel',
+    'fal-ai/clarity-upscaler': 'nie sprawdzone'
+  },
+  // Modele warte przetestowania przy najbliższym przeglądzie.
+  candidates: [
+    {
+      slug: 'fal-ai/flux-2/dev/turbo',
+      why: '~0,008 USD / obraz i 1024x1024 w ~6,6 s – około 3x taniej i szybciej niż flux/dev',
+      replaces: 'text'
+    }
+  ],
+  // Czego NIE wolno zapomnieć przy ocenie kandydata.
+  warning: 'flux/schnell był już wdrożony i wycofany: gubił anatomię i kadrowanie '
+    + '(„pszczółki" wychodziły jako ptaki). Tanio nie znaczy dobrze dla kolorowanek, '
+    + 'piktogramów AAC i ramek dyplomów – każdy kandydat przechodzi tę samą próbę.'
+};
+
+module.exports = { falModel, MODELS, SAFE_SLUG, REVIEW };

@@ -174,6 +174,11 @@ assert.match(ui, /\.eb-segment\b/, 'edubox-ui.css: brak przełącznika trybów')
 // Reguła wygaszająca neonowe poświaty wpisane w markup (124 wystąpienia w 49 plikach).
 assert.ok(/\[class\*="shadow-\[0_0_"\]/.test(ui),
   'edubox-ui.css: brak reguły wygaszającej neonowe shadow-[0_0_…] z markupu');
+// Jasnoszary tekst na wydruku: jedna reguła dla 58 plików i 1284 wystąpień klas
+// text-slate/gray/zinc/neutral -300/-400/-500. Jej usunięcie zabrałoby czytelność
+// wydruku w całym portfolio naraz, więc pilnujemy jej wprost.
+assert.ok(/@media print[\s\S]*?\[class\*="text-slate-400"\][\s\S]*?color:\s*#374151\s*!important/.test(ui),
+  'edubox-ui.css: brak reguły rozjaśniającej jasnoszary tekst przy druku (text-slate-400 i pokrewne)');
 // Zapas dla przeglądarek bez color-mix(): focus musi być widoczny wszędzie.
 assert.match(ui, /@supports not \(color: color-mix/, 'edubox-ui.css: brak zapasu dla przeglądarek bez color-mix()');
 
