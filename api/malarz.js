@@ -1,5 +1,6 @@
 // Dyfuzja 28-30 krokow (FLUX Dev / SDXL / Recraft) regularnie przekracza domyslne 10 s planu Hobby.
 import { isRateLimited } from './_lib/rateLimit.js';
+import { falModel } from './_lib/falModels.js';
 
 export const maxDuration = 60;
 
@@ -68,42 +69,40 @@ export default async function handler(req, res) {
   let endpointUrl;
   let payload;
 
+  let fal;
   if (model === 'recraft' && !init_image) {
-    endpointUrl = "https://fal.run/fal-ai/recraft-v3";
+    fal = falModel('design', req.body);
+    endpointUrl = fal.url;
     let recraftStyle = 'digital_illustration';
     if (style === 'wektor') recraftStyle = 'vector_illustration';
     else if (style === 'akwarela') recraftStyle = 'digital_illustration/hand_drawn';
-    payload = {
+    payload = Object.assign({
       prompt: finalPrompt,
       image_size: imageSize,
-      style: recraftStyle,
-      enable_safety_checker: true
-    };
+      style: recraftStyle
+    }, fal.params);
   } else if (init_image) {
-    endpointUrl = "https://fal.run/fal-ai/fast-sdxl/image-to-image";
-    payload = {
+    fal = falModel('imageToImage', req.body);
+    endpointUrl = fal.url;
+    payload = Object.assign({
       prompt: finalPrompt,
       image_url: init_image,
       strength: typeof image_strength === 'number' ? image_strength : 0.65,
-      image_size: imageSize,
-      num_inference_steps: 30,
-      enable_safety_checker: true
-    };
+      image_size: imageSize
+    }, fal.params);
   } else {
-    endpointUrl = "https://fal.run/fal-ai/flux/dev";
-    payload = {
+    fal = falModel('text', req.body);
+    endpointUrl = fal.url;
+    payload = Object.assign({
       prompt: finalPrompt,
-      image_size: imageSize,
-      num_inference_steps: 28,
-      guidance_scale: 3.5,
-      enable_safety_checker: true
-    };
+      image_size: imageSize
+    }, fal.params);
   }
 
   // Seed (opcjonalny) - pozwala kilku wywołaniom (np. okładka + strony bajki, kolejne kadry
   // komiksu) startować z tego samego "punktu losowości", co znacznie poprawia spójność
   // wyglądu tej samej postaci między niezależnymi generacjami. Recraft V3 nie przyjmuje seeda.
-  if (model !== 'recraft' && typeof seed === 'number' && Number.isFinite(seed)) {
+  if (fal.acceptsSeed && typeof seed === 'number' && Number.isFinite(seed)) {
     payload.seed = Math.floor(seed);
   }
 

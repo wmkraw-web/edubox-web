@@ -327,6 +327,25 @@ a siatka kart ma inline `maxHeight: calc(100vh - 250px)` i `overflow-y-auto` –
 to, co widać na ekranie, resztę kart ucinało. Przy takich siatkach zdejmuj styl inline przez
 `!important` w bloku druku.
 
+**Modele graficzne Fal.ai – jedno miejsce i jak je testować (od 10.2026):** endpointy i parametry
+czterech modeli siedzą w `api/_lib/falModels.js` (nie liczy się do limitu 12 funkcji, jak `scamCheck.js`),
+bo te same liczby stały wcześniej osobno w `generate.js`, `malarz.js`, `ewa-generate.js` i `upscale.js`
+i mogły się po cichu rozjechać. Modele: `flux/dev` (tekst→obraz, 28 kroków, guidance 3.5),
+`recraft-v3` (grafika projektowa, bez seeda), `fast-sdxl/image-to-image` (30 kroków),
+`clarity-upscaler` (creativity 0.15, resemblance 0.9 – chcemy więcej pikseli, nie domalowywania).
+Testy: `node api/_lib/falModels.test.js` (w `npm test` przez `npm run api:check`) porównują rejestr
+z wartościami SPRZED refaktoru, więc cicha zmiana jakości wszystkich narzędzi graficznych naraz
+jest niemożliwa – świadoma zmiana modelu wymaga poprawienia też testu.
+**Ceny (stan 6.10.2026, z agregatorów – fal.ai jest zablokowany w sandboxie):** flux/dev ~0,025 USD
+za obraz, recraft-v3 ~0,04 (wektor ~0,08), SDXL i2i za megapiksel. Kandydat: **FLUX.2 [dev] Turbo**,
+podawane ~0,008 USD i 1024×1024 w ~6,6 s, czyli ~3× taniej i szybciej. **NIE podmieniaj bez testu
+na żywo** – `flux/schnell` był już raz wdrożony i wycofany, bo gubił anatomię i kadrowanie
+(„pszczółki" wychodziły jako ptaki). Tanio ≠ dobrze dla kolorowanek, piktogramów AAC i ramek dyplomów.
+Test bez wdrażania, ta sama konwencja co `testModel` w `api/chat.js` (tylko preview, chronione
+logowaniem Vercel): w body `testFalEndpoint: "fal-ai/flux-2/dev/turbo"` i opcjonalnie
+`testFalParams: { "num_inference_steps": 8 }`. Pole buduje URL, więc slug przechodzi przez
+`SAFE_SLUG` (ochrona przed SSRF) – testy sprawdzają, że `https://zly.example.com` nie przejdzie.
+
 **Kody PRO za wsparcie (Buycoffee.to):** `api/coffee-check.js` wydaje kod `KAWA-…` (7 dni, weryfikacja
 w Make, scenariusz Coffee-Verify) albo – od 49 zł – `ROK-…` (365 dni od wygenerowania), który
 `api/verify-code.js` sprawdza bezpośrednio w arkuszu `Coffee_Codes` (A kod, F data). Logika planu:
@@ -352,7 +371,12 @@ przez `bonus/until` (eduboxBonusUntil).
   jednoznaczny język.
 - *"Jak to działa"* — info-box (ℹ️, 2–3 zdania + konkretny przykład) blisko
   góry formularza w każdym narzędziu, pisany z faktycznego czytania kodu
-  strony, nie tylko opisu z `apps.js`.
+  strony, nie tylko opisu z `apps.js`. **Jest już we wszystkich 60 narzędziach**
+  (klasa `.eb-note` ze wspólnej warstwy). Uwaga przy wstawianiu: gdy box ma
+  wejść do `{stage === 'form' && (` albo innego warunku, musi być JEDNYM
+  korzeniem — wkładaj go więc do środka panelu formularza, nie obok niego,
+  inaczej Babel zgłasza „Unexpected token, expected ,". Numery linii z błędu
+  Babela są względne do skryptu, nie do pliku.
 - *Body payloady do serwerlessów*: zdjęcia zawsze skalować/kompresować przez
   `<canvas>` w przeglądarce PRZED wysyłką (base64 potrafi łatwo przebić
   limit ~4,5 MB na body zapytania na Vercelu — realny błąd, już naprawiany).

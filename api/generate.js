@@ -44,6 +44,7 @@ function computeImageSize({ width, height, size, aspect_ratio }) {
 }
 
 import { isRateLimited } from './_lib/rateLimit.js';
+import { falModel } from './_lib/falModels.js';
 
 // Dyfuzja 28-30 krokow (FLUX Dev / SDXL) regularnie przekracza domyslne 10 s planu Hobby.
 export const maxDuration = 60;
@@ -79,15 +80,15 @@ export default async function handler(req, res) {
     // i częściej psuje anatomię/kadrowanie - np. "pszczółki" wychodziły jako ptaki, a dziecko niesione
     // na barana wychodziło ucięte w połowie). flux/dev generuje wolniej (kilkanaście sekund zamiast
     // kilku) i kosztuje więcej za obrazek u Fal.ai, ale znacznie wierniej trzyma się promptu.
-    let endpointUrl = 'https://fal.run/fal-ai/flux/dev';
-    let payload = {
+    // Endpoint i parametry z api/_lib/falModels.js - jedno miejsce dla trzech funkcji
+    // obrazkowych (wcześniej te same liczby stały osobno w każdej i mogły się rozjechać).
+    let fal = falModel('text', req.body);
+    let endpointUrl = fal.url;
+    let payload = Object.assign({
       prompt: prompt,
       image_size: falImageSize,
-      num_inference_steps: 28,
-      guidance_scale: 3.5,
-      num_images: 1,
-      enable_safety_checker: true
-    };
+      num_images: 1
+    }, fal.params);
 
     // ---------------------------------------------------------
     // TRYB 0: GRAFIKA PROJEKTOWA (Model: Recraft V3) - ozdobne ramki dyplomów i motywy okazji.
@@ -95,7 +96,8 @@ export default async function handler(req, res) {
     // "ozdobna ramka + pusty środek" dużo lepiej niż FLUX. Nieco droższy za obrazek.
     // ---------------------------------------------------------
     if (model === 'recraft') {
-      endpointUrl = 'https://fal.run/fal-ai/recraft-v3';
+      fal = falModel('design', req.body);
+      endpointUrl = fal.url;
       let recraftSize = 'square_hd';
       if (size && /^\d+x\d+$/i.test(String(size))) {
         const [rw, rh] = String(size).split(/x/i).map(Number);
@@ -105,12 +107,11 @@ export default async function handler(req, res) {
       } else if (aspect_ratio === '16:9' || aspect_ratio === '4:3') {
         recraftSize = 'landscape_4_3';
       }
-      payload = {
+      payload = Object.assign({
         prompt: prompt,
         image_size: recraftSize,
-        style: (typeof style === 'string' && style) ? style : 'digital_illustration',
-        enable_safety_checker: true
-      };
+        style: (typeof style === 'string' && style) ? style : 'digital_illustration'
+      }, fal.params);
     } else if (init_image) {
       // SDXL jest znacznie lepszy w trzymaniu się kompozycji wzoru bez niszczenia twarzy/proporcji.
       // UWAGA: "strength" honoruje teraz to, co faktycznie przyjdzie z frontendu (image_strength) -
@@ -118,21 +119,20 @@ export default async function handler(req, res) {
       // w UI nic by nie zmieniał. Usunięto też sztywne "style_preset: line-art" - opis stylu jest już
       // w samym prompcie (patrz styleModifier wyżej na froncie), więc SDXL trzyma się wybranego stylu,
       // a nie zawsze rysunku kreskowego.
-      endpointUrl = 'https://fal.run/fal-ai/fast-sdxl/image-to-image';
-      payload = {
+      fal = falModel('imageToImage', req.body);
+      endpointUrl = fal.url;
+      payload = Object.assign({
         prompt: prompt,
         image_url: init_image,
         strength: typeof image_strength === 'number' ? image_strength : 0.65,
-        image_size: falImageSize,
-        num_inference_steps: 30, // Większa precyzja
-        enable_safety_checker: true
-      };
+        image_size: falImageSize
+      }, fal.params);
       if (negative_prompt) payload.negative_prompt = negative_prompt;
     }
 
     // Seed (opcjonalny) - pozwala powtórzyć lub świadomie zmienić wariant tej samej grafiki.
     // Recraft V3 nie przyjmuje seeda - i tak losuje inaczej za każdym razem.
-    if (model !== 'recraft' && typeof seed === 'number' && Number.isFinite(seed)) payload.seed = Math.floor(seed);
+    if (fal.acceptsSeed && typeof seed === 'number' && Number.isFinite(seed)) payload.seed = Math.floor(seed);
 
     // Wysłanie zapytania do chmury FAL
     const response = await fetch(endpointUrl, {
