@@ -24,7 +24,7 @@ w podglądzie wydruku (Ctrl+P), nie jako listę błędów.
 | Prawdziwy .docx | 20 | 0 | 40 | plik „.doc" z HTML-em w środku (mime application/msword) Word otwiera z ostrzeżeniem, a Dokumenty Google potrafią go odrzucić |
 | Czysty wydruk | 16 | 25 | 8 | printDoc albo reguła wymuszająca czerń w kontenerze wydruku. Środkowa kolumna = „zerknij”, NIE „zepsute”: strona bez takiej reguły bywa w porządku, gdy drukowaną treść renderuje ciemnym tekstem na białej kartce (np. edusprawdzian: `text-slate-900`). Tego nie da się rzetelnie wykryć z kodu – trzeba spojrzeć na podgląd wydruku. |
 | Nowy wygląd | 60 | 0 | 0 | wspólna warstwa edubox-ui.css: spokojne powierzchnie z prawdziwym cieniem zamiast neonowych poświat i pływających bąbli z 2021. Neony wpisane w markup wygasza reguła [class*="shadow-[0_0_"] w tym pliku, więc podpięcie linku wystarcza – klas nie trzeba czyścić z markupu. |
-| „Jak to działa" | 46 | 0 | 14 | info-box blisko góry formularza - konwencja z CLAUDE.md |
+| „Jak to działa" | 60 | 0 | 0 | info-box blisko góry formularza - konwencja z CLAUDE.md |
 | Wspólna pula | 26 | 0 | 19 | EduBoxCore.executeWithLimitCheck zamiast własnego licznika per-aplikacja |
 
 ## Przepisy
@@ -80,8 +80,8 @@ przy okazji innych zmian w danym pliku. Nie ma potrzeby robić z tego osobnej ak
 | Kreator Awansu AI | `awans.html` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | · | ✅ ISAP |
 | EduAwans | `eduawans.html` | – | – | ✅ | ⚠️ | ✅ | ✅ | – | ✅ ISAP |
 | EduBiurokrata AI | `edubiurokrata.html` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | · | ✅ ISAP |
-| Baza Druków | `edudruki.html` | – | – | – | – | ✅ | – | · | ✅ ISAP |
-| EduKatalog (Generator Ofert) | `edukatalog.html` | – | – | – | ✅ | ✅ | – | · | · |
+| Baza Druków | `edudruki.html` | – | – | – | – | ✅ | ✅ | · | ✅ ISAP |
+| EduKatalog (Generator Ofert) | `edukatalog.html` | – | – | – | ✅ | ✅ | ✅ | · | · |
 | EduKorektor AI (NAZU) | `edukorektor.html` | – | – | – | ✅ | ✅ | ✅ | ✅ | · |
 | EduNotariusz AI | `edunotariusz.html` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | · | · |
 | EduOcena AI | `eduocena.html` | – | – | ✅ | ⚠️ | ✅ | ✅ | ✅ | ✅ ISAP |
@@ -90,7 +90,7 @@ przy okazji innych zmian w danym pliku. Nie ma potrzeby robić z tego osobnej ak
 | EduRaport AI | `eduraport.html` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | · | · |
 | Asystent Wdrożenia Reformy 2026 | `edureforma.html` | – | – | – | ⚠️ | ✅ | ✅ | ✅ | ✅ ISAP |
 | EduSprawozdawca PRO | `edusprawozdania.html` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | · | ✅ ISAP |
-| EduWpisy PRO (Dziennik) | `eduwpisy.html` | – | – | – | – | ✅ | – | – | · |
+| EduWpisy PRO (Dziennik) | `eduwpisy.html` | – | – | – | – | ✅ | ✅ | – | · |
 | EduWycieczka Organizator | `eduwycieczka.html` | – | – | – | ⚠️ | ✅ | ✅ | ✅ | · |
 
 ### Lekcje i zajęcia (22)
@@ -98,15 +98,15 @@ przy okazji innych zmian w danym pliku. Nie ma potrzeby robić z tego osobnej ak
 | Narzędzie | Plik | Kartka A4 | Strumień | Prawdziwy .docx | Czysty wydruk | Nowy wygląd | „Jak to działa" | Wspólna pula | Przepisy |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | EduBystrzak AI | `edubystrzak.html` | – | – | – | ✅ | ✅ | ✅ | · | · |
-| EduDetox AI | `edudetox.html` | – | – | – | ⚠️ | ✅ | – | – | · |
+| EduDetox AI | `edudetox.html` | – | – | – | ⚠️ | ✅ | ✅ | – | · |
 | EduEscape PRO | `eduescape.html` | – | – | – | ⚠️ | ✅ | ✅ | – | · |
 | EduFiszki i Memory AI | `edufiszki.html` | – | – | – | ⚠️ | ✅ | ✅ | – | · |
 | EduGrupy (Koło Fortuny) | `edugrupy.html` | – | – | – | ⚠️ | ✅ | ✅ | · | · |
 | EduGry (Ja Mam) | `edugry.html` | – | – | – | ⚠️ | ✅ | ✅ | · | · |
 | Edukacja Obywatelska AI | `edukacja2025.html` | – | – | ✅ | ⚠️ | ✅ | ✅ | ✅ | ✅ ISAP |
-| EduKalendarz | `edukalendarz.html` | – | – | – | ✅ | ✅ | – | – | · |
-| EduKomiks AI | `edukomiks.html` | – | – | – | ⚠️ | ✅ | – | ✅ | · |
-| EduLekcja 360 | `edulekcja360.html` | – | – | ✅ | ✅ | ✅ | – | ✅ | ✅ ISAP |
+| EduKalendarz | `edukalendarz.html` | – | – | – | ✅ | ✅ | ✅ | – | · |
+| EduKomiks AI | `edukomiks.html` | – | – | – | ⚠️ | ✅ | ✅ | ✅ | · |
+| EduLekcja 360 | `edulekcja360.html` | – | – | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ ISAP |
 | EduMotywator AI | `edumotywator.html` | – | – | ✅ | ⚠️ | ✅ | ✅ | ✅ | · |
 | EduPrezentacja PRO | `eduprezentacja.html` | – | – | – | – | ✅ | ✅ | ✅ | · |
 | EduRymy AI | `edurymy.html` | – | – | – | ⚠️ | ✅ | ✅ | ✅ | · |
@@ -116,23 +116,23 @@ przy okazji innych zmian w danym pliku. Nie ma potrzeby robić z tego osobnej ak
 | EduTik PRO (Wierszyki i Piosenki) | `edutik.html` | – | – | ✅ | ⚠️ | ✅ | ✅ | ✅ | · |
 | EduWakacje PRO | `eduwakacje.html` | – | – | – | ⚠️ | ✅ | ✅ | – | · |
 | EduZadania AI | `eduzadania.html` | – | – | – | ✅ | ✅ | ✅ | – | · |
-| EduZastępstwo 999 | `eduzastepstwo.html` | – | – | – | ⚠️ | ✅ | – | ✅ | · |
+| EduZastępstwo 999 | `eduzastepstwo.html` | – | – | – | ⚠️ | ✅ | ✅ | ✅ | · |
 | EduBoxPro Studio | `studio.html` | – | – | ✅ | ✅ | ✅ | ✅ | – | · |
-| ZanimKlikniesz | `zanimklikniesz.html` | – | – | – | ⚠️ | ✅ | – | – | · |
+| ZanimKlikniesz | `zanimklikniesz.html` | – | – | – | ⚠️ | ✅ | ✅ | – | · |
 
 ### Grafika i materiały (11)
 
 | Narzędzie | Plik | Kartka A4 | Strumień | Prawdziwy .docx | Czysty wydruk | Nowy wygląd | „Jak to działa" | Wspólna pula | Przepisy |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | EduWystrój AI | `edudekorator.html` | – | – | – | · | ✅ | ✅ | – | · |
-| EduDyplom Wideo | `edudyplom.html` | – | – | – | – | ✅ | – | ✅ | · |
+| EduDyplom Wideo | `edudyplom.html` | – | – | – | – | ✅ | ✅ | ✅ | · |
 | EduDyplomy AI | `edudyplomy.html` | – | – | ✅ | · | ✅ | ✅ | – | · |
-| EduGazetka AI | `edugazetka.html` | – | – | – | · | ✅ | – | – | · |
+| EduGazetka AI | `edugazetka.html` | – | – | – | · | ✅ | ✅ | – | · |
 | EduGenerator PRO | `edugenerator.html` | – | – | – | · | ✅ | ✅ | ✅ | · |
 | EduMalarz AI | `edumalarz.html` | – | – | – | · | ✅ | ✅ | – | · |
 | EduPlakat AI | `eduplakat.html` | – | – | – | · | ✅ | ✅ | ✅ | · |
-| EduPodsumowanie | `edupodsumowanie.html` | – | – | – | – | ✅ | – | ✅ | · |
-| EduStudio AI | `edustudio.html` | – | – | – | · | ✅ | – | ✅ | · |
-| Magic Color AI | `magiccolor.html` | – | – | – | · | ✅ | – | ✅ | · |
+| EduPodsumowanie | `edupodsumowanie.html` | – | – | – | – | ✅ | ✅ | ✅ | · |
+| EduStudio AI | `edustudio.html` | – | – | – | · | ✅ | ✅ | ✅ | · |
+| Magic Color AI | `magiccolor.html` | – | – | – | · | ✅ | ✅ | ✅ | · |
 | EduBoxPro MagicLetters | `magicletters.html` | – | – | – | · | ✅ | ✅ | – | · |
 

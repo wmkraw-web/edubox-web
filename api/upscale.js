@@ -9,6 +9,7 @@
 export const maxDuration = 60;
 
 import { isRateLimited } from './_lib/rateLimit.js';
+import { falModel } from './_lib/falModels.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -30,19 +31,18 @@ export default async function handler(req, res) {
   }
 
   try {
-    const response = await fetch('https://fal.run/fal-ai/clarity-upscaler', {
+    // Endpoint i parametry z api/_lib/falModels.js - jedno miejsce na wszystkie modele Fal.
+    const fal = falModel('upscale', req.body);
+    const response = await fetch(fal.url, {
       method: 'POST',
       headers: {
         'Authorization': `Key ${falKey}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({
+      body: JSON.stringify(Object.assign({
         image_url,
-        upscale_factor: scale || 4,
-        creativity: 0.15,
-        resemblance: 0.9,
-        num_inference_steps: 16
-      })
+        upscale_factor: scale || 4
+      }, fal.params))
     });
 
     if (!response.ok) {

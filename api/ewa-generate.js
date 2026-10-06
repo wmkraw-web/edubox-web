@@ -143,6 +143,7 @@ async function handleVideoStatus(req, res) {
 
 // Renderowanie wideo D-ID i dyfuzja obrazu potrafią trwać dłużej niż domyślne 10 s planu Hobby.
 import { isRateLimited } from './_lib/rateLimit.js';
+import { falModel } from './_lib/falModels.js';
 
 export const maxDuration = 60;
 
@@ -187,31 +188,29 @@ export default async function handler(req, res) {
     // ---------------------------------------------------------
     // UWAGA: wcześniej flux/schnell (4 kroki - najsłabszy, gorzej trzyma anatomię
     // i kadrowanie). Podniesione do flux/dev (28 kroków), tak jak reszta strony.
-    let endpointUrl = 'https://fal.run/fal-ai/flux/dev';
-    let payload = {
+    // Endpoint i parametry z api/_lib/falModels.js (wspólne dla trzech funkcji obrazkowych).
+    let fal = falModel('text', req.body);
+    let endpointUrl = fal.url;
+    let payload = Object.assign({
       prompt: prompt,
       image_size: falImageSize,
-      num_inference_steps: 28,
-      guidance_scale: 3.5,
-      num_images: 1,
-      enable_safety_checker: true
-    };
+      num_images: 1
+    }, fal.params);
 
     // ---------------------------------------------------------
     // TRYB 2: GENEROWANIE ZE ZDJĘCIA (Model: FAST SDXL)
     // ---------------------------------------------------------
     if (init_image) {
       // SDXL jest znacznie lepszy w trzymaniu się stylu line-art bez niszczenia twarzy
-      endpointUrl = 'https://fal.run/fal-ai/fast-sdxl/image-to-image';
-      payload = {
+      fal = falModel('imageToImage', req.body);
+      endpointUrl = fal.url;
+      payload = Object.assign({
         prompt: prompt,
         image_url: init_image,
         strength: typeof image_strength === 'number' ? image_strength : 0.65,
         image_size: falImageSize,
-        style_preset: "line-art", // Parametr, którego Flux nie obsługuje, a SDXL tak!
-        num_inference_steps: 30, // Większa precyzja
-        enable_safety_checker: true
-      };
+        style_preset: "line-art" // Parametr, którego Flux nie obsługuje, a SDXL tak!
+      }, fal.params);
     }
 
     // Wysłanie zapytania do chmury FAL
