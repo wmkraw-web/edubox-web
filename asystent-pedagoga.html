@@ -360,6 +360,8 @@
             const [isPublishing, setIsPublishing] = useState(false);
 
             const resultRef = useRef(null);
+            // Kartka z dokumentem jest edytowalna po zakończeniu pisania – eksport bierze treść z niej.
+            const paperRef = useRef(null);
 
             // --- LOGOWANIE (wspólny silnik) ---
             useEffect(() => {
@@ -757,21 +759,22 @@ CRITICAL RULE: Define ONE specific character and start ALL 3 prompts with this e
             const docTitle = (activeModule === 'wwrd' ? WWRD_DOC_TYPES : DOC_TYPES).find(d => d.id === currentDocType)?.label || 'Dokument';
             const docFileName = `${DOC_FILE_NAMES[currentDocType] || 'Dokument'}-${new Date().toISOString().slice(0, 10)}`;
 
+            const exportHtml = () => (paperRef.current && paperRef.current.innerHTML) || docHtml;
             const handleCopyDoc = async () => {
-                const ok = await DT.copyRich(docHtml);
+                const ok = await DT.copyRich(exportHtml());
                 if (ok) { setCopied(true); showToast('✅ Skopiowano z formatowaniem – wklej do Worda lub Dokumentów Google.'); setTimeout(() => setCopied(false), 2500); }
                 else showToast('Nie udało się skopiować – zaznacz tekst ręcznie.');
             };
             const handleDocx = async () => {
                 setDocxBusy(true);
                 try {
-                    await DT.downloadDocx(docHtml, { filename: docFileName, title: docTitle });
+                    await DT.downloadDocx(exportHtml(), { filename: docFileName, title: docTitle });
                     try { if (typeof window.gtag === 'function') window.gtag('event', 'dokument_docx', { doc_type: currentDocType }); } catch (e) {}
                 } catch (e) {
                     showToast(e.message || 'Nie udało się przygotować pliku Word.');
                 } finally { setDocxBusy(false); }
             };
-            const handlePrintDoc = () => DT.printDoc(docHtml, docFileName);
+            const handlePrintDoc = () => DT.printDoc(exportHtml(), docFileName);
 
             return (
                 <div className="flex min-h-screen relative">
@@ -1131,7 +1134,7 @@ CRITICAL RULE: Define ONE specific character and start ALL 3 prompts with this e
                                                 )}
                                                 <div className="card-bg rounded-2xl p-4">
                                                     <div className="font-bold text-sm mb-2 text-amber-300">🟨 Do uzupełnienia: {placeholderCount} {placeholderCount === 1 ? 'miejsce' : (placeholderCount % 10 >= 2 && placeholderCount % 10 <= 4 && (placeholderCount % 100 < 12 || placeholderCount % 100 > 14)) ? 'miejsca' : 'miejsc'}</div>
-                                                    <p className="text-xs text-slate-400 leading-relaxed">Zaznaczyliśmy je na żółto – tak samo w pliku Word. Uzupełnij dane (daty, numer orzeczenia, wymiar godzin ustalony przez dyrektora), a przed podpisaniem omów treść z zespołem.</p>
+                                                    <p className="text-xs text-slate-400 leading-relaxed">Zaznaczyliśmy je na żółto – możesz je uzupełnić od razu na kartce (kliknij w tekst), a zmiany trafią do pliku Word i wydruku. Uzupełnij dane (daty, numer orzeczenia, wymiar godzin ustalony przez dyrektora), a przed podpisaniem omów treść z zespołem.</p>
                                                     {activeModule === 'dokumenty' && !localName && (
                                                         <div className="mt-3 flex gap-2">
                                                             <input type="text" value={localName} onChange={(e) => setLocalName(e.target.value)} placeholder="Imię i nazwisko – wstawimy lokalnie" autoComplete="off" className="flex-1 input-bg rounded-lg p-2 text-xs" />
@@ -1145,7 +1148,7 @@ CRITICAL RULE: Define ONE specific character and start ALL 3 prompts with this e
                                         )}
                                         {error && <div className="print-hidden mb-6 p-5 bg-red-900/20 border border-red-500/30 rounded-2xl text-red-400 text-sm font-medium">⚠️ {error}</div>}
 
-                                        <div className={`doc-paper ${isStreaming ? 'doc-caret' : ''}`} dangerouslySetInnerHTML={{ __html: window.EduBoxCore.sanitizeHtml(docHtml) }} />
+                                        <div ref={paperRef} contentEditable={!isStreaming} suppressContentEditableWarning={true} className={`doc-paper outline-none focus:ring-2 focus:ring-rose-400 ${isStreaming ? 'doc-caret' : ''}`} dangerouslySetInnerHTML={{ __html: window.EduBoxCore.sanitizeHtml(docHtml) }} />
 
                                         <p className="print-hidden text-xs text-slate-500 max-w-3xl mx-auto mt-6 text-center leading-relaxed">Dokument przygotowany z pomocą AI na podstawie Twoich notatek. Przed podpisaniem sprawdź treść z zespołem, uzupełnij pola zaznaczone na żółto i dopasuj zapisy do ustaleń placówki. Podstawy prawne sprawdzone w ISAP {AD.CHECKED} – <a href="przepisy-i-rodo.html" className="underline">lista przepisów</a>.</p>
                                     </div>

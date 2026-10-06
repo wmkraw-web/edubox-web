@@ -319,6 +319,8 @@ TREŚĆ:
             const [isPublishing, setIsPublishing] = useState(false);
 
             const resultRef = useRef(null);
+            // Kartka z dokumentem jest edytowalna po zakończeniu pisania – eksport bierze treść z niej.
+            const paperRef = useRef(null);
 
             // --- LOGOWANIE (wspólny silnik) ---
             useEffect(() => {
@@ -432,7 +434,7 @@ Przygotuj dokument zgodnie z instrukcją.`;
             const docHtml = generatedText ? DT.markPlaceholders(DT.fillName(DT.normalize(generatedText), localName)) : '';
             const docFile = `Dostosowanie-wymagan-${(selectedSubject || 'przedmiot').replace(/[^a-zA-Z0-9ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]+/g, '-')}`;
             const handleCopyDoc = async () => {
-                const ok = await DT.copyRich(docHtml);
+                const ok = await DT.copyRich((paperRef.current && paperRef.current.innerHTML) || docHtml);
                 showToast(ok ? '✅ Skopiowano z formatowaniem – wklej do Worda lub dziennika.' : 'Nie udało się skopiować.');
             };
             const handleDocx = async (html, name) => {
@@ -485,7 +487,7 @@ Przygotuj dokument zgodnie z instrukcją.`;
                 }
             };
 
-            const printDocument = () => DT.printDoc(docHtml, docFile);
+            const printDocument = () => DT.printDoc((paperRef.current && paperRef.current.innerHTML) || docHtml, docFile);
 
             return (
                 <div className="relative flex flex-col min-h-screen print:bg-white">
@@ -661,7 +663,7 @@ Przygotuj dokument zgodnie z instrukcją.`;
                                                         <button onClick={() => setShowPublishModal(true)} className="flex-1 sm:flex-none bg-amber-500 hover:bg-amber-400 text-slate-900 px-4 py-2 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all btn-bounce shadow-md">
                                                             <Icon name="Share" size={16}/> Jako Wzór
                                                         </button>
-                                                        <button disabled={isStreaming || docxBusy} onClick={() => handleDocx(docHtml, docFile)} className="flex-1 sm:flex-none bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 px-4 py-2 rounded-xl text-sm font-bold transition-all btn-bounce flex items-center justify-center gap-2">
+                                                        <button disabled={isStreaming || docxBusy} onClick={() => handleDocx((paperRef.current && paperRef.current.innerHTML) || docHtml, docFile)} className="flex-1 sm:flex-none bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 px-4 py-2 rounded-xl text-sm font-bold transition-all btn-bounce flex items-center justify-center gap-2">
                                                             <Icon name="Word" size={16}/> {docxBusy ? 'Przygotowuję…' : 'Word (.docx)'}
                                                         </button>
                                                         <button disabled={isStreaming} onClick={handleCopyDoc} className="flex-1 sm:flex-none bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 px-4 py-2 rounded-xl text-sm font-bold transition-all btn-bounce flex items-center justify-center gap-2">
@@ -673,8 +675,8 @@ Przygotuj dokument zgodnie z instrukcją.`;
                                                     </div>
                                                 </div>
 
-                                                <div className={`doc-paper ${isStreaming ? 'doc-caret' : ''}`} style={{ boxShadow: 'none', padding: '8px 4px' }} dangerouslySetInnerHTML={{ __html: window.EduBoxCore ? window.EduBoxCore.sanitizeHtml(docHtml) : '' }} />
-                                                <p className="print-hidden text-xs text-slate-500 mt-6 text-center">Pola zaznaczone na żółto uzupełnij przed podpisaniem. Podstawa prawna sprawdzona w ISAP 6.10.2026.</p>
+                                                <div ref={paperRef} contentEditable={!isStreaming} suppressContentEditableWarning={true} className={`doc-paper outline-none focus:ring-2 focus:ring-teal-400 ${isStreaming ? 'doc-caret' : ''}`} style={{ boxShadow: 'none', padding: '8px 4px' }} dangerouslySetInnerHTML={{ __html: window.EduBoxCore ? window.EduBoxCore.sanitizeHtml(docHtml) : '' }} />
+                                                <p className="print-hidden text-xs text-slate-500 mt-6 text-center">Kliknij w tekst, żeby go poprawić; pola zaznaczone na żółto uzupełnij przed podpisaniem – zmiany trafią do pliku Word i wydruku. Podstawa prawna sprawdzona w ISAP 6.10.2026.</p>
                                             </div>
                                         </div>
                                     )}
