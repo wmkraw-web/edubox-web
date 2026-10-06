@@ -333,6 +333,7 @@
             const [promptInput, setPromptInput] = useState('');
             const [styleOption, setStyleOption] = useState('szkola'); 
             const [generatedImage, setGeneratedImage] = useState(null);
+            const [canvasPortrait, setCanvasPortrait] = useState(false);
             const [generationStep, setGenerationStep] = useState(null); // 'translating' | 'generating' | null
             
             // === CANVAS STATE ===
@@ -440,11 +441,10 @@
             };
 
             const secureApiImageCall = async (payloadData) => {
-                // Limit podniesiony z 20 s do 45 s - FLUX Dev (28 kroków) na wolniejszym starcie potrafi
-                // zająć więcej niż 20 s, a usunięty niżej martwy fallback na Imagen (pusty klucz API,
-                // zawsze 401) i tak nigdy nie działał, więc zbyt krótki timeout tylko psuł generowanie.
+                // GPT Image 2.5 rysuje ~20 s, ale przy zimnym starcie lub awarii serwer próbuje kolejnych modeli
+                // (FLUX.2 pro, FLUX.1 dev) – 45 s potrafiło przerwać udane rysowanie, więc dajemy 120 s.
                 const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 45000);
+                const timeoutId = setTimeout(() => controller.abort(), 120000);
                 try {
                     const res = await fetch('/api/generate', {
                         method: 'POST',
@@ -489,11 +489,14 @@
                             // Uwaga: negative_prompt i dawny style_preset byly ignorowane przez backend przy
                             // domyslnym FLUX Dev (uzywane tylko w trybie SDXL image-to-image) - usunieto martwe
                             // parametry, ograniczenia stylu sa juz w hiddenInstruction powyzej.
+                            // Kartka A4 jest pionowa: kolorowanka 2:3 wypełnia stronę (kwadrat zostawiał ~9 cm pustego
+                            // miejsca). Mandala jest okrągła, więc zostaje kwadratowa.
+                            const portrait = styleOption !== 'mandala';
                             const payload = {
-                                prompt: hiddenInstruction,
-                                aspect_ratio: '1:1',
+                                prompt: hiddenInstruction + (portrait ? ' Vertical page composition: the subject large and centered, filling the whole page.' : ''),
+                                aspect_ratio: portrait ? '2:3' : '1:1',
                                 width: 1024,
-                                height: 1024
+                                height: portrait ? 1536 : 1024
                             };
 
                             const data = await secureApiImageCall(payload);
@@ -554,6 +557,7 @@
                     
                     img.onload = () => {
                         canvas.width = img.width;
+                        setCanvasPortrait(img.height > img.width * 1.1);
                         canvas.height = img.height;
                         
                         ctx.fillStyle = "#ffffff";
@@ -872,7 +876,7 @@
                                                 onTouchStart={startDrawing}
                                                 onTouchMove={draw}
                                                 onTouchEnd={stopDrawing}
-                                                className="w-full max-w-2xl rounded-xl bg-white block mx-auto print-only-image"
+                                                className={`w-full ${canvasPortrait ? 'max-w-lg' : 'max-w-2xl'} rounded-xl bg-white block mx-auto print-only-image`}
                                             />
                                         </div>
                                     </div>
