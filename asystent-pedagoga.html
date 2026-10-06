@@ -597,16 +597,13 @@
                         model: activeModule === 'rymowanki' ? 'strong' : (activeModule === 'tus' || activeModule === 'historyjki') ? 'balanced' : undefined
                     };
 
-                    const textRes = await fetch('/api/chat', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(textPayload)
+                    // Strumień: tekst widać od razu, a tryb "strong" (rymowanki) dostaje najmocniejszy model.
+                    const streamed = await DT.streamChat(textPayload, (partial) => {
+                        if (partial.trim()) { setIsGenerating(false); setGeneratedText(partial); }
                     });
-                    
-                    if (!textRes.ok) throw new Error("Błąd podczas generowania tekstu.");
-                    const textData = await textRes.json();
+                    setIsGenerating(true);
 
-                    let cleanText = textData.text || "";
+                    let cleanText = streamed.text || "";
                     cleanText = cleanText.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
                     
                     if (activeModule === 'rymowanki' || (activeModule === 'historyjki' && !/<p[ >]/i.test(cleanText))) {
