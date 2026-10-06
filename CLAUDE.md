@@ -315,13 +315,17 @@ Test: `npm i --no-save jsdom && npm run docx:check` (`scripts/check-docx.js`) ur
 konwersję HTML→bloki docx na atrapie biblioteki `docx`; celowo poza `npm test`, ta sama konwencja
 co `docx@9` w generatorze wzorów.
 
-**Wydruk – czego NIE da się wykryć grepem:** `body { color: black }` w `@media print` nie wystarcza,
-bo tailwindowe klasy na dzieciach (`text-slate-300`) biją je specyficznością – dlatego regułę czerni
-dajemy na potomków kontenera wydruku (`#print-container *`, `main *`, `.a4-page *`). ALE strona bez
-takiej reguły bywa w porządku, gdy renderuje treść ciemnym tekstem na białej kartce (np.
-`edusprawdzian.html` → `text-slate-900`), a w dekoratorach (MagicLetters, EduWystrój, EduGenerator,
-EduMalarz, EduDyplomy, EduPiktogram) kolor jest celowy i czerń byłaby psuciem. Dlatego kolumna
-„Czysty wydruk" w `docs/STAN-PORTFOLIO.md` oznacza „zerknij w Ctrl+P", nie „zepsute”.
+**Wydruk – jedna reguła dla całego portfolio (od 10.2026):** `body { color: black }` w `@media print`
+nie wystarcza, bo tailwindowe klasy na dzieciach biją je specyficznością. Jasnoszary tekst
+(`text-slate/gray/zinc/neutral` `-300/-400/-500` – **1284 wystąpienia w 58 plikach**) to podpisy
+i podpowiedzi zaprojektowane pod ciemny panel; na papierze mają kontrast 2,56:1, czyli są
+praktycznie niewidoczne. Załatwia to jedna reguła w `edubox-ui.css` w `@media print`: selektor po
+fragmencie atrybutu `class` z `!important`, kolor `#374151` (10,3:1 na bieli – czytelne, a tekst
+drugiego planu zostaje drugim planem). Działa tylko przy druku, ekran bez zmian. **Celowo NIE ruszamy
+`text-white`:** w dekoratorach (MagicLetters, EduWystrój, EduGenerator, EduMalarz, EduDyplomy,
+EduPiktogram) biały napis na kolorowym tle jest zamierzony i tam wydruk ma być kolorowy – te
+narzędzia mają w spisie „nie dotyczy". Narzędzia z własną regułą czerni na potomkach kontenera
+(`#print-container *`, `main *`, `.a4-page *`) albo z `printDoc` też się liczą.
 Realny błąd znaleziony przy tym przeglądzie: `edusymbol.html` nie miał `@media print` WCALE,
 a siatka kart ma inline `maxHeight: calc(100vh - 250px)` i `overflow-y-auto` – drukowało się tylko
 to, co widać na ekranie, resztę kart ucinało. Przy takich siatkach zdejmuj styl inline przez
@@ -345,6 +349,14 @@ Test bez wdrażania, ta sama konwencja co `testModel` w `api/chat.js` (tylko pre
 logowaniem Vercel): w body `testFalEndpoint: "fal-ai/flux-2/dev/turbo"` i opcjonalnie
 `testFalParams: { "num_inference_steps": 8 }`. Pole buduje URL, więc slug przechodzi przez
 `SAFE_SLUG` (ochrona przed SSRF) – testy sprawdzają, że `https://zly.example.com` nie przejdzie.
+**Cykliczny przegląd:** `REVIEW` w tym samym pliku trzyma datę ostatniego przeglądu, zapisane ceny,
+kandydatów i ostrzeżenie o schnellu – jako DANE, nie komentarz. `npm run fal:check`
+(`scripts/check-fal-models.js`) kończy się błędem, gdy od przeglądu minęło >90 dni;
+`.github/workflows/fal-models-check.yml` robi to 3. dnia miesiąca (czerwony przebieg = mail).
+Celowo **nie** jest to automat sprawdzający ceny: fal.ai nie daje cennika w formie do rzetelnego
+odczytu, a skrobanie strony dawałoby fałszywy alarm albo fałszywy spokój – skrypt pilnuje więc
+tylko regularności i wypisuje konkretne kroki. Z tego samego powodu `fal:check` jest POZA
+`npm test` (jak `legal:check`) – po 90 dniach załamałby CI na każdym PR.
 
 **Kody PRO za wsparcie (Buycoffee.to):** `api/coffee-check.js` wydaje kod `KAWA-…` (7 dni, weryfikacja
 w Make, scenariusz Coffee-Verify) albo – od 49 zł – `ROK-…` (365 dni od wygenerowania), który
