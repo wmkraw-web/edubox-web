@@ -43,6 +43,10 @@ export default async function handler(req, res) {
   } else if (format === 'naklejka') {
       formatModifier = "sticker design, isolated on pure white background, centered";
       imageSize = "square_hd";
+  } else if (format === 'zawieszka') {
+      // EduMalarz: zawieszka do prezentu w pionie 3:4 (wcześniej kwadrat przycinany w podglądzie).
+      formatModifier = "vertical gift tag design, decorative motif at the top and bottom, calm open space in the middle for a name";
+      imageSize = "portrait_4_3";
   } else if (format === 'poziom') {
       // Ilustracja nad tekstem (strona książeczki A4) – szeroki kadr, bez ramek.
       imageSize = "landscape_4_3";
@@ -60,10 +64,10 @@ export default async function handler(req, res) {
 
   const finalPrompt = [`Subject: ${prompt}.`, textModifier, styleModifier && `${styleModifier}.`, formatModifier && `${formatModifier}.`, 'High quality, professional educational material for kindergarten.'].filter(Boolean).join(' ');
 
-  // Dobór modelu (api/_lib/imageModels.js): model:'recraft' bez zdjęcia -> Recraft V4.1 (medale, ramki,
-  // dyplomy – czysta kompozycja z miejscem na tekst); zdjęcie/rysunek użytkownika -> GPT Image 2.5 edit
-  // (przerabia DOKŁADNIE ten obrazek w wybranym stylu); pozostałe -> GPT Image 2.5, który poprawnie pisze
-  // polskie teksty z customText. Przy błędzie lub odmowie modelu łańcuch próbuje kolejnych.
+  // Dobór modelu (api/_lib/imageModels.js): zawsze najpierw GPT Image 2.5 (poprawne polskie teksty z customText,
+  // wierna kompozycja); model:'recraft' bez zdjęcia -> zapasowo Recraft V4.1/V3 (medale, ramki, dyplomy);
+  // zdjęcie/rysunek użytkownika -> GPT Image 2.5 edit (przerabia DOKŁADNIE ten obrazek w wybranym stylu).
+  // Przy błędzie lub odmowie modelu łańcuch próbuje kolejnych.
   let recraftStyle = 'digital_illustration';
   if (style === 'wektor') recraftStyle = 'vector_illustration';
   else if (style === 'akwarela') recraftStyle = 'digital_illustration/hand_drawn';

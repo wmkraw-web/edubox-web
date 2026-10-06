@@ -5,7 +5,8 @@
 //   napisy z ogonkami, najwierniej trzyma się opisu (jabłko NA kolcach jeża, piktogram z mydłem i wodą),
 //   ok. 0,015–0,03 USD za obraz w jakości "medium"; ~15–20 s.
 // - FLUX.2 [pro] – świetne ilustracje i kolorowanki, ale psuje polskie napisy; szybki (~8–10 s) – zapas.
-// - Recraft V4.1 – najczystsze, symetryczne ramki z pustym środkiem (dyplomy, dekoracje).
+// - Recraft V4.1 – czyste, symetryczne ramki, szybki (~8 s), ale słabszy w medalach i zaproszeniach i droższy
+//   (~0,04 USD) – zapas dla grafiki projektowej. Przyjmuje tylko style 'any' / 'vector_illustration'.
 // - Edycja zdjęcia: GPT Image 2.5 edit; dawny SDXL image-to-image w ogóle nie przerabiał zdjęcia
 //   (zwracał prawie niezmienione zdjęcie zamiast kolorowanki).
 // FLUX.1 [dev] i Recraft V3 zostają jako ostatni zapas (sprawdzone od miesięcy).
@@ -76,15 +77,19 @@ function buildAttempts(o) {
   }
   if (o.kind === 'design') {
     const style = typeof o.style === 'string' && o.style ? o.style : 'digital_illustration';
-    // Style wektorowe Recrafta zwracają plik SVG – narzędzia drukują i zapisują obrazy przez canvas/PDF,
-    // więc prosimy o raster z płaską, wektorową estetyką opisaną słowami.
+    // Test 6.10.2026 (medal, zaproszenie, ramka dyplomu z postaciami w rogach): GPT Image 2.5 lepiej trzyma
+    // kompozycję z instrukcji (okrągły medal z miejscem na tekst, postacie tylko w rogach) i jest tańszy –
+    // idzie pierwszy. Recraft V4.1 przyjmuje WYŁĄCZNIE style 'any' i 'vector_illustration' (inne = błąd 422),
+    // a 'vector_illustration' zwraca plik SVG, którego narzędzia nie wydrukują przez canvas/PDF – dostaje 'any',
+    // a styl opisujemy słowami. Recraft V3 zna pełną listę stylów rastrowych.
     const isVector = /^vector/.test(style);
-    const rasterStyle = isVector ? 'digital_illustration' : style;
-    const designPrompt = o.prompt + negative + (isVector ? ' Flat vector illustration style, clean geometric shapes, solid colors.' : '');
+    const styleWords = isVector ? ' Flat vector illustration style, clean geometric shapes, solid colors.'
+      : /hand_drawn/.test(style) ? ' Hand-drawn illustration style.' : '';
+    const designPrompt = o.prompt + negative + styleWords;
     return [
-      { label: 'recraft-v4.1', endpoint: ENDPOINTS.recraft, payload: { prompt: designPrompt, image_size: falPreset(ratio), style: rasterStyle } },
-      { label: 'gpt-image-2.5', endpoint: ENDPOINTS.gpt, payload: { prompt: o.prompt + negative, image_size: gptSize(ratio), quality: 'medium' } },
-      { label: 'recraft-v3', endpoint: ENDPOINTS.recraftOld, payload: { prompt: designPrompt, image_size: falPreset(ratio), style: rasterStyle, enable_safety_checker: true } }
+      { label: 'gpt-image-2.5', endpoint: ENDPOINTS.gpt, payload: { prompt: designPrompt, image_size: gptSize(ratio), quality: 'medium' } },
+      { label: 'recraft-v4.1', endpoint: ENDPOINTS.recraft, payload: { prompt: designPrompt, image_size: falPreset(ratio), style: 'any' } },
+      { label: 'recraft-v3', endpoint: ENDPOINTS.recraftOld, payload: { prompt: designPrompt, image_size: falPreset(ratio), style: isVector ? 'digital_illustration' : style, enable_safety_checker: true } }
     ];
   }
   return [
