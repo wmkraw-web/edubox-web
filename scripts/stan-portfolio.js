@@ -36,6 +36,17 @@ const CATEGORY_LABELS = {
   grafika: 'Grafika i materiały'
 };
 
+// Wydruk: czerń wymuszona na potomkach kontenera wydruku, dowolnym selektorem.
+const FORCES_BLACK = /\*\s*\{[^}]*color:\s*(?:#000|black)/i;
+
+// Narzędzia, które drukują celowo w kolorze (girlandy, dekoracje, dyplomy z grafiką,
+// medale i zaproszenia) - wymuszanie czerni zepsułoby ich sens.
+const DECORATIVE = new Set([
+  'magicletters.html', 'edudekorator.html', 'edugenerator.html', 'edumalarz.html',
+  'edudyplomy.html', 'edugazetka.html', 'edustudio.html', 'magiccolor.html',
+  'edupiktogram.html', 'edusymbol.html', 'eduplakat.html'
+]);
+
 // --- Cechy, które sprawdzamy w każdym pliku -------------------------------------------
 // Każda ma krótką nazwę do tabeli i wyjaśnienie, dlaczego ma znaczenie.
 const FEATURES = [
@@ -61,9 +72,13 @@ const FEATURES = [
   {
     key: 'wydruk',
     label: 'Czysty wydruk',
-    why: 'window.print() z ciemnego panelu daje jasnoszary, prawie niewidoczny tekst',
-    test: (s) => /printDoc\(/.test(s) || /#root \* \{ color: ?#000/.test(s) || /\.print-area \*|print-card/.test(s),
-    broken: (s) => /window\.print\(\)/.test(s) && !/printDoc\(/.test(s) && !/#root \* \{ color: ?#000/.test(s)
+    why: 'printDoc albo reguła wymuszająca czerń w kontenerze wydruku. Środkowa kolumna = „zerknij”, NIE „zepsute”: strona bez takiej reguły bywa w porządku, gdy drukowaną treść renderuje ciemnym tekstem na białej kartce (np. edusprawdzian: `text-slate-900`). Tego nie da się rzetelnie wykryć z kodu – trzeba spojrzeć na podgląd wydruku.',
+    // Czerń może być wymuszona dowolnym selektorem potomków (#print-container *, main *,
+    // .a4-page *, .print-area *) - szukamy wzorca, nie jednej konkretnej reguły.
+    test: (s) => /printDoc\(/.test(s) || FORCES_BLACK.test(s),
+    broken: (s) => /window\.print\(\)/.test(s) && !/printDoc\(/.test(s) && !FORCES_BLACK.test(s),
+    // Dekoratory drukują celowo w kolorze - czerń byłaby tam psuciem, nie naprawą.
+    n_a: (s, file) => DECORATIVE.has(file)
   },
   {
     key: 'wyglad',
@@ -94,7 +109,7 @@ const rows = pages.map((page) => {
   const citesLaw = /§\s*\d+|\bart\.\s*\d+|Dz\.\s?U\./.test(src);
   const state = {};
   for (const f of FEATURES) {
-    if (f.n_a && f.n_a(src)) state[f.key] = 'n/a';
+    if (f.n_a && f.n_a(src, page)) state[f.key] = 'n/a';
     else if (f.broken && f.broken(src)) state[f.key] = 'do zrobienia';
     else state[f.key] = f.test(src) ? 'jest' : 'brak';
   }
@@ -124,7 +139,12 @@ lines.push('Ten plik odpowiada na pytanie „co jest już zrobione, a co został
 lines.push('powstaje z faktycznych plików, nie z notatek. Po każdej większej zmianie odpal');
 lines.push('`npm run stan` i zacommituj — `npm test` sprawdza, czy jest aktualny.');
 lines.push('');
-lines.push('Legenda: ✅ jest · ⚠️ jest, ale po staremu (do wymiany) · – brak · · nie dotyczy');
+lines.push('Legenda: ✅ jest · ⚠️ po staremu / do zerknięcia · – brak · · nie dotyczy');
+lines.push('');
+lines.push('⚠️ znaczy „sprawdź”, nie „zepsute”. Przy kolumnie **Czysty wydruk** jest to szczególnie ważne:');
+lines.push('wykrycie poprawnego wydruku z samego kodu jest zawodne, bo zależy od tego, jakim kolorem');
+lines.push('markup renderuje treść w środku kartki. Traktuj te pozycje jako listę do obejrzenia');
+lines.push('w podglądzie wydruku (Ctrl+P), nie jako listę błędów.');
 lines.push('');
 
 lines.push('## Podsumowanie');

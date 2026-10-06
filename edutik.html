@@ -36,6 +36,7 @@
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin=""></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="/doc-tools.js"></script>
     
     <!-- Phosphor Icons -->
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
@@ -429,10 +430,11 @@ ZASADY KRYTYCZNE (Musisz się ich trzymać w 100%):
             const exportToWord = () => {
                 if(!generatedData) return;
                 const content = document.getElementById('document-render-area').innerHTML;
-                const header = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>${generatedData.title}</title><style>body { font-family: 'Comic Sans MS', cursive, sans-serif; font-size: 16pt; line-height: 1.6; color: #000; text-align: center; } h1 { font-size: 24pt; color: #db2777; margin-bottom: 20px; } img { max-width: 80%; height: auto; border-radius: 15px; margin-bottom: 20px; }</style></head><body>`;
-                const footer = `<\/body><\/html>`;
-                const blob = new Blob(['\ufeff', header + content + footer], { type: 'application/msword' });
-                const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = `EduTik_${Date.now()}.doc`; link.click();
+                // Prawdziwy .docx przez wspólną bibliotekę. Wcześniej był to plik „.doc”
+                // z HTML-em w środku (mime Worda) – Word otwierał go z ostrzeżeniem,
+                // a Dokumenty Google potrafiły go odrzucić.
+                window.EduDocTools.downloadDocx(content, { filename: `EduTik_${Date.now()}`, title: 'Wierszyk / piosenka' })
+                    .catch(e => showToast(e.message || 'Nie udało się przygotować pliku Word.'));
             };
 
             // === RENDERERS ===

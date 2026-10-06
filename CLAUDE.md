@@ -296,6 +296,29 @@ dostanie to przy okazji własnych zmian (plik działa też bez przepisywania mar
 nazwy klas). Uwaga: `sanitizeHtml` w `global-core.js` przepuszcza tylko atrybut `class`, więc żadnego
 `<a href>` ani `style` w HTML-u wstawianym do kartki.
 
+**Eksport do Worda – koniec z fejkowym „.doc" (10.2026):** wszystkie 20 narzędzi eksportujących
+do Worda używa `EduDocTools.downloadDocx`. Wcześniej 10 z nich tworzyło plik `.doc`, który był
+HTML-em z mime Worda – Word otwierał go z ostrzeżeniem, a Dokumenty Google potrafiły odrzucić.
+`downloadDocx` przyjmuje teraz `align` (`center`/`justify`/`right`), `italic` i `size` (w półpunktach),
+bo dyplom bez wyśrodkowania wychodził do lewej. Gdzie treść ma układ (bilety EduMotywatora:
+`float` + obramowanie kreskowane), **nie** eksportuj akapitów – zbuduj `<table>` z DANYCH, bo
+`htmlToDocxBlocks` wspiera tabele, a `div`/`span` tylko rozwija do tekstu i gubi układ.
+Test: `npm i --no-save jsdom && npm run docx:check` (`scripts/check-docx.js`) uruchamia prawdziwą
+konwersję HTML→bloki docx na atrapie biblioteki `docx`; celowo poza `npm test`, ta sama konwencja
+co `docx@9` w generatorze wzorów.
+
+**Wydruk – czego NIE da się wykryć grepem:** `body { color: black }` w `@media print` nie wystarcza,
+bo tailwindowe klasy na dzieciach (`text-slate-300`) biją je specyficznością – dlatego regułę czerni
+dajemy na potomków kontenera wydruku (`#print-container *`, `main *`, `.a4-page *`). ALE strona bez
+takiej reguły bywa w porządku, gdy renderuje treść ciemnym tekstem na białej kartce (np.
+`edusprawdzian.html` → `text-slate-900`), a w dekoratorach (MagicLetters, EduWystrój, EduGenerator,
+EduMalarz, EduDyplomy, EduPiktogram) kolor jest celowy i czerń byłaby psuciem. Dlatego kolumna
+„Czysty wydruk" w `docs/STAN-PORTFOLIO.md` oznacza „zerknij w Ctrl+P", nie „zepsute”.
+Realny błąd znaleziony przy tym przeglądzie: `edusymbol.html` nie miał `@media print` WCALE,
+a siatka kart ma inline `maxHeight: calc(100vh - 250px)` i `overflow-y-auto` – drukowało się tylko
+to, co widać na ekranie, resztę kart ucinało. Przy takich siatkach zdejmuj styl inline przez
+`!important` w bloku druku.
+
 **Kody PRO za wsparcie (Buycoffee.to):** `api/coffee-check.js` wydaje kod `KAWA-…` (7 dni, weryfikacja
 w Make, scenariusz Coffee-Verify) albo – od 49 zł – `ROK-…` (365 dni od wygenerowania), który
 `api/verify-code.js` sprawdza bezpośrednio w arkuszu `Coffee_Codes` (A kod, F data). Logika planu:
