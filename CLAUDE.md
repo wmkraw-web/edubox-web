@@ -291,10 +291,18 @@ poświaty, komponenty `.eb-btn`, `.eb-field`, `.eb-segment` (z `aria-pressed`), 
 `.eb-toolbar`, `prefers-reduced-motion`, widoczny `:focus-visible` i reguły wydruku.
 **Link musi stać PO wewnętrznym `<style>` strony** – przy tej samej specyficzności wygrywa kolejność
 (test to sprawdza). Narzędzie zmienia tylko akcent: `:root { --eb-accent: … }` w osobnym, późniejszym
-`<style>`. Przerobione: `awans.html`, `edunotariusz.html`, `eduraport.html`; pozostałe 40+ stron
-dostanie to przy okazji własnych zmian (plik działa też bez przepisywania markupu, bo przejmuje stare
-nazwy klas). Uwaga: `sanitizeHtml` w `global-core.js` przepuszcza tylko atrybut `class`, więc żadnego
-`<a href>` ani `style` w HTML-u wstawianym do kartki.
+`<style>` (test pilnuje, by po linku nie stał żaden inny `<style>` w `<head>` – wyjątkiem jest właśnie
+blok akcentu). **Podpięte we wszystkich 60 stronach narzędzi.** Akcent każdej strony wyciągnięty z jej
+własnego CSS (`.text-gradient` → `.aura-1` → `.hero-glow`), żeby ujednolicić powłokę, a nie pomalować
+portfolio na jeden kolor. Kolor napisu na przycisku (`--eb-accent-text`) dobierany przez porównanie
+kontrastu bieli i ciemności, nie progiem luminancji – próg dawał biały tekst na cyjanie (2,4:1).
+Najgorszy kontrast w portfolio to teraz 4,78:1; `edustudio` dostał indigo-600 zamiast indigo-500, bo
+przy 500 ani biel, ani czerń nie dobijały do 4,5:1. Neonowe poświaty wpisane w markup (124 wystąpienia
+w 49 plikach) wygasza jedna reguła `[class*="shadow-[0_0_"]` z `!important` – bije nieimportantowe
+utility Tailwinda niezależnie od kolejności wstrzyknięcia jego `<style>`, więc markupu nie trzeba
+czyścić; `drop-shadow-[0_0_…]` to filtr, nie `box-shadow`, i tej reguły nie dotyczy. Styl wewnątrz JSX
+(po `</head>`) celowo wygrywa nad warstwą wspólną. Uwaga: `sanitizeHtml` w `global-core.js` przepuszcza
+tylko atrybut `class`, więc żadnego `<a href>` ani `style` w HTML-u wstawianym do kartki.
 
 **Eksport do Worda – koniec z fejkowym „.doc" (10.2026):** wszystkie 20 narzędzi eksportujących
 do Worda używa `EduDocTools.downloadDocx`. Wcześniej 10 z nich tworzyło plik `.doc`, który był

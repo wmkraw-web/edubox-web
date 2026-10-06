@@ -83,9 +83,8 @@ const FEATURES = [
   {
     key: 'wyglad',
     label: 'Nowy wygląd',
-    why: 'wspólna warstwa edubox-ui.css zamiast neonowych poświat i pływających bąbli z 2021',
-    test: (s) => /<link[^>]+edubox-ui\.css/.test(s),
-    broken: (s) => /shadow-\[0_0_/.test(s)
+    why: 'wspólna warstwa edubox-ui.css: spokojne powierzchnie z prawdziwym cieniem zamiast neonowych poświat i pływających bąbli z 2021. Neony wpisane w markup wygasza reguła [class*="shadow-[0_0_"] w tym pliku, więc podpięcie linku wystarcza – klas nie trzeba czyścić z markupu.',
+    test: (s) => /<link[^>]+edubox-ui\.css/.test(s)
   },
   {
     key: 'jaktodziala',
@@ -228,6 +227,13 @@ if (viaRefs.length) {
   lines.push('');
 }
 
+const legacyNeon = rows.filter((r) => /shadow-\[0_0_/.test(fs.readFileSync(path.join(root, r.page), 'utf8')));
+lines.push('## Porządki (nie błędy)');
+lines.push('');
+lines.push(`Stron z martwymi klasami \`shadow-[0_0_…]\` w markupie: **${legacyNeon.length}**.`);
+lines.push('Wygasza je reguła w `edubox-ui.css`, więc wyglądu nie psują – to tylko kod do sprzątnięcia');
+lines.push('przy okazji innych zmian w danym pliku. Nie ma potrzeby robić z tego osobnej akcji.');
+lines.push('');
 lines.push('## Narzędzia');
 lines.push('');
 const header = `| Narzędzie | Plik | ${FEATURES.map((f) => f.label).join(' | ')} | Przepisy |`;

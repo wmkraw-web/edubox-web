@@ -23,7 +23,7 @@ w podglądzie wydruku (Ctrl+P), nie jako listę błędów.
 | Strumień | 8 | 0 | 52 | tekst pojawia się na bieżąco; bez tego nauczyciel czeka w ciszy nawet 100 s |
 | Prawdziwy .docx | 20 | 0 | 40 | plik „.doc" z HTML-em w środku (mime application/msword) Word otwiera z ostrzeżeniem, a Dokumenty Google potrafią go odrzucić |
 | Czysty wydruk | 16 | 25 | 8 | printDoc albo reguła wymuszająca czerń w kontenerze wydruku. Środkowa kolumna = „zerknij”, NIE „zepsute”: strona bez takiej reguły bywa w porządku, gdy drukowaną treść renderuje ciemnym tekstem na białej kartce (np. edusprawdzian: `text-slate-900`). Tego nie da się rzetelnie wykryć z kodu – trzeba spojrzeć na podgląd wydruku. |
-| Nowy wygląd | 3 | 47 | 10 | wspólna warstwa edubox-ui.css zamiast neonowych poświat i pływających bąbli z 2021 |
+| Nowy wygląd | 60 | 0 | 0 | wspólna warstwa edubox-ui.css: spokojne powierzchnie z prawdziwym cieniem zamiast neonowych poświat i pływających bąbli z 2021. Neony wpisane w markup wygasza reguła [class*="shadow-[0_0_"] w tym pliku, więc podpięcie linku wystarcza – klas nie trzeba czyścić z markupu. |
 | „Jak to działa" | 46 | 0 | 14 | info-box blisko góry formularza - konwencja z CLAUDE.md |
 | Wspólna pula | 26 | 0 | 19 | EduBoxCore.executeWithLimitCheck zamiast własnego licznika per-aplikacja |
 
@@ -48,85 +48,91 @@ Cytowane przez numer tekstu jednolitego lub noweli — pilnowane pod numerem pie
 - Dz.U. 2026 poz. 1122 → `DU/2019/373` (Ocenianie – dostosowanie wymagań (§ 2), zachowanie (§ 11), prace domowe (§ 12a))
 - Dz.U. 2026 poz. 515 → `DU/1982/19` (Karta Nauczyciela (awans zawodowy))
 
+## Porządki (nie błędy)
+
+Stron z martwymi klasami `shadow-[0_0_…]` w markupie: **47**.
+Wygasza je reguła w `edubox-ui.css`, więc wyglądu nie psują – to tylko kod do sprzątnięcia
+przy okazji innych zmian w danym pliku. Nie ma potrzeby robić z tego osobnej akcji.
+
 ## Narzędzia
 
 ### Terapia i SPE (11)
 
 | Narzędzie | Plik | Kartka A4 | Strumień | Prawdziwy .docx | Czysty wydruk | Nowy wygląd | „Jak to działa" | Wspólna pula | Przepisy |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| EduChunk AI | `chunking.html` | – | – | ✅ | ✅ | ⚠️ | ✅ | – | · |
-| EduBajka PRO (Ilustrowana) | `edubajka.html` | – | – | – | ⚠️ | ⚠️ | ✅ | – | · |
-| EduDialog AI (Tłumacz) | `edudialog.html` | ✅ | ✅ | ✅ | ✅ | ⚠️ | ✅ | · | ✅ ISAP |
-| Asystent Dostosowań | `edudostosowania.html` | ✅ | ✅ | ✅ | ✅ | ⚠️ | ✅ | · | ✅ ISAP |
-| EduKasia PRO | `edukasia.html` | – | – | – | ⚠️ | ⚠️ | ✅ | ✅ | · |
-| EduOddech - Chwila dla Nauczyciela | `eduoddech.html` | – | – | – | – | – | ✅ | · | · |
-| EduPiktogram | `edupiktogram.html` | – | – | – | · | ⚠️ | ✅ | ✅ | · |
-| EduSOS PRO | `edusos.html` | – | – | – | ⚠️ | ⚠️ | ✅ | ✅ | · |
-| EduSymbol AI | `edusymbol.html` | – | – | – | · | ⚠️ | ✅ | – | · |
-| EduTerapia PRO (TUS) | `eduterapia.html` | – | – | ✅ | ⚠️ | ⚠️ | ✅ | ✅ | · |
-| EduWizualizator (AAC) | `eduwizualizator.html` | – | – | – | ⚠️ | ⚠️ | ✅ | ✅ | · |
+| EduChunk AI | `chunking.html` | – | – | ✅ | ✅ | ✅ | ✅ | – | · |
+| EduBajka PRO (Ilustrowana) | `edubajka.html` | – | – | – | ⚠️ | ✅ | ✅ | – | · |
+| EduDialog AI (Tłumacz) | `edudialog.html` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | · | ✅ ISAP |
+| Asystent Dostosowań | `edudostosowania.html` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | · | ✅ ISAP |
+| EduKasia PRO | `edukasia.html` | – | – | – | ⚠️ | ✅ | ✅ | ✅ | · |
+| EduOddech - Chwila dla Nauczyciela | `eduoddech.html` | – | – | – | – | ✅ | ✅ | · | · |
+| EduPiktogram | `edupiktogram.html` | – | – | – | · | ✅ | ✅ | ✅ | · |
+| EduSOS PRO | `edusos.html` | – | – | – | ⚠️ | ✅ | ✅ | ✅ | · |
+| EduSymbol AI | `edusymbol.html` | – | – | – | · | ✅ | ✅ | – | · |
+| EduTerapia PRO (TUS) | `eduterapia.html` | – | – | ✅ | ⚠️ | ✅ | ✅ | ✅ | · |
+| EduWizualizator (AAC) | `eduwizualizator.html` | – | – | – | ⚠️ | ✅ | ✅ | ✅ | · |
 
 ### Dokumenty i biurokracja (16)
 
 | Narzędzie | Plik | Kartka A4 | Strumień | Prawdziwy .docx | Czysty wydruk | Nowy wygląd | „Jak to działa" | Wspólna pula | Przepisy |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Asystent Pedagoga (IPET/WWRD) | `asystent-pedagoga.html` | ✅ | ✅ | ✅ | ✅ | ⚠️ | ✅ | – | ✅ ISAP |
+| Asystent Pedagoga (IPET/WWRD) | `asystent-pedagoga.html` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | – | ✅ ISAP |
 | Kreator Awansu AI | `awans.html` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | · | ✅ ISAP |
-| EduAwans | `eduawans.html` | – | – | ✅ | ⚠️ | ⚠️ | ✅ | – | ✅ ISAP |
-| EduBiurokrata AI | `edubiurokrata.html` | ✅ | ✅ | ✅ | ✅ | ⚠️ | ✅ | · | ✅ ISAP |
-| Baza Druków | `edudruki.html` | – | – | – | – | – | – | · | ✅ ISAP |
-| EduKatalog (Generator Ofert) | `edukatalog.html` | – | – | – | ✅ | – | – | · | · |
-| EduKorektor AI (NAZU) | `edukorektor.html` | – | – | – | ✅ | ⚠️ | ✅ | ✅ | · |
+| EduAwans | `eduawans.html` | – | – | ✅ | ⚠️ | ✅ | ✅ | – | ✅ ISAP |
+| EduBiurokrata AI | `edubiurokrata.html` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | · | ✅ ISAP |
+| Baza Druków | `edudruki.html` | – | – | – | – | ✅ | – | · | ✅ ISAP |
+| EduKatalog (Generator Ofert) | `edukatalog.html` | – | – | – | ✅ | ✅ | – | · | · |
+| EduKorektor AI (NAZU) | `edukorektor.html` | – | – | – | ✅ | ✅ | ✅ | ✅ | · |
 | EduNotariusz AI | `edunotariusz.html` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | · | · |
-| EduOcena AI | `eduocena.html` | – | – | ✅ | ⚠️ | ⚠️ | ✅ | ✅ | ✅ ISAP |
-| EduPDF Edytor | `edupdf.html` | – | – | – | – | – | ✅ | · | · |
-| EduPrawo AI | `eduprawo.html` | – | – | ✅ | ⚠️ | ⚠️ | ✅ | ✅ | ✅ ISAP |
+| EduOcena AI | `eduocena.html` | – | – | ✅ | ⚠️ | ✅ | ✅ | ✅ | ✅ ISAP |
+| EduPDF Edytor | `edupdf.html` | – | – | – | – | ✅ | ✅ | · | · |
+| EduPrawo AI | `eduprawo.html` | – | – | ✅ | ⚠️ | ✅ | ✅ | ✅ | ✅ ISAP |
 | EduRaport AI | `eduraport.html` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | · | · |
-| Asystent Wdrożenia Reformy 2026 | `edureforma.html` | – | – | – | ⚠️ | ⚠️ | ✅ | ✅ | ✅ ISAP |
-| EduSprawozdawca PRO | `edusprawozdania.html` | ✅ | ✅ | ✅ | ✅ | ⚠️ | ✅ | · | ✅ ISAP |
-| EduWpisy PRO (Dziennik) | `eduwpisy.html` | – | – | – | – | ⚠️ | – | – | · |
-| EduWycieczka Organizator | `eduwycieczka.html` | – | – | – | ⚠️ | ⚠️ | ✅ | ✅ | · |
+| Asystent Wdrożenia Reformy 2026 | `edureforma.html` | – | – | – | ⚠️ | ✅ | ✅ | ✅ | ✅ ISAP |
+| EduSprawozdawca PRO | `edusprawozdania.html` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | · | ✅ ISAP |
+| EduWpisy PRO (Dziennik) | `eduwpisy.html` | – | – | – | – | ✅ | – | – | · |
+| EduWycieczka Organizator | `eduwycieczka.html` | – | – | – | ⚠️ | ✅ | ✅ | ✅ | · |
 
 ### Lekcje i zajęcia (22)
 
 | Narzędzie | Plik | Kartka A4 | Strumień | Prawdziwy .docx | Czysty wydruk | Nowy wygląd | „Jak to działa" | Wspólna pula | Przepisy |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| EduBystrzak AI | `edubystrzak.html` | – | – | – | ✅ | ⚠️ | ✅ | · | · |
-| EduDetox AI | `edudetox.html` | – | – | – | ⚠️ | ⚠️ | – | – | · |
-| EduEscape PRO | `eduescape.html` | – | – | – | ⚠️ | ⚠️ | ✅ | – | · |
-| EduFiszki i Memory AI | `edufiszki.html` | – | – | – | ⚠️ | ⚠️ | ✅ | – | · |
-| EduGrupy (Koło Fortuny) | `edugrupy.html` | – | – | – | ⚠️ | ⚠️ | ✅ | · | · |
-| EduGry (Ja Mam) | `edugry.html` | – | – | – | ⚠️ | ⚠️ | ✅ | · | · |
-| Edukacja Obywatelska AI | `edukacja2025.html` | – | – | ✅ | ⚠️ | ⚠️ | ✅ | ✅ | ✅ ISAP |
-| EduKalendarz | `edukalendarz.html` | – | – | – | ✅ | ⚠️ | – | – | · |
-| EduKomiks AI | `edukomiks.html` | – | – | – | ⚠️ | – | – | ✅ | · |
-| EduLekcja 360 | `edulekcja360.html` | – | – | ✅ | ✅ | – | – | ✅ | ✅ ISAP |
-| EduMotywator AI | `edumotywator.html` | – | – | ✅ | ⚠️ | ⚠️ | ✅ | ✅ | · |
-| EduPrezentacja PRO | `eduprezentacja.html` | – | – | – | – | ⚠️ | ✅ | ✅ | · |
-| EduRymy AI | `edurymy.html` | – | – | – | ⚠️ | ⚠️ | ✅ | ✅ | · |
-| Scenariusz AI PRO | `eduscenariusz.html` | – | – | ✅ | ⚠️ | – | ✅ | ✅ | · |
-| EduSprawdzian Maker | `edusprawdzian.html` | – | – | – | ⚠️ | ⚠️ | ✅ | ✅ | · |
-| EduTimer PRO | `edustoper.html` | – | – | – | – | ⚠️ | ✅ | · | · |
-| EduTik PRO (Wierszyki i Piosenki) | `edutik.html` | – | – | ✅ | ⚠️ | ⚠️ | ✅ | ✅ | · |
-| EduWakacje PRO | `eduwakacje.html` | – | – | – | ⚠️ | ⚠️ | ✅ | – | · |
-| EduZadania AI | `eduzadania.html` | – | – | – | ✅ | ⚠️ | ✅ | – | · |
-| EduZastępstwo 999 | `eduzastepstwo.html` | – | – | – | ⚠️ | ⚠️ | – | ✅ | · |
-| EduBoxPro Studio | `studio.html` | – | – | ✅ | ✅ | ⚠️ | ✅ | – | · |
-| ZanimKlikniesz | `zanimklikniesz.html` | – | – | – | ⚠️ | ⚠️ | – | – | · |
+| EduBystrzak AI | `edubystrzak.html` | – | – | – | ✅ | ✅ | ✅ | · | · |
+| EduDetox AI | `edudetox.html` | – | – | – | ⚠️ | ✅ | – | – | · |
+| EduEscape PRO | `eduescape.html` | – | – | – | ⚠️ | ✅ | ✅ | – | · |
+| EduFiszki i Memory AI | `edufiszki.html` | – | – | – | ⚠️ | ✅ | ✅ | – | · |
+| EduGrupy (Koło Fortuny) | `edugrupy.html` | – | – | – | ⚠️ | ✅ | ✅ | · | · |
+| EduGry (Ja Mam) | `edugry.html` | – | – | – | ⚠️ | ✅ | ✅ | · | · |
+| Edukacja Obywatelska AI | `edukacja2025.html` | – | – | ✅ | ⚠️ | ✅ | ✅ | ✅ | ✅ ISAP |
+| EduKalendarz | `edukalendarz.html` | – | – | – | ✅ | ✅ | – | – | · |
+| EduKomiks AI | `edukomiks.html` | – | – | – | ⚠️ | ✅ | – | ✅ | · |
+| EduLekcja 360 | `edulekcja360.html` | – | – | ✅ | ✅ | ✅ | – | ✅ | ✅ ISAP |
+| EduMotywator AI | `edumotywator.html` | – | – | ✅ | ⚠️ | ✅ | ✅ | ✅ | · |
+| EduPrezentacja PRO | `eduprezentacja.html` | – | – | – | – | ✅ | ✅ | ✅ | · |
+| EduRymy AI | `edurymy.html` | – | – | – | ⚠️ | ✅ | ✅ | ✅ | · |
+| Scenariusz AI PRO | `eduscenariusz.html` | – | – | ✅ | ⚠️ | ✅ | ✅ | ✅ | · |
+| EduSprawdzian Maker | `edusprawdzian.html` | – | – | – | ⚠️ | ✅ | ✅ | ✅ | · |
+| EduTimer PRO | `edustoper.html` | – | – | – | – | ✅ | ✅ | · | · |
+| EduTik PRO (Wierszyki i Piosenki) | `edutik.html` | – | – | ✅ | ⚠️ | ✅ | ✅ | ✅ | · |
+| EduWakacje PRO | `eduwakacje.html` | – | – | – | ⚠️ | ✅ | ✅ | – | · |
+| EduZadania AI | `eduzadania.html` | – | – | – | ✅ | ✅ | ✅ | – | · |
+| EduZastępstwo 999 | `eduzastepstwo.html` | – | – | – | ⚠️ | ✅ | – | ✅ | · |
+| EduBoxPro Studio | `studio.html` | – | – | ✅ | ✅ | ✅ | ✅ | – | · |
+| ZanimKlikniesz | `zanimklikniesz.html` | – | – | – | ⚠️ | ✅ | – | – | · |
 
 ### Grafika i materiały (11)
 
 | Narzędzie | Plik | Kartka A4 | Strumień | Prawdziwy .docx | Czysty wydruk | Nowy wygląd | „Jak to działa" | Wspólna pula | Przepisy |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| EduWystrój AI | `edudekorator.html` | – | – | – | · | ⚠️ | ✅ | – | · |
-| EduDyplom Wideo | `edudyplom.html` | – | – | – | – | – | – | ✅ | · |
-| EduDyplomy AI | `edudyplomy.html` | – | – | ✅ | · | ⚠️ | ✅ | – | · |
-| EduGazetka AI | `edugazetka.html` | – | – | – | · | ⚠️ | – | – | · |
-| EduGenerator PRO | `edugenerator.html` | – | – | – | · | ⚠️ | ✅ | ✅ | · |
-| EduMalarz AI | `edumalarz.html` | – | – | – | · | ⚠️ | ✅ | – | · |
-| EduPlakat AI | `eduplakat.html` | – | – | – | · | ⚠️ | ✅ | ✅ | · |
-| EduPodsumowanie | `edupodsumowanie.html` | – | – | – | – | – | – | ✅ | · |
-| EduStudio AI | `edustudio.html` | – | – | – | · | ⚠️ | – | ✅ | · |
-| Magic Color AI | `magiccolor.html` | – | – | – | · | ⚠️ | – | ✅ | · |
-| EduBoxPro MagicLetters | `magicletters.html` | – | – | – | · | – | ✅ | – | · |
+| EduWystrój AI | `edudekorator.html` | – | – | – | · | ✅ | ✅ | – | · |
+| EduDyplom Wideo | `edudyplom.html` | – | – | – | – | ✅ | – | ✅ | · |
+| EduDyplomy AI | `edudyplomy.html` | – | – | ✅ | · | ✅ | ✅ | – | · |
+| EduGazetka AI | `edugazetka.html` | – | – | – | · | ✅ | – | – | · |
+| EduGenerator PRO | `edugenerator.html` | – | – | – | · | ✅ | ✅ | ✅ | · |
+| EduMalarz AI | `edumalarz.html` | – | – | – | · | ✅ | ✅ | – | · |
+| EduPlakat AI | `eduplakat.html` | – | – | – | · | ✅ | ✅ | ✅ | · |
+| EduPodsumowanie | `edupodsumowanie.html` | – | – | – | – | ✅ | – | ✅ | · |
+| EduStudio AI | `edustudio.html` | – | – | – | · | ✅ | – | ✅ | · |
+| Magic Color AI | `magiccolor.html` | – | – | – | · | ✅ | – | ✅ | · |
+| EduBoxPro MagicLetters | `magicletters.html` | – | – | – | · | ✅ | ✅ | – | · |
 

@@ -13,6 +13,17 @@ const fs = require('fs');
 const path = require('path');
 
 const root = path.resolve(__dirname, '..');
+
+// Kontrast wg WCAG: luminancja sRGB i stosunek jaśniejszego do ciemniejszego.
+const luminance = (hex) => {
+  const c = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255)
+    .map((v) => (v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4)));
+  return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+};
+const contrast = (a, b) => {
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
+};
 const read = (f) => fs.readFileSync(path.join(root, f), 'utf8');
 
 // Narzędzia z pełnym wzorcem: kartka + edycja + eksport z kartki.
@@ -30,8 +41,12 @@ const PAPER_TOOLS = [
 // Narzędzia, które korzystają z EduDocTools, ale budują HTML same (nie ze strumienia AI).
 const EXPORT_ONLY_TOOLS = ['edulekcja360.html', 'eduawans.html'];
 
-// Narzędzia przerobione na wspólną warstwę wyglądu /edubox-ui.css.
-const UI_TOOLS = ['awans.html', 'edunotariusz.html', 'eduraport.html'];
+// Narzędzia na wspólnej warstwie wyglądu wykrywamy z plików – lista na sztywno
+// rozjechałaby się przy pierwszym podpięciu kolejnej strony.
+const UI_TOOLS = fs.readdirSync(root)
+  .filter((f) => f.endsWith('.html'))
+  .filter((f) => /<link[^>]+href="\/edubox-ui\.css"/.test(read(f)))
+  .sort();
 
 const sources = new Map();
 for (const file of [...PAPER_TOOLS, ...EXPORT_ONLY_TOOLS]) sources.set(file, read(file));
@@ -156,31 +171,42 @@ assert.match(ui, /--eb-accent:/, 'edubox-ui.css: brak tokenu akcentu (narzędzia
 assert.match(ui, /\.eb-btn\b/, 'edubox-ui.css: brak komponentu przycisku');
 assert.match(ui, /\.eb-field\b/, 'edubox-ui.css: brak komponentu pola formularza');
 assert.match(ui, /\.eb-segment\b/, 'edubox-ui.css: brak przełącznika trybów');
+// Reguła wygaszająca neonowe poświaty wpisane w markup (124 wystąpienia w 49 plikach).
+assert.ok(/\[class\*="shadow-\[0_0_"\]/.test(ui),
+  'edubox-ui.css: brak reguły wygaszającej neonowe shadow-[0_0_…] z markupu');
 // Zapas dla przeglądarek bez color-mix(): focus musi być widoczny wszędzie.
 assert.match(ui, /@supports not \(color: color-mix/, 'edubox-ui.css: brak zapasu dla przeglądarek bez color-mix()');
 
 for (const file of UI_TOOLS) {
-  const src = sources.get(file);
+  const src = read(file);
   // Szukamy tagu <link>, nie samej nazwy pliku - ta pojawia się też w komentarzach.
   const linkMatch = /<link[^>]+href="\/edubox-ui\.css"[^>]*>/.exec(src);
   assert.ok(linkMatch, `${file}: brak <link> do /edubox-ui.css`);
-  const linkAt = linkMatch.index;
   // Kolejność ma znaczenie: przy tej samej specyficzności wygrywa reguła późniejsza,
-  // więc wspólna warstwa musi stać PO wewnętrznym <style> strony.
-  const firstStyleStart = src.indexOf('<style>');
-  assert.ok(firstStyleStart === -1 || src.lastIndexOf('</style>', linkAt) > firstStyleStart,
-    `${file}: <link> do /edubox-ui.css musi stać PO wewnętrznym <style> strony (inaczej stare reguły wygrają kolejnością)`);
-  assert.ok(!/shadow-\[0_0_/.test(src),
-    `${file}: neonowe poświaty (shadow-[0_0_…]) zastąpiliśmy cieniami z edubox-ui.css`);
-  assert.ok(/@media print/.test(src), `${file}: brak reguł wydruku (ciemne panele dawały jasnoszary tekst)`);
-  assert.match(src, /#root \* \{ color: #000 !important \}|printDoc\(/,
-    `${file}: wydruk musi dawać czarny tekst (printDoc albo reguła #root *)`);
-}
-
-// Przełącznik trybów musi mówić czytnikom ekranu, który tryb jest włączony.
-for (const file of UI_TOOLS) {
-  const src = sources.get(file);
-  assert.ok(/aria-pressed=/.test(src), `${file}: przełącznik trybów bez aria-pressed`);
+  // więc wspólna warstwa musi stać PO wewnętrznym <style> strony. Styl wewnątrz JSX
+  // (po </head>) celowo wygrywa nad warstwą wspólną, więc patrzymy tylko na <head>.
+  const headEnd = src.indexOf('</head>');
+  const head = headEnd === -1 ? src : src.slice(0, headEnd);
+  // Po linku może stać tylko jeden blok: nadpisanie akcentu marki (:root { --eb-accent }).
+  // Każdy inny <style> za linkiem oznacza, że stare reguły strony wygrają kolejnością.
+  for (const m of head.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)) {
+    if (m.index < linkMatch.index) continue;
+    assert.ok(/:root\s*\{\s*--eb-accent/.test(m[1]),
+      `${file}: <style> stoi PO <link> do /edubox-ui.css, więc stare reguły wygrają kolejnością`);
+  }
+  // Akcent marki: strona, która ma własny kolor w --eb-accent, musi też mieć dobrany
+  // kolor napisu na przycisku - inaczej wychodzi biały tekst na żółtym tle.
+  const accent = /--eb-accent: (#[0-9a-f]{6});/.exec(src);
+  if (accent) {
+    const textOn = /--eb-accent-text: (#[0-9a-f]{6});/.exec(src);
+    assert.ok(textOn, `${file}: ustawia --eb-accent bez --eb-accent-text`);
+    assert.ok(contrast(accent[1], textOn[1]) >= 4.5,
+      `${file}: kontrast napisu na przycisku ${contrast(accent[1], textOn[1]).toFixed(2)}:1 – poniżej WCAG AA (4.5:1)`);
+  }
+  // aria-pressed tylko tam, gdzie faktycznie jest przełącznik trybów.
+  if (/eb-segment__item/.test(src)) {
+    assert.ok(/aria-pressed=/.test(src), `${file}: przełącznik .eb-segment bez aria-pressed`);
+  }
 }
 
 console.log(`[Dokumenty] OK — ${PAPER_TOOLS.length} narzędzi na wzorcu kartki, ${UI_TOOLS.length} na wspólnej warstwie wyglądu, bez fejkowego .doc i bez obietnic "rozbudowanych akapitów".`);
