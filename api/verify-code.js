@@ -1,5 +1,6 @@
 import { getServiceAccountAccessToken } from './_lib/googleServiceAccountAuth.js';
 import { isRateLimited } from './_lib/rateLimit.js';
+import { YEAR_CODE_PATTERN, yearCodeUntil } from './_lib/coffeePlan.js';
 
 // UWAGA: ten plik obsługuje TERAZ dwie sprawy pod jednym endpointem, celowo -
 // dokładnie ten sam kompromis co api/ewa-generate.js (obrazy fal.ai + wideo D-ID
@@ -38,6 +39,31 @@ async function checkWebhook(webhookUrl, normalizedCode) {
   }
 }
 
+// Roczny kod PRO (wsparcie od 49 zł, generowany przez api/coffee-check.js) - sprawdzany bezpośrednio
+// w arkuszu Coffee_Codes (kolumna A kod, F data wygenerowania), ważny 365 dni od wygenerowania.
+// Zwraca datę wygaśnięcia (ISO), gdy kod istnieje i nie wygasł; w każdym innym przypadku null.
+async function checkYearCode(normalizedCode) {
+  try {
+    if (!YEAR_CODE_PATTERN.test(normalizedCode)) return null;
+    if (!process.env.GOOGLE_SERVICE_ACCOUNT_KEY || !process.env.SHEETS_SPREADSHEET_ID) return null;
+    const token = await getServiceAccountAccessToken(
+      JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_KEY),
+      'https://www.googleapis.com/auth/spreadsheets.readonly'
+    );
+    const sheetRes = await fetch(
+      `https://sheets.googleapis.com/v4/spreadsheets/${process.env.SHEETS_SPREADSHEET_ID}/values/Coffee_Codes!A:F`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    if (!sheetRes.ok) return null;
+    const rows = (await sheetRes.json()).values || [];
+    const row = rows.find(r => String(r[0] || '').trim().toUpperCase() === normalizedCode);
+    const until = row ? yearCodeUntil(row[5]) : null;
+    return until && Date.parse(until) > Date.now() ? until : null;
+  } catch (e) {
+    return null;
+  }
+}
+
 // Ten sam trzystopniowy sposób weryfikacji kodu co poniżej w handlerze - wydzielony,
 // żeby akcja "materialy-download" mogła go użyć bez duplikowania trzech gałęzi if.
 async function isCodeCurrentlyValid(code) {
@@ -45,6 +71,8 @@ async function isCodeCurrentlyValid(code) {
   const normalized = code.trim().toUpperCase();
 
   if (normalized === process.env.PREMIUM_CODE) return true;
+
+  if (YEAR_CODE_PATTERN.test(normalized)) return Boolean(await checkYearCode(normalized));
 
   if (process.env.REFERRAL_WEBHOOK_URL) {
     const referralResult = await checkWebhook(process.env.REFERRAL_WEBHOOK_URL, normalized);
@@ -234,6 +262,12 @@ export default async function handler(req, res) {
   // 1. Stały kod (bezpośredni zakup) — szybka ścieżka, działa jak dotychczas.
   if (normalized === process.env.PREMIUM_CODE) {
     return res.status(200).json({ valid: true });
+  }
+
+  // 1a. Roczny kod PRO (wsparcie od 49 zł) — sprawdzany bezpośrednio w arkuszu, bez Make.
+  if (YEAR_CODE_PATTERN.test(normalized)) {
+    const until = await checkYearCode(normalized);
+    return res.status(200).json(until ? { valid: true, bonus: true, until } : { valid: false });
   }
 
   // 2. Kod bonusowy z programu poleceń — sprawdzany w Make (rejestr w Google Sheets).

@@ -538,6 +538,17 @@ export const EduBoxCore = {
     }
 };
 
+const showPiiNotice = () => {
+    if (typeof document === 'undefined' || document.getElementById('edubox-pii-notice')) return;
+    const box = document.createElement('div');
+    box.id = 'edubox-pii-notice';
+    box.setAttribute('role', 'status');
+    box.style.cssText = 'position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:99999;max-width:92vw;width:440px;background:#0f172a;color:#fff;border:1px solid #10b981;border-radius:14px;padding:12px 16px;font:600 14px/1.45 system-ui,sans-serif;box-shadow:0 10px 30px rgba(0,0,0,.35)';
+    box.textContent = '🔒 Dla ochrony danych usunęliśmy z tekstu numer PESEL, zanim trafił do AI. Nie wpisuj danych osobowych dziecka – wystarczy inicjał.';
+    document.body.appendChild(box);
+    setTimeout(() => box.remove(), 7000);
+};
+
 // Jedno miejsce zliczania dla wszystkich narzędzi korzystających ze wspólnego API.
 // Nie liczymy rozpoczętych ani nieudanych prób, odczytów statusu wideo i syntezy głosu.
 if (typeof window !== 'undefined' && !window.__eduboxGenerationFetchTrackerV1) {
@@ -550,6 +561,10 @@ if (typeof window !== 'undefined' && !window.__eduboxGenerationFetchTrackerV1) {
             // w Firestore bywa blokowany regułami bazy, a GA zasila poniedziałkowy raport z Make.
             try { if (typeof window.gtag === 'function') window.gtag('event', 'ai_generation'); } catch (e) {}
         }
+        // Serwer usunął z tekstu numer PESEL przed wysłaniem do AI (api/_lib/pii.js) - krótka informacja.
+        try {
+            if (Number(response.headers.get('X-EduBox-PII-Removed') || 0) > 0) showPiiNotice();
+        } catch (e) {}
         return response;
     };
     Object.defineProperty(window, '__eduboxGenerationFetchTrackerV1', { value: true });

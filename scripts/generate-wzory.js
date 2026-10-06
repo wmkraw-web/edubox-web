@@ -12,8 +12,8 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..');
-const UPDATED = '5 października 2026';
-const UPDATED_ISO = '2026-10-05';
+const UPDATED = '6 października 2026';
+const UPDATED_ISO = '2026-10-06';
 const BASE = 'https://eduboxpro.pl';
 
 const PAGES = [
@@ -120,10 +120,16 @@ Wskazówki do dalszej pracy: Warto codziennie czytać z uczniem na głos przez 1
       'Trudne słowa i żargon, których rodzic nie zrozumie.'
     ],
     faq: [
-      ['Czy w klasach 1–3 ocena klasyfikacyjna musi być opisowa?', 'Tak. W klasach I–III szkoły podstawowej śródroczne i roczne oceny klasyfikacyjne z obowiązkowych i dodatkowych zajęć edukacyjnych są ocenami opisowymi. Szczegóły – np. sposób oceniania bieżącego – określa statut szkoły.'],
+      ['Czy w klasach 1–3 ocena klasyfikacyjna musi być opisowa?', 'Tak. W klasach I–III szkoły podstawowej śródroczne i roczne oceny klasyfikacyjne z obowiązkowych i dodatkowych zajęć edukacyjnych są ocenami opisowymi (art. 44i ust. 1 pkt 2 ustawy o systemie oświaty). Sposób ustalania ocen bieżących określa statut szkoły.'],
       ['Czym różni się ocena śródroczna od rocznej?', 'Ocena śródroczna podsumowuje pierwsze półrocze i zwykle zawiera więcej wskazówek do dalszej pracy. Ocena roczna podsumowuje cały rok szkolny i trafia na świadectwo.'],
+      ['Czy w ocenie rocznej trzeba uwzględnić „doświadczenia edukacyjne”?', 'Od 1 września 2026 r. przy ustalaniu rocznej oceny klasyfikacyjnej z zajęć, dla których podstawa programowa przewiduje doświadczenia edukacyjne, bierze się pod uwagę także zaangażowanie ucznia w ich realizację (§ 9 ust. 3 rozporządzenia w sprawie oceniania, dodany rozporządzeniem z 20 sierpnia 2026 r., Dz.U. 2026 poz. 1122). Nowa podstawa programowa obowiązuje w roku szkolnym 2026/2027 w klasach I i IV.'],
       ['Czy mogę użyć AI do pisania ocen opisowych?', 'Tak, jako pomocy w redagowaniu tekstu – ale zawsze na podstawie własnych obserwacji, bez wpisywania danych osobowych dziecka (zamiast imienia użyj inicjału) i z uważnym sprawdzeniem wyniku. Ocenę wystawia nauczyciel.'],
       ['Jak długa powinna być ocena opisowa?', 'Na tyle, by była konkretna – zwykle kilka zdań na każdą edukację. Ważniejsze od długości są trafność i wskazówki, z których rodzic może skorzystać.']
+    ],
+    legal: [
+      ['Art. 44i ustawy o systemie oświaty (tekst jedn. Dz.U. 2025 poz. 881 ze zm.)', 'https://isap.sejm.gov.pl/isap.nsf/DocDetails.xsp?id=WDU20250000881'],
+      ['Rozporządzenie w sprawie oceniania, klasyfikowania i promowania uczniów i słuchaczy w szkołach publicznych (tekst jedn. Dz.U. 2023 poz. 2572 ze zm.)', 'https://isap.sejm.gov.pl/isap.nsf/DocDetails.xsp?id=WDU20230002572'],
+      ['Zmiana od 1.09.2026 – m.in. § 9 ust. 3 (doświadczenia edukacyjne): Dz.U. 2026 poz. 1122', 'https://isap.sejm.gov.pl/isap.nsf/DocDetails.xsp?id=WDU20260001122']
     ],
     tool: {
       name: 'EduOcena AI',
@@ -138,15 +144,19 @@ Wskazówki do dalszej pracy: Warto codziennie czytać z uczniem na głos przez 1
     description: 'Przykłady opisowej oceny zachowania dla klas 1–3: uczennica wzorowa, uczeń z trudnością w przestrzeganiu zasad i dziecko nieśmiałe. Gotowe zwroty do skopiowania.',
     kicker: 'Wzory i przykłady · Klasy 1–3',
     h1: 'Ocena opisowa zachowania w klasach 1–3 – przykłady',
-    short: 'W klasach 1–3 śródroczna i roczna ocena zachowania jest oceną opisową. Opisuje, jak dziecko funkcjonuje w szkole: jak wywiązuje się z obowiązków ucznia, jak odnosi się do innych, jak dba o bezpieczeństwo i jak radzi sobie z emocjami. Najważniejsza zasada: opisuj zachowania, a nie oceniaj dziecka jako osoby.',
-    rulesTitle: 'Co zwykle uwzględnia ocena zachowania',
+    short: 'W klasach 1–3 śródroczna i roczna ocena zachowania jest oceną opisową. Od 1 września 2026 r. obowiązuje nowa lista podstawowych obszarów oceny zachowania – m.in. odpowiedzialność za własny rozwój, przestrzeganie norm społecznych i zaangażowanie w życie klasy, szkoły i wspólnoty lokalnej. Najważniejsza zasada się nie zmienia: opisuj zachowania, a nie oceniaj dziecka jako osoby.',
+    rulesTitle: 'Obszary oceny zachowania od 1 września 2026 r. (§ 11 ust. 1)',
     rules: [
-      'Wywiązywanie się z obowiązków ucznia (przygotowanie do zajęć, staranność, punktualność).',
-      'Postępowanie zgodne z dobrem klasy i szkoły, zaangażowanie w życie klasy.',
-      'Kulturę osobistą i dbałość o piękno mowy ojczystej – zwroty grzecznościowe, sposób wypowiadania się.',
+      'Wywiązywanie się z obowiązków ucznia.',
+      'Okazywanie szacunku innym osobom, w tym nauczycielom, uczniom i pracownikom szkoły.',
+      'Przejmowanie odpowiedzialności za własny rozwój i zaangażowanie w realizację celów rozwojowych.',
+      'Przestrzeganie norm społecznych w szkole i poza nią.',
+      'Dbałość o kulturę języka.',
       'Dbałość o bezpieczeństwo i zdrowie własne oraz innych osób.',
-      'Okazywanie szacunku innym – rówieśnikom i dorosłym.',
-      'Postępy w porównaniu z poprzednim okresem – szczególnie ważne u dzieci, którym jest trudniej.'
+      'Współpraca oraz dbałość o dobre relacje z innymi.',
+      'Zaangażowanie w życie klasy, szkoły i wspólnoty lokalnej.',
+      'Wykazywanie się szacunkiem dla własnego narodu i ojczyzny oraz tradycji i kultury innych narodów.',
+      'Szczegółowe kryteria i sposób oceniania określa statut szkoły – w klasach 1–3 opisz te obszary językiem zrozumiałym dla rodzica i odpowiednio do wieku dziecka.'
     ],
     examplesNote: 'Przykłady są punktem wyjścia – opisz konkretne zachowania konkretnego dziecka. Nie wpisuj informacji o diagnozach, zdrowiu ani sytuacji rodzinnej.',
     examples: [
@@ -174,26 +184,32 @@ Wskazówki: Warto chwalić ucznia za każdą sytuację, w której zachował spok
         'Potrzebuje przypominania o przygotowaniu do zajęć.',
         'Starannie i samodzielnie wykonuje powierzone zadania.'
       ]],
-      ['Relacje z innymi', [
+      ['Szacunek, współpraca i relacje', [
         'Jest koleżeński, życzliwy i chętnie pomaga innym.',
         'Zgodnie współpracuje w grupie i szanuje zdanie innych.',
         'Uczy się rozwiązywać konflikty bez kłótni – z pomocą dorosłego.',
-        'Odnosi się z szacunkiem do rówieśników i dorosłych.'
+        'Odnosi się z szacunkiem do rówieśników, nauczycieli i pracowników szkoły.',
+        'Coraz lepiej radzi sobie z emocjami w trudnych sytuacjach.'
       ]],
-      ['Kultura osobista', [
+      ['Normy społeczne i kultura języka', [
         'Używa zwrotów grzecznościowych i dba o kulturę słowa.',
-        'Zachowuje się kulturalnie w szkole i poza nią, np. podczas wycieczek.',
+        'Przestrzega ustalonych zasad w szkole i poza nią, np. podczas wycieczek.',
         'Czasem potrzebuje przypomnienia o czekaniu na swoją kolej.'
       ]],
-      ['Bezpieczeństwo', [
+      ['Bezpieczeństwo i zdrowie', [
         'Przestrzega zasad bezpieczeństwa w klasie, na korytarzu i na boisku.',
-        'Dba o bezpieczeństwo swoje i innych.',
+        'Dba o bezpieczeństwo i zdrowie swoje oraz innych.',
         'Uczy się przewidywać skutki swoich działań.'
       ]],
-      ['Emocje i zaangażowanie', [
-        'Coraz lepiej radzi sobie z emocjami w trudnych sytuacjach.',
-        'Chętnie angażuje się w życie klasy i szkoły.',
-        'Jest otwarty na nowe zadania i wyzwania.'
+      ['Odpowiedzialność za własny rozwój', [
+        'Chętnie podejmuje nowe wyzwania i wytrwale pracuje nad trudniejszymi zadaniami.',
+        'Z pomocą nauczyciela wyznacza sobie małe cele i cieszy się z postępów.',
+        'Uczy się przyjmować informację zwrotną i poprawiać swoją pracę.'
+      ]],
+      ['Zaangażowanie i wspólnota', [
+        'Chętnie angażuje się w życie klasy i szkoły, np. w przygotowanie uroczystości.',
+        'Bierze udział w działaniach na rzecz innych i społeczności lokalnej.',
+        'Z szacunkiem i ciekawością poznaje tradycje własnego kraju i innych kultur.'
       ]]
     ],
     mistakes: [
@@ -204,15 +220,21 @@ Wskazówki: Warto chwalić ucznia za każdą sytuację, w której zachował spok
       'Wpisywanie informacji poufnych – diagnoz, zdrowia, sytuacji rodzinnej.'
     ],
     faq: [
-      ['Czy ocena zachowania w klasach 1–3 jest opisowa?', 'Tak. W klasach I–III szkoły podstawowej śródroczne i roczne oceny klasyfikacyjne zachowania są ocenami opisowymi.'],
-      ['Czy ocena zachowania wpływa na oceny z zajęć edukacyjnych?', 'Nie. Ocena zachowania nie ma wpływu na oceny klasyfikacyjne z zajęć edukacyjnych.'],
+      ['Czy ocena zachowania w klasach 1–3 jest opisowa?', 'Tak. W klasach I–III szkoły podstawowej śródroczne i roczne oceny klasyfikacyjne zachowania są ocenami opisowymi (art. 44i ust. 1 pkt 2 ustawy o systemie oświaty).'],
+      ['Co zmieniło się w ocenie zachowania od 1 września 2026 r.?', 'Rozporządzenie z 20 sierpnia 2026 r. (Dz.U. 2026 poz. 1122) nadało nowe brzmienie § 11 ust. 1 rozporządzenia w sprawie oceniania, klasyfikowania i promowania. Ocena zachowania uwzględnia teraz 9 podstawowych obszarów – doszły m.in. odpowiedzialność za własny rozwój, przestrzeganie norm społecznych, zaangażowanie w życie klasy, szkoły i wspólnoty lokalnej oraz szacunek dla własnego narodu i innych kultur. Szczegółowe kryteria nadal określa statut szkoły.'],
+      ['Czy ocena zachowania wpływa na oceny z zajęć edukacyjnych?', 'Nie. Ocena zachowania nie ma wpływu na oceny klasyfikacyjne z zajęć edukacyjnych ani na promocję (art. 44f ust. 9 ustawy o systemie oświaty).'],
       ['Jak opisać trudne zachowanie, żeby nie urazić rodziców?', 'Opisz konkretne sytuacje i ich częstotliwość, pokaż postępy i mocne strony dziecka oraz zaproponuj, jak wspólnie można mu pomóc. Spokojną wiadomość do rodzica pomoże też przygotować EduDialog.']
+    ],
+    legal: [
+      ['Art. 44i ust. 1 pkt 2 i art. 44f ust. 9 ustawy o systemie oświaty (tekst jedn. Dz.U. 2025 poz. 881 ze zm.)', 'https://isap.sejm.gov.pl/isap.nsf/DocDetails.xsp?id=WDU20250000881'],
+      ['§ 11 ust. 1 rozporządzenia w sprawie oceniania, klasyfikowania i promowania – nowe brzmienie od 1.09.2026: Dz.U. 2026 poz. 1122', 'https://isap.sejm.gov.pl/isap.nsf/DocDetails.xsp?id=WDU20260001122'],
+      ['Tekst jednolity rozporządzenia w sprawie oceniania (Dz.U. 2023 poz. 2572 ze zm.)', 'https://isap.sejm.gov.pl/isap.nsf/DocDetails.xsp?id=WDU20230002572']
     ],
     tool: {
       name: 'EduOcena AI',
       url: 'eduocena.html?typ=zachowanie',
       campaign: 'ocena-zachowania',
-      text: 'Otwiera się od razu w trybie oceny zachowania: wybierz poziom w trzech obszarach (obowiązki, relacje, kultura i bezpieczeństwo), dopisz własne obserwacje, a AI zredaguje spójny, życzliwy opis. Za darmo, bez rejestracji. Zamiast imienia wpisz inicjał.'
+      text: 'Otwiera się od razu w trybie oceny zachowania: wybierz poziom w trzech obszarach (obowiązki, relacje, kultura i bezpieczeństwo), dopisz własne obserwacje, a AI zredaguje spójny, życzliwy opis z uwzględnieniem obszarów obowiązujących od 1 września 2026 r. Za darmo, bez rejestracji. Zamiast imienia wpisz inicjał.'
     },
     extraLink: { text: 'Trudna rozmowa z rodzicem? Zobacz przykłady spokojnych wiadomości →', url: 'wiadomosc-do-rodzica-przyklady.html' }
   },
@@ -474,10 +496,10 @@ Pozdrawiam serdecznie
 [podpis]`
       },
       {
-        label: 'Przykład 2: słabsze wyniki i brak zadań domowych',
+        label: 'Przykład 2: słabsze wyniki w nauce',
         meta: 'Nauka',
         text: `Dzień dobry,
-chciałabym podzielić się obserwacją dotyczącą [imię]. [Imię] świetnie radzi sobie w pracy w grupie i ma ciekawe pomysły. Zauważyłam jednak, że od kilku tygodni często brakuje zadań domowych, a ostatnie sprawdziany z [przedmiotu] wypadły słabiej niż wcześniej.
+chciałabym podzielić się obserwacją dotyczącą [imię]. [Imię] świetnie radzi sobie w pracy w grupie i ma ciekawe pomysły. Zauważyłam jednak, że od kilku tygodni trudniej jej skupić się na lekcjach, często nie ma potrzebnych przyborów, a ostatnie sprawdziany z [przedmiotu] wypadły słabiej niż wcześniej.
 Chciałabym zrozumieć, co może być przyczyną, i wspólnie z Państwem pomóc jej wrócić do wcześniejszych wyników. Proponuję krótkie spotkanie lub rozmowę telefoniczną – proszę o informację, jaki termin Państwu odpowiada.
 Z pozdrowieniami
 [podpis]`
@@ -569,27 +591,61 @@ Z pozdrowieniami
   {
     slug: 'opinia-o-uczniu-do-poradni-przyklady.html',
     title: 'Opinia o uczniu do poradni – wzór i przykłady | EduBox AI',
-    description: 'Wzór opinii nauczyciela o uczniu do poradni psychologiczno-pedagogicznej: co powinna zawierać, dwa przykłady, zwroty do skopiowania i najczęstsze błędy.',
+    description: 'Opinia szkoły o funkcjonowaniu ucznia do poradni: wymagana treść od 1 września 2026 r. (§ 7, obszary ICF), dwa przykłady, zwroty do skopiowania i najczęstsze błędy.',
     kicker: 'Wzory i przykłady · Pomoc psychologiczno-pedagogiczna',
     h1: 'Opinia o uczniu do poradni psychologiczno-pedagogicznej – wzór i przykłady',
-    short: 'Opinia szkoły o uczniu pomaga poradni zrozumieć, jak dziecko funkcjonuje na co dzień. Dobra opinia opisuje konkretne obserwacje – mocne strony, trudności, sytuacje, w których uczeń radzi sobie najlepiej, i dotychczasową pomoc – zamiast stawiać diagnozę. Nie ma jednego wzoru dla wszystkich szkół; poniżej znajdziesz uniwersalny układ, dwa przykłady i bank zwrotów.',
-    rulesTitle: 'Co zwykle zawiera opinia o uczniu',
+    short: 'Opinia przedszkola lub szkoły o funkcjonowaniu dziecka pomaga poradni zrozumieć, jak radzi sobie ono na co dzień. Gdy sprawa trafia do zespołu orzekającego (np. orzeczenie o potrzebie kształcenia specjalnego), dyrektor przekazuje opinię w ciągu 10 dni, a od 1 września 2026 r. jej treść określa § 7 ust. 6–7 rozporządzenia z 2 marca 2026 r. W innych sprawach, np. przy diagnozie trudności w nauce, przepisy nie narzucają treści – poradnie często mają własne formularze. W obu przypadkach liczą się konkretne obserwacje, mocne strony i efekty dotychczasowej pomocy, a nie stawianie diagnoz.',
+    rulesTitle: 'Co musi zawierać opinia dla zespołu orzekającego (od 1 września 2026 r.)',
     rules: [
-      'Dane ucznia, klasę, okres obserwacji i powód przygotowania opinii.',
-      'Funkcjonowanie w nauce: czytanie, pisanie, liczenie, uwaga, tempo pracy, rozumienie poleceń.',
-      'Funkcjonowanie społeczno-emocjonalne: relacje z rówieśnikami i dorosłymi, radzenie sobie z emocjami.',
-      'Mocne strony, zainteresowania i warunki, w których uczeń pracuje najlepiej.',
-      'Trudności opisane konkretnie: w jakich sytuacjach, jak często i jak się przejawiają.',
-      'Dotychczasową pomoc w szkole (zajęcia, dostosowania) i jej efekty.',
-      'Współpracę z rodzicami oraz pytania, na które szkoła szuka odpowiedzi w poradni.'
+      'Datę wydania opinii oraz imię i nazwisko dziecka lub ucznia (§ 7 ust. 6 pkt 1–2).',
+      'Informację o funkcjonowaniu w przedszkolu lub szkole – trudności, mocne strony i uzdolnienia rozpoznane przez nauczycieli i specjalistów (pkt 3).',
+      'Opis funkcjonowania w obszarach aktywności i uczestniczenia według ICF: 5 obszarów u dziecka w wieku przedszkolnym, 7 u ucznia (§ 7 ust. 7) – oraz zakres i rodzaj trudności w realizacji programu.',
+      'Aktualną WOPFU – u ucznia objętego kształceniem specjalnym (pkt 4); aktualną okresową ocenę funkcjonowania – przy zajęciach rewalidacyjno-wychowawczych (pkt 5).',
+      'Działania nauczycieli i specjalistów, formy i zakres udzielonej pomocy, okres jej udzielania i efekty (pkt 6).',
+      'Wnioski dotyczące dalszej pracy z dzieckiem lub uczniem (pkt 7).',
+      'Termin: 10 dni od prośby przewodniczącego zespołu lub rodzica; kopię otrzymują rodzice (§ 7 ust. 3–5).'
     ],
     examplesNote: 'Dane w nawiasach kwadratowych uzupełnij dopiero w dokumencie szkoły. Do narzędzi AI wpisuj wyłącznie anonimowe obserwacje – bez imienia, nazwiska i diagnoz.',
     examples: [
       {
-        label: 'Przykład 1: uczeń klasy 2 – trudności w czytaniu i pisaniu',
-        meta: 'Opinia wychowawcy',
-        text: `Opinia o uczniu [imię i nazwisko], klasa [2b], [nazwa szkoły]
-Okres obserwacji: [wrzesień–listopad 2026]. Opinia przygotowana na prośbę rodziców w związku z diagnozą w poradni.
+        label: 'Przykład 1: opinia dla zespołu orzekającego – uczeń klasy 4 z orzeczeniem',
+        meta: 'Układ wg § 7 ust. 6–7 · od 1 września 2026 r.',
+        text: `Opinia o funkcjonowaniu ucznia w szkole – dla zespołu orzekającego [nazwa poradni]
+Data wydania opinii: [data]
+Imię i nazwisko ucznia: [imię i nazwisko], klasa [4a], [nazwa szkoły]
+Opinia przekazana na prośbę przewodniczącego zespołu orzekającego z dnia [data].
+
+1. Mocne strony i uzdolnienia
+Uczeń ma bardzo dobrą pamięć i szeroką wiedzę o przyrodzie i technice, chętnie pracuje z komputerem. Jest słowny i przestrzega zasad, gdy są zapisane i przewidywalne.
+
+2. Funkcjonowanie w obszarach aktywności i uczestniczenia (ICF)
+Uczenie się i stosowanie wiedzy: szybko zapamiętuje fakty i definicje; trudniej mu rozumieć teksty literackie i wnioskować o intencjach bohaterów. Najlepiej pracuje z instrukcją zapisaną krok po kroku.
+Ogólne zadania i obowiązki: samodzielnie wykonuje zadania o jasnej strukturze; przy zmianie planu dnia potrzebuje wcześniejszej zapowiedzi i wsparcia nauczyciela.
+Porozumiewanie się: wypowiada się poprawnie i chętnie na tematy swoich zainteresowań; ma trudność z rozmową na tematy proponowane przez innych i z rozumieniem żartów.
+Motoryka, poruszanie się, w tym aktywność manualna: porusza się sprawnie; pismo jest mało czytelne, przy dłuższym pisaniu ręcznym szybko się męczy.
+Dbanie o siebie, samoobsługa i samodzielność: jest samodzielny w czynnościach samoobsługowych; potrzebuje przypomnienia o przygotowaniu stroju na wychowanie fizyczne.
+Życie domowe (według informacji od rodziców): pomaga w prostych obowiązkach domowych według stałego planu; źle znosi nieprzewidziane zmiany.
+Wzajemne kontakty i związki międzyludzkie, życie w społeczności szkolnej i lokalnej: ma jednego bliskiego kolegę; w hałasie na przerwach szuka spokojnego miejsca; przy przeciążeniu wycofuje się lub płacze.
+
+3. Zakres i rodzaj trudności w realizacji programu nauczania
+Trudności dotyczą głównie języka polskiego (rozumienie tekstów literackich, dłuższe wypowiedzi pisemne) oraz zajęć wymagających pracy w dużej grupie.
+
+4. Dokumenty stanowiące część opinii
+Aktualna wielospecjalistyczna ocena poziomu funkcjonowania ucznia (WOPFU) z dnia [data].
+
+5. Działania, formy pomocy, okres i efekty
+Zajęcia rozwijające kompetencje emocjonalno-społeczne (1 godz. tygodniowo, od [września 2025 r.]) – uczeń częściej sygnalizuje potrzebę przerwy, zamiast wychodzić z sali. Zajęcia rewalidacyjne (2 godz. tygodniowo) – poprawa w organizowaniu własnej pracy. Dostosowania: zapowiadanie zmian w planie, wydłużony czas pracy pisemnej, możliwość pisania na komputerze – częściowe efekty.
+
+6. Wnioski dotyczące dalszej pracy
+Kontynuować zajęcia rozwijające kompetencje społeczne i rewalidację, utrzymać przewidywalny plan dnia i możliwość krótkich przerw, wykorzystywać zainteresowania przyrodnicze ucznia jako podstawę pracy w grupie.
+
+[podpis dyrektora] – opinię przygotował zespół: [wychowawca, nauczyciel wspomagający, pedagog specjalny]`
+      },
+      {
+        label: 'Przykład 2: informacja dla poradni przy diagnozie – uczeń klasy 2',
+        meta: 'Treści nie określa przepis – uniwersalny układ',
+        text: `Informacja o funkcjonowaniu ucznia [imię i nazwisko], klasa [2b], [nazwa szkoły]
+Okres obserwacji: [wrzesień–listopad 2026]. Informacja przygotowana na prośbę rodziców w związku z diagnozą w poradni.
 
 Funkcjonowanie w nauce
 Uczeń czyta głoskując, wolno, często zgaduje końcówki wyrazów; myli litery o podobnym kształcie (b–d, p–g). Rozumie krótkie teksty czytane przez nauczyciela, gorzej – czytane samodzielnie. W pisaniu ze słuchu opuszcza i przestawia litery, pismo jest mało czytelne. Dobrze radzi sobie z liczeniem w zakresie 20 i z zadaniami praktycznymi.
@@ -610,83 +666,63 @@ Pytania do poradni
 Prosimy o diagnozę przyczyn trudności w czytaniu i pisaniu oraz wskazanie form pomocy i dostosowań wymagań edukacyjnych.
 
 [data] [podpis wychowawcy]`
-      },
-      {
-        label: 'Przykład 2: uczennica klasy 5 – koncentracja i emocje',
-        meta: 'Opinia wychowawcy',
-        text: `Opinia o uczennicy [imię i nazwisko], klasa [5a], [nazwa szkoły]
-Okres obserwacji: [wrzesień–listopad 2026]. Opinia przygotowana na prośbę rodziców.
-
-Funkcjonowanie w nauce
-Uczennica ma trudności z utrzymaniem uwagi na zadaniu dłużej niż kilka minut, szczególnie podczas samodzielnej pracy pisemnej. Często nie kończy zadań w wyznaczonym czasie, zapomina o pracach domowych i przyborach. Wiadomości przyswaja szybko, gdy temat ją zainteresuje; najlepsze wyniki osiąga z przyrody i plastyki.
-
-Funkcjonowanie społeczno-emocjonalne
-W sytuacjach rywalizacji lub niepowodzenia reaguje silnymi emocjami (płacz, wychodzenie z sali). Po wyciszeniu potrafi rozmawiać o sytuacji i szukać rozwiązań. Ma dwie bliskie koleżanki, w większej grupie czasem się wycofuje.
-
-Mocne strony
-Kreatywność, wrażliwość, poczucie humoru, chęć pomagania młodszym uczniom. Dobrze funkcjonuje przy jasnych zasadach, krótkich poleceniach i częstej informacji zwrotnej.
-
-Dotychczasowa pomoc
-Uczennica uczestniczy w zajęciach rozwijających kompetencje emocjonalno-społeczne prowadzonych przez pedagoga szkolnego. Stosowane dostosowania: miejsce blisko nauczyciela, dzielenie zadań na etapy, możliwość krótkiej przerwy w trakcie lekcji. Działania przynoszą częściowe efekty – rzadziej dochodzi do wybuchów emocji.
-
-Współpraca z rodzicami
-Rodzice pozostają w stałym kontakcie z wychowawcą i wspierają ustalone sposoby pracy w domu.
-
-Pytania do poradni
-Prosimy o diagnozę przyczyn trudności z koncentracją uwagi i regulacją emocji oraz o zalecenia do pracy z uczennicą w szkole i w domu.
-
-[data] [podpis wychowawcy]`
       }
     ],
     phrases: [
-      ['Funkcjonowanie w nauce', [
+      ['Uczenie się i stosowanie wiedzy', [
         'Czyta głoskując, wolno, często zgaduje końcówki wyrazów.',
         'Ma trudności z utrzymaniem uwagi na zadaniu dłużej niż kilka minut.',
-        'Pracuje w wolnym tempie i potrzebuje dodatkowego czasu na wykonanie poleceń.',
         'Lepiej przyswaja treści podawane wizualnie niż słownie.',
         'Rozumie polecenia podawane krok po kroku.'
       ]],
-      ['Funkcjonowanie społeczno-emocjonalne', [
+      ['Ogólne zadania i obowiązki', [
+        'Samodzielnie wykonuje zadania o jasnej strukturze.',
+        'Pracuje w wolnym tempie i potrzebuje dodatkowego czasu na wykonanie poleceń.',
+        'Przy zmianie planu dnia potrzebuje wcześniejszej zapowiedzi.'
+      ]],
+      ['Porozumiewanie się i kontakty z innymi', [
+        'Wypowiada się chętnie na tematy swoich zainteresowań.',
         'Nawiązuje pozytywne relacje z rówieśnikami i chętnie pomaga innym.',
-        'W sytuacjach niepowodzenia reaguje silnymi emocjami; po wyciszeniu potrafi rozmawiać o sytuacji.',
         'W większej grupie się wycofuje, lepiej czuje się w pracy w parach.',
-        'Ma trudności z przestrzeganiem ustalonych zasad podczas zabaw ruchowych.'
+        'W sytuacjach niepowodzenia reaguje silnymi emocjami; po wyciszeniu potrafi rozmawiać o sytuacji.'
       ]],
-      ['Mocne strony', [
-        'Ma bogate słownictwo i chętnie wypowiada się na interesujące go tematy.',
-        'Wykazuje zdolności manualne i plastyczne.',
-        'Najlepiej pracuje przy jasnych zasadach i częstej informacji zwrotnej.'
+      ['Motoryka, samoobsługa, życie domowe', [
+        'Porusza się sprawnie; przy dłuższym pisaniu ręcznym szybko się męczy.',
+        'Jest samodzielny w czynnościach samoobsługowych.',
+        'Według informacji od rodziców pomaga w prostych obowiązkach domowych według stałego planu.'
       ]],
-      ['Dotychczasowa pomoc', [
+      ['Pomoc, efekty i wnioski', [
         'Uczestniczy w zajęciach korekcyjno-kompensacyjnych (1 godz. tygodniowo).',
         'Stosowane są dostosowania: wydłużony czas pracy, polecenia dzielone na etapy, miejsce blisko nauczyciela.',
-        'Zastosowane działania przynoszą częściowe efekty.'
-      ]],
-      ['Pytania do poradni', [
-        'Prosimy o diagnozę przyczyn trudności w czytaniu i pisaniu.',
-        'Prosimy o wskazanie form pomocy i dostosowań wymagań edukacyjnych.',
-        'Prosimy o zalecenia do pracy z uczniem w szkole i w domu.'
+        'Zastosowane działania przynoszą częściowe efekty.',
+        'Prosimy o wskazanie form pomocy i dostosowań wymagań edukacyjnych.'
       ]]
     ],
     mistakes: [
       'Stawianie diagnozy („ma ADHD”, „jest dyslektykiem”) zamiast opisu obserwacji – diagnozę stawiają specjaliści.',
-      'Same trudności, bez mocnych stron i warunków, w których uczeń radzi sobie dobrze.',
-      'Etykiety i oceny charakteru zamiast opisu zachowań.',
+      'Same trudności, bez mocnych stron, uzdolnień i warunków, w których uczeń radzi sobie dobrze.',
+      'Pominięcie obszarów ICF albo aktualnej WOPFU w opinii dla zespołu orzekającego (od 1 września 2026 r.).',
       'Ogólniki bez przykładów – brak informacji, jak często i w jakich sytuacjach pojawiają się trudności.',
       'Brak informacji o dotychczasowej pomocy i jej efektach.',
       'Wpisywanie imienia, nazwiska lub diagnoz dziecka do narzędzi AI.'
     ],
     faq: [
-      ['Kto przygotowuje opinię szkoły o uczniu?', 'Zwykle wychowawca we współpracy z nauczycielami uczącymi w klasie i specjalistami szkolnymi (pedagogiem, psychologiem, logopedą). Sposób przygotowania i podpisywania opinii określają procedury obowiązujące w szkole.'],
-      ['Czy jest jeden obowiązujący wzór opinii?', 'Nie ma jednego wzoru dla wszystkich szkół. Wiele poradni udostępnia własne formularze – warto zapytać w poradni, z którą współpracuje szkoła, i wypełnić jej punkty.'],
-      ['Czy w opinii mogę napisać, że podejrzewam np. dysleksję?', 'Lepiej opisać obserwacje i sformułować pytania do poradni (np. „prosimy o diagnozę przyczyn trudności w czytaniu i pisaniu”). Diagnozę stawiają specjaliści poradni.'],
-      ['Czy mogę użyć AI do napisania opinii?', 'Tak, do uporządkowania i zredagowania anonimowych notatek – bez imienia, nazwiska i diagnoz. Dane ucznia uzupełnij dopiero w dokumencie szkoły, a całość uważnie sprawdź: to Ty odpowiadasz za treść opinii.']
+      ['Kiedy szkoła przygotowuje opinię o funkcjonowaniu ucznia dla poradni?', 'Na prośbę przewodniczącego zespołu orzekającego albo wnioskodawcy (rodzica). Dyrektor przekazuje opinię w terminie 10 dni od otrzymania prośby, a kopię otrzymują rodzice (§ 7 ust. 2–5 rozporządzenia Ministra Edukacji z 2 marca 2026 r., Dz.U. 2026 poz. 428).'],
+      ['Czy jest obowiązkowy wzór opinii?', 'Przepisy nie narzucają wzoru graficznego, ale od 1 września 2026 r. określają treść opinii dla zespołu orzekającego (§ 7 ust. 6–7): datę, imię i nazwisko, informację o funkcjonowaniu w obszarach ICF z trudnościami, mocnymi stronami i uzdolnieniami, aktualną WOPFU u ucznia objętego kształceniem specjalnym, podjęte działania z efektami oraz wnioski. W innych sprawach poradnie często mają własne formularze.'],
+      ['Czy poradnia wyda opinię o dysleksji uczniowi klasy 2?', 'Opinię o specyficznych trudnościach w uczeniu się poradnia może wydać nie wcześniej niż po ukończeniu klasy III szkoły podstawowej (§ 3 ust. 1 rozporządzenia w sprawie oceniania, klasyfikowania i promowania uczniów). Wcześniej szkoła może opisać obserwacje i objąć dziecko pomocą psychologiczno-pedagogiczną.'],
+      ['Czy w opinii mogę napisać, że podejrzewam np. ADHD?', 'Lepiej opisać obserwacje i sformułować pytania do poradni. Diagnozę stawiają specjaliści.'],
+      ['Czy mogę użyć AI do napisania opinii?', 'Tak, do uporządkowania i zredagowania anonimowych notatek – bez imienia, nazwiska i diagnoz. Dane ucznia uzupełnij dopiero w dokumencie szkoły, a całość uważnie sprawdź: to szkoła odpowiada za treść opinii.']
+    ],
+    legal: [
+      ['§ 7 rozporządzenia Ministra Edukacji z 2 marca 2026 r. w sprawie orzeczeń i opinii wydawanych przez zespoły orzekające (Dz.U. 2026 poz. 428) – obowiązuje od 14.04.2026, § 7 ust. 6–7 od 1.09.2026', 'https://isap.sejm.gov.pl/isap.nsf/DocDetails.xsp?id=WDU20260000428'],
+      ['§ 3 ust. 1 rozporządzenia w sprawie oceniania, klasyfikowania i promowania uczniów i słuchaczy (tekst jedn. Dz.U. 2023 poz. 2572 ze zm.)', 'https://isap.sejm.gov.pl/isap.nsf/DocDetails.xsp?id=WDU20230002572'],
+      ['Gotowy wzór opinii do pobrania (Word) – układ wg § 7 ust. 6–7', 'edudruki.html']
     ],
     tool: {
       name: 'EduDialog',
       url: 'edudialog.html?mode=ppp',
       campaign: 'opinia-do-poradni',
-      text: 'Otwiera się od razu w trybie „Opinia (PPP / IPET)”: wpisz potoczne, anonimowe notatki (bez imienia i nazwiska), a AI zamieni je w uporządkowany, profesjonalny fragment opinii – z mocnymi stronami ucznia, nie tylko trudnościami. Za darmo, bez rejestracji.'
+      text: 'Otwiera się od razu w trybie „Opinia (PPP / IPET)”: wpisz potoczne, anonimowe notatki (bez imienia i nazwiska), a AI zamieni je w uporządkowany, profesjonalny fragment opinii – z mocnymi stronami ucznia i obszarami ICF. Za darmo, bez rejestracji.'
     }
   }
 ];
@@ -808,7 +844,14 @@ ${p.mistakes.map(m => `        <li class="flex gap-3"><span class="text-rose-500
     </section>
 ${ctaBox('bottom')}${p.extraLink ? `
     <p class="-mt-6 mb-10 text-sm"><a href="${p.extraLink.url}" class="text-indigo-700 font-semibold hover:underline">${esc(p.extraLink.text)}</a></p>` : ''}
-    <section class="mb-10">
+${p.legal ? `    <section class="mb-8 bg-white border border-slate-200 rounded-2xl p-5">
+      <h2 class="text-sm font-extrabold uppercase tracking-widest text-slate-500 mb-3">Podstawa prawna · sprawdzone w ISAP ${UPDATED}</h2>
+      <ul class="space-y-2 text-sm">
+${p.legal.map(([t, u]) => `        <li class="flex gap-2"><span class="text-indigo-500">§</span><a href="${u}"${/^https?:/.test(u) ? ' target="_blank" rel="noopener"' : ''} class="text-indigo-700 hover:underline">${esc(t)}</a></li>`).join('\n')}
+      </ul>
+      <p class="text-xs text-slate-500 mt-3">Jak sprawdzamy aktualność przepisów: <a href="przepisy-i-rodo.html" class="text-indigo-700 font-semibold hover:underline">Przepisy i RODO w EduBox</a></p>
+    </section>
+` : ''}    <section class="mb-10">
       <h2 class="text-xl font-extrabold text-slate-900 mb-3">Najczęstsze pytania</h2>
       <div class="space-y-3">
 ${p.faq.map(([q, a]) => `        <details class="bg-white border border-slate-200 rounded-xl p-4"><summary class="font-bold text-slate-900 cursor-pointer">${esc(q)}</summary><p class="text-sm leading-relaxed mt-2">${esc(a)}</p></details>`).join('\n')}

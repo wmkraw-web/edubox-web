@@ -79,6 +79,7 @@ module.exports = {
     { path: 'sprawozdanie-wychowawcy-przyklady.html', changefreq: 'monthly', priority: '0.8', ogType: 'article' },
     { path: 'wiadomosc-do-rodzica-przyklady.html', changefreq: 'monthly', priority: '0.8', ogType: 'article' },
     { path: 'opinia-o-uczniu-do-poradni-przyklady.html', changefreq: 'monthly', priority: '0.8', ogType: 'article' },
+    { path: 'przepisy-i-rodo.html', changefreq: 'monthly', priority: '0.6', ogType: 'article' },
     { path: 'eduscenariusz.html' },
     { path: 'edusos.html' },
     { path: 'edusprawdzian.html' },

@@ -1,5 +1,6 @@
 import { isRateLimited } from './_lib/rateLimit.js';
 import { handleVerify } from './_lib/scamCheck.js';
+import { scrubPersonalData } from './_lib/pii.js';
 
 const TTS_RATE_WINDOW_MS = 5 * 60 * 1000;
 const TTS_RATE_MAX_REQUESTS = 12;
@@ -137,11 +138,19 @@ export default async function handler(req, res) {
     return res.status(429).json({ message: 'Zbyt wiele zapytań w krótkim czasie. Spróbuj ponownie za kilka minut.' });
   }
 
-  const { prompt, system, temperature = 0.5, format = "text", model } = req.body;
+  const { temperature = 0.5, format = "text", model } = req.body;
 
-  if (!prompt) {
+  if (!req.body.prompt) {
     return res.status(400).json({ message: 'Brak polecenia (promptu)' });
   }
+
+  // RODO: numery PESEL usuwamy, zanim tekst trafi do dostawcy AI (szczegóły w api/_lib/pii.js).
+  const cleanPrompt = scrubPersonalData(req.body.prompt);
+  const cleanSystem = scrubPersonalData(req.body.system);
+  const prompt = cleanPrompt.text;
+  const system = cleanSystem.text;
+  const piiRemoved = cleanPrompt.removed + cleanSystem.removed;
+  if (piiRemoved > 0) res.setHeader('X-EduBox-PII-Removed', String(piiRemoved));
 
   const modelChain = resolveModelChain(model);
 

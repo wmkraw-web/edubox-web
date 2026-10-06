@@ -23,6 +23,7 @@ import nodemailer from 'nodemailer';
 import { parseCoffeePayment } from './_lib/parseCoffeePayment.js';
 import { extractEmailText } from './_lib/extractEmailText.js';
 import { getServiceAccountAccessToken } from './_lib/googleServiceAccountAuth.js';
+import { planForAmount } from './_lib/coffeePlan.js';
 
 async function sendEmail(transporter, { to, subject, text }) {
     await transporter.sendMail({ from: process.env.GMAIL_ADDRESS, to, subject, text });
@@ -129,14 +130,20 @@ export default async function handler(req, res) {
                                 text: `Powód: ${parsed.reason}\nFolder: ${box.path}\n\nSUROWY TEKST (pierwsze 2000 znaków):\n${text.slice(0, 2000)}`
                             });
                         } else {
-                            const code = `KAWA-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
+                            // Drobna kawa = 7 dni (kod KAWA-, weryfikacja w Make); od 49 zł = 12 miesięcy
+                            // (kod ROK-, weryfikacja w api/verify-code.js bezpośrednio z arkusza).
+                            const plan = planForAmount(parsed.amount);
+                            const code = `${plan.prefix}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
                             await appendSheetRow(sheetsAccessToken, process.env.SHEETS_SPREADSHEET_ID, [
                                 code, parsed.payerEmail, parsed.payerName, parsed.amount, 'unused', new Date().toISOString()
                             ]);
+                            const yearly = plan.days === 365;
                             await sendEmail(transporter, {
                                 to: parsed.payerEmail,
-                                subject: 'Dziękujemy za kawę! Twój kod PRO na 7 dni ☕',
-                                text: `Cześć!\n\nDziękujemy za postawioną kawę dla EduBox AI — to naprawdę dużo dla nas znaczy!\n\nOto Twój kod dostępu PRO:\n\n${code}\n\nWpisz go na eduboxpro.pl (przycisk odblokowania Premium w dowolnym narzędziu) — dostaniesz 7 dni pełnego dostępu PRO.\n\nDzięki, że jesteś z nami!\nZespół EduBox AI`
+                                subject: yearly
+                                    ? 'Dziękujemy za roczne wsparcie! Twój kod PRO na 12 miesięcy ☕'
+                                    : 'Dziękujemy za kawę! Twój kod PRO na 7 dni ☕',
+                                text: `Cześć!\n\n${yearly ? 'Dziękujemy za roczne wsparcie EduBox AI' : 'Dziękujemy za postawioną kawę dla EduBox AI'} — to naprawdę dużo dla nas znaczy!\n\nOto Twój kod dostępu PRO:\n\n${code}\n\nWpisz go na eduboxpro.pl (przycisk odblokowania Premium w dowolnym narzędziu) — dostaniesz ${plan.label} pełnego dostępu PRO${yearly ? ', liczone od dziś' : ''}.\n\nDzięki, że jesteś z nami!\nZespół EduBox AI`
                             });
                             results.processed++;
                         }

@@ -190,6 +190,32 @@ przyklad/zwrot), linki do narzędzi mają `utm_medium=wzor`. EduOcena ma dwa try
 Treści prawne formułuj ostrożnie (statut szkoły decyduje o szczegółach), zawsze przypominaj
 o niewpisywaniu danych dzieci do AI.
 
+**Przepisy – stan prawny i weryfikacja (od 10.2026):** każde odwołanie do przepisu w narzędziach,
+wzorach Word (`wzory-drukow/`) i stronach sprawdzamy w ISAP / oficjalnym API Sejmu
+(`https://api.sejm.gov.pl/eli/acts/DU/<rok>/<poz>`, PDF: `/text.pdf`) – nigdy z pamięci ani z artykułów.
+Lista aktów, na których się opieramy (z plikami, które z nich korzystają), jest w `scripts/legal-acts.json`;
+`npm run legal:check` porównuje bieżący stan aktów ze snapshotem (nowelizacje, teksty jednolite,
+uchylenia), a `.github/workflows/legal-check.yml` robi to co poniedziałek (zmiana = czerwony przebieg
+i mail z GitHuba). Po przejrzeniu zmian i poprawieniu treści: `npm run legal:update` + commit.
+Nowy akt w treściach = dopisz go do `legal-acts.json`. Publiczna strona `przepisy-i-rodo.html`
+(lista aktów, rejestr zmian, RODO) jest generowana przez `node scripts/generate-przepisy.js`
+(rejestr zmian w tablicy `CHANGELOG`). Wzór opinii o funkcjonowaniu ucznia (.docx) generuje
+`scripts/generate-opinia-docx.js` (wymaga `npm i --no-save docx@9`). Precyzja dat: rozporządzenie
+Dz.U. 2026 poz. 428 obowiązuje od 14.04.2026, § 7 ust. 6–7 i § 8 od 1.09.2026; ocena zachowania
+od 1.09.2026 – 9 obszarów z § 11 ust. 1 (Dz.U. 2026 poz. 1122); prace domowe – § 12a.
+
+**RODO – minimalizacja danych:** `api/chat.js` przed wysłaniem do OpenAI usuwa numery PESEL
+(`api/_lib/pii.js`, testy `node api/_lib/pii.test.js`; celowo NIE usuwa telefonów/e-maili/kont – nauczyciel
+wpisuje własny kontakt do pism). Gdy coś usunięto, odpowiedź ma nagłówek `X-EduBox-PII-Removed`, a
+`global-core.js` pokazuje krótki komunikat. Giełda Wzorów w EduOcena publikuje inicjał zamiast imienia
+(także w treści oceny, z odmianą imienia). Treści AI nie są logowane.
+
+**Kody PRO za wsparcie (Buycoffee.to):** `api/coffee-check.js` wydaje kod `KAWA-…` (7 dni, weryfikacja
+w Make, scenariusz Coffee-Verify) albo – od 49 zł – `ROK-…` (365 dni od wygenerowania), który
+`api/verify-code.js` sprawdza bezpośrednio w arkuszu `Coffee_Codes` (A kod, F data). Logika planu:
+`api/_lib/coffeePlan.js` (testy `node api/_lib/coffeePlan.test.js`). Przeglądarka obsługuje oba typy
+przez `bonus/until` (eduboxBonusUntil).
+
 **Generowanie treści przez AI — wypracowane wzorce:**
 - *Dwuetapowy generator + weryfikator* (EduRymy): pierwsze zapytanie
   proponuje kandydatów swobodnie, DRUGIE, niezależne zapytanie (bez

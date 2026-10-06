@@ -1,15 +1,15 @@
 <!DOCTYPE html><html lang="pl" translate="no" class="notranslate"><head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EduOcena AI PRO - Kreator Ocen Opisowych (V3 PRO MAX)</title>
-    <meta property="og:title" content="EduOcena AI PRO - Kreator Ocen Opisowych (V3 PRO MAX)">
+    <title>EduOcena – ocena opisowa i ocena zachowania z AI | EduBox AI</title>
+    <meta property="og:title" content="EduOcena – ocena opisowa i ocena zachowania z AI | EduBox AI">
     <meta property="og:description" content="Kreator Ocen Opisowych. Wyklikaj umiejętności na świadectwo. Za darmo, prosto z przeglądarki – EduBox AI.">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://eduboxpro.pl/eduocena.html">
     <meta property="og:image" content="https://eduboxpro.pl/okladka.jpg">
     <meta property="og:locale" content="pl_PL">
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="EduOcena AI PRO - Kreator Ocen Opisowych (V3 PRO MAX)">
+    <meta name="twitter:title" content="EduOcena – ocena opisowa i ocena zachowania z AI | EduBox AI">
     <meta name="twitter:description" content="Kreator Ocen Opisowych. Wyklikaj umiejętności na świadectwo. Za darmo, prosto z przeglądarki – EduBox AI.">
     <meta name="twitter:image" content="https://eduboxpro.pl/okladka.jpg">
 
@@ -91,7 +91,7 @@
 {
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
-  "name": "EduOcena AI PRO - Kreator Ocen Opisowych (V3 PRO MAX)",
+  "name": "EduOcena – ocena opisowa i ocena zachowania z AI | EduBox AI",
   "description": "Kreator Ocen Opisowych. Wyklikaj umiejętności na świadectwo. Za darmo, prosto z przeglądarki – EduBox AI.",
   "url": "https://eduboxpro.pl/eduocena.html",
   "applicationCategory": "EducationalApplication",
@@ -232,8 +232,23 @@
                     async (newCount) => {
                         setUsageCount(newCount);
                         try {
-                            const name = `${isBehavior ? 'Zachowanie' : 'Ocena'}: ${params.studentName} (${params.classLevel})`;
-                            const config = { params, generatedData };
+                            // Giełda jest publiczna - imię ucznia zamieniamy na inicjał (RODO), także w treści oceny.
+                            const fullName = params.studentName.trim();
+                            const initial = (fullName.charAt(0) || 'X').toUpperCase() + '.';
+                            // Polskie imiona się odmieniają (Kasia, Kasi, Kasię) - podmieniamy też formy z tym samym rdzeniem.
+                            const LETTERS = 'A-Za-zĄĆĘŁŃÓŚŹŻąćęłńóśźż';
+                            const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                            const stem = /a$/i.test(fullName) ? fullName.slice(0, Math.max(2, fullName.length - 1))
+                                : fullName.length >= 5 ? fullName.slice(0, fullName.length - 2) : fullName;
+                            const nameRe = new RegExp('(^|[^' + LETTERS + '])' + escapeRe(stem) + '[' + LETTERS + ']{0,5}(?![' + LETTERS + '])', 'g');
+                            const anonymize = (text) => fullName.length > 2
+                                ? String(text || '').replace(nameRe, (m, pre) => pre + initial).split(initial + '.').join(initial)
+                                : String(text || '');
+                            const name = `${isBehavior ? 'Zachowanie' : 'Ocena'}: ${initial} (${params.classLevel})`;
+                            const config = {
+                                params: { ...params, studentName: initial },
+                                generatedData: { ...generatedData, content: anonymize(generatedData.content) }
+                            };
                             
                             await window.EduBoxCore.saveToGielda('gielda_wzorow_eduocena', 'Ocena Opisowa', name, config);
                             showToast("✨ Udostępniono w Giełdzie Wzorów!");
@@ -287,7 +302,7 @@
                 const behaviorSystemPrompt = `Jesteś doświadczonym polskim wychowawcą edukacji wczesnoszkolnej. Twoim zadaniem jest napisanie opisowej oceny zachowania (śródrocznej lub rocznej).
 ZASADY KRYTYCZNE:
 1. Opisuj zachowania, a nie oceniaj dziecka jako osoby. Bez etykiet (np. "niegrzeczny", "agresywny", "leniwy") i bez porównywania z innymi dziećmi.
-2. Uwzględnij: wywiązywanie się z obowiązków ucznia, relacje z rówieśnikami i dorosłymi, kulturę osobistą, dbałość o bezpieczeństwo oraz radzenie sobie z emocjami. Zacznij od mocnych stron, trudności opisz życzliwie i konkretnie, zakończ krótką wskazówką do dalszej pracy.
+2. Od 1 września 2026 r. ocena zachowania uwzględnia podstawowe obszary z § 11 ust. 1 rozporządzenia w sprawie oceniania, klasyfikowania i promowania (Dz.U. 2026 poz. 1122): wywiązywanie się z obowiązków ucznia; okazywanie szacunku innym osobom; przejmowanie odpowiedzialności za własny rozwój; przestrzeganie norm społecznych w szkole i poza nią; dbałość o kulturę języka; dbałość o bezpieczeństwo i zdrowie własne oraz innych; współpraca i dbałość o dobre relacje z innymi; zaangażowanie w życie klasy, szkoły i wspólnoty lokalnej; szacunek dla własnego narodu i ojczyzny oraz tradycji i kultury innych narodów. Opisz te obszary, o których nauczyciel podał informacje, językiem odpowiednim dla klas 1-3; nie wymieniaj ich mechanicznie jako listy. Zacznij od mocnych stron, trudności opisz życzliwie i konkretnie, zakończ krótką wskazówką do dalszej pracy.
 3. Nie dopisuj faktów, których nie podał nauczyciel. Nie wspominaj o diagnozach, zdrowiu ani sytuacji rodzinnej.
 4. ${grammarInstruction}
 5. Od jednego do trzech akapitów, językiem zrozumiałym dla rodzica. Brak formatowania markdown, akapity oddzielaj pustą linią.
