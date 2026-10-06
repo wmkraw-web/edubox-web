@@ -169,7 +169,12 @@
             .print-hidden { display: none !important; }
             #wspolne-menu-kontener { display: none !important; }
             .print-area { width: 100% !important; max-width: 100% !important; margin: 0 !important; padding: 0 !important; border: none !important; box-shadow: none !important; background: white !important;}
-            .comic-grid { gap: 15px !important; }
+            .comic-grid { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 12px !important; background: white !important; padding: 0 !important; border: none !important; }
+            .comic-grid .min-h-\[300px\] { min-height: 74mm !important; }
+            .questions-box { break-inside: avoid; padding: 10px 16px !important; margin-top: 10px !important; }
+            .questions-box h2 { font-size: 1.3rem !important; margin-bottom: 4px !important; }
+            .questions-box ol { font-size: 1rem !important; }
+            * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
             .comic-panel { border-width: 3px !important; border-color: black !important; break-inside: avoid; box-shadow: none !important;}
             .narration-bar { border-bottom-width: 3px !important; border-color: black !important; }
             .comic-bubble { border-width: 3px !important; border-color: black !important; box-shadow: none !important; }
@@ -259,7 +264,7 @@
             useEffect(() => {
                 if (coreReady && window.EduBoxCore) {
                     window.EduBoxCore.init((loadedUser) => setUser(loadedUser));
-                    setUsageCount(window.EduBoxCore.getUsageCount());
+                    setUsageCount(window.EduBoxCore.getImageUsageCount());
                     const status = localStorage.getItem('eduboxProStatus');
                     if(status === 'PRO' || status === 'active') setIsPremium(true);
                 }
@@ -289,35 +294,56 @@
                 }
             };
 
+            // Opis stylu słowami (bez nazw studiów filmowych i wydawnictw – prawa do marek).
             const translateStyle = (styleName) => {
                 switch(styleName) {
-                    case 'Klasyczny Komiks': return 'classic Marvel DC comic book style, pop art, vibrant flat colors, strong black ink outlines';
-                    case 'Manga / Anime': return 'Japanese manga anime style, Studio Ghibli, highly detailed, beautiful lighting';
-                    case 'Bajkowe 3D (Disney)': return 'cute 3D Pixar Disney style render, adorable, flawless, vibrant colors, unreal engine 5';
-                    case 'Kredki / Szkic': return 'hand drawn crayon sketch, children book illustration, soft, artistic, playful';
+                    case 'Klasyczny Komiks': return 'classic comic book style, bold black ink outlines, flat vibrant colors, halftone shading';
+                    case 'Manga / Anime': return 'Japanese manga and anime illustration style, clean line art, expressive eyes, soft cel shading, beautiful lighting';
+                    case 'Bajkowe 3D (Disney)': return 'cute 3D animated movie style render, adorable stylized characters with big expressive eyes, vibrant colors, soft lighting';
+                    case 'Kredki / Szkic': return "hand-drawn colored pencil and crayon illustration, children's book style, soft textures, playful";
                     default: return 'comic book style';
                 }
             };
 
+            // Kadr przez /api/generate. referenceUrl = kadr-wzór: ten sam bohater (twarz, włosy, ubranie) w każdym kadrze.
+            // Wspólny seed zostaje dla modeli zapasowych. Zwraca link do obrazka albo null.
+            const drawPanel = async (imagePrompt, engStyle, seed, referenceUrl) => {
+                const fullPrompt = `${imagePrompt}. STYLE: ${engStyle}. Comic panel illustration, high quality, perfect anatomy. ABSOLUTELY NO TEXT, NO WORDS, NO SPEECH BUBBLES.`;
+                try {
+                    const res = await fetch('/api/generate', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            prompt: fullPrompt,
+                            negative_prompt: "text, words, speech bubbles, watermark, deformed, bad anatomy, extra limbs",
+                            aspect_ratio: '1:1',
+                            size: '1024x1024',
+                            seed,
+                            ...(referenceUrl && /^https:\/\//.test(referenceUrl) ? { reference_image: referenceUrl } : {})
+                        })
+                    });
+                    if (!res.ok) return null;
+                    const data = await res.json();
+                    let imgUrl = data.imageUrl || data.image_url || data.url || (data.data && data.data[0]?.url) || data.image;
+                    if (imgUrl && imgUrl.length > 1000 && !imgUrl.startsWith('http') && !imgUrl.startsWith('data:')) {
+                        imgUrl = `data:image/png;base64,${imgUrl}`;
+                    }
+                    return imgUrl || null;
+                } catch (e) { return null; }
+            };
+
             // --- GIEŁDA WZORÓW ACTIONS ---
+            // Udostępnienie gotowego komiksu nie woła AI, więc nie zużywa darmowych generowań.
             const sharePattern = async () => {
                 if (!comicData) return;
-                window.EduBoxCore.executeWithLimitCheck(isPremium, 
-                    async (newCount) => {
-                        setUsageCount(newCount);
-                        try {
-                            const name = comicData.title || `Komiks: ${topic.substring(0, 15)}...`;
-                            const config = { topic, ageGroup, artStyle, comicData };
-                            
-                            await window.EduBoxCore.saveToGielda('gielda_wzorow_edukomiks', 'Komiks AI', name, config);
-                            showToast("✨ Udostępniono Komiks w Giełdzie Wzorów!");
-                        } catch (e) {
-                            showToast(e.message || "🚨 Błąd podczas zapisu w chmurze.");
-                        }
-                    },
-                    (msg) => showToast(msg),
-                    (msg) => showToast(msg)
-                );
+                try {
+                    const name = comicData.title || `Komiks: ${topic.substring(0, 15)}...`;
+                    const config = { topic, ageGroup, artStyle, comicData };
+                    await window.EduBoxCore.saveToGielda('gielda_wzorow_edukomiks', 'Komiks AI', name, config);
+                    showToast("✨ Udostępniono Komiks w Giełdzie Wzorów!");
+                } catch (e) {
+                    showToast(e.message || "🚨 Błąd podczas zapisu w chmurze.");
+                }
             };
 
             const loadPattern = (pattern) => {
@@ -349,87 +375,72 @@
 
             const generateComic = async () => {
                 setStep('generating');
-                setLoadingStatus('1/2 Wymyślam scenariusz i dialogi...');
+                setLoadingStatus('1/3 Wymyślam scenariusz i dialogi...');
                 setLoadingProgress(10);
-                
+
                 try {
-                    const systemPrompt = `Jesteś genialnym scenarzystą komiksów edukacyjnych. Twoim zadaniem jest napisanie krótkiej, 4-kadrowej historii.
-                    
-                    ZASADY JĘZYKOWE:
-                    - 'title', 'narration' oraz 'dialogue' MUSZĄ być w języku POLSKIM.
-                    - 'imagePrompt' MUSI być po ANGIELSKU dla zagranicznego malarza AI.
-                    
-                    STABILIZACJA POSTACI (KRYTYCZNE):
-                    1. Na podstawie podanego tematu wymyśl głównego bohatera.
-                    2. Stwórz JEDEN, precyzyjny opis wyglądu w języku angielskim (np. "A 7-year-old Caucasian girl with blonde pigtails wearing a red shirt").
-                    3. Wklej TEN SAM opis kropka w kropkę do KAŻDEGO z 4 'imagePrompt', opisując co ta postać akurat robi.
-                    4. Aby postać nie ucinała głowy, w każdym 'imagePrompt' dopisz na końcu: "Medium shot, full body visible".
-                    
-                    Zwróć WYŁĄCZNIE poprawny JSON o strukturze:
-                    {
-                        "title": "Chwytliwy tytuł (max 4 słowa)",
-                        "panels": [
-                            {
-                                "narration": "Tekst narratora (opis sytuacji, krótki, 1 zdanie).",
-                                "dialogue": "Krótka wypowiedź bohatera (max 8 słów!). Jeśli brak, zostaw puste.",
-                                "imagePrompt": "[Tutaj wklej stały opis postaci] is doing [czynność]. Medium shot, full body visible. ABSOLUTELY NO TEXT, NO SPEECH BUBBLES."
-                            }
-                        ]
-                    }`;
+                    const systemPrompt = `Jesteś scenarzystą krótkich komiksów edukacyjnych dla dzieci. Napisz 4-kadrowy komiks z morałem do rozmowy w klasie.
 
-                    const userPrompt = `Temat / Morał / Bohater: ${topic}. Wiek odbiorców: ${ageGroup}.`;
+BUDOWA:
+- Kadr 1: bohater i sytuacja wyjściowa.
+- Kadr 2: problem albo trudny wybór.
+- Kadr 3: punkt zwrotny – bohater coś zauważa, ktoś mu pomaga albo próbuje innego sposobu.
+- Kadr 4: rozwiązanie i dobre zakończenie. Morał wynika z historii – nie wypisuj go wprost w dymku.
 
+ZASADY:
+- 'title', 'narration', 'dialogue' i 'questions' po POLSKU; 'character_description' i 'imagePrompt' po ANGIELSKU.
+- Język dopasowany do wieku odbiorców, poprawna polszczyzna, polskie imiona.
+- 'narration': jedno krótkie zdanie (najwyżej 15 słów). 'dialogue': najwyżej 8 słów, naturalna mowa; może być puste.
+- Bez przemocy, wyśmiewania i stereotypów – pokazuj dobre wzorce zachowań.
+- 'questions': 3 krótkie pytania do rozmowy z klasą po lekturze (o uczuciach bohatera, o tym, co można zrobić inaczej, o doświadczeniach dzieci).
+
+SPÓJNOŚĆ POSTACI:
+1. 'character_description': JEDEN precyzyjny opis wyglądu głównego bohatera po angielsku (age, gender, hair, skin tone, exact clothes with colours), a jeśli występuje druga ważna postać – także jej wygląd.
+2. Każdy 'imagePrompt' zaczyna się od tego opisu słowo w słowo, potem: co postać robi, jaką ma minę (emocja z tego kadru) i gdzie jest. Na końcu dopisz: "Medium-wide shot, characters' heads in the middle or lower part of the frame, simple background in the top quarter (a speech bubble will cover it)."
+
+Zwróć WYŁĄCZNIE poprawny JSON:
+{
+  "title": "Chwytliwy tytuł (najwyżej 5 słów)",
+  "character_description": "Fixed English description of the characters",
+  "panels": [
+    { "narration": "Zdanie narratora.", "dialogue": "Krótka wypowiedź albo pusty tekst.", "imagePrompt": "[character_description] ... Medium-wide shot, ..." }
+  ],
+  "questions": ["Pytanie 1?", "Pytanie 2?", "Pytanie 3?"]
+}
+Tablica "panels" ma dokładnie 4 elementy.`;
+
+                    const userPrompt = `Temat / morał / bohater: ${topic}. Wiek odbiorców: ${ageGroup}.`;
+
+                    // 'balanced' (gpt-5.4-mini): lepsze dialogi po polsku i trzymanie się budowy z morałem.
                     const resChat = await fetch('/api/chat', {
-                        method: 'POST', 
+                        method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ prompt: userPrompt, system: systemPrompt, format: "json", temperature: 0.7, model: "gpt-4o-mini" })
+                        body: JSON.stringify({ prompt: userPrompt, system: systemPrompt, format: "json", model: "balanced" })
                     });
-                    
+
                     if (!resChat.ok) throw new Error("Błąd podczas tworzenia scenariusza");
                     const dataChat = await resChat.json();
-                    
-                    let jsonStr = dataChat.text.replace(/```json/gi, '').replace(/```/g, '').trim();
+
+                    let jsonStr = String(dataChat.text || '').replace(/```json/gi, '').replace(/```/g, '').trim();
                     if(jsonStr.indexOf('{') !== -1) jsonStr = jsonStr.substring(jsonStr.indexOf('{'), jsonStr.lastIndexOf('}') + 1);
                     let comicObj = JSON.parse(jsonStr);
+                    if (!Array.isArray(comicObj.panels) || comicObj.panels.length === 0) throw new Error('Brak kadrów w scenariuszu');
+                    comicObj.panels = comicObj.panels.slice(0, 4);
 
-                    setLoadingStatus('2/2 Rysuję kadry komiksu we Fluxie...');
                     const engStyle = translateStyle(artStyle);
-
-                    // STABILIZACJA POSTACI cz.2: sam identyczny opis tekstowy w promptcie nie
-                    // gwarantuje identycznego wyglądu w niezależnych generacjach FLUX - dorzucamy
-                    // WSPÓLNY seed dla całego komiksu (ten sam "punkt startowy" losowości dla
-                    // wszystkich 4 kadrów), co razem z opisem znacznie poprawia spójność bohatera.
                     const baseSeed = Math.floor(Math.random() * 1000000000);
                     comicObj.baseSeed = baseSeed;
 
-                    for (let i = 0; i < comicObj.panels.length; i++) {
-                        setLoadingProgress(25 + (i * 18));
-                        
-                        const fullPrompt = `${comicObj.panels[i].imagePrompt}. STYLE: ${engStyle}. High quality masterpiece. ABSOLUTELY NO TEXT, NO WORDS, NO SPEECH BUBBLES. Perfect anatomy.`;
+                    // Kadr 1 = wzór wyglądu bohatera; kadry 2–4 rysujemy równocześnie z tym wzorem.
+                    setLoadingStatus('2/3 Rysuję pierwszy kadr – wzór wyglądu bohatera...');
+                    setLoadingProgress(35);
+                    const panels = comicObj.panels;
+                    panels[0].imageUrl = await drawPanel(panels[0].imagePrompt, engStyle, baseSeed);
 
-                        const responseImg = await fetch('/api/generate', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ 
-                                prompt: fullPrompt,
-                                negative_prompt: "text, words, speech bubbles, watermark, mutated, bad anatomy, bad hands, extra limbs",
-                                aspect_ratio: '1:1',
-                                size: '1024x1024',
-                                seed: baseSeed
-                            })
-                        });
-                        
-                        if (responseImg.ok) {
-                            const dataImg = await responseImg.json();
-                            let imgUrl = dataImg.imageUrl || dataImg.image_url || dataImg.url || (dataImg.data && dataImg.data[0]?.url) || dataImg.image;
-                            if (imgUrl) {
-                                if (imgUrl.length > 1000 && !imgUrl.startsWith('http') && !imgUrl.startsWith('data:')) {
-                                    imgUrl = `data:image/png;base64,${imgUrl}`;
-                                }
-                                comicObj.panels[i].imageUrl = imgUrl;
-                            }
-                        }
-                    }
+                    setLoadingStatus('3/3 Rysuję pozostałe kadry z tym samym bohaterem...');
+                    setLoadingProgress(65);
+                    const rest = await Promise.all(panels.slice(1).map(p => drawPanel(p.imagePrompt, engStyle, baseSeed, panels[0].imageUrl)));
+                    rest.forEach((url, i) => { panels[i + 1].imageUrl = url; });
 
                     setComicData(comicObj);
                     setLoadingProgress(100);
@@ -443,6 +454,8 @@
             };
 
             const handleRegeneratePanel = (index) => {
+                // Kadr, który się nie narysował, ponawiamy bez liczenia limitu.
+                if (!comicData?.panels[index]?.imageUrl) { regeneratePanel(index); return; }
                 window.EduBoxCore.executeImageLimitCheck(isPremium,
                     (newCount) => {
                         setUsageCount(newCount);
@@ -454,44 +467,19 @@
             };
 
             const regeneratePanel = async (index) => {
-                if (regeneratingIndex !== null) return; 
+                if (regeneratingIndex !== null || !comicData) return;
                 setRegeneratingIndex(index);
-                showToast("Magia działa... Odświeżam ten kadr!");
-                
-                try {
-                    const engStyle = translateStyle(artStyle);
-                    const fullPrompt = `${comicData.panels[index].imagePrompt}. STYLE: ${engStyle}. High quality masterpiece. ABSOLUTELY NO TEXT, NO WORDS, NO SPEECH BUBBLES. Perfect anatomy.`;
-
-                    const responseImg = await fetch('/api/generate', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ 
-                            prompt: fullPrompt,
-                            negative_prompt: "text, words, speech bubbles, watermark, mutated, bad anatomy, deformed",
-                            aspect_ratio: '1:1',
-                            size: '1024x1024'
-                        })
-                    });
-                    
-                    if (responseImg.ok) {
-                        const dataImg = await responseImg.json();
-                        let imgUrl = dataImg.imageUrl || dataImg.image_url || dataImg.url || (dataImg.data && dataImg.data[0]?.url) || dataImg.image;
-                        if (imgUrl) {
-                            if (imgUrl.length > 1000 && !imgUrl.startsWith('http') && !imgUrl.startsWith('data:')) {
-                                imgUrl = `data:image/png;base64,${imgUrl}`;
-                            }
-                            const newData = {...comicData};
-                            newData.panels[index].imageUrl = imgUrl;
-                            setComicData(newData);
-                            showToast("Gotowe! Mamy nowy rysunek.");
-                        }
-                    }
-                } catch (err) {
-                    console.error(err);
-                    showToast("Błąd przy odświeżaniu. Spróbuj jeszcze raz.");
-                } finally {
-                    setRegeneratingIndex(null);
+                showToast("Rysuję ten kadr od nowa – z tym samym bohaterem...");
+                // Wzorem jest dowolny inny gotowy kadr – bohater nie zmienia wyglądu.
+                const reference = comicData.panels.find((p, i) => i !== index && p.imageUrl && /^https:\/\//.test(p.imageUrl))?.imageUrl;
+                const url = await drawPanel(comicData.panels[index].imagePrompt, translateStyle(artStyle), Math.floor(Math.random() * 1000000000), reference);
+                if (url) {
+                    setComicData(prev => ({ ...prev, panels: prev.panels.map((p, i) => i === index ? { ...p, imageUrl: url } : p) }));
+                    showToast("Gotowe! Mamy nowy rysunek.");
+                } else {
+                    showToast("Nie udało się narysować kadru. Spróbuj jeszcze raz.");
                 }
+                setRegeneratingIndex(null);
             };
 
             if (!coreReady) {
@@ -557,8 +545,8 @@
                             {!isPremium && (
                                 <div className="bg-white border-4 border-black p-4 rounded-2xl shadow-solid flex flex-col sm:flex-row justify-between items-center gap-4 mb-8 transform rotate-1">
                                     <div className="flex flex-col font-comic">
-                                        <span className="text-sm font-black text-black uppercase tracking-widest">Darmowe użycia: <span className="text-red-500">{Math.max(0, 5 - usageCount)}/5</span></span>
-                                        <span className="text-[10px] text-slate-500 font-bold">Wersja Demo</span>
+                                        <span className="text-sm font-black text-black uppercase tracking-widest">Darmowy start: <span className="text-red-500">{Math.max(0, 1 - usageCount)}/1</span> komiks</span>
+                                        <span className="text-[10px] text-slate-500 font-bold">Kolejne komiksy z kodem PRO</span>
                                     </div>
                                     <div className="flex items-center gap-2 w-full sm:w-auto">
                                         <input value={accessCode} onChange={e => setAccessCode(e.target.value)} placeholder="Kod autoryzacji..." className="flex-1 sm:w-40 px-3 py-2 bg-slate-100 border-4 border-black rounded-lg text-sm outline-none text-black font-bold font-comic focus:bg-yellow-50 transition-colors uppercase"/>
@@ -576,7 +564,8 @@
                             <div className="text-center mb-10 bg-white border-4 border-black p-8 rounded-2xl shadow-solid relative transform -rotate-1">
                                 <div className="absolute -top-6 -right-6 bg-blue-500 text-white font-bangers text-2xl py-2 px-4 border-4 border-black rounded-full rotate-12 shadow-solid-sm">BAM!</div>
                                 <h1 className="text-4xl md:text-5xl font-bangers text-black mb-2 tracking-wide">Twórz Komiksy z EduBox AI!</h1>
-                                <p className="text-slate-600 font-bold font-comic text-lg">Podaj temat, bohatera lub sytuację, a sztuczna inteligencja wygeneruje 4-kadrowy komiks do wydruku.</p>
+                                <p className="text-slate-600 font-bold font-comic text-lg">Podaj temat, bohatera lub sytuację, a sztuczna inteligencja wygeneruje 4-kadrowy komiks z morałem do wydruku – z pytaniami do rozmowy z klasą.</p>
+                                <p className="text-slate-500 font-comic text-sm mt-2">Pierwszy kadr jest wzorem wyglądu bohatera, więc w każdym kadrze wygląda tak samo. Kadr, który się nie spodoba, przerysujesz jednym kliknięciem.</p>
                             </div>
 
                             <div className="bg-white p-8 rounded-2xl shadow-solid border-4 border-black space-y-6">
@@ -595,7 +584,7 @@
                                     <div>
                                         <label className="text-sm font-black text-black uppercase block mb-2 font-comic">3. Styl rysunku</label>
                                         <select value={artStyle} onChange={e => setArtStyle(e.target.value)} className="w-full p-4 bg-slate-50 border-4 border-black rounded-xl outline-none text-black font-bold focus:bg-yellow-50 font-comic cursor-pointer">
-                                            <option>Bajkowe 3D (Disney)</option>
+                                            <option value="Bajkowe 3D (Disney)">Bajkowe 3D</option>
                                             <option>Klasyczny Komiks</option>
                                             <option>Manga / Anime</option>
                                             <option>Kredki / Szkic</option>
@@ -604,7 +593,7 @@
                                 </div>
 
                                 <button onClick={handleGenerateComic} className="w-full mt-4 bg-yellow-400 hover:bg-yellow-300 text-black py-5 rounded-xl font-bangers text-3xl tracking-widest border-4 border-black shadow-solid transition-transform active:translate-y-2 active:shadow-none flex justify-center items-center gap-3">
-                                    <i className="ph-fill ph-lightning"></i> Rysuj Komiks! {!isPremium && `(${Math.max(0, 5 - usageCount)})`}
+                                    <i className="ph-fill ph-lightning"></i> Rysuj Komiks!
                                 </button>
                             </div>
                         </div>
@@ -716,6 +705,15 @@
                                     ))}
                                 </div>
                                 
+                                {Array.isArray(comicData.questions) && comicData.questions.length > 0 && (
+                                    <div className="questions-box mt-6 border-4 border-black rounded-xl p-5 bg-yellow-50 font-comic text-black">
+                                        <h2 className="font-bangers text-2xl tracking-wider mb-2">Porozmawiajmy!</h2>
+                                        <ol className="list-decimal pl-6 space-y-1 font-bold text-lg">
+                                            {comicData.questions.map((q, i) => <li key={i}>{q}</li>)}
+                                        </ol>
+                                    </div>
+                                )}
+
                                 <div className="mt-6 text-right font-comic font-bold text-sm text-slate-500 uppercase tracking-widest">
                                     Stworzono w EduBox AI
                                 </div>
