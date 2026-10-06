@@ -101,20 +101,21 @@ async function handleTts(req, res) {
   }
 }
 
-// Vercel: pozwól dłuższym generacjom (mocny model na długim dokumencie) dojść do końca
-// zamiast być ucinane na domyślnym 10 s planu Hobby.
-export const maxDuration = 60;
+// Vercel (fluid compute): pełny IPET mocnym modelem trwa do ~100 s; strumień pokazuje tekst od 2-3 s.
+export const maxDuration = 300;
 
 // Whitelist modeli - klient NIE może zażądać dowolnego (droższego) modelu.
 const KNOWN_MODELS = new Set([
   'gpt-4o-mini', 'gpt-4o', 'gpt-4.1-mini', 'gpt-4.1', 'gpt-5-mini', 'gpt-5', 'o4-mini'
 ]);
 
-// Zwraca listę modeli do wypróbowania po kolei. Przy błędzie "nieznany model"
-// schodzimy na pewny gpt-4o-mini, więc zmiana oferty OpenAI nie wywala narzędzi.
+// Zwraca listę modeli do wypróbowania po kolei (przy błędzie modelu lub przeciążeniu - następny).
+// "strong" = dokumenty urzędowe (IPET, WOPFU, opinie): gpt-6.1-sol pisał je najrzetelniej w testach
+// z 6.10.2026 (8/8 elementów § 6, poprawne formy pomocy pp); "balanced" = dłuższe materiały robocze.
 // Prośby o stary gpt-4o-mini (23 wywołania w narzędziach) dostają domyślny, lepszy łańcuch.
 function resolveModelChain(model) {
-  if (model === 'strong') return ['gpt-5', 'gpt-4.1', 'gpt-4o', 'gpt-4o-mini'];
+  if (model === 'strong') return ['gpt-6.1-sol', 'gpt-5.4-mini', 'gpt-4.1', 'gpt-4o-mini'];
+  if (model === 'balanced') return ['gpt-5.4-mini', 'gpt-4.1-mini', 'gpt-4o-mini'];
   if (model !== 'gpt-4o-mini' && typeof model === 'string' && KNOWN_MODELS.has(model)) return [model, 'gpt-4o-mini'];
   return ['gpt-4.1-mini', 'gpt-4o-mini']; // domyślny - lepszy niz stary gpt-4o-mini
 }
@@ -178,7 +179,7 @@ export default async function handler(req, res) {
       if (testVerbosity) p.verbosity = testVerbosity;
     } else p.temperature = temperature;
     if (format === "json") p.response_format = { type: "json_object" };
-    if (stream) p.stream = true;
+    if (stream) { p.stream = true; p.stream_options = { include_usage: true }; }
     return p;
   };
 
@@ -209,10 +210,15 @@ export default async function handler(req, res) {
       if (response.ok && wantsStream) {
         return await pipeOpenAIStream(response, res, modelChain[i]);
       }
-      if (response.ok) { data = await response.json(); usedModel = modelChain[i]; break; }
+      if (response.ok) { data = await response.json(); usedModel = modelChain[i]; logUsage(data.model || usedModel, data.usage); break; }
 
       const j = await response.json().catch(() => ({}));
       lastErr = j.error?.message || lastErr;
+      // Przeciążenie lub awaria po stronie OpenAI (429/5xx) - próbujemy następnego modelu z łańcucha.
+      if ((response.status === 429 || response.status >= 500) && i < modelChain.length - 1) {
+        console.warn(`Model ${modelChain[i]} niedostępny (HTTP ${response.status}) - próbuję ${modelChain[i + 1]}`);
+        continue;
+      }
       // Część modeli wymaga weryfikacji organizacji do strumieniowania - wtedy ten sam model bez strumienia.
       if (wantsStream && /verif|stream/i.test(lastErr)) {
         response = await callOpenAI(modelChain[i], false);
@@ -244,6 +250,13 @@ export default async function handler(req, res) {
   }
 }
 
+// Do kontroli kosztów w logach Vercel: wyłącznie model i liczby tokenów, nigdy treść zapytania ani odpowiedzi.
+function logUsage(model, usage) {
+  if (!usage) return;
+  const reasoning = usage.completion_tokens_details?.reasoning_tokens || 0;
+  console.log(`[usage] ${model} in=${usage.prompt_tokens || 0} out=${usage.completion_tokens || 0} reasoning=${reasoning}`);
+}
+
 // Przekazuje strumień SSE z OpenAI jako zwykły tekst (same fragmenty treści). Przerwanie w połowie
 // kończy się znacznikiem, po którym przeglądarka wie, że dokument jest niepełny.
 async function pipeOpenAIStream(upstream, res, model) {
@@ -270,8 +283,10 @@ async function pipeOpenAIStream(upstream, res, model) {
         const payload = line.slice(5).trim();
         if (!payload || payload === '[DONE]') continue;
         try {
-          const delta = JSON.parse(payload).choices?.[0]?.delta?.content;
+          const chunk = JSON.parse(payload);
+          const delta = chunk.choices?.[0]?.delta?.content;
           if (delta) res.write(delta);
+          if (chunk.usage) logUsage(chunk.model || model, chunk.usage);
         } catch (e) { /* niepełna linia SSE - pomijamy */ }
       }
     }
