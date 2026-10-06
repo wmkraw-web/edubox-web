@@ -222,13 +222,14 @@
                 }
             };
 
-            // === API FUNCTIONS (Twój własny backend: GPT-4o-mini + SD/Fal) ===
+            // === API FUNCTIONS (własny backend: /api/chat + /api/generate) ===
             
             const fetchEduBoxText = async (userPrompt, systemPrompt) => {
                 const res = await fetch('/api/chat', {
                     method: 'POST', 
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ prompt: userPrompt, system: systemPrompt, format: "json", temperature: 0.7, model: "gpt-4o-mini" })
+                    // 'balanced' (gpt-5.4-mini): treść slajdów trafia na lekcję – mniej pomyłek w faktach niż dawny model.
+                    body: JSON.stringify({ prompt: userPrompt, system: systemPrompt, format: "json", model: "balanced" })
                 });
                 
                 if (!res.ok) throw new Error(`API Error: ${res.status}`);
@@ -300,7 +301,8 @@
                         2. Jeśli contentStyle to 'bullets', pole "bullets" ma zawierać 3-5 równoważników zdań.
                         3. Jeśli contentStyle to 'descriptive', pole "bullets" ma zawierać 2 krótkie, pełne akapity narracji.
                         4. Zawsze pierwszy slajd to tytuł.
-                        5. Jeśli zażądano quizu, ostatni slajd to pytanie, a odpowiedzi są w 'bullets' (A, B, C, Poprawna: ...).`;
+                        5. Jeśli zażądano quizu, ostatni slajd to pytanie, a odpowiedzi są w 'bullets' (A, B, C, Poprawna: ...).
+                        6. Rzetelność: tylko pewne, sprawdzone fakty; bez dokładnych liczb, dat i cytatów, których nie jesteś pewien; poziom i słownictwo dopasowane do grupy; poprawna polszczyzna.`;
 
                         const userPrompt = `Temat: ${topic}. Grupa: ${audience}. Liczba slajdów: ${slideCount}. Styl: ${contentStyle}. Quiz: ${includeQuiz ? 'Tak' : 'Nie'}. Język: Polski.`;
                         
@@ -323,32 +325,44 @@
             const generateImages = async () => {
                 setStep('generating_images');
                 let updatedSlides = [...slides];
+                const proStatus = localStorage.getItem('eduboxProStatus');
+                const isPro = proStatus === 'PRO' || proStatus === 'active' || isPremium;
+                const todo = updatedSlides.map((s, i) => i).filter(i => !updatedSlides[i].imageUrl);
+                let done = 0;
+                setLoadingProgress(0);
 
-                for (let i = 0; i < updatedSlides.length; i++) {
-                    setLoadingProgress(Math.round(((i) / updatedSlides.length) * 100));
-                    if (updatedSlides[i].imageUrl) continue; 
-
-                    const proStatus = localStorage.getItem('eduboxProStatus');
-                    const isPro = proStatus === 'PRO' || proStatus === 'active' || isPremium;
-                    if (!isPro && window.EduBoxCore.getImageUsageCount() >= 2) {
-                        showToast('⚠️ Dzienny limit darmowych obrazków (2/2) wyczerpany. Pozostałe slajdy zostaną bez grafiki - wpisz kod odblokowujący, by kontynuować.', 'error');
-                        break;
-                    }
-
+                const drawOne = async (i) => {
                     try {
                         const imgUrl = await fetchEduBoxImage(updatedSlides[i].imagePrompt, theme);
-                        updatedSlides[i].imageUrl = imgUrl;
+                        updatedSlides[i] = { ...updatedSlides[i], imageUrl: imgUrl };
                         setSlides([...updatedSlides]);
-                        if (!isPro) {
+                    } catch (err) {
+                        console.error(`Błąd przy obrazku ${i}:`, err);
+                    }
+                    done++;
+                    setLoadingProgress(Math.round((done / Math.max(1, todo.length)) * 100));
+                };
+
+                if (isPro) {
+                    // PRO: po 4 obrazki naraz (~25 s na paczkę zamiast ~20 s na każdy slajd po kolei).
+                    for (let k = 0; k < todo.length; k += 4) {
+                        await Promise.all(todo.slice(k, k + 4).map(drawOne));
+                    }
+                } else {
+                    for (const i of todo) {
+                        if (window.EduBoxCore.getImageUsageCount() >= 2) {
+                            showToast('⚠️ Dzienny limit darmowych obrazków (2/2) wyczerpany. Pozostałe slajdy zostaną bez grafiki - wpisz kod odblokowujący, by kontynuować.', 'error');
+                            break;
+                        }
+                        await drawOne(i);
+                        if (updatedSlides[i].imageUrl) {
                             const today = new Date().toISOString().split('T')[0];
                             const newImgCount = window.EduBoxCore.getImageUsageCount() + 1;
                             localStorage.setItem('eduboxImageUsage', JSON.stringify({ date: today, count: newImgCount }));
                         }
-                    } catch (err) { 
-                        console.error(`Błąd przy obrazku ${i}:`, err);
                     }
                 }
-                
+
                 setLoadingProgress(100);
                 setTimeout(() => setStep('review'), 800); // Wracamy do ekranu edycji, aby obejrzeć grafiki
             };
