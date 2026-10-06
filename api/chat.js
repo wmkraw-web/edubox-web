@@ -157,9 +157,15 @@ export default async function handler(req, res) {
   const piiRemoved = cleanPrompt.removed + cleanSystem.removed;
   if (piiRemoved > 0) res.setHeader('X-EduBox-PII-Removed', String(piiRemoved));
 
-  const modelChain = resolveModelChain(model);
+  // TYMCZASOWE (tylko preview, do usunięcia przed merge): test dowolnego modelu i wysiłku rozumowania.
+  const isPreviewTest = process.env.VERCEL_ENV === 'preview' && typeof req.body.testModel === 'string';
+  const modelChain = isPreviewTest ? [req.body.testModel] : resolveModelChain(model);
+  const testEffort = process.env.VERCEL_ENV === 'preview' ? req.body.testEffort : undefined;
+  const testVerbosity = process.env.VERCEL_ENV === 'preview' ? req.body.testVerbosity : undefined;
+  // Strumień: tekst płynie do przeglądarki na bieżąco (długie dokumenty mocnego modelu trwają ponad minutę).
+  const wantsStream = req.body.stream === true && format !== 'json';
 
-  const buildPayload = (m) => {
+  const buildPayload = (m, stream) => {
     const p = {
       model: m,
       messages: [
@@ -167,30 +173,59 @@ export default async function handler(req, res) {
         { role: "user", content: prompt }
       ]
     };
-    if (isReasoningModel(m)) p.reasoning_effort = 'low';
-    else p.temperature = temperature;
+    if (isReasoningModel(m)) {
+      p.reasoning_effort = testEffort || 'low';
+      if (testVerbosity) p.verbosity = testVerbosity;
+    } else p.temperature = temperature;
     if (format === "json") p.response_format = { type: "json_object" };
+    if (stream) p.stream = true;
     return p;
   };
 
+  const callOpenAI = (m, stream) => fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
+    },
+    body: JSON.stringify(buildPayload(m, stream))
+  });
+
+  // TYMCZASOWE (tylko preview, do usunięcia przed merge): lista modeli dostępnych dla klucza.
+  if (req.body?.mode === 'models-probe' && process.env.VERCEL_ENV === 'preview') {
+    const r = await fetch('https://api.openai.com/v1/models', { headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` } });
+    const j = await r.json();
+    return res.status(200).json({ ids: (j.data || []).map(x => x.id).filter(id => /^(gpt|o\d|chatgpt)/.test(id)).sort() });
+  }
+
   try {
     let data = null;
+    let usedModel = null;
     let lastErr = "Nieznany błąd od OpenAI";
 
     for (let i = 0; i < modelChain.length; i++) {
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
-        },
-        body: JSON.stringify(buildPayload(modelChain[i]))
-      });
+      let response = await callOpenAI(modelChain[i], wantsStream);
 
-      const j = await response.json();
-      if (response.ok) { data = j; break; }
+      if (response.ok && wantsStream) {
+        return await pipeOpenAIStream(response, res, modelChain[i]);
+      }
+      if (response.ok) { data = await response.json(); usedModel = modelChain[i]; break; }
 
+      const j = await response.json().catch(() => ({}));
       lastErr = j.error?.message || lastErr;
+      // Część modeli wymaga weryfikacji organizacji do strumieniowania - wtedy ten sam model bez strumienia.
+      if (wantsStream && /verif|stream/i.test(lastErr)) {
+        response = await callOpenAI(modelChain[i], false);
+        if (response.ok) {
+          const full = await response.json();
+          const text = full?.choices?.[0]?.message?.content;
+          if (typeof text === 'string') {
+            res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+            res.setHeader('X-EduBox-Model', full.model || modelChain[i]);
+            return res.status(200).send(text);
+          }
+        }
+      }
       // Przechodzimy do kolejnego modelu TYLKO gdy problem dotyczy samego modelu.
       const modelIssue = /model|not found|does not exist|invalid|unsupported|deprecat|access/i.test(lastErr);
       if (!modelIssue || i === modelChain.length - 1) throw new Error(lastErr);
@@ -201,9 +236,48 @@ export default async function handler(req, res) {
       throw new Error('OpenAI nie zwrócił treści (możliwy filtr bezpieczeństwa treści).');
     }
 
-    res.status(200).json({ text, model: data.model });
+    res.status(200).json({ text, model: data.model || usedModel });
   } catch (error) {
     console.error("Szczegóły błędu w API:", error);
+    if (res.headersSent) { try { res.end(); } catch (e) {} return; }
     res.status(500).json({ message: 'Błąd serwera API', details: error.message });
   }
+}
+
+// Przekazuje strumień SSE z OpenAI jako zwykły tekst (same fragmenty treści). Przerwanie w połowie
+// kończy się znacznikiem, po którym przeglądarka wie, że dokument jest niepełny.
+async function pipeOpenAIStream(upstream, res, model) {
+  res.statusCode = 200;
+  res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
+  res.setHeader('X-Accel-Buffering', 'no');
+  res.setHeader('X-EduBox-Model', model);
+  if (typeof res.flushHeaders === 'function') res.flushHeaders();
+
+  const reader = upstream.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      let nl;
+      while ((nl = buffer.indexOf('\n')) >= 0) {
+        const line = buffer.slice(0, nl).trim();
+        buffer = buffer.slice(nl + 1);
+        if (!line.startsWith('data:')) continue;
+        const payload = line.slice(5).trim();
+        if (!payload || payload === '[DONE]') continue;
+        try {
+          const delta = JSON.parse(payload).choices?.[0]?.delta?.content;
+          if (delta) res.write(delta);
+        } catch (e) { /* niepełna linia SSE - pomijamy */ }
+      }
+    }
+  } catch (error) {
+    console.error('Przerwany strumień OpenAI:', error);
+    res.write('\n<!--EDUBOX_STREAM_ERROR-->');
+  }
+  res.end();
 }
