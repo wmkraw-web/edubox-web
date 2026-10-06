@@ -119,9 +119,9 @@ function resolveModelChain(model) {
   return ['gpt-4.1-mini', 'gpt-4o-mini']; // domyślny - lepszy niz stary gpt-4o-mini
 }
 
-// Modele rozumujące (gpt-5*, o*) przyjmują tylko domyślne temperature=1. Wysyłanie 0.5 kończyło
+// Modele rozumujące (gpt-5*, gpt-6*, o*) przyjmują tylko domyślne temperature=1. Wysyłanie 0.5 kończyło
 // się błędem, więc tryb "strong" nigdy nie używał gpt-5, tylko po cichu schodził na gpt-4.1.
-const isReasoningModel = (m) => /^(gpt-5|o\d)/.test(m);
+const isReasoningModel = (m) => /^(gpt-5|gpt-6|o\d)/.test(m);
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
