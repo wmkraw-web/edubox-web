@@ -22,6 +22,8 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <!-- Wspólny eksport dokumentów: Word (.docx), wydruk A4 / PDF, kopiowanie z formatowaniem -->
+    <script src="/doc-tools.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet">
 
     <script>
@@ -134,6 +136,124 @@
             needs: 'Brak szczególnych potrzeb',
             components: COMPONENTS.map(item => item.id)
         };
+
+        // Instrukcje dla AI (poza komponentem, żeby dało się je testować w Node). Przepisy sprawdzone w ISAP 6.10.2026:
+        // podstawa programowa Dz.U. 2026 poz. 378 (od 2026/2027: przedszkole, klasy I i IV), ramowe plany Dz.U. 2026
+        // poz. 1028 (nowe przedmioty w klasach objętych nowym planem), prace domowe – § 12a rozporządzenia o ocenianiu.
+        const LESSON_SYSTEM_PROMPT = `Jesteś doświadczonym polskim nauczycielem-praktykiem i metodykiem. Tworzysz lekcje, które da się poprowadzić jutro bez poprawek: konkretne polecenia, gotowe treści zadań, realny czas. Odpowiadasz WYŁĄCZNIE poprawnym JSON-em (bez Markdownu i komentarzy).
+
+KONTEKST ROKU SZKOLNEGO 2026/2027:
+- Od 1 września 2026 r. w przedszkolu oraz w klasach I i IV szkoły podstawowej obowiązuje nowa podstawa programowa (Dz.U. 2026 poz. 378); w pozostałych klasach – dotychczasowa. Cele formułuj własnymi słowami. NIE podawaj numerów wymagań ani cytatów z podstawy programowej.
+- Prace domowe – § 12a rozporządzenia w sprawie oceniania: w klasach I–III wyłącznie ćwiczenia usprawniające motorykę małą (bez innych prac pisemnych i praktyczno-technicznych); w klasach IV–VIII wyłącznie nieobowiązkowa praca pisemna, z której nie wystawia się oceny (bez prac praktyczno-technicznych). W przedszkolu i na zajęciach rewalidacyjnych – brak pracy domowej lub propozycja zabawy z rodzicem.
+
+ZASADY JAKOŚCI:
+- Etapy lekcji sumują się DOKŁADNIE do podanego czasu (np. 45 minut). Pole "minutes" zapisuj jako zakres, np. "0–5 min".
+- Każdy etap: co dokładnie mówi i robi nauczyciel (konkretne polecenia, pytania kluczowe, przykłady) oraz co robią uczniowie (forma pracy: indywidualnie, w parach, w grupach). W środku lekcji umieść szybkie sprawdzenie zrozumienia, na końcu – podsumowanie z uczniami.
+- Cele: 2–4 cele operacyjne zaczynające się od czasownika (np. "wyjaśnia…", "rozpoznaje…", "oblicza…"). Kryteria sukcesu w języku ucznia: "Potrafię…".
+- Zadania dla uczniów: 4–6 zadań o rosnącej trudności, z pełną treścią (nie "uzupełnij luki", tylko gotowe zdania z lukami, dane liczbowe, teksty), polem "level" ("podstawowy" lub "rozszerzony") i kluczem odpowiedzi.
+- Quiz: 5–8 pytań, każde z 4 odpowiedziami, dokładnie jedna poprawna, wiarygodne dystraktory; "correct" = pełna treść poprawnej odpowiedzi; "explanation" = jedno zdanie wyjaśnienia.
+- Treści merytorycznie poprawne i aktualne. Liczby, daty i definicje podawaj tylko, gdy jesteś pewien. Doświadczenia – z zasadami bezpieczeństwa.
+- Nie przytaczaj obszernych fragmentów utworów chronionych prawem autorskim – przy lekturach odwołuj się do fragmentu z podręcznika.
+- Język i trudność dopasuj do etapu: w przedszkolu i klasach I–III – zabawa, ruch, konkret; starsze klasy – rozumowanie, argumentacja, praca ze źródłem.
+- Dostosowania muszą odnosić się do wskazanych potrzeb (np. ADHD: krótkie etapy, ruch, jasne instrukcje krok po kroku) i być możliwe do zastosowania w zwykłej klasie.
+- Nie umieszczaj danych osobowych uczniów. Nie wymyślaj przepisów.
+- Polska typografia: cudzysłowy „…”, półpauza – w zakresach.
+
+Zwróć dokładnie strukturę:
+{
+  "title": "...",
+  "summary": "2–3 zdania: o czym jest lekcja i jak przebiega",
+  "goals": ["Uczeń: …"],
+  "success_criteria": ["Potrafię …"],
+  "materials": ["..."],
+  "timeline": [{"minutes":"0–5 min","phase":"...","teacher":"...","students":"..."}],
+  "board_note": "notatka do zeszytu: 4–8 krótkich linii z kluczowymi pojęciami",
+  "worksheet": [{"type":"...","level":"podstawowy","instruction":"pełna treść zadania","answer":"..."}],
+  "slides_outline": [{"title":"...","content":"..."}],
+  "quiz": [{"question":"...","options":["...","...","...","..."],"correct":"...","explanation":"..."}],
+  "exit_ticket": ["..."],
+  "homework": "...",
+  "differentiation": {"support":["..."],"extension":["..."],"spe":["..."]}
+}`;
+
+        // Model dobrany w testach jakości (patrz komentarz w api/chat.js przy resolveModelChain).
+        const LESSON_MODEL = 'balanced';
+
+        const buildLessonUserPrompt = (form, requestedLabels) => `Przygotuj kompletny pakiet lekcyjny.
+Temat: ${form.topic}
+Przedmiot/obszar: ${form.subject}
+Etap: ${form.level}
+Czas: ${form.duration}
+Profil klasy: ${form.classProfile || 'typowa zróżnicowana klasa'}
+Cel nauczyciela: ${form.learningGoal || 'dobierz właściwy cel'}
+Potrzeby i SPE: ${form.needs}
+Wymagane elementy: ${requestedLabels.join(', ') || 'podstawowy przebieg lekcji'}.
+Jeżeli dany element nie został wybrany, zwróć dla jego pola pustą tablicę lub pusty tekst.`;
+
+        // Przedmioty: nowe nazwy z ramowych planów nauczania (Dz.U. 2026 poz. 1028 – klasy objęte nowym planem)
+        // oraz dotychczasowe, które w roku 2026/2027 obowiązują jeszcze w klasach V–VIII.
+        const SUBJECTS = ['Edukacja przedszkolna', 'Edukacja wczesnoszkolna', 'Język polski', 'Matematyka', 'Język angielski', 'Drugi język obcy',
+            'Przyroda', 'Biologia', 'Geografia', 'Chemia', 'Fizyka', 'Historia', 'Edukacja obywatelska', 'Wiedza o społeczeństwie', 'Informatyka',
+            'Zajęcia praktyczno-techniczne', 'Technika', 'Plastyka', 'Muzyka', 'Wychowanie fizyczne', 'Edukacja zdrowotna',
+            'Kształcenie obronne', 'Edukacja dla bezpieczeństwa', 'Zajęcia z wychowawcą', 'Etyka', 'Zajęcia rewalidacyjne', 'Inny przedmiot'];
+
+        const esc = (v) => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        const escBr = (v) => esc(typeof v === 'string' ? v : (v == null ? '' : JSON.stringify(v))).replace(/\n/g, '<br>');
+        const asList = (v) => Array.isArray(v) ? v : (v == null || v === '' ? [] : [v]);
+        const LINE = '……………………………………………………………………………………';
+
+        // Lekcja jako dokument do Worda / wydruku: "teacher" = konspekt z kluczem, "student" = karta pracy bez odpowiedzi.
+        const lessonToHtml = (result, form, mode) => {
+            if (!result) return '';
+            const parts = [];
+            if (mode === 'student') {
+                parts.push(`<h1>Karta pracy: ${esc(result.title || form.topic)}</h1>`);
+                parts.push(`<p>Imię i nazwisko: ${LINE}   Klasa: ……………   Data: ……………</p>`);
+                const tasks = asList(result.worksheet);
+                if (tasks.length) {
+                    parts.push('<h2>Zadania</h2><ol>' + tasks.map(t => `<li><strong>${esc(t.type || 'Zadanie')}</strong>${t.level ? ` <em>(${esc(t.level)})</em>` : ''}<br>${escBr(t.instruction || t)}<br>${LINE}<br>${LINE}</li>`).join('') + '</ol>');
+                }
+                const quiz = asList(result.quiz);
+                if (quiz.length) {
+                    parts.push('<h2>Sprawdź się</h2><ol>' + quiz.map(q => `<li>${esc(q.question || q)}<br>${asList(q.options).map((o, j) => `${String.fromCharCode(65 + j)}. ${esc(o)}`).join('<br>')}</li>`).join('') + '</ol>');
+                }
+                const exit = asList(result.exit_ticket);
+                if (exit.length) parts.push('<h2>Karta wyjścia</h2><ol>' + exit.map(x => `<li>${escBr(x)}<br>${LINE}</li>`).join('') + '</ol>');
+                return parts.join('\n');
+            }
+            parts.push(`<h1>${esc(result.title || form.topic || 'Konspekt lekcji')}</h1>`);
+            parts.push(`<table><tbody><tr><th>Przedmiot</th><td>${esc(form.subject)}</td></tr><tr><th>Etap / klasa</th><td>${esc(form.level)}</td></tr><tr><th>Czas</th><td>${esc(form.duration)}</td></tr><tr><th>Temat</th><td>${esc(form.topic)}</td></tr><tr><th>Data i prowadzący</th><td>[uzupełnij]</td></tr></tbody></table>`);
+            if (result.summary) parts.push(`<p>${escBr(result.summary)}</p>`);
+            const ul = (title, items) => { const l = asList(items); if (l.length) parts.push(`<h2>${title}</h2><ul>${l.map(x => `<li>${escBr(x)}</li>`).join('')}</ul>`); };
+            ul('Cele lekcji', result.goals);
+            ul('Kryteria sukcesu', result.success_criteria);
+            ul('Pomoce i materiały', result.materials);
+            const tl = asList(result.timeline);
+            if (tl.length) parts.push('<h2>Przebieg lekcji</h2><table><thead><tr><th>Czas</th><th>Etap</th><th>Nauczyciel</th><th>Uczniowie</th></tr></thead><tbody>' + tl.map(st => `<tr><td>${esc(st.minutes)}</td><td>${esc(st.phase)}</td><td>${escBr(st.teacher)}</td><td>${escBr(st.students)}</td></tr>`).join('') + '</tbody></table>');
+            if (result.board_note) parts.push(`<h2>Notatka do zeszytu</h2><p>${escBr(result.board_note)}</p>`);
+            const tasks = asList(result.worksheet);
+            if (tasks.length) parts.push('<h2>Zadania dla uczniów (z kluczem)</h2><ol>' + tasks.map(t => `<li><strong>${esc(t.type || 'Zadanie')}</strong>${t.level ? ` <em>(${esc(t.level)})</em>` : ''}: ${escBr(t.instruction || t)}${t.answer ? `<br><em>Odpowiedź: ${escBr(t.answer)}</em>` : ''}</li>`).join('') + '</ol>');
+            const quiz = asList(result.quiz);
+            if (quiz.length) parts.push('<h2>Quiz sprawdzający (z kluczem)</h2><ol>' + quiz.map(q => `<li>${esc(q.question || q)}<br>${asList(q.options).map((o, j) => `${String.fromCharCode(65 + j)}. ${esc(o)}`).join('<br>')}${q.correct ? `<br><em>Poprawna: ${esc(q.correct)}${q.explanation ? ' – ' + esc(q.explanation) : ''}</em>` : ''}</li>`).join('') + '</ol>');
+            const slides = asList(result.slides_outline);
+            if (slides.length) parts.push('<h2>Plan prezentacji</h2><table><thead><tr><th>Slajd</th><th>Tytuł</th><th>Treść</th></tr></thead><tbody>' + slides.map((sl, i) => `<tr><td>${i + 1}</td><td>${esc(sl.title)}</td><td>${escBr(sl.content || '')}</td></tr>`).join('') + '</tbody></table>');
+            const exit = asList(result.exit_ticket);
+            if (exit.length) parts.push('<h2>Karta wyjścia</h2><ol>' + exit.map(x => `<li>${escBr(x)}</li>`).join('') + '</ol>');
+            if (result.homework) parts.push(`<h2>Praca domowa</h2><p>${escBr(result.homework)}</p>`);
+            const d = result.differentiation || {};
+            if (asList(d.support).length || asList(d.extension).length || asList(d.spe).length) {
+                parts.push('<h2>Dostosowania i zróżnicowanie</h2><table><thead><tr><th>Wsparcie</th><th>Dla uczniów szybszych</th><th>SPE</th></tr></thead><tbody><tr>' +
+                    [d.support, d.extension, d.spe].map(col => `<td><ul>${asList(col).map(x => `<li>${escBr(x)}</li>`).join('')}</ul></td>`).join('') + '</tr></tbody></table>');
+            }
+            return parts.join('\n');
+        };
+
+        // Kontrola czasu: czy etapy kończą się na zaplanowanej minucie (np. 45).
+        const timelineEnd = (result) => asList(result?.timeline).reduce((max, st) => {
+            const m = String(st.minutes || '').match(/(\d+)\s*[–-]\s*(\d+)/);
+            return m ? Math.max(max, Number(m[2])) : max;
+        }, 0);
+        const plannedMinutes = (duration) => /2\s*×/.test(duration) ? 90 : parseInt(duration, 10) || 45;
 
         const listify = (value) => {
             if (Array.isArray(value)) return value;
@@ -359,48 +479,13 @@
             const requestedLabels = useMemo(() => COMPONENTS.filter(item => form.components.includes(item.id)).map(item => item.label), [form.components]);
 
             const fetchLesson = async () => {
-                const systemPrompt = `Jesteś doświadczonym polskim metodykiem nauczania. Tworzysz realne, wykonalne lekcje, a nie ogólniki. Odpowiadasz WYŁĄCZNIE poprawnym JSON-em, bez markdownu.
-
-Zasady:
-- pilnuj podanego czasu i podziel go realistycznie między etapy,
-- język oraz trudność dopasuj do etapu edukacyjnego,
-- nie wymyślaj przepisów ani podstaw prawnych,
-- nie umieszczaj danych osobowych uczniów,
-- przygotuj zadania z odpowiedziami i quiz z jednoznacznym kluczem,
-- dostosowania mają być praktyczne i możliwe do zastosowania w klasie.
-
-Zwróć dokładnie strukturę:
-{
-  "title": "...",
-  "summary": "2-3 zdania",
-  "goals": ["..."],
-  "success_criteria": ["Uczeń potrafi..."],
-  "materials": ["..."],
-  "timeline": [{"minutes":"0-5 min","phase":"...","teacher":"...","students":"..."}],
-  "board_note": "krótka gotowa notatka",
-  "worksheet": [{"type":"...","instruction":"...","answer":"..."}],
-  "slides_outline": [{"title":"...","content":"..."}],
-  "quiz": [{"question":"...","options":["..."],"correct":"...","explanation":"..."}],
-  "exit_ticket": ["..."],
-  "homework": "propozycja pracy domowej zgodna z § 12a rozporządzenia w sprawie oceniania: w klasach I-III szkoły podstawowej wyłącznie ćwiczenia usprawniające motorykę małą (bez innych prac pisemnych i praktyczno-technicznych); w klasach IV-VIII wyłącznie nieobowiązkowa pisemna praca domowa, z której nie ustala się oceny (bez prac praktyczno-technicznych); albo Bez pracy domowej.",
-  "differentiation": {"support":["..."],"extension":["..."],"spe":["..."]}
-}`;
-
-                const userPrompt = `Przygotuj kompletny pakiet lekcyjny.
-Temat: ${form.topic}
-Przedmiot/obszar: ${form.subject}
-Etap: ${form.level}
-Czas: ${form.duration}
-Profil klasy: ${form.classProfile || 'typowa zróżnicowana klasa'}
-Cel nauczyciela: ${form.learningGoal || 'dobierz właściwy cel'}
-Potrzeby i SPE: ${form.needs}
-Wymagane elementy: ${requestedLabels.join(', ') || 'podstawowy przebieg lekcji'}.
-Jeżeli dany element nie został wybrany, zwróć dla jego pola pustą tablicę lub pusty tekst.`;
+                const systemPrompt = LESSON_SYSTEM_PROMPT;
+                const userPrompt = buildLessonUserPrompt(form, requestedLabels);
 
                 const response = await fetch('/api/chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ prompt: userPrompt, system: systemPrompt, format: 'json', temperature: 0.35, model: 'gpt-4o-mini' })
+                    body: JSON.stringify({ prompt: userPrompt, system: systemPrompt, format: 'json', temperature: 0.35, model: LESSON_MODEL })
                 });
                 if (!response.ok) throw new Error(`Serwer zwrócił błąd ${response.status}.`);
                 const data = await response.json();
@@ -445,26 +530,29 @@ Jeżeli dany element nie został wybrany, zwróć dla jego pola pustą tablicę 
                 return `${result.title || 'EduLekcja 360'}\n\n${result.summary || ''}\n\nCELE:\n${listify(result.goals).map(x => `- ${textify(x)}`).join('\n')}\n\nPRZEBIEG:\n${listify(result.timeline).map(step => `${step.minutes || ''} ${step.phase || ''}\nNauczyciel: ${textify(step.teacher)}\nUczniowie: ${textify(step.students)}`).join('\n\n')}\n\nNOTATKA NA TABLICĘ:\n${textify(result.board_note)}\n\nZADANIA:\n${listify(result.worksheet).map((x, i) => `${i + 1}. ${textify(x.instruction || x)}\nOdpowiedź: ${textify(x.answer)}`).join('\n')}\n\nDOSTOSOWANIA:\n${textify(result.differentiation)}`;
             };
 
+            const fileBase = () => `EduLekcja360_${String(result?.title || form.topic || 'lekcja').replace(/[^a-zA-Z0-9ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]+/g, '_').slice(0, 60)}`;
+
+            // Kopiowanie z formatowaniem (tabela przebiegu, listy) – wkleja się poprawnie do Worda i Dokumentów Google.
             const copyAll = async () => {
+                const ok = await window.EduDocTools.copyRich(lessonToHtml(result, form, 'teacher'));
+                showToast(ok ? 'Skopiowano konspekt z formatowaniem – wklej do Worda lub Dokumentów Google.' : 'Przeglądarka nie pozwoliła skopiować tekstu.', ok ? 'success' : 'error');
+            };
+
+            // Prawdziwy plik .docx (style nagłówków, tabela przebiegu, numery stron) – konspekt albo karta pracy ucznia.
+            const exportWord = async (mode) => {
+                if (!result) return;
                 try {
-                    await navigator.clipboard.writeText(buildPlainText());
-                    showToast('Skopiowano cały pakiet lekcyjny.', 'success');
-                } catch {
-                    showToast('Przeglądarka nie pozwoliła skopiować tekstu.', 'error');
+                    await window.EduDocTools.downloadDocx(lessonToHtml(result, form, mode), {
+                        filename: mode === 'student' ? `${fileBase()}_karta_pracy` : fileBase(),
+                        title: result.title || form.topic
+                    });
+                    try { if (typeof window.gtag === 'function') window.gtag('event', 'lekcja_docx', { variant: mode }); } catch (e) {}
+                } catch (error) {
+                    showToast(error.message || 'Nie udało się przygotować pliku Word.', 'error');
                 }
             };
 
-            const exportWord = () => {
-                if (!result) return;
-                const content = document.getElementById('lesson-document').innerHTML;
-                const styles = `<style>body{font-family:Arial,sans-serif;line-height:1.5;color:#172033}h1{color:#4338ca}h3{color:#4338ca;border-bottom:1px solid #cbd5e1;padding-bottom:6px}section,div{margin-bottom:14px}ul{padding-left:20px}</style>`;
-                const blob = new Blob(['\ufeff', `<html><head><meta charset="utf-8">${styles}</head><body>${content}</body></html>`], { type: 'application/msword' });
-                const link = document.createElement('a');
-                link.href = URL.createObjectURL(blob);
-                link.download = `EduLekcja360_${(result.title || 'lekcja').replace(/[^a-zA-Z0-9ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]+/g, '_')}.doc`;
-                link.click();
-                URL.revokeObjectURL(link.href);
-            };
+            const printLesson = (mode) => window.EduDocTools.printDoc(lessonToHtml(result, form, mode), mode === 'student' ? `${fileBase()}_karta_pracy` : fileBase());
 
             const openSpecialistTool = (tool) => {
                 if (!result) return;
@@ -621,7 +709,7 @@ Jeżeli dany element nie został wybrany, zwróć dla jego pola pustą tablicę 
                                     <div>
                                         <label className="block text-xs font-black uppercase tracking-wider text-slate-400 mb-2">Przedmiot</label>
                                         <select value={form.subject} onChange={e => update('subject', e.target.value)} className="w-full bg-slate-950/70 border border-slate-700 rounded-xl px-3 py-3 text-sm text-white outline-none focus:border-indigo-400">
-                                            {['Edukacja przedszkolna','Edukacja wczesnoszkolna','Język polski','Matematyka','Przyroda','Biologia','Geografia','Historia','WOS','Język angielski','Fizyka','Chemia','Informatyka','Godzina wychowawcza','Inny przedmiot'].map(item => <option key={item}>{item}</option>)}
+                                            {SUBJECTS.map(item => <option key={item}>{item}</option>)}
                                         </select>
                                     </div>
                                     <div>
@@ -686,19 +774,22 @@ Jeżeli dany element nie został wybrany, zwróć dla jego pola pustą tablicę 
                                     <div className="glass rounded-3xl p-8 min-h-[640px] flex flex-col items-center justify-center text-center">
                                         <div className="w-20 h-20 border-4 border-indigo-500/20 border-t-indigo-400 rounded-full animate-spin mb-6"></div>
                                         <h2 className="text-2xl font-black mb-3">Metodyk układa elementy lekcji</h2>
-                                        <p className="text-slate-400">Pilnuję czasu, poziomu, odpowiedzi i dostosowań. To może potrwać kilkanaście sekund.</p>
+                                        <p className="text-slate-400">Pilnuję czasu, poziomu, odpowiedzi i dostosowań. Zwykle trwa to około 30 sekund.</p>
                                     </div>
                                 )}
 
                                 {result && !isGenerating && (
                                     <div id="wynik" className="glass rounded-3xl p-6 md:p-8">
                                         <div className="flex flex-wrap items-center justify-between gap-3 mb-8 pb-5 border-b border-slate-800 print-hidden">
-                                            <div><p className="text-xs text-emerald-400 font-black uppercase tracking-widest">Pakiet gotowy</p><p className="text-sm text-slate-400 mt-1">Możesz skopiować, wydrukować albo rozwinąć dalej.</p></div>
+                                            <div><p className="text-xs text-emerald-400 font-black uppercase tracking-widest">Pakiet gotowy</p><p className="text-sm text-slate-400 mt-1">Pobierz konspekt i kartę pracy ucznia do Worda, wydrukuj albo rozwiń dalej.</p>
+                                                {timelineEnd(result) > 0 && timelineEnd(result) !== plannedMinutes(form.duration) && <p className="text-xs text-amber-300 mt-2"><i className="ph-bold ph-warning mr-1"></i>Etapy kończą się na {timelineEnd(result)}. minucie, a lekcja ma trwać {plannedMinutes(form.duration)} min – sprawdź podział czasu.</p>}</div>
                                              <div className="flex flex-wrap gap-2">
                                                  <button onClick={copyAll} className="bg-slate-800 hover:bg-slate-700 border border-slate-700 px-4 py-2 rounded-xl text-xs font-bold"><i className="ph-bold ph-copy mr-1"></i> Kopiuj</button>
-                                                 <button onClick={exportWord} className="bg-slate-800 hover:bg-slate-700 border border-slate-700 px-4 py-2 rounded-xl text-xs font-bold"><i className="ph-bold ph-file-doc mr-1"></i> Word</button>
+                                                 <button onClick={() => exportWord('teacher')} className="bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded-xl text-xs font-bold"><i className="ph-bold ph-file-doc mr-1"></i> Konspekt (Word)</button>
+                                                 <button onClick={() => exportWord('student')} className="bg-slate-800 hover:bg-slate-700 border border-slate-700 px-4 py-2 rounded-xl text-xs font-bold"><i className="ph-bold ph-student mr-1"></i> Karta pracy ucznia (Word)</button>
+                                                 <button onClick={() => printLesson('teacher')} className="bg-indigo-600 hover:bg-indigo-500 px-4 py-2 rounded-xl text-xs font-bold"><i className="ph-bold ph-printer mr-1"></i> Drukuj / PDF</button>
+                                                 <button onClick={() => printLesson('student')} className="bg-slate-800 hover:bg-slate-700 border border-slate-700 px-4 py-2 rounded-xl text-xs font-bold"><i className="ph-bold ph-printer mr-1"></i> Drukuj kartę pracy</button>
                                                  <button onClick={publishToGielda} disabled={isSavingToGielda} className="bg-emerald-700 hover:bg-emerald-600 disabled:opacity-60 px-4 py-2 rounded-xl text-xs font-bold"><i className={`ph-bold ${isSavingToGielda ? 'ph-spinner animate-spin' : 'ph-database'} mr-1`}></i> {isSavingToGielda ? 'Zapisuję...' : 'Dodaj do bazy'}</button>
-                                                 <button onClick={() => window.print()} className="bg-indigo-600 hover:bg-indigo-500 px-4 py-2 rounded-xl text-xs font-bold"><i className="ph-bold ph-printer mr-1"></i> Drukuj</button>
                                             </div>
                                         </div>
                                         <LessonDocument result={result} />
@@ -729,7 +820,6 @@ Jeżeli dany element nie został wybrany, zwróć dla jego pola pustą tablicę 
                         )}
                     </main>
 
-                    <div className="print-only"><LessonDocument result={result} /></div>
                     <Toast toast={toast} />
                 </div>
             );
