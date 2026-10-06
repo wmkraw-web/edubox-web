@@ -53,8 +53,9 @@ export default async function handler(req, res) {
     }
   }
 
-  // Dobór modelu: grafika projektowa (ramki, dyplomy) -> Recraft V4.1; zdjęcie do przerobienia -> GPT Image 2.5
-  // edit; pozostałe -> GPT Image 2.5. Przy błędzie lub odmowie modelu łańcuch próbuje kolejnych (imageModels.js).
+  // Dobór modelu (imageModels.js): najpierw GPT Image 2.5 (zdjęcie do przerobienia -> GPT Image 2.5 edit,
+  // reference_image -> ten sam bohater w nowej scenie); zapas: grafika projektowa (model:'recraft') -> Recraft,
+  // pozostałe -> FLUX.2 pro / FLUX.1 dev. Przy błędzie lub odmowie modelu łańcuch próbuje kolejnych.
   try {
     const result = await runImageChain({
       prompt, negativePrompt: negative_prompt, aspect_ratio, size, width, height, seed, style,
