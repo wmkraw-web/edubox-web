@@ -249,7 +249,11 @@ o ocenianiu – 5 podstaw, uczeń zdolny = art. 44c ust. 1), EduDialog (NVC z te
 fragment opinii w obszarach ICF), EduSprawozdawca, EduBiurokrata (opinia do poradni korzysta z
 `asystent-dokumenty.js`), EduLekcja 360 (JSON → konspekt i karta pracy ucznia przez `lessonToHtml`),
 Kreator Awansu (`awans.html` – 3 tryby w `DOC_TYPES`: sprawozdanie nauczyciela, ocena pracy, opinia
-mentora). Wydruk z ciemnych paneli dawał jasnoszary tekst – w narzędziach bez białej kartki dodawaj do
+mentora), EduNotariusz (`DOC_KINDS`: notatka służbowa, protokół zebrania, wniosek o pomoc pp, notatka
+o zdarzeniu) i EduRaport (`REPORT_KINDS`: wydarzenie, projekt, zajęcia dodatkowe, akcja).
+`npm run dokumenty:check` (`scripts/check-dokumenty.js`) pilnuje całego wzorca naraz we wszystkich
+narzędziach – także tego, że eksport czyta `innerHTML` kartki przez ref, a nie surowe wyjście AI.
+Wydruk z ciemnych paneli dawał jasnoszary tekst – w narzędziach bez białej kartki dodawaj do
 `@media print` regułę `#root * { color:#000 !important }` albo używaj `printDoc`.
 
 **Podstawa prawna NIGDY od AI (od 10.2026):** modele halucynują numery artykułów i paragrafów, więc
@@ -262,6 +266,35 @@ tekst jednolity Karty Nauczyciela ze snapshotem w `legal-acts.json`, więc po `n
 trzeba poprawić też `AKTY.kn`. Uwaga przy starych narzędziach: eksport „.doc” jako HTML z mime
 `application/msword` wymieniamy na `EduDocTools.downloadDocx`, a regexy w stylu `/\\n/g` z plików
 `<script type="text/babel">` nie łapią enterów (szukają znaku `\` i `n`) – realny błąd w `eduawans.html`.
+
+**Zasada „nie dopisuj faktów" (od 10.2026, pilnowana testem):** generatory dokumentów mają w instrukcji
+zakaz wymyślania liczb, nazw, cytatów, celów i efektów; braki zostają jako `[uzupełnij: …]`, a długość
+wynika z notatek. `scripts/check-dokumenty.js` blokuje zwroty, które to łamały – realnie znalezione
+w kodzie: „minimum 3 rozbudowane akapity" i „żelazna tarcza ochronna” (EduNotariusz), „podniosły ton”,
+„bogate słownictwo pedagogiczne”, „minimum 2 rozbudowane akapity” i przykład „swobodna eksploracja”
+(EduRaport), „lany tekst” (Kreator Awansu). Test rozpoznaje negację, więc *zakaz* w instrukcji
+(„bez podniosłego tonu”) jest w porządku – wywala tylko polecenie. Komentarze liniowe są pomijane,
+żeby można było opisać, co usunięto.
+
+**Dane osobowe poza zapytaniem do AI:** pola, w które nauczyciele wpisują imiona (uczestnicy rozmowy,
+nazwa wydarzenia, imię i nazwisko), NIE trafiają do promptu. Model pisze token (`[imię i nazwisko]`,
+`[uczestnicy]`, `[nazwa]`, `[grupa]`), a przeglądarka podmienia go na kartce; publikacja wzoru w Bazie
+wstawia token z powrotem, także z ręcznych poprawek. Wartość zamrażamy w chwili generowania
+(`docName`/`docPeople`/`docMeta`) – gdyby kartka czytała pole na żywo, dopisanie nazwiska po
+wygenerowaniu zmieniłoby `baseHtml` i React nadpisałby poprawki nauczyciela.
+
+**Wspólna warstwa wyglądu `edubox-ui.css` (od 10.2026):** każde narzędzie miało własny blok `<style>`
+z tymi samymi klasami (`.glass-panel`, `.aura-blob`, `.btn-bounce`, `.text-gradient`), każdy trochę inny
+i w stylu 2021: neonowe `shadow-[0_0_20px_rgba(...)]` pod każdym przyciskiem, `blur(24px)`, trzy pływające
+bąble. Plik definiuje je raz, spokojniej: tokeny `--eb-*`, powierzchnie z prawdziwym cieniem zamiast
+poświaty, komponenty `.eb-btn`, `.eb-field`, `.eb-segment` (z `aria-pressed`), `.eb-chip`, `.eb-note`,
+`.eb-toolbar`, `prefers-reduced-motion`, widoczny `:focus-visible` i reguły wydruku.
+**Link musi stać PO wewnętrznym `<style>` strony** – przy tej samej specyficzności wygrywa kolejność
+(test to sprawdza). Narzędzie zmienia tylko akcent: `:root { --eb-accent: … }` w osobnym, późniejszym
+`<style>`. Przerobione: `awans.html`, `edunotariusz.html`, `eduraport.html`; pozostałe 40+ stron
+dostanie to przy okazji własnych zmian (plik działa też bez przepisywania markupu, bo przejmuje stare
+nazwy klas). Uwaga: `sanitizeHtml` w `global-core.js` przepuszcza tylko atrybut `class`, więc żadnego
+`<a href>` ani `style` w HTML-u wstawianym do kartki.
 
 **Kody PRO za wsparcie (Buycoffee.to):** `api/coffee-check.js` wydaje kod `KAWA-…` (7 dni, weryfikacja
 w Make, scenariusz Coffee-Verify) albo – od 49 zł – `ROK-…` (365 dni od wygenerowania), który
