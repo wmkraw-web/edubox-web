@@ -1,7 +1,8 @@
-// Dyfuzja 28-30 krokow (FLUX Dev / SDXL / Recraft) regularnie przekracza domyslne 10 s planu Hobby.
+// GPT Image 2.5 rysuje ~15–20 s, a przy awarii łańcuch próbuje kolejnych modeli (imageModels.js).
 import { isRateLimited } from './_lib/rateLimit.js';
+import { runImageChain } from './_lib/imageModels.js';
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -53,93 +54,24 @@ export default async function handler(req, res) {
 
   const finalPrompt = `Subject: ${prompt}. ${textModifier} ${styleModifier}. ${formatModifier}. High quality, professional educational material for kindergarten.`;
 
-  // TRYB "WŁASNE ZDJĘCIE": jeśli przyszło init_image (zdjęcie/rysunek wgrane przez użytkownika),
-  // zamiast czystego generowania z tekstu (Flux) używamy SDXL image-to-image, żeby AI przemalowało
-  // DOKŁADNIE ten obrazek w wybranym stylu, zamiast wymyślać coś od zera.
-  // UWAGA: celowo NIE wysyłamy tu "style_preset" (wcześniej było na sztywno "line-art" niezależnie
-  // od wyboru użytkownika, co ignorowało np. styl Disney/akwarela) - opis stylu jest już w finalPrompt
-  // (styleModifier), tak samo jak w trybie tekstowym, więc SDXL trzyma się wybranego stylu poprawnie.
-  // Wybór modelu:
-  // - model:'recraft' + brak zdjęcia -> Recraft V3 (grafika projektowa: medale, ramki,
-  //   dekoracje, dyplomy - trzyma kompozycję i "puste miejsce na tekst" dużo lepiej niż FLUX).
-  // - init_image -> Fast-SDXL image-to-image (przemalowanie wgranego zdjęcia w stylu).
-  // - domyślnie -> FLUX Dev (28 kroków). Wcześniej był FLUX schnell (4 kroki, najsłabszy,
-  //   psuł anatomię i kadrowanie) - stąd "tani" wygląd dekoracji.
-  let endpointUrl;
-  let payload;
-
-  if (model === 'recraft' && !init_image) {
-    endpointUrl = "https://fal.run/fal-ai/recraft-v3";
-    let recraftStyle = 'digital_illustration';
-    if (style === 'wektor') recraftStyle = 'vector_illustration';
-    else if (style === 'akwarela') recraftStyle = 'digital_illustration/hand_drawn';
-    payload = {
-      prompt: finalPrompt,
-      image_size: imageSize,
-      style: recraftStyle,
-      enable_safety_checker: true
-    };
-  } else if (init_image) {
-    endpointUrl = "https://fal.run/fal-ai/fast-sdxl/image-to-image";
-    payload = {
-      prompt: finalPrompt,
-      image_url: init_image,
-      strength: typeof image_strength === 'number' ? image_strength : 0.65,
-      image_size: imageSize,
-      num_inference_steps: 30,
-      enable_safety_checker: true
-    };
-  } else {
-    endpointUrl = "https://fal.run/fal-ai/flux/dev";
-    payload = {
-      prompt: finalPrompt,
-      image_size: imageSize,
-      num_inference_steps: 28,
-      guidance_scale: 3.5,
-      enable_safety_checker: true
-    };
-  }
-
-  // Seed (opcjonalny) - pozwala kilku wywołaniom (np. okładka + strony bajki, kolejne kadry
-  // komiksu) startować z tego samego "punktu losowości", co znacznie poprawia spójność
-  // wyglądu tej samej postaci między niezależnymi generacjami. Recraft V3 nie przyjmuje seeda.
-  if (model !== 'recraft' && typeof seed === 'number' && Number.isFinite(seed)) {
-    payload.seed = Math.floor(seed);
-  }
+  // Dobór modelu (api/_lib/imageModels.js): model:'recraft' bez zdjęcia -> Recraft V4.1 (medale, ramki,
+  // dyplomy – czysta kompozycja z miejscem na tekst); zdjęcie/rysunek użytkownika -> GPT Image 2.5 edit
+  // (przerabia DOKŁADNIE ten obrazek w wybranym stylu); pozostałe -> GPT Image 2.5, który poprawnie pisze
+  // polskie teksty z customText. Przy błędzie lub odmowie modelu łańcuch próbuje kolejnych.
+  let recraftStyle = 'digital_illustration';
+  if (style === 'wektor') recraftStyle = 'vector_illustration';
+  else if (style === 'akwarela') recraftStyle = 'digital_illustration/hand_drawn';
 
   try {
-    const response = await fetch(endpointUrl, {
-      method: "POST",
-      headers: {
-        "Authorization": `Key ${falKey}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(payload)
+    const result = await runImageChain({
+      prompt: finalPrompt, preset: imageSize, seed,
+      initImage: init_image, imageStrength: image_strength,
+      kind: model === 'recraft' && !init_image ? 'design' : 'text',
+      style: recraftStyle, falKey
     });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Błąd API Fal.ai: ${errorText}`);
-    }
-
-    const data = await response.json();
-
-    // WAŻNE: model SDXL (używany w trybie ze zdjęciem) w razie wykrycia "niebezpiecznej" treści
-    // NIE zwraca błędu - podmienia obrazek na całkowicie czarny i ustawia has_nsfw_concepts[0]=true.
-    // Bez tego sprawdzenia taki czarny obrazek wyglądał jak poprawny wynik. To częsty "fałszywy alarm"
-    // przy zdjęciach realnych osób/dzieci, dlatego dajemy użytkownikowi zrozumiały komunikat zamiast
-    // po cichu wstawiać czarny kwadrat.
-    const flagged = Array.isArray(data.has_nsfw_concepts) && data.has_nsfw_concepts[0];
-    if (flagged) {
-      return res.status(422).json({ error: 'Zdjęcie zostało zablokowane przez automatyczny filtr bezpieczeństwa AI (to częsty "fałszywy alarm" przy zdjęciach osób/dzieci). Spróbuj: użyć rysunku zamiast zdjęcia, przyciąć kadr do samej zabawki/maskotki, albo wybrać inne zdjęcie.' });
-    }
-
-    if (data.images && data.images.length > 0) {
-      res.status(200).json({ url: data.images[0].url });
-    } else {
-      throw new Error("Model nie wygenerował obrazka.");
-    }
+    res.status(200).json({ url: result.url, model: result.model });
   } catch (error) {
+    if (error.status === 422) return res.status(422).json({ error: error.message });
     res.status(500).json({ error: error.message });
   }
 }
