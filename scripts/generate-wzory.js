@@ -130,8 +130,7 @@ Wskazówki do dalszej pracy: Warto codziennie czytać z uczniem na głos przez 1
       url: 'eduocena.html',
       campaign: 'oceny-opisowe',
       text: 'Wybierz z list poziom ucznia (edukacja polonistyczna, matematyczna, rozwój społeczno-emocjonalny), dopisz własne obserwacje, a AI złoży z tego spójny, życzliwy tekst oceny. Za darmo, bez rejestracji. Zamiast imienia wpisz inicjał.'
-    },
-    related: ['ocena-zachowania-przyklady.html', 'wpisy-do-dziennika-przyklady.html', 'sprawozdanie-wychowawcy-przyklady.html']
+    }
   },
   {
     slug: 'ocena-zachowania-przyklady.html',
@@ -215,8 +214,7 @@ Wskazówki: Warto chwalić ucznia za każdą sytuację, w której zachował spok
       campaign: 'ocena-zachowania',
       text: 'Otwiera się od razu w trybie oceny zachowania: wybierz poziom w trzech obszarach (obowiązki, relacje, kultura i bezpieczeństwo), dopisz własne obserwacje, a AI zredaguje spójny, życzliwy opis. Za darmo, bez rejestracji. Zamiast imienia wpisz inicjał.'
     },
-    extraLink: { text: 'Trudna rozmowa z rodzicem? EduDialog pomoże napisać spokojną wiadomość →', url: 'edudialog.html?mode=nvc' },
-    related: ['ocena-opisowa-przyklady.html', 'wpisy-do-dziennika-przyklady.html', 'sprawozdanie-wychowawcy-przyklady.html']
+    extraLink: { text: 'Trudna rozmowa z rodzicem? Zobacz przykłady spokojnych wiadomości →', url: 'wiadomosc-do-rodzica-przyklady.html' }
   },
   {
     slug: 'wpisy-do-dziennika-przyklady.html',
@@ -305,8 +303,7 @@ Wskazówki: Warto chwalić ucznia za każdą sytuację, w której zachował spok
       url: 'eduwpisy.html',
       campaign: 'wpisy-dziennik',
       text: 'Podaj temat i aktywności, wybierz grupę wiekową (żłobek, przedszkole, klasy 1–3, 4–8, świetlica) i ewentualne dostosowania SPE – dostaniesz 5 wariantów wpisu do wyboru.'
-    },
-    related: ['ocena-opisowa-przyklady.html', 'ocena-zachowania-przyklady.html', 'sprawozdanie-wychowawcy-przyklady.html']
+    }
   },
   {
     slug: 'sprawozdanie-wychowawcy-przyklady.html',
@@ -447,8 +444,250 @@ Odbyły się [2] zebrania z rodzicami oraz konsultacje indywidualne. Rodzice wsp
       url: 'edusprawozdania.html',
       campaign: 'sprawozdanie-wychowawcy',
       text: 'Wybierz szkołę lub przedszkole, wklej nagłówki wymagane w Twojej placówce (jeśli są) i dopisz krótkie notatki – liczby, wydarzenia, problemy, bez nazwisk uczniów. AI ułoży z tego sprawozdanie półroczne lub roczne. Za darmo, bez rejestracji.'
-    },
-    related: ['ocena-opisowa-przyklady.html', 'ocena-zachowania-przyklady.html', 'wpisy-do-dziennika-przyklady.html']
+    }
+  },
+  {
+    slug: 'wiadomosc-do-rodzica-przyklady.html',
+    title: 'Wiadomość do rodzica – przykłady trudnych sytuacji | EduBox AI',
+    description: 'Przykłady wiadomości do rodzica przez e-dziennik: zachowanie, oceny, konflikt, nieobecności i pochwała. Spokojne, życzliwe zwroty do skopiowania i darmowy kreator.',
+    kicker: 'Wzory i przykłady · Kontakt z rodzicami',
+    h1: 'Wiadomość do rodzica przez e-dziennik – przykłady na trudne sytuacje',
+    short: 'Trudną wiadomość do rodzica najłatwiej napisać według prostego schematu: zacznij od czegoś dobrego o dziecku, opisz konkretną sytuację (fakty, bez ocen), pokaż troskę i zaproponuj wspólny krok – rozmowę, spotkanie albo prostą umowę. Krótko i spokojnie. Poniżej znajdziesz przykłady na najczęstsze sytuacje oraz zwroty do skopiowania.',
+    rulesTitle: 'Jak napisać trudną wiadomość do rodzica',
+    rules: [
+      'Zacznij od mocnej strony dziecka albo od czegoś, co ostatnio się udało.',
+      'Opisz konkretną sytuację: co się stało, kiedy i jak często – bez etykiet („niegrzeczny”, „leniwy”).',
+      'Pisz o trosce i o dobru dziecka, a nie o swoim zmęczeniu czy irytacji.',
+      'Zaproponuj konkretny krok: rozmowę telefoniczną, spotkanie albo wspólną umowę.',
+      'Pisz krótko – poważne sprawy lepiej omówić w rozmowie, a wiadomość niech do niej zaprasza.',
+      'Przed wysłaniem przeczytaj tekst oczami rodzica: czy po lekturze będzie chciał współpracować?'
+    ],
+    examplesNote: 'W miejsce [imię] wpisz imię dziecka dopiero w dzienniku i dopasuj formy (on/ona). Do narzędzi AI nie wpisuj imion ani nazwisk.',
+    examples: [
+      {
+        label: 'Przykład 1: przeszkadzanie na lekcjach',
+        meta: 'Zachowanie',
+        text: `Dzień dobry,
+piszę w sprawie [imię]. Widzę, że [imię] jest bardzo pomysłowy i chętnie zabiera głos, co bardzo cenię. W ostatnim tygodniu kilka razy zdarzyło się jednak, że podczas lekcji rozmawiał z kolegami i wstawał z miejsca, co utrudniało pracę jemu i innym uczniom. Rozmawialiśmy o tym w klasie i [imię] obiecał się postarać.
+Zależy mi, żeby dobrze wykorzystywał swój potencjał. Czy moglibyśmy porozmawiać telefonicznie w tym tygodniu? Chętnie wspólnie ustalimy, jak możemy mu pomóc – w szkole i w domu.
+Pozdrawiam serdecznie
+[podpis]`
+      },
+      {
+        label: 'Przykład 2: słabsze wyniki i brak zadań domowych',
+        meta: 'Nauka',
+        text: `Dzień dobry,
+chciałabym podzielić się obserwacją dotyczącą [imię]. [Imię] świetnie radzi sobie w pracy w grupie i ma ciekawe pomysły. Zauważyłam jednak, że od kilku tygodni często brakuje zadań domowych, a ostatnie sprawdziany z [przedmiotu] wypadły słabiej niż wcześniej.
+Chciałabym zrozumieć, co może być przyczyną, i wspólnie z Państwem pomóc jej wrócić do wcześniejszych wyników. Proponuję krótkie spotkanie lub rozmowę telefoniczną – proszę o informację, jaki termin Państwu odpowiada.
+Z pozdrowieniami
+[podpis]`
+      },
+      {
+        label: 'Przykład 3: konflikt z kolegą na przerwie',
+        meta: 'Bezpieczeństwo i relacje',
+        text: `Dzień dobry,
+chcę poinformować Państwa o sytuacji z dzisiejszej przerwy. Doszło do sprzeczki między [imię] a kolegą z klasy, która zakończyła się popchnięciem. Nikomu nic poważnego się nie stało. Porozmawiałam z obydwoma chłopcami, wyjaśniliśmy sytuację i chłopcy się przeprosili.
+Wiem, że [imię] na co dzień jest koleżeński, dlatego zależy mi, żeby takie sytuacje się nie powtarzały. Proszę o rozmowę z synem w domu – warto wspólnie zastanowić się, co może zrobić następnym razem, gdy poczuje złość. W razie pytań jestem do dyspozycji.
+Pozdrawiam
+[podpis]`
+      },
+      {
+        label: 'Przykład 4: nieobecności i spóźnienia',
+        meta: 'Frekwencja',
+        text: `Dzień dobry,
+zwracam się w sprawie frekwencji [imię]. W ostatnim miesiącu [imię] miała [5] nieusprawiedliwionych nieobecności i kilka spóźnień na pierwszą lekcję. Martwię się, bo omijają ją ważne treści, a w klasie brakuje jej pomysłów.
+Proszę o usprawiedliwienie nieobecności zgodnie z zasadami szkoły i o kontakt, jeśli dzieje się coś, o czym powinnam wiedzieć – wspólnie poszukamy rozwiązania.
+Z pozdrowieniami
+[podpis]`
+      },
+      {
+        label: 'Przykład 5: pochwała',
+        meta: 'Dobra wiadomość',
+        text: `Dzień dobry,
+chcę podzielić się dobrą wiadomością: [imię] w tym tygodniu świetnie poradził sobie z [zadaniem / występem / pracą w grupie]. Widać, że włożył w to dużo pracy, a jego pomysł zainspirował całą klasę. Proszę przekazać mu ode mnie gratulacje – zasłużył na nie!
+Pozdrawiam serdecznie
+[podpis]`
+      },
+      {
+        label: 'Przykład 6: zaproszenie na rozmowę',
+        meta: 'Spotkanie',
+        text: `Dzień dobry,
+chciałabym porozmawiać z Państwem o tym, jak [imię] odnajduje się w klasie. Mam kilka obserwacji, którymi chcę się podzielić, i jestem ciekawa Państwa spojrzenia – razem łatwiej będzie nam wspierać [imię].
+Czy pasowałoby Państwu spotkanie w [dzień] o [godzina] albo krótka rozmowa telefoniczna? Jeśli ten termin nie odpowiada, proszę zaproponować inny.
+Z pozdrowieniami
+[podpis]`
+      }
+    ],
+    phrases: [
+      ['Na początek', [
+        'Chcę podzielić się obserwacją dotyczącą [imię].',
+        'Widzę, że [imię] chętnie… – bardzo to cenię.',
+        'Piszę, bo zależy mi, żeby [imię] dobrze czuł się w klasie.'
+      ]],
+      ['Opis sytuacji', [
+        'W ostatnim tygodniu kilka razy zdarzyło się, że…',
+        'Podczas dzisiejszej przerwy doszło do…',
+        'Zauważyłam, że od kilku tygodni…'
+      ]],
+      ['Troska i współpraca', [
+        'Zależy mi, żeby [imię] dobrze wykorzystywał swój potencjał.',
+        'Chciałabym zrozumieć, co może być przyczyną.',
+        'Razem łatwiej będzie nam pomóc [imię].'
+      ]],
+      ['Propozycja', [
+        'Czy moglibyśmy porozmawiać telefonicznie w tym tygodniu?',
+        'Proponuję krótkie spotkanie – proszę o informację, jaki termin Państwu odpowiada.',
+        'Proponuję prostą umowę, a za dwa tygodnie wspólnie sprawdzimy efekty.'
+      ]],
+      ['Zakończenie', [
+        'W razie pytań jestem do dyspozycji.',
+        'Dziękuję za współpracę.',
+        'Pozdrawiam serdecznie'
+      ]]
+    ],
+    mistakes: [
+      'Etykiety i oceny dziecka („jest niegrzeczny”, „leniwy”) zamiast opisu sytuacji.',
+      'Pisanie w emocjach – lepiej odczekać i przeczytać wiadomość jeszcze raz.',
+      'Lista wszystkich przewinień z całego semestru w jednej wiadomości.',
+      'Przerzucanie odpowiedzialności („proszę coś z tym zrobić”) bez propozycji współpracy.',
+      'Wielkie litery, wykrzykniki i ironia – w piśmie brzmią ostrzej niż w rozmowie.',
+      'Opisywanie innych dzieci z imienia i nazwiska.'
+    ],
+    faq: [
+      ['Czy trudne sprawy omawiać przez e-dziennik?', 'Wiadomość dobrze sprawdza się do krótkiej informacji i umówienia rozmowy. Poważne sprawy – np. przemoc, zdrowie czy powtarzające się problemy – lepiej omówić osobiście lub telefonicznie, zgodnie z procedurami szkoły.'],
+      ['Jak pisać, żeby rodzic nie poczuł się atakowany?', 'Zacznij od mocnej strony dziecka, opisz fakty bez ocen, pokaż troskę i zaproponuj konkretny wspólny krok. Krótka, spokojna wiadomość działa lepiej niż długa lista zarzutów.'],
+      ['Co zrobić, gdy rodzic odpowiada nerwowo?', 'Odpowiedz krótko i spokojnie, podziękuj za odpowiedź i zaproponuj rozmowę – w razie potrzeby z udziałem pedagoga lub dyrekcji. Nie prowadź sporu w wiadomościach.'],
+      ['Czy mogę użyć AI do napisania wiadomości?', 'Tak – opisz sytuację bez imienia i nazwiska dziecka, a AI pomoże nadać jej spokojny ton. Gotowy tekst przeczytaj, uzupełnij i dopiero wtedy wyślij.']
+    ],
+    tool: {
+      name: 'EduDialog',
+      url: 'edudialog.html?mode=nvc',
+      campaign: 'wiadomosc-do-rodzica',
+      text: 'Wpisz, co się stało – nawet nerwowo, ale bez imienia dziecka – a EduDialog zamieni to w spokojną, profesjonalną wiadomość do rodzica: pozytyw, fakty i propozycja współpracy. Za darmo, bez rejestracji.'
+    }
+  },
+  {
+    slug: 'opinia-o-uczniu-do-poradni-przyklady.html',
+    title: 'Opinia o uczniu do poradni – wzór i przykłady | EduBox AI',
+    description: 'Wzór opinii nauczyciela o uczniu do poradni psychologiczno-pedagogicznej: co powinna zawierać, dwa przykłady, zwroty do skopiowania i najczęstsze błędy.',
+    kicker: 'Wzory i przykłady · Pomoc psychologiczno-pedagogiczna',
+    h1: 'Opinia o uczniu do poradni psychologiczno-pedagogicznej – wzór i przykłady',
+    short: 'Opinia szkoły o uczniu pomaga poradni zrozumieć, jak dziecko funkcjonuje na co dzień. Dobra opinia opisuje konkretne obserwacje – mocne strony, trudności, sytuacje, w których uczeń radzi sobie najlepiej, i dotychczasową pomoc – zamiast stawiać diagnozę. Nie ma jednego wzoru dla wszystkich szkół; poniżej znajdziesz uniwersalny układ, dwa przykłady i bank zwrotów.',
+    rulesTitle: 'Co zwykle zawiera opinia o uczniu',
+    rules: [
+      'Dane ucznia, klasę, okres obserwacji i powód przygotowania opinii.',
+      'Funkcjonowanie w nauce: czytanie, pisanie, liczenie, uwaga, tempo pracy, rozumienie poleceń.',
+      'Funkcjonowanie społeczno-emocjonalne: relacje z rówieśnikami i dorosłymi, radzenie sobie z emocjami.',
+      'Mocne strony, zainteresowania i warunki, w których uczeń pracuje najlepiej.',
+      'Trudności opisane konkretnie: w jakich sytuacjach, jak często i jak się przejawiają.',
+      'Dotychczasową pomoc w szkole (zajęcia, dostosowania) i jej efekty.',
+      'Współpracę z rodzicami oraz pytania, na które szkoła szuka odpowiedzi w poradni.'
+    ],
+    examplesNote: 'Dane w nawiasach kwadratowych uzupełnij dopiero w dokumencie szkoły. Do narzędzi AI wpisuj wyłącznie anonimowe obserwacje – bez imienia, nazwiska i diagnoz.',
+    examples: [
+      {
+        label: 'Przykład 1: uczeń klasy 2 – trudności w czytaniu i pisaniu',
+        meta: 'Opinia wychowawcy',
+        text: `Opinia o uczniu [imię i nazwisko], klasa [2b], [nazwa szkoły]
+Okres obserwacji: [wrzesień–listopad 2026]. Opinia przygotowana na prośbę rodziców w związku z diagnozą w poradni.
+
+Funkcjonowanie w nauce
+Uczeń czyta głoskując, wolno, często zgaduje końcówki wyrazów; myli litery o podobnym kształcie (b–d, p–g). Rozumie krótkie teksty czytane przez nauczyciela, gorzej – czytane samodzielnie. W pisaniu ze słuchu opuszcza i przestawia litery, pismo jest mało czytelne. Dobrze radzi sobie z liczeniem w zakresie 20 i z zadaniami praktycznymi.
+
+Funkcjonowanie społeczno-emocjonalne
+Jest koleżeński i lubiany. Gdy ma czytać na głos przy klasie, widoczne jest napięcie – czasem odmawia lub mówi, że „nie umie”.
+
+Mocne strony
+Bogate słownictwo w wypowiedziach ustnych, duża wiedza przyrodnicza, zdolności manualne. Najlepiej pracuje, gdy polecenia są podawane krok po kroku i wsparte obrazkiem.
+
+Dotychczasowa pomoc
+Od [października] uczestniczy w zajęciach korekcyjno-kompensacyjnych (1 godz. tygodniowo). Stosowane dostosowania: wydłużony czas pracy, czytanie poleceń przez nauczyciela, ocenianie przede wszystkim treści wypowiedzi pisemnej. Widoczne są niewielkie postępy w technice czytania.
+
+Współpraca z rodzicami
+Rodzice są zaangażowani i codziennie czytają z dzieckiem w domu.
+
+Pytania do poradni
+Prosimy o diagnozę przyczyn trudności w czytaniu i pisaniu oraz wskazanie form pomocy i dostosowań wymagań edukacyjnych.
+
+[data] [podpis wychowawcy]`
+      },
+      {
+        label: 'Przykład 2: uczennica klasy 5 – koncentracja i emocje',
+        meta: 'Opinia wychowawcy',
+        text: `Opinia o uczennicy [imię i nazwisko], klasa [5a], [nazwa szkoły]
+Okres obserwacji: [wrzesień–listopad 2026]. Opinia przygotowana na prośbę rodziców.
+
+Funkcjonowanie w nauce
+Uczennica ma trudności z utrzymaniem uwagi na zadaniu dłużej niż kilka minut, szczególnie podczas samodzielnej pracy pisemnej. Często nie kończy zadań w wyznaczonym czasie, zapomina o pracach domowych i przyborach. Wiadomości przyswaja szybko, gdy temat ją zainteresuje; najlepsze wyniki osiąga z przyrody i plastyki.
+
+Funkcjonowanie społeczno-emocjonalne
+W sytuacjach rywalizacji lub niepowodzenia reaguje silnymi emocjami (płacz, wychodzenie z sali). Po wyciszeniu potrafi rozmawiać o sytuacji i szukać rozwiązań. Ma dwie bliskie koleżanki, w większej grupie czasem się wycofuje.
+
+Mocne strony
+Kreatywność, wrażliwość, poczucie humoru, chęć pomagania młodszym uczniom. Dobrze funkcjonuje przy jasnych zasadach, krótkich poleceniach i częstej informacji zwrotnej.
+
+Dotychczasowa pomoc
+Uczennica uczestniczy w zajęciach rozwijających kompetencje emocjonalno-społeczne prowadzonych przez pedagoga szkolnego. Stosowane dostosowania: miejsce blisko nauczyciela, dzielenie zadań na etapy, możliwość krótkiej przerwy w trakcie lekcji. Działania przynoszą częściowe efekty – rzadziej dochodzi do wybuchów emocji.
+
+Współpraca z rodzicami
+Rodzice pozostają w stałym kontakcie z wychowawcą i wspierają ustalone sposoby pracy w domu.
+
+Pytania do poradni
+Prosimy o diagnozę przyczyn trudności z koncentracją uwagi i regulacją emocji oraz o zalecenia do pracy z uczennicą w szkole i w domu.
+
+[data] [podpis wychowawcy]`
+      }
+    ],
+    phrases: [
+      ['Funkcjonowanie w nauce', [
+        'Czyta głoskując, wolno, często zgaduje końcówki wyrazów.',
+        'Ma trudności z utrzymaniem uwagi na zadaniu dłużej niż kilka minut.',
+        'Pracuje w wolnym tempie i potrzebuje dodatkowego czasu na wykonanie poleceń.',
+        'Lepiej przyswaja treści podawane wizualnie niż słownie.',
+        'Rozumie polecenia podawane krok po kroku.'
+      ]],
+      ['Funkcjonowanie społeczno-emocjonalne', [
+        'Nawiązuje pozytywne relacje z rówieśnikami i chętnie pomaga innym.',
+        'W sytuacjach niepowodzenia reaguje silnymi emocjami; po wyciszeniu potrafi rozmawiać o sytuacji.',
+        'W większej grupie się wycofuje, lepiej czuje się w pracy w parach.',
+        'Ma trudności z przestrzeganiem ustalonych zasad podczas zabaw ruchowych.'
+      ]],
+      ['Mocne strony', [
+        'Ma bogate słownictwo i chętnie wypowiada się na interesujące go tematy.',
+        'Wykazuje zdolności manualne i plastyczne.',
+        'Najlepiej pracuje przy jasnych zasadach i częstej informacji zwrotnej.'
+      ]],
+      ['Dotychczasowa pomoc', [
+        'Uczestniczy w zajęciach korekcyjno-kompensacyjnych (1 godz. tygodniowo).',
+        'Stosowane są dostosowania: wydłużony czas pracy, polecenia dzielone na etapy, miejsce blisko nauczyciela.',
+        'Zastosowane działania przynoszą częściowe efekty.'
+      ]],
+      ['Pytania do poradni', [
+        'Prosimy o diagnozę przyczyn trudności w czytaniu i pisaniu.',
+        'Prosimy o wskazanie form pomocy i dostosowań wymagań edukacyjnych.',
+        'Prosimy o zalecenia do pracy z uczniem w szkole i w domu.'
+      ]]
+    ],
+    mistakes: [
+      'Stawianie diagnozy („ma ADHD”, „jest dyslektykiem”) zamiast opisu obserwacji – diagnozę stawiają specjaliści.',
+      'Same trudności, bez mocnych stron i warunków, w których uczeń radzi sobie dobrze.',
+      'Etykiety i oceny charakteru zamiast opisu zachowań.',
+      'Ogólniki bez przykładów – brak informacji, jak często i w jakich sytuacjach pojawiają się trudności.',
+      'Brak informacji o dotychczasowej pomocy i jej efektach.',
+      'Wpisywanie imienia, nazwiska lub diagnoz dziecka do narzędzi AI.'
+    ],
+    faq: [
+      ['Kto przygotowuje opinię szkoły o uczniu?', 'Zwykle wychowawca we współpracy z nauczycielami uczącymi w klasie i specjalistami szkolnymi (pedagogiem, psychologiem, logopedą). Sposób przygotowania i podpisywania opinii określają procedury obowiązujące w szkole.'],
+      ['Czy jest jeden obowiązujący wzór opinii?', 'Nie ma jednego wzoru dla wszystkich szkół. Wiele poradni udostępnia własne formularze – warto zapytać w poradni, z którą współpracuje szkoła, i wypełnić jej punkty.'],
+      ['Czy w opinii mogę napisać, że podejrzewam np. dysleksję?', 'Lepiej opisać obserwacje i sformułować pytania do poradni (np. „prosimy o diagnozę przyczyn trudności w czytaniu i pisaniu”). Diagnozę stawiają specjaliści poradni.'],
+      ['Czy mogę użyć AI do napisania opinii?', 'Tak, do uporządkowania i zredagowania anonimowych notatek – bez imienia, nazwiska i diagnoz. Dane ucznia uzupełnij dopiero w dokumencie szkoły, a całość uważnie sprawdź: to Ty odpowiadasz za treść opinii.']
+    ],
+    tool: {
+      name: 'EduDialog',
+      url: 'edudialog.html?mode=ppp',
+      campaign: 'opinia-do-poradni',
+      text: 'Otwiera się od razu w trybie „Opinia (PPP / IPET)”: wpisz potoczne, anonimowe notatki (bez imienia i nazwiska), a AI zamieni je w uporządkowany, profesjonalny fragment opinii – z mocnymi stronami ucznia, nie tylko trudnościami. Za darmo, bez rejestracji.'
+    }
   }
 ];
 
@@ -579,7 +818,7 @@ ${p.faq.map(([q, a]) => `        <details class="bg-white border border-slate-20
     <section class="border-t border-slate-200 pt-6">
       <h2 class="text-sm font-extrabold uppercase tracking-widest text-slate-500 mb-3">Inne wzory i przykłady</h2>
       <ul class="space-y-2">
-${p.related.map(r => `        <li><a href="${r}" class="text-indigo-700 font-semibold hover:underline">${nowrap(esc(bySlug(r).h1))}</a></li>`).join('\n')}
+${PAGES.filter(o => o.slug !== p.slug).map(o => `        <li><a href="${o.slug}" class="text-indigo-700 font-semibold hover:underline">${nowrap(esc(o.h1))}</a></li>`).join('\n')}
         <li><a href="/index.html" class="text-indigo-700 font-semibold hover:underline">Wszystkie darmowe narzędzia EduBox AI</a></li>
       </ul>
       <p class="text-xs text-slate-500 mt-6 leading-relaxed">Przykłady mają charakter pomocniczy. Ocenę i dokumentację zawsze przygotowuje i zatwierdza nauczyciel, zgodnie ze statutem i zasadami swojej placówki. EduBox AI – darmowe narzędzia, które pomagają nauczycielom na co dzień.</p>
@@ -614,7 +853,6 @@ ${p.related.map(r => `        <li><a href="${r}" class="text-indigo-700 font-sem
 for (const p of PAGES) {
   if (p.description.length < 70 || p.description.length > 180) throw new Error(`Opis ${p.slug}: ${p.description.length} znaków (zalecane 70-180)`);
   if (p.title.length > 65) throw new Error(`Tytuł ${p.slug}: ${p.title.length} znaków (zalecane do 65)`);
-  for (const r of p.related) if (!bySlug(r)) throw new Error(`Nieznana strona w related: ${r}`);
   fs.writeFileSync(path.join(ROOT, p.slug), render(p));
 }
 console.log(`[Wzory] Wygenerowano stron: ${PAGES.length} (${PAGES.map(p => p.slug).join(', ')})`);

@@ -180,9 +180,11 @@ Zasada jak w narzędziu: piszemy o oszustach podszywających się pod firmy, nig
 
 **Wzory i przykłady** (SEO, ruch z Google → narzędzia): `ocena-opisowa-przyklady.html`,
 `ocena-zachowania-przyklady.html`, `wpisy-do-dziennika-przyklady.html`,
-`sprawozdanie-wychowawcy-przyklady.html` (→ EduSprawozdawca) generowane przez
-`node scripts/generate-wzory.js` z tablicy `PAGES` (ten sam tryb pracy co poradniki; linki
-w stopce `index.html`). Przyciski „Kopiuj” wysyłają zdarzenie GA `wzor_copy` (`copy_type`:
+`sprawozdanie-wychowawcy-przyklady.html` (→ EduSprawozdawca), `wiadomosc-do-rodzica-przyklady.html`
+(→ EduDialog `?mode=nvc`), `opinia-o-uczniu-do-poradni-przyklady.html` (→ EduDialog `?mode=ppp`)
+generowane przez `node scripts/generate-wzory.js` z tablicy `PAGES` (ten sam tryb pracy co
+poradniki; linki w stopce `index.html`; sekcja „Inne wzory” linkuje automatycznie do wszystkich
+pozostałych stron). Przyciski „Kopiuj” wysyłają zdarzenie GA `wzor_copy` (`copy_type`:
 przyklad/zwrot), linki do narzędzi mają `utm_medium=wzor`. EduOcena ma dwa tryby
 (`params.kind`: nauka/zachowanie); `eduocena.html?typ=zachowanie` otwiera ocenę zachowania.
 Treści prawne formułuj ostrożnie (statut szkoły decyduje o szczegółach), zawsze przypominaj
