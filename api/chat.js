@@ -112,11 +112,16 @@ const KNOWN_MODELS = new Set([
 
 // Zwraca listę modeli do wypróbowania po kolei. Przy błędzie "nieznany model"
 // schodzimy na pewny gpt-4o-mini, więc zmiana oferty OpenAI nie wywala narzędzi.
+// Prośby o stary gpt-4o-mini (23 wywołania w narzędziach) dostają domyślny, lepszy łańcuch.
 function resolveModelChain(model) {
   if (model === 'strong') return ['gpt-5', 'gpt-4.1', 'gpt-4o', 'gpt-4o-mini'];
-  if (typeof model === 'string' && KNOWN_MODELS.has(model)) return [model, 'gpt-4o-mini'];
+  if (model !== 'gpt-4o-mini' && typeof model === 'string' && KNOWN_MODELS.has(model)) return [model, 'gpt-4o-mini'];
   return ['gpt-4.1-mini', 'gpt-4o-mini']; // domyślny - lepszy niz stary gpt-4o-mini
 }
+
+// Modele rozumujące (gpt-5*, o*) przyjmują tylko domyślne temperature=1. Wysyłanie 0.5 kończyło
+// się błędem, więc tryb "strong" nigdy nie używał gpt-5, tylko po cichu schodził na gpt-4.1.
+const isReasoningModel = (m) => /^(gpt-5|o\d)/.test(m);
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -160,9 +165,10 @@ export default async function handler(req, res) {
       messages: [
         { role: "system", content: system },
         { role: "user", content: prompt }
-      ],
-      temperature: temperature
+      ]
     };
+    if (isReasoningModel(m)) p.reasoning_effort = 'low';
+    else p.temperature = temperature;
     if (format === "json") p.response_format = { type: "json_object" };
     return p;
   };
@@ -195,7 +201,7 @@ export default async function handler(req, res) {
       throw new Error('OpenAI nie zwrócił treści (możliwy filtr bezpieczeństwa treści).');
     }
 
-    res.status(200).json({ text });
+    res.status(200).json({ text, model: data.model });
   } catch (error) {
     console.error("Szczegóły błędu w API:", error);
     res.status(500).json({ message: 'Błąd serwera API', details: error.message });
