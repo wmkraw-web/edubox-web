@@ -208,7 +208,9 @@ Lista aktów, na których się opieramy (z plikami, które z nich korzystają), 
 `npm run legal:check` porównuje bieżący stan aktów ze snapshotem (nowelizacje, teksty jednolite,
 uchylenia), a `.github/workflows/legal-check.yml` robi to co poniedziałek (zmiana = czerwony przebieg
 i mail z GitHuba). Po przejrzeniu zmian i poprawieniu treści: `npm run legal:update` + commit.
-Nowy akt w treściach = dopisz go do `legal-acts.json`. Publiczna strona `przepisy-i-rodo.html`
+Nowy akt w treściach = dopisz go do `legal-acts.json` (i do listy plików w `usedIn`). Uwaga: w sandboxie
+deweloperskim `api.sejm.gov.pl` jest zablokowany (403 z proxy) – weryfikację nowych przepisów robi
+użytkownik albo CI, nigdy „z pamięci”. Publiczna strona `przepisy-i-rodo.html`
 (lista aktów, rejestr zmian, RODO) jest generowana przez `node scripts/generate-przepisy.js`
 (rejestr zmian w tablicy `CHANGELOG`). Wzór opinii o funkcjonowaniu ucznia (.docx) generuje
 `scripts/generate-opinia-docx.js` (wymaga `npm i --no-save docx@9`). Precyzja dat: rozporządzenie
@@ -245,9 +247,21 @@ z kartki), przyciski Kopiuj (`copyRich`) / Word (`downloadDocx`) / Drukuj-PDF (`
 płciowo, bez żargonu diagnostycznego. Wdrożone: Asystent Pedagoga, EduDostosowania (§ 2 rozporządzenia
 o ocenianiu – 5 podstaw, uczeń zdolny = art. 44c ust. 1), EduDialog (NVC z tematem do e-dziennika,
 fragment opinii w obszarach ICF), EduSprawozdawca, EduBiurokrata (opinia do poradni korzysta z
-`asystent-dokumenty.js`), EduLekcja 360 (JSON → konspekt i karta pracy ucznia przez `lessonToHtml`).
-Wydruk z ciemnych paneli dawał jasnoszary tekst – w narzędziach bez białej kartki dodawaj do
+`asystent-dokumenty.js`), EduLekcja 360 (JSON → konspekt i karta pracy ucznia przez `lessonToHtml`),
+Kreator Awansu (`awans.html` – 3 tryby w `DOC_TYPES`: sprawozdanie nauczyciela, ocena pracy, opinia
+mentora). Wydruk z ciemnych paneli dawał jasnoszary tekst – w narzędziach bez białej kartki dodawaj do
 `@media print` regułę `#root * { color:#000 !important }` albo używaj `printDoc`.
+
+**Podstawa prawna NIGDY od AI (od 10.2026):** modele halucynują numery artykułów i paragrafów, więc
+instrukcja dla AI zawiera zakaz powoływania przepisów, a blok „Podstawa prawna” dokleja kod z aktów
+sprawdzonych w ISAP (wzorzec: stała `AKTY` + `withLegal()` w `awans.html` – wstawia blok pod metryczką,
+nie po miejscu na podpis). Cytujemy na poziomie aktów (bez numerów jednostek, których nie weryfikowaliśmy),
+z „z późn. zm.”, i dorzucamy zastrzeżenie, że szczegóły zależą od regulaminu/statutu placówki.
+`npm run awans:check` (`scripts/check-awans.js`) pilnuje tego automatycznie – m.in. zestawia cytowany
+tekst jednolity Karty Nauczyciela ze snapshotem w `legal-acts.json`, więc po `npm run legal:update`
+trzeba poprawić też `AKTY.kn`. Uwaga przy starych narzędziach: eksport „.doc” jako HTML z mime
+`application/msword` wymieniamy na `EduDocTools.downloadDocx`, a regexy w stylu `/\\n/g` z plików
+`<script type="text/babel">` nie łapią enterów (szukają znaku `\` i `n`) – realny błąd w `eduawans.html`.
 
 **Kody PRO za wsparcie (Buycoffee.to):** `api/coffee-check.js` wydaje kod `KAWA-…` (7 dni, weryfikacja
 w Make, scenariusz Coffee-Verify) albo – od 49 zł – `ROK-…` (365 dni od wygenerowania), który
