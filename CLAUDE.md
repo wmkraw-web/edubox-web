@@ -208,7 +208,9 @@ Lista aktów, na których się opieramy (z plikami, które z nich korzystają), 
 `npm run legal:check` porównuje bieżący stan aktów ze snapshotem (nowelizacje, teksty jednolite,
 uchylenia), a `.github/workflows/legal-check.yml` robi to co poniedziałek (zmiana = czerwony przebieg
 i mail z GitHuba). Po przejrzeniu zmian i poprawieniu treści: `npm run legal:update` + commit.
-Nowy akt w treściach = dopisz go do `legal-acts.json`. Publiczna strona `przepisy-i-rodo.html`
+Nowy akt w treściach = dopisz go do `legal-acts.json` (i do listy plików w `usedIn`). Uwaga: w sandboxie
+deweloperskim `api.sejm.gov.pl` jest zablokowany (403 z proxy) – weryfikację nowych przepisów robi
+użytkownik albo CI, nigdy „z pamięci”. Publiczna strona `przepisy-i-rodo.html`
 (lista aktów, rejestr zmian, RODO) jest generowana przez `node scripts/generate-przepisy.js`
 (rejestr zmian w tablicy `CHANGELOG`). Wzór opinii o funkcjonowaniu ucznia (.docx) generuje
 `scripts/generate-opinia-docx.js` (wymaga `npm i --no-save docx@9`). Precyzja dat: rozporządzenie
@@ -245,9 +247,54 @@ z kartki), przyciski Kopiuj (`copyRich`) / Word (`downloadDocx`) / Drukuj-PDF (`
 płciowo, bez żargonu diagnostycznego. Wdrożone: Asystent Pedagoga, EduDostosowania (§ 2 rozporządzenia
 o ocenianiu – 5 podstaw, uczeń zdolny = art. 44c ust. 1), EduDialog (NVC z tematem do e-dziennika,
 fragment opinii w obszarach ICF), EduSprawozdawca, EduBiurokrata (opinia do poradni korzysta z
-`asystent-dokumenty.js`), EduLekcja 360 (JSON → konspekt i karta pracy ucznia przez `lessonToHtml`).
+`asystent-dokumenty.js`), EduLekcja 360 (JSON → konspekt i karta pracy ucznia przez `lessonToHtml`),
+Kreator Awansu (`awans.html` – 3 tryby w `DOC_TYPES`: sprawozdanie nauczyciela, ocena pracy, opinia
+mentora), EduNotariusz (`DOC_KINDS`: notatka służbowa, protokół zebrania, wniosek o pomoc pp, notatka
+o zdarzeniu) i EduRaport (`REPORT_KINDS`: wydarzenie, projekt, zajęcia dodatkowe, akcja).
+`npm run dokumenty:check` (`scripts/check-dokumenty.js`) pilnuje całego wzorca naraz we wszystkich
+narzędziach – także tego, że eksport czyta `innerHTML` kartki przez ref, a nie surowe wyjście AI.
 Wydruk z ciemnych paneli dawał jasnoszary tekst – w narzędziach bez białej kartki dodawaj do
 `@media print` regułę `#root * { color:#000 !important }` albo używaj `printDoc`.
+
+**Podstawa prawna NIGDY od AI (od 10.2026):** modele halucynują numery artykułów i paragrafów, więc
+instrukcja dla AI zawiera zakaz powoływania przepisów, a blok „Podstawa prawna” dokleja kod z aktów
+sprawdzonych w ISAP (wzorzec: stała `AKTY` + `withLegal()` w `awans.html` – wstawia blok pod metryczką,
+nie po miejscu na podpis). Cytujemy na poziomie aktów (bez numerów jednostek, których nie weryfikowaliśmy),
+z „z późn. zm.”, i dorzucamy zastrzeżenie, że szczegóły zależą od regulaminu/statutu placówki.
+`npm run awans:check` (`scripts/check-awans.js`) pilnuje tego automatycznie – m.in. zestawia cytowany
+tekst jednolity Karty Nauczyciela ze snapshotem w `legal-acts.json`, więc po `npm run legal:update`
+trzeba poprawić też `AKTY.kn`. Uwaga przy starych narzędziach: eksport „.doc” jako HTML z mime
+`application/msword` wymieniamy na `EduDocTools.downloadDocx`, a regexy w stylu `/\\n/g` z plików
+`<script type="text/babel">` nie łapią enterów (szukają znaku `\` i `n`) – realny błąd w `eduawans.html`.
+
+**Zasada „nie dopisuj faktów" (od 10.2026, pilnowana testem):** generatory dokumentów mają w instrukcji
+zakaz wymyślania liczb, nazw, cytatów, celów i efektów; braki zostają jako `[uzupełnij: …]`, a długość
+wynika z notatek. `scripts/check-dokumenty.js` blokuje zwroty, które to łamały – realnie znalezione
+w kodzie: „minimum 3 rozbudowane akapity" i „żelazna tarcza ochronna” (EduNotariusz), „podniosły ton”,
+„bogate słownictwo pedagogiczne”, „minimum 2 rozbudowane akapity” i przykład „swobodna eksploracja”
+(EduRaport), „lany tekst” (Kreator Awansu). Test rozpoznaje negację, więc *zakaz* w instrukcji
+(„bez podniosłego tonu”) jest w porządku – wywala tylko polecenie. Komentarze liniowe są pomijane,
+żeby można było opisać, co usunięto.
+
+**Dane osobowe poza zapytaniem do AI:** pola, w które nauczyciele wpisują imiona (uczestnicy rozmowy,
+nazwa wydarzenia, imię i nazwisko), NIE trafiają do promptu. Model pisze token (`[imię i nazwisko]`,
+`[uczestnicy]`, `[nazwa]`, `[grupa]`), a przeglądarka podmienia go na kartce; publikacja wzoru w Bazie
+wstawia token z powrotem, także z ręcznych poprawek. Wartość zamrażamy w chwili generowania
+(`docName`/`docPeople`/`docMeta`) – gdyby kartka czytała pole na żywo, dopisanie nazwiska po
+wygenerowaniu zmieniłoby `baseHtml` i React nadpisałby poprawki nauczyciela.
+
+**Wspólna warstwa wyglądu `edubox-ui.css` (od 10.2026):** każde narzędzie miało własny blok `<style>`
+z tymi samymi klasami (`.glass-panel`, `.aura-blob`, `.btn-bounce`, `.text-gradient`), każdy trochę inny
+i w stylu 2021: neonowe `shadow-[0_0_20px_rgba(...)]` pod każdym przyciskiem, `blur(24px)`, trzy pływające
+bąble. Plik definiuje je raz, spokojniej: tokeny `--eb-*`, powierzchnie z prawdziwym cieniem zamiast
+poświaty, komponenty `.eb-btn`, `.eb-field`, `.eb-segment` (z `aria-pressed`), `.eb-chip`, `.eb-note`,
+`.eb-toolbar`, `prefers-reduced-motion`, widoczny `:focus-visible` i reguły wydruku.
+**Link musi stać PO wewnętrznym `<style>` strony** – przy tej samej specyficzności wygrywa kolejność
+(test to sprawdza). Narzędzie zmienia tylko akcent: `:root { --eb-accent: … }` w osobnym, późniejszym
+`<style>`. Przerobione: `awans.html`, `edunotariusz.html`, `eduraport.html`; pozostałe 40+ stron
+dostanie to przy okazji własnych zmian (plik działa też bez przepisywania markupu, bo przejmuje stare
+nazwy klas). Uwaga: `sanitizeHtml` w `global-core.js` przepuszcza tylko atrybut `class`, więc żadnego
+`<a href>` ani `style` w HTML-u wstawianym do kartki.
 
 **Kody PRO za wsparcie (Buycoffee.to):** `api/coffee-check.js` wydaje kod `KAWA-…` (7 dni, weryfikacja
 w Make, scenariusz Coffee-Verify) albo – od 49 zł – `ROK-…` (365 dni od wygenerowania), który
@@ -278,6 +325,19 @@ przez `bonus/until` (eduboxBonusUntil).
 - *Body payloady do serwerlessów*: zdjęcia zawsze skalować/kompresować przez
   `<canvas>` w przeglądarce PRZED wysyłką (base64 potrafi łatwo przebić
   limit ~4,5 MB na body zapytania na Vercelu — realny błąd, już naprawiany).
+
+**Spis stanu portfolio — zacznij tutaj (od 10.2026):** `docs/STAN-PORTFOLIO.md` odpowiada na pytanie
+„co jest już zrobione, a co zostało?" dla wszystkich 60 stron narzędzi: wzorzec kartki, strumień,
+prawdziwy `.docx`, czysty wydruk, nowy wygląd, info-box „Jak to działa", wspólna pula limitów oraz
+objęcie kontrolą ISAP. **Plik jest GENEROWANY** z faktycznych plików (`npm run stan`), nie pisany
+ręcznie, więc nie może się rozjechać z rzeczywistością; `npm test` pilnuje aktualności
+(`npm run stan:check`). Czytaj go na starcie sesji zamiast szacować na oko albo liczyć na pamięć —
+sesja Claude Code zawsze startuje od zera i zna tylko repo + ten plik.
+Kontrola przepisów działa po NUMERACH aktów: akt cytowany przez numer tekstu jednolitego albo noweli
+(np. Dz.U. 2023 poz. 2572 → `DU/2019/373`, Dz.U. 2026 poz. 1122 → `DU/2019/373`, Dz.U. 2026 poz. 515 →
+`DU/1982/19`) jest pilnowany pod numerem pierwotnym, bo snapshot ISAP wymienia jedno i drugie — bez tej
+reguły raport krzyczałby o aktach, które są w porządku. Nowy plik cytujący przepis trzeba dopisać do
+`usedIn` właściwego aktu, inaczej raport nie wskaże go do przeglądu po nowelizacji.
 
 **Otwarte/niedawno zamknięte wątki** (stan na koniec tej sesji):
 - Generator Wideo Ani: `stitch:true` dodane, żeby zmniejszyć nadmierne

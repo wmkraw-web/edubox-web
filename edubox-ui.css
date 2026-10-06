@@ -1,0 +1,351 @@
+/* ============================================================================
+   edubox-ui.css — wspólna warstwa wyglądu narzędzi EduBox (od 10.2026).
+
+   Po co: każde narzędzie miało własny blok <style> z tymi samymi klasami
+   (.glass-panel, .aura-blob, .btn-bounce, .text-gradient…), każdy trochę inny
+   i w stylu 2021: neonowe glowy pod każdym przyciskiem, blur 24 px, trzy pływające
+   kolorowe bąble. Ten plik definiuje je raz, nowocześniej: spokojne powierzchnie,
+   prawdziwa głębia zamiast świecenia, jeden akcent, ruch tylko przy interakcji.
+
+   JAK UŻYĆ w narzędziu:
+     <link rel="stylesheet" href="/edubox-ui.css">
+   WAŻNE: link musi stać PO wewnętrznym <style> strony, inaczej stare reguły
+   (ta sama specyficzność) wygrają kolejnością. Przy okazji konwersji usuwaj
+   z <style> reguły, które ten plik już definiuje.
+
+   Dostępność: kontrast tekstu na --eb-surface >= 4.5:1, widoczny focus-visible,
+   @media (prefers-reduced-motion: reduce) wyłącza animacje, @media print
+   zdejmuje tła i wymusza czarny tekst (ciemne panele dawały jasnoszary wydruk).
+   ========================================================================== */
+
+:root {
+  /* Powierzchnie - od tła strony do wypukłej karty */
+  --eb-bg: #060911;
+  --eb-surface: #0e1524;
+  --eb-surface-2: #141d30;
+  --eb-surface-hi: rgba(255, 255, 255, 0.045);
+  --eb-border: rgba(148, 163, 184, 0.16);
+  --eb-border-strong: rgba(148, 163, 184, 0.28);
+
+  /* Tekst */
+  --eb-text: #eef2f8;
+  --eb-text-soft: #aebaca;
+  --eb-text-dim: #7c8aa0;
+
+  /* Akcent - jeden na narzędzie; strona może nadpisać --eb-accent u siebie */
+  --eb-accent: #4f7cff;
+  --eb-accent-soft: rgba(79, 124, 255, 0.14);
+  --eb-accent-text: #ffffff;
+  --eb-ok: #22c08a;
+  --eb-warn: #f0b23a;
+  --eb-danger: #f2585b;
+
+  /* Promienie - trzy stopnie zamiast pięciu losowych */
+  --eb-r-sm: 10px;
+  --eb-r-md: 14px;
+  --eb-r-lg: 22px;
+
+  /* Głębia: cień zamiast poświaty */
+  --eb-shadow-1: 0 1px 2px rgba(2, 6, 18, 0.4), 0 1px 1px rgba(2, 6, 18, 0.3);
+  --eb-shadow-2: 0 10px 24px -12px rgba(2, 6, 18, 0.75), 0 2px 6px -2px rgba(2, 6, 18, 0.5);
+  --eb-shadow-3: 0 28px 60px -28px rgba(2, 6, 18, 0.85), 0 8px 20px -10px rgba(2, 6, 18, 0.55);
+
+  --eb-ring: 0 0 0 2px var(--eb-bg), 0 0 0 4px color-mix(in srgb, var(--eb-accent) 70%, transparent);
+  --eb-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* Starsze przeglądarki bez color-mix() - pierścień focusa i tak musi być widoczny. */
+@supports not (color: color-mix(in srgb, red 50%, blue)) {
+  :root { --eb-ring: 0 0 0 2px var(--eb-bg), 0 0 0 4px var(--eb-accent); }
+}
+
+/* --------------------------------------------------- Tło i dekoracje */
+
+.eb-app { background: var(--eb-bg); color: var(--eb-text); }
+
+/* Trzy pływające bąble zastąpione spokojną, nieruchomą mgiełką.
+   Zostawiamy klasę .aura-blob, żeby nie przepisywać markup-u 24 stron. */
+.aura-blob {
+  position: fixed;
+  border-radius: 50%;
+  filter: blur(140px);
+  opacity: 0.13;
+  z-index: -1;
+  pointer-events: none;
+  animation: none !important;
+}
+
+.hero-glow {
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 420px;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(60% 100% at 50% 0%, var(--eb-accent-soft), transparent 70%);
+}
+
+/* --------------------------------------------------- Powierzchnie */
+
+/* Karta: delikatny gradient + obwódka + wewnętrzna kreska u góry (realna głębia)
+   zamiast mocnego backdrop-blur, który rozmywał tekst pod spodem. */
+.glass-panel,
+.eb-card {
+  background:
+    linear-gradient(180deg, var(--eb-surface-hi), rgba(255, 255, 255, 0.012)),
+    var(--eb-surface);
+  border: 1px solid var(--eb-border);
+  border-radius: var(--eb-r-lg);
+  box-shadow: var(--eb-shadow-2), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.eb-card--flat { box-shadow: none; background: var(--eb-surface); }
+.eb-card--raised { box-shadow: var(--eb-shadow-3), inset 0 1px 0 rgba(255, 255, 255, 0.06); }
+
+.glass-nav {
+  background: color-mix(in srgb, var(--eb-bg) 86%, transparent);
+  border-bottom: 1px solid var(--eb-border);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+/* --------------------------------------------------- Typografia */
+
+.text-gradient {
+  background: linear-gradient(100deg, var(--eb-text) 10%, var(--eb-accent) 95%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+.eb-title { font-weight: 800; letter-spacing: -0.02em; color: var(--eb-text); line-height: 1.15; }
+.eb-sub { color: var(--eb-text-soft); line-height: 1.6; }
+
+/* Mikro-etykieta nad polem. Mniej uppercase + tracking-widest niż wcześniej:
+   duże odstępy w wersalikach męczą przy dłuższych podpisach. */
+.eb-label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: var(--eb-text-soft);
+  margin-bottom: 0.4rem;
+}
+
+.eb-hint { font-size: 0.72rem; line-height: 1.5; color: var(--eb-text-dim); margin-top: 0.4rem; }
+
+/* --------------------------------------------------- Przyciski */
+
+.eb-btn {
+  --eb-btn-bg: var(--eb-surface-2);
+  --eb-btn-fg: var(--eb-text);
+  --eb-btn-bd: var(--eb-border-strong);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 2.75rem;
+  padding: 0 1.1rem;
+  border: 1px solid var(--eb-btn-bd);
+  border-radius: var(--eb-r-md);
+  background: var(--eb-btn-bg);
+  color: var(--eb-btn-fg);
+  font: inherit;
+  font-weight: 700;
+  font-size: 0.875rem;
+  line-height: 1;
+  cursor: pointer;
+  text-decoration: none;
+  box-shadow: var(--eb-shadow-1);
+  transition: transform 0.12s var(--eb-ease), background-color 0.15s var(--eb-ease),
+    border-color 0.15s var(--eb-ease), box-shadow 0.15s var(--eb-ease);
+}
+
+.eb-btn:hover:not(:disabled) { box-shadow: var(--eb-shadow-2); border-color: var(--eb-text-dim); }
+.eb-btn:active:not(:disabled) { transform: translateY(1px); box-shadow: var(--eb-shadow-1); }
+.eb-btn:disabled { opacity: 0.45; cursor: not-allowed; box-shadow: none; }
+.eb-btn:focus-visible { outline: none; box-shadow: var(--eb-ring); }
+
+/* Jeden akcent zamiast neonowej poświaty pod każdym przyciskiem. */
+.eb-btn--primary {
+  --eb-btn-bg: var(--eb-accent);
+  --eb-btn-fg: var(--eb-accent-text);
+  --eb-btn-bd: transparent;
+}
+.eb-btn--primary:hover:not(:disabled) {
+  --eb-btn-bg: color-mix(in srgb, var(--eb-accent) 88%, white);
+  border-color: transparent;
+}
+
+.eb-btn--ghost { --eb-btn-bg: transparent; --eb-btn-bd: var(--eb-border); box-shadow: none; }
+.eb-btn--ghost:hover:not(:disabled) { --eb-btn-bg: var(--eb-surface-2); }
+
+.eb-btn--quiet { --eb-btn-bg: transparent; --eb-btn-bd: transparent; box-shadow: none; color: var(--eb-text-soft); }
+.eb-btn--quiet:hover:not(:disabled) { color: var(--eb-text); --eb-btn-bg: var(--eb-surface-2); }
+
+.eb-btn--lg { min-height: 3.25rem; padding: 0 1.5rem; font-size: 0.95rem; border-radius: var(--eb-r-md); }
+.eb-btn--block { display: flex; width: 100%; }
+.eb-btn--icon { min-height: 2.25rem; width: 2.25rem; padding: 0; border-radius: var(--eb-r-sm); }
+
+/* Zostawione dla stron, które jeszcze nie przeszły na .eb-btn. */
+.btn-bounce { transition: transform 0.12s var(--eb-ease); }
+.btn-bounce:active { transform: translateY(1px) scale(0.99); }
+
+/* --------------------------------------------------- Pola formularza */
+
+.eb-field {
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0.65rem 0.85rem;
+  background: var(--eb-bg);
+  color: var(--eb-text);
+  border: 1px solid var(--eb-border);
+  border-radius: var(--eb-r-md);
+  font: inherit;
+  font-size: 0.9rem;
+  transition: border-color 0.15s var(--eb-ease), box-shadow 0.15s var(--eb-ease);
+}
+
+.eb-field::placeholder { color: var(--eb-text-dim); }
+.eb-field:hover { border-color: var(--eb-border-strong); }
+.eb-field:focus,
+.eb-field:focus-visible { outline: none; border-color: var(--eb-accent); box-shadow: var(--eb-ring); }
+textarea.eb-field { min-height: 8rem; line-height: 1.6; resize: vertical; }
+select.eb-field { appearance: none; padding-right: 2.2rem; cursor: pointer; }
+
+/* --------------------------------------------------- Przełącznik trybów */
+
+.eb-segment {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  background: var(--eb-bg);
+  border: 1px solid var(--eb-border);
+  border-radius: var(--eb-r-md);
+}
+
+.eb-segment__item {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  min-height: 3.1rem;
+  padding: 0.4rem 0.3rem;
+  border: 0;
+  border-radius: var(--eb-r-sm);
+  background: transparent;
+  color: var(--eb-text-dim);
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.15s var(--eb-ease), color 0.15s var(--eb-ease);
+}
+
+.eb-segment__item:hover { background: var(--eb-surface-2); color: var(--eb-text-soft); }
+.eb-segment__item:focus-visible { outline: none; box-shadow: var(--eb-ring); }
+.eb-segment__item[aria-pressed='true'] {
+  background: var(--eb-surface-2);
+  color: var(--eb-text);
+  box-shadow: inset 0 0 0 1px var(--eb-border-strong);
+}
+
+/* --------------------------------------------------- Drobne elementy */
+
+.eb-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid var(--eb-border);
+  background: var(--eb-surface-2);
+  color: var(--eb-text-soft);
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.eb-chip--ok { border-color: color-mix(in srgb, var(--eb-ok) 40%, transparent); color: var(--eb-ok); background: color-mix(in srgb, var(--eb-ok) 12%, transparent); }
+.eb-chip--warn { border-color: color-mix(in srgb, var(--eb-warn) 40%, transparent); color: var(--eb-warn); background: color-mix(in srgb, var(--eb-warn) 12%, transparent); }
+.eb-chip--accent { border-color: color-mix(in srgb, var(--eb-accent) 45%, transparent); color: var(--eb-text); background: var(--eb-accent-soft); }
+
+/* Pasek akcji nad dokumentem - przykleja się u góry przy długiej kartce. */
+.eb-toolbar {
+  position: sticky;
+  top: 0.5rem;
+  z-index: 20;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  background: color-mix(in srgb, var(--eb-surface) 92%, transparent);
+  border: 1px solid var(--eb-border);
+  border-radius: var(--eb-r-md);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: var(--eb-shadow-2);
+}
+
+.eb-note {
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.9rem 1rem;
+  border-radius: var(--eb-r-md);
+  border: 1px solid var(--eb-border);
+  background: var(--eb-surface-2);
+  color: var(--eb-text-soft);
+  font-size: 0.82rem;
+  line-height: 1.6;
+}
+
+.eb-note--accent { border-color: color-mix(in srgb, var(--eb-accent) 35%, transparent); background: var(--eb-accent-soft); }
+.eb-note--warn { border-color: color-mix(in srgb, var(--eb-warn) 35%, transparent); background: color-mix(in srgb, var(--eb-warn) 10%, transparent); }
+
+.eb-divider { height: 1px; border: 0; background: var(--eb-border); margin: 1.25rem 0; }
+
+.custom-scrollbar { scrollbar-width: thin; scrollbar-color: var(--eb-border-strong) transparent; }
+.custom-scrollbar::-webkit-scrollbar { width: 8px; height: 8px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: var(--eb-border-strong); border-radius: 999px; }
+.custom-scrollbar::-webkit-scrollbar-thumb:hover { background: var(--eb-text-dim); }
+
+/* --------------------------------------------------- Ruch */
+
+.fade-in { animation: ebFadeIn 0.28s var(--eb-ease) both; }
+@keyframes ebFadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+.eb-skeleton {
+  background: linear-gradient(90deg, var(--eb-surface-2) 25%, var(--eb-surface-hi) 37%, var(--eb-surface-2) 63%);
+  background-size: 400% 100%;
+  animation: ebShimmer 1.4s ease-in-out infinite;
+  border-radius: var(--eb-r-sm);
+}
+@keyframes ebShimmer { 0% { background-position: 100% 0; } 100% { background-position: 0 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  .eb-btn:active:not(:disabled) { transform: none; }
+}
+
+/* --------------------------------------------------- Wydruk */
+
+@media print {
+  .aura-blob, .hero-glow, .eb-toolbar, .print-hidden { display: none !important; }
+  .glass-panel, .eb-card {
+    background: #fff !important;
+    border-color: #cbd5e1 !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+  .text-gradient { -webkit-text-fill-color: #000 !important; color: #000 !important; background: none !important; }
+}
