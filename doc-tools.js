@@ -97,9 +97,15 @@
       .replace(/<mark>/gi, '<mark style="background:#FFF3A3">')
       .replace(/<h1>/gi, '<h1 style="font-size:16pt;text-align:center;margin:0 0 10pt">')
       .replace(/<h2>/gi, '<h2 style="font-size:13pt;margin:14pt 0 6pt;color:#1F3864">')
-      .replace(/<h3>/gi, '<h3 style="font-size:11.5pt;margin:10pt 0 4pt">')
+      .replace(/<h3>/gi, '<h3 style="font-size:11.5pt;margin:10pt 0 4pt">');
+  }
+
+  // Tylko do schowka: Word i Dokumenty Google nie znają naszych klas (linia do pisania, podział strony).
+  // Wydruk zostawia klasy – obsługują je reguły w printDoc (zamiana na <br> zepsuła podział stron w druku).
+  function clipboardHtml(html) {
+    return styledHtml(html)
       .replace(/<p class="linia"><\/p>/gi, '<p style="border-bottom:1px dotted #808080;margin:0;line-height:22pt">&nbsp;</p>')
-      .replace(/<div class="page-break"><\/div>/gi, '<br style="page-break-before:always">');
+      .replace(/<div class="page-break"><\/div>/gi, '<br clear="all" style="page-break-before:always">');
   }
 
   function plainText(html) {
@@ -112,7 +118,7 @@
   }
 
   async function copyRich(html) {
-    const rich = '<div style="font-family:Calibri,Arial,sans-serif;font-size:11pt;line-height:1.4">' + styledHtml(html) + '</div>';
+    const rich = '<div style="font-family:Calibri,Arial,sans-serif;font-size:11pt;line-height:1.4">' + clipboardHtml(html) + '</div>';
     const text = plainText(html);
     try {
       if (navigator.clipboard && window.ClipboardItem) {
