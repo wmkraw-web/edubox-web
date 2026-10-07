@@ -427,7 +427,9 @@ Struktura JSON:
                     // Dosłowne brzmienie przepisów, na które powołał się model (tylko te z bazy – inne identyfikatory pomijamy).
                     const sources = Array.isArray(data.sources) ? data.sources : [];
                     const cited = Array.isArray(parsedData.cited) ? parsedData.cited : [];
-                    parsedData.citedSources = sources.filter(src => cited.includes(src.id));
+                    // Model bywa, że zwraca identyfikator w nawiasach albo z ustępem ("[KN art. 73]", "KN art. 73 ust. 8").
+                    const normId = (x) => String(x).replace(/[\[\]]/g, '').trim();
+                    parsedData.citedSources = sources.filter(src => cited.some(c => { const n = normId(c); return n === src.id || n.startsWith(src.id + ' '); }));
                     parsedData.corpusDate = data.corpusDate || '';
                     setAiResponse(parsedData);
                     setBotMessage(parsedData.citedSources && parsedData.citedSources.length ? "Gotowe. Odpowiedź opiera się na przepisach z bazy – ich dosłowne brzmienie jest pod podstawą prawną." : "Gotowe. W bazie przepisów nie znalazłem zapisu, który to rozstrzyga – sprawdź statut szkoły albo zapytaj w kuratorium.");
