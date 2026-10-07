@@ -361,7 +361,12 @@ dostałby fałszywy alarm. Rozstrzygnięcie płaci się tylko przy rozbieżnośc
 się „Failed to fetch” (realny błąd w MagicLetters: obrazek opłacony, użytkownik dostawał błąd, licznik się nie
 zwiększał). Obrazek z fal.media zamieniamy na dane przez `<img crossOrigin="anonymous">` + `<canvas>` (img-src
 pozwala na https:, fal.media wysyła CORS) – tak robią EduPrezentacja (PPTX) i MagicLetters. Nie dopisuj fal.media do
-`connect-src` „na szybko”.
+`connect-src` „na szybko”. Ten sam problem miał EduRymy: zapytanie do pl.wiktionary.org z przeglądarki blokował CSP,
+a kod przepuszczał wtedy każde słowo (fail-open) – krok „Sprawdzam w słowniku” od dawna nic nie robił. Teraz pyta serwer:
+`api/chat.js` z `mode: 'slownik'` → `api/_lib/wordCheck.js` (testy w `api:check`; Wikimedia nie dostaje IP nauczyciela).
+Sama strona w Wikisłowniku to za mało (są tam też słowa obce: „basa”, „pasa”) – liczy się kategoria polskiego hasła
+albo polskiej formy fleksyjnej (`clcategories`). Ocena rymów w EduRymach: `strong` ze strumieniem (gpt-6.1).
+Przed dodaniem `fetch` do obcej domeny w przeglądarce sprawdź `connect-src` w `vercel.json`.
 
 **Wydruk – sprawdzanie bez drukarki:** kopia strony z wstrzykniętymi danymi wyniku → Chrome
 headless `--print-to-pdf` → strony PDF do PNG (`pdfjs-dist` + `@napi-rs/canvas`). Tak wyszły:
