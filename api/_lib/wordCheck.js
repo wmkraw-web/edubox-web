@@ -7,6 +7,12 @@ const WIKI_URL = 'https://pl.wiktionary.org/w/api.php';
 // Tylko pojedyncze polskie słowa (z łącznikiem) – żadnych znaków sterujących ani zapytań w treści.
 const WORD_RE = /^[a-ząćęłńóśźż][a-ząćęłńóśźż-]{0,39}$/i;
 const MAX_WORDS = 40; // API Wikimedia przyjmuje do 50 tytułów naraz
+// pl.wiktionary ma hasła z wielu języków – „basa”, „pasa”, „wasa” mają strony jako słowa obce. Polskie słowo to strona
+// z kategorią polskiego hasła albo polskiej formy fleksyjnej (sprawdzone na żywo: „boli” – forma czasownika, „nocą”).
+const POLISH_CATEGORIES = [
+  'polski (indeks)', 'Formy rzeczowników polskich', 'Formy czasowników polskich', 'Formy przymiotników polskich',
+  'Formy liczebników polskich', 'Formy zaimków polskich'
+].map(c => 'Kategoria:' + c);
 
 function cleanWords(input) {
   if (!Array.isArray(input)) return [];
@@ -24,7 +30,9 @@ function foundWords(data, asked) {
   const q = (data && data.query) || {};
   const existing = new Set();
   Object.values(q.pages || {}).forEach(p => {
-    if (p && p.missing === undefined && p.invalid === undefined && p.title) existing.add(String(p.title).toLowerCase());
+    if (p && p.missing === undefined && p.invalid === undefined && p.title && Array.isArray(p.categories) && p.categories.length) {
+      existing.add(String(p.title).toLowerCase());
+    }
   });
   const hop = new Map();
   (q.normalized || []).forEach(n => hop.set(String(n.from).toLowerCase(), String(n.to).toLowerCase()));
@@ -44,7 +52,8 @@ async function handleWordCheck(req, res, fetchImpl = fetch) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 6000);
   try {
-    const url = `${WIKI_URL}?action=query&format=json&redirects=1&titles=${encodeURIComponent(words.join('|'))}`;
+    const url = `${WIKI_URL}?action=query&format=json&redirects=1&prop=categories&cllimit=max`
+      + `&clcategories=${encodeURIComponent(POLISH_CATEGORIES.join('|'))}&titles=${encodeURIComponent(words.join('|'))}`;
     const r = await fetchImpl(url, {
       headers: { 'User-Agent': 'EduBoxAI/1.0 (https://eduboxpro.pl; slownik rymow dla nauczycieli)' },
       signal: controller.signal

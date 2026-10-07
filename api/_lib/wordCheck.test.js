@@ -17,9 +17,11 @@ check('nie-tablica → pusto', cleanWords('kot').length === 0);
 const data = { query: {
   normalized: [{ from: 'koc_', to: 'koc ' }],
   redirects: [{ from: 'kotek', to: 'kot' }],
-  pages: { '1': { title: 'kot' }, '2': { title: 'koc' }, '-1': { title: 'fasa', missing: '' }, '-2': { title: 'zła', invalid: '' } }
+  pages: { '1': { title: 'kot', categories: [{ title: 'Kategoria:polski (indeks)' }] }, '2': { title: 'koc', categories: [{ title: 'Kategoria:polski (indeks)' }] },
+    '3': { title: 'basa' }, '-1': { title: 'fasola', missing: '' }, '-2': { title: 'zła', invalid: '' } }
 } };
-check('istniejące hasła i przekierowania; brakujące odrzucone', JSON.stringify(foundWords(data, ['kot', 'kotek', 'koc', 'fasa', 'zła'])) === '["kot","kotek","koc"]', foundWords(data, ['kot', 'kotek', 'koc', 'fasa', 'zła']));
+check('polskie hasła i przekierowania; brakujące odrzucone', JSON.stringify(foundWords(data, ['kot', 'kotek', 'koc', 'fasola', 'zła'])) === '["kot","kotek","koc"]', foundWords(data, ['kot', 'kotek', 'koc', 'fasola', 'zła']));
+check('strona bez polskiej kategorii (słowo obce, np. „basa”) odrzucona', foundWords(data, ['basa']).length === 0);
 check('pusta odpowiedź → nic', foundWords({}, ['kot']).length === 0);
 
 (async () => {
@@ -27,9 +29,10 @@ check('pusta odpowiedź → nic', foundWords({}, ['kot']).length === 0);
 let called = null;
 const okFetch = async (url, opts) => { called = { url, opts }; return { ok: true, json: async () => data }; };
 let res = fakeRes();
-await handleWordCheck({ body: { words: ['kot', 'fasa', 'kotek'] } }, res, okFetch);
+await handleWordCheck({ body: { words: ['kot', 'basa', 'kotek'] } }, res, okFetch);
 check('zwraca istniejące słowa', res.code === 200 && JSON.stringify(res.body.found) === '["kot","kotek"]', res.body);
 check('pyta pl.wiktionary.org z User-Agentem EduBox (zasady Wikimedia)', called.url.startsWith('https://pl.wiktionary.org/w/api.php?') && /EduBoxAI/.test(called.opts.headers['User-Agent']) && called.url.includes('redirects=1'));
+check('pyta tylko o kategorie polskich haseł i form', called.url.includes('prop=categories') && decodeURIComponent(called.url).includes('Kategoria:polski (indeks)') && decodeURIComponent(called.url).includes('Formy czasowników polskich'));
 res = fakeRes();
 await handleWordCheck({ body: { words: [] } }, res, okFetch);
 check('brak słów → 400', res.code === 400);
