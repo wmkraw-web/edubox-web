@@ -6,7 +6,8 @@
   'use strict';
 
   const DOCX_URL = 'https://cdn.jsdelivr.net/npm/docx@9.8.1/dist/index.iife.min.js';
-  const PLACEHOLDER_RE = /\[(?:uzupełnij|propozycja|do decyzji|do ustalenia|imię i nazwisko)[^\]\n]{0,160}\]/gi;
+  // Literówki modelu („uzpełnij”, „uzupelnij”, „do uzupełnienia”) też podświetlamy – inaczej luka ginie w tekście.
+  const PLACEHOLDER_RE = /\[(?:uzu?pe[łl]ni(?:j|ć)|do uzu?pe[łl]nienia|propozycja|do decyzji|do ustalenia|imię i nazwisko)[^\]\n]{0,160}\]/gi;
   const NAME_RE = /\[imię i nazwisko(?: ucznia| dziecka)?\]/gi;
   const STREAM_ERROR = '<!--EDUBOX_STREAM_ERROR-->';
 
