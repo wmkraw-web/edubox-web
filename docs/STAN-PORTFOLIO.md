@@ -21,7 +21,7 @@ w podglądzie wydruku (Ctrl+P), nie jako listę błędów.
 | --- | --- | --- | --- | --- |
 | Kartka A4 | 11 | 0 | 49 | wzorzec generatorów dokumentów: AI zwraca czysty HTML, podgląd jako kartka, edycja przed eksportem |
 | Strumień | 17 | 0 | 43 | tekst pojawia się na bieżąco; bez tego nauczyciel czeka w ciszy nawet 100 s |
-| Prawdziwy .docx | 23 | 0 | 37 | plik „.doc" z HTML-em w środku (mime application/msword) Word otwiera z ostrzeżeniem, a Dokumenty Google potrafią go odrzucić |
+| Prawdziwy .docx | 24 | 0 | 36 | plik „.doc" z HTML-em w środku (mime application/msword) Word otwiera z ostrzeżeniem, a Dokumenty Google potrafią go odrzucić |
 | Czysty wydruk | 49 | 0 | 0 | jasnoszary tekst (`text-slate-400` i pokrewne – 1284 wystąpienia) jest na wydruku praktycznie niewidoczny, a `body { color: black }` go nie przebija, bo klasa Tailwinda ma wyższą specyficzność. Od 10.2026 załatwia to wspólna reguła w `edubox-ui.css` w `@media print`, więc wystarcza podpięcie warstwy; `printDoc` albo własna reguła czerni też się liczą. Dekoratory drukują w kolorze – tam `text-white` celowo zostaje białe. |
 | Nowy wygląd | 60 | 0 | 0 | wspólna warstwa edubox-ui.css: spokojne powierzchnie z prawdziwym cieniem zamiast neonowych poświat i pływających bąbli z 2021. Neony wpisane w markup wygasza reguła [class*="shadow-[0_0_"] w tym pliku, więc podpięcie linku wystarcza – klas nie trzeba czyścić z markupu. |
 | „Jak to działa" | 60 | 0 | 0 | info-box blisko góry formularza - konwencja z CLAUDE.md |
@@ -107,7 +107,7 @@ przy okazji innych zmian w danym pliku. Nie ma potrzeby robić z tego osobnej ak
 | EduGrupy (Koło Fortuny) | `edugrupy.html` | – | – | – | ✅ | ✅ | ✅ | · | · |
 | EduGry (Ja Mam) | `edugry.html` | – | – | – | ✅ | ✅ | ✅ | · | · |
 | Edukacja Obywatelska AI | `edukacja2025.html` | – | – | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ ISAP |
-| EduKalendarz | `edukalendarz.html` | – | – | – | ✅ | ✅ | ✅ | – | · |
+| EduKalendarz | `edukalendarz.html` | – | – | ✅ | ✅ | ✅ | ✅ | – | · |
 | EduKomiks AI | `edukomiks.html` | – | – | – | ✅ | ✅ | ✅ | ✅ | · |
 | EduLekcja 360 | `edulekcja360.html` | – | – | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ ISAP |
 | EduMotywator AI | `edumotywator.html` | – | – | ✅ | ✅ | ✅ | ✅ | ✅ | · |
