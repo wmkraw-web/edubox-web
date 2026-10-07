@@ -346,6 +346,17 @@ materiał (fragmenty podręczników). Wykładniki: `<sup>` – model przepisywa�
 w schowku i w .docx; `sanitizeHtml` przepuszcza `sup`/`sub` (Word: superScript/subScript). Zamiany „pod Worda”
 robi tylko `clipboardHtml` – w `styledHtml` (wspólnym z wydrukiem) `<br>` zamiast podziału sklejał grupy A i B.
 
+**EduZadania (od 7.10.2026):** ten sam wzorzec – blok `ZADANIA_PROMPTS_START…END` (testy `npm run zadania:check`),
+sekcje TEMAT / KARTA / ROZWIĄZANIA / WYNIKI, motyw (Minecraft, piłka…) tylko jako tło, bez zbędnych liczb „dla zmyłki”
+(opis poziomu „wybierz potrzebne dane” sprawiał, że model doklejał je do KAŻDEGO zadania), ułamki zwykłym zapisem 3/4
+(model zaczął pisać je indeksami – na kartce za drobne). Kontrola wyników: liczby porównywane po sprowadzeniu zapisu
+(`numbersOf`/`sameResult`: 3/4 = 0,75, 1 1/12 = 13/12, 1 000, m², zaokrąglenia). Wspólna pula limitów zamiast dawnych
+„2 prób na zawsze”; menu ładuje tylko `EduBoxCore.init` (drugi loader uruchamiał skrypty menu dwa razy).
+**Kontrola klucza ma trzy kroki (EduSprawdzian, EduZadania):** generator → niezależne rozwiązanie bez klucza (`balanced`)
+→ przy rozbieżności rozstrzygnięcie (`strong` = gpt-6.1, widzi zadanie i obie odpowiedzi, `applyVerdicts`). Realny
+przypadek: klucz 11/24 km był dobry, a gpt-5.4-mini podał długość już ułożonych torów – bez rozstrzygnięcia nauczyciel
+dostałby fałszywy alarm. Rozstrzygnięcie płaci się tylko przy rozbieżności.
+
 **CSP a obrazki z fal.media:** `connect-src` NIE obejmuje fal.media, więc `fetch(urlObrazka)` w przeglądarce kończy
 się „Failed to fetch” (realny błąd w MagicLetters: obrazek opłacony, użytkownik dostawał błąd, licznik się nie
 zwiększał). Obrazek z fal.media zamieniamy na dane przez `<img crossOrigin="anonymous">` + `<canvas>` (img-src
