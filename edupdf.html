@@ -278,7 +278,9 @@
                             type: 'pdf',
                             imgData: canvas.toDataURL('image/jpeg', 0.95), 
                             width: RENDER_WIDTH,
-                            height: unscaledViewport.height * scale, 
+                            height: unscaledViewport.height * scale,
+                            ptWidth: unscaledViewport.width,
+                            ptHeight: unscaledViewport.height,
                             extractedText: extractedText.trim(),
                             elements: []
                         });
@@ -460,13 +462,14 @@
                 
                 try {
                     const { jsPDF } = window.jspdf;
-                    const pdf = new jsPDF({ unit: 'px', format: 'a4', orientation: 'portrait' });
-                    const pdfWidth = pdf.internal.pageSize.getWidth();
+                    // Każda strona w rozmiarze i orientacji oryginału; puste strony – A4 pionowo.
+                    const sizeOf = (p) => (p.ptWidth && p.ptHeight) ? [p.ptWidth, p.ptHeight] : [595.28, 841.89];
+                    const [w0, h0] = sizeOf(pages[0]);
+                    const pdf = new jsPDF({ unit: 'pt', format: [w0, h0], orientation: w0 > h0 ? 'landscape' : 'portrait' });
 
                     for (let i = 0; i < pages.length; i++) {
                         const page = pages[i];
-                        const ratio = page.height / page.width;
-                        const pdfHeight = pdfWidth * ratio;
+                        const [pdfWidth, pdfHeight] = sizeOf(page);
 
                         const tempDiv = document.createElement('div');
                         tempDiv.style.position = 'absolute';
@@ -513,7 +516,7 @@
                         const canvas = await html2canvas(tempDiv, { scale: 2, useCORS: true, logging: false });
                         const imgData = canvas.toDataURL('image/jpeg', 0.95);
                         
-                        if (i > 0) pdf.addPage();
+                        if (i > 0) pdf.addPage([pdfWidth, pdfHeight], pdfWidth > pdfHeight ? 'landscape' : 'portrait');
                         
                         pdf.setPage(i + 1);
                         pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
