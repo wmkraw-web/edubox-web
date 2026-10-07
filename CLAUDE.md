@@ -299,6 +299,16 @@ podstawa z 2017 r. (formalnie uchylona przez Dz.U. 2026 poz. 1012, stosowana z �
 `strong` ze strumieniem (tekst, nie JSON), kartka edytowalna, „Kopiuj tekst” do dziennika, licznik znaków, Word
 z metryczką i podpisami w tabelach.
 
+**EduWycieczka (od 10.2026):** blok `WYCIECZKA_PROMPTS_START…END` w `eduwycieczka.html` (testy
+`npm run wycieczka:check`). Rozporządzenie MEN z 25.05.2018 (Dz.U. 2018 poz. 1055, sprawdzone w ISAP): karta
+wycieczki dokładnie według wzoru z załącznika (dyrektor ją zatwierdza – § 6 ust. 1) + lista uczniów z telefonem
+rodzica jako załącznik (§ 6 ust. 3), regulamin i program opracowuje kierownik (§ 10), zgoda rodziców na piśmie
+(§ 8), za granicą – § 7 (informacja dla organu i kuratora, NNW i KL, język). Liczby opiekunów rozporządzenie nie
+narzuca (wyznacza dyrektor, § 9). Zgoda: telefon rodzica (potrzebny do listy), bez klauzuli przerzucającej na
+rodzica odpowiedzialność za szkody (w czasie wycieczki nadzór sprawuje szkoła). Telefon kierownika nie trafia do
+AI (token `[telefon kierownika]`), Giełda bez telefonu i nazwy szkoły. Dwa strumienie równolegle (dokumenty i gra,
+`strong` = gpt-6.1-sol), odpowiedź w sekcjach. Wydruk: karta/regulamin/gra przez `printDoc`, zgody 2 × 124 mm na A4.
+
 **Wydruk – sprawdzanie bez drukarki:** kopia strony z wstrzykniętymi danymi wyniku → Chrome
 headless `--print-to-pdf` → strony PDF do PNG (`pdfjs-dist` + `@napi-rs/canvas`). Tak wyszły:
 baner cookies drukujący się na każdej stronie (naprawione w `cookie-consent.js`), cienie jako
@@ -426,6 +436,11 @@ w Make, scenariusz Coffee-Verify) albo – od 49 zł – `ROK-…` (365 dni od w
 przez `bonus/until` (eduboxBonusUntil).
 
 **Generowanie treści przez AI — wypracowane wzorce:**
+- *Sekcje zamiast JSON przy strumieniu* (EduWycieczka): JSON nie płynie strumieniem, więc dostaje słabszy
+  model (strong bez strumienia = gpt-5.4-mini). Gdy potrzebny jest najmocniejszy model, prosimy o odpowiedź
+  w sekcjach `=== NAZWA ===` i dzielimy ją w przeglądarce (`splitSections` – odporne na brak polskich znaków
+  w nagłówkach). gpt-5.4-mini potrafił wstawić słowo w obcym piśmie („bez अनुमति opiekuna”) – `plain()`
+  zamienia obce pismo na żółte `[uzupełnij: słowo]`.
 - *Dwuetapowy generator + weryfikator* (EduRymy): pierwsze zapytanie
   proponuje kandydatów swobodnie, DRUGIE, niezależne zapytanie (bez
   kontekstu "mają się ładnie rymować") ocenia surowo istnienie/poprawność —
