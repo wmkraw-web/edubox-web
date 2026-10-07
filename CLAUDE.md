@@ -224,7 +224,9 @@ Lista aktów, na których się opieramy (z plikami, które z nich korzystają), 
 `npm run legal:check` porównuje bieżący stan aktów ze snapshotem (nowelizacje, teksty jednolite,
 uchylenia), a `.github/workflows/legal-check.yml` robi to co poniedziałek (zmiana = czerwony przebieg
 i mail z GitHuba). Po przejrzeniu zmian i poprawieniu treści: `npm run legal:update` + commit.
-Nowy akt w treściach = dopisz go do `legal-acts.json`. Publiczna strona `przepisy-i-rodo.html`
+Nowy akt w treściach = dopisz go do `legal-acts.json` (i do listy plików w `usedIn`). Uwaga: w sandboxie
+deweloperskim `api.sejm.gov.pl` jest zablokowany (403 z proxy) – weryfikację nowych przepisów robi
+użytkownik albo CI, nigdy „z pamięci”. Publiczna strona `przepisy-i-rodo.html`
 (lista aktów, rejestr zmian, RODO) jest generowana przez `node scripts/generate-przepisy.js`
 (rejestr zmian w tablicy `CHANGELOG`). Wzór opinii o funkcjonowaniu ucznia (.docx) generuje
 `scripts/generate-opinia-docx.js` (wymaga `npm i --no-save docx@9`). Precyzja dat: rozporządzenie
@@ -261,7 +263,12 @@ z kartki), przyciski Kopiuj (`copyRich`) / Word (`downloadDocx`) / Drukuj-PDF (`
 płciowo, bez żargonu diagnostycznego. Wdrożone: Asystent Pedagoga, EduDostosowania (§ 2 rozporządzenia
 o ocenianiu – 5 podstaw, uczeń zdolny = art. 44c ust. 1), EduDialog (NVC z tematem do e-dziennika,
 fragment opinii w obszarach ICF), EduSprawozdawca, EduBiurokrata (opinia do poradni korzysta z
-`asystent-dokumenty.js`), EduLekcja 360 (JSON → konspekt i karta pracy ucznia przez `lessonToHtml`).
+`asystent-dokumenty.js`), EduLekcja 360 (JSON → konspekt i karta pracy ucznia przez `lessonToHtml`),
+Kreator Awansu (`awans.html` – 3 tryby w `DOC_TYPES`: sprawozdanie nauczyciela, ocena pracy, opinia
+mentora), EduNotariusz (`DOC_KINDS`: notatka służbowa, protokół zebrania, wniosek o pomoc pp, notatka
+o zdarzeniu) i EduRaport (`REPORT_KINDS`: wydarzenie, projekt, zajęcia dodatkowe, akcja).
+`npm run dokumenty:check` (`scripts/check-dokumenty.js`) pilnuje całego wzorca naraz we wszystkich
+narzędziach – także tego, że eksport czyta `innerHTML` kartki przez ref, a nie surowe wyjście AI.
 Wydruk z ciemnych paneli dawał jasnoszary tekst – w narzędziach bez białej kartki dodawaj do
 `@media print` regułę `#root * { color:#000 !important }` albo używaj `printDoc`.
 
@@ -284,6 +291,106 @@ MagicLetters) dołącza `layout-mobile.css`: poniżej 1024 px panel nad podgląd
 (wcześniej stały panel 320–380 px zasłaniał wynik), na komputerze układ kończy się równo pod menu.
 Nowe narzędzie z panelem `<aside>` obok `<main>` = dołącz ten plik. Ruch z filmików (YouTube Shorts)
 to głównie telefony – każdą zmianę wyglądu sprawdzaj też w widoku 375 px.
+
+**Podstawa prawna NIGDY od AI (od 10.2026):** modele halucynują numery artykułów i paragrafów, więc
+instrukcja dla AI zawiera zakaz powoływania przepisów, a blok „Podstawa prawna” dokleja kod z aktów
+sprawdzonych w ISAP (wzorzec: stała `AKTY` + `withLegal()` w `awans.html` – wstawia blok pod metryczką,
+nie po miejscu na podpis). Cytujemy na poziomie aktów (bez numerów jednostek, których nie weryfikowaliśmy),
+z „z późn. zm.”, i dorzucamy zastrzeżenie, że szczegóły zależą od regulaminu/statutu placówki.
+`npm run awans:check` (`scripts/check-awans.js`) pilnuje tego automatycznie – m.in. zestawia cytowany
+tekst jednolity Karty Nauczyciela ze snapshotem w `legal-acts.json`, więc po `npm run legal:update`
+trzeba poprawić też `AKTY.kn`. Uwaga przy starych narzędziach: eksport „.doc” jako HTML z mime
+`application/msword` wymieniamy na `EduDocTools.downloadDocx`, a regexy w stylu `/\\n/g` z plików
+`<script type="text/babel">` nie łapią enterów (szukają znaku `\` i `n`) – realny błąd w `eduawans.html`.
+
+**Zasada „nie dopisuj faktów" (od 10.2026, pilnowana testem):** generatory dokumentów mają w instrukcji
+zakaz wymyślania liczb, nazw, cytatów, celów i efektów; braki zostają jako `[uzupełnij: …]`, a długość
+wynika z notatek. `scripts/check-dokumenty.js` blokuje zwroty, które to łamały – realnie znalezione
+w kodzie: „minimum 3 rozbudowane akapity" i „żelazna tarcza ochronna” (EduNotariusz), „podniosły ton”,
+„bogate słownictwo pedagogiczne”, „minimum 2 rozbudowane akapity” i przykład „swobodna eksploracja”
+(EduRaport), „lany tekst” (Kreator Awansu). Test rozpoznaje negację, więc *zakaz* w instrukcji
+(„bez podniosłego tonu”) jest w porządku – wywala tylko polecenie. Komentarze liniowe są pomijane,
+żeby można było opisać, co usunięto.
+
+**Dane osobowe poza zapytaniem do AI:** pola, w które nauczyciele wpisują imiona (uczestnicy rozmowy,
+nazwa wydarzenia, imię i nazwisko), NIE trafiają do promptu. Model pisze token (`[imię i nazwisko]`,
+`[uczestnicy]`, `[nazwa]`, `[grupa]`), a przeglądarka podmienia go na kartce; publikacja wzoru w Bazie
+wstawia token z powrotem, także z ręcznych poprawek. Wartość zamrażamy w chwili generowania
+(`docName`/`docPeople`/`docMeta`) – gdyby kartka czytała pole na żywo, dopisanie nazwiska po
+wygenerowaniu zmieniłoby `baseHtml` i React nadpisałby poprawki nauczyciela.
+
+**Wspólna warstwa wyglądu `edubox-ui.css` (od 10.2026):** każde narzędzie miało własny blok `<style>`
+z tymi samymi klasami (`.glass-panel`, `.aura-blob`, `.btn-bounce`, `.text-gradient`), każdy trochę inny
+i w stylu 2021: neonowe `shadow-[0_0_20px_rgba(...)]` pod każdym przyciskiem, `blur(24px)`, trzy pływające
+bąble. Plik definiuje je raz, spokojniej: tokeny `--eb-*`, powierzchnie z prawdziwym cieniem zamiast
+poświaty, komponenty `.eb-btn`, `.eb-field`, `.eb-segment` (z `aria-pressed`), `.eb-chip`, `.eb-note`,
+`.eb-toolbar`, `prefers-reduced-motion`, widoczny `:focus-visible` i reguły wydruku.
+**Link musi stać PO wewnętrznym `<style>` strony** – przy tej samej specyficzności wygrywa kolejność
+(test to sprawdza). Narzędzie zmienia tylko akcent: `:root { --eb-accent: … }` w osobnym, późniejszym
+`<style>` (test pilnuje, by po linku nie stał żaden inny `<style>` w `<head>` – wyjątkiem jest właśnie
+blok akcentu). **Podpięte we wszystkich 60 stronach narzędzi.** Akcent każdej strony wyciągnięty z jej
+własnego CSS (`.text-gradient` → `.aura-1` → `.hero-glow`), żeby ujednolicić powłokę, a nie pomalować
+portfolio na jeden kolor. Kolor napisu na przycisku (`--eb-accent-text`) dobierany przez porównanie
+kontrastu bieli i ciemności, nie progiem luminancji – próg dawał biały tekst na cyjanie (2,4:1).
+Najgorszy kontrast w portfolio to teraz 4,78:1; `edustudio` dostał indigo-600 zamiast indigo-500, bo
+przy 500 ani biel, ani czerń nie dobijały do 4,5:1. Neonowe poświaty wpisane w markup (124 wystąpienia
+w 49 plikach) wygasza jedna reguła `[class*="shadow-[0_0_"]` z `!important` – bije nieimportantowe
+utility Tailwinda niezależnie od kolejności wstrzyknięcia jego `<style>`, więc markupu nie trzeba
+czyścić; `drop-shadow-[0_0_…]` to filtr, nie `box-shadow`, i tej reguły nie dotyczy. Styl wewnątrz JSX
+(po `</head>`) celowo wygrywa nad warstwą wspólną. Uwaga: `sanitizeHtml` w `global-core.js` przepuszcza
+tylko atrybut `class`, więc żadnego `<a href>` ani `style` w HTML-u wstawianym do kartki.
+
+**Eksport do Worda – koniec z fejkowym „.doc" (10.2026):** wszystkie 20 narzędzi eksportujących
+do Worda używa `EduDocTools.downloadDocx`. Wcześniej 10 z nich tworzyło plik `.doc`, który był
+HTML-em z mime Worda – Word otwierał go z ostrzeżeniem, a Dokumenty Google potrafiły odrzucić.
+`downloadDocx` przyjmuje teraz `align` (`center`/`justify`/`right`), `italic` i `size` (w półpunktach),
+bo dyplom bez wyśrodkowania wychodził do lewej. Gdzie treść ma układ (bilety EduMotywatora:
+`float` + obramowanie kreskowane), **nie** eksportuj akapitów – zbuduj `<table>` z DANYCH, bo
+`htmlToDocxBlocks` wspiera tabele, a `div`/`span` tylko rozwija do tekstu i gubi układ.
+Test: `npm i --no-save jsdom && npm run docx:check` (`scripts/check-docx.js`) uruchamia prawdziwą
+konwersję HTML→bloki docx na atrapie biblioteki `docx`; celowo poza `npm test`, ta sama konwencja
+co `docx@9` w generatorze wzorów.
+
+**Wydruk – jedna reguła dla całego portfolio (od 10.2026):** `body { color: black }` w `@media print`
+nie wystarcza, bo tailwindowe klasy na dzieciach biją je specyficznością. Jasnoszary tekst
+(`text-slate/gray/zinc/neutral` `-300/-400/-500` – **1284 wystąpienia w 58 plikach**) to podpisy
+i podpowiedzi zaprojektowane pod ciemny panel; na papierze mają kontrast 2,56:1, czyli są
+praktycznie niewidoczne. Załatwia to jedna reguła w `edubox-ui.css` w `@media print`: selektor po
+fragmencie atrybutu `class` z `!important`, kolor `#374151` (10,3:1 na bieli – czytelne, a tekst
+drugiego planu zostaje drugim planem). Działa tylko przy druku, ekran bez zmian. **Celowo NIE ruszamy
+`text-white`:** w dekoratorach (MagicLetters, EduWystrój, EduGenerator, EduMalarz, EduDyplomy,
+EduPiktogram) biały napis na kolorowym tle jest zamierzony i tam wydruk ma być kolorowy – te
+narzędzia mają w spisie „nie dotyczy". Narzędzia z własną regułą czerni na potomkach kontenera
+(`#print-container *`, `main *`, `.a4-page *`) albo z `printDoc` też się liczą.
+Realny błąd znaleziony przy tym przeglądzie: `edusymbol.html` nie miał `@media print` WCALE,
+a siatka kart ma inline `maxHeight: calc(100vh - 250px)` i `overflow-y-auto` – drukowało się tylko
+to, co widać na ekranie, resztę kart ucinało. Przy takich siatkach zdejmuj styl inline przez
+`!important` w bloku druku.
+
+**Modele graficzne Fal.ai – jedno miejsce i jak je testować (od 10.2026):** `api/_lib/falModels.js`
+(nie liczy się do limitu 12 funkcji) trzyma adresy i parametry WSZYSTKICH modeli: łańcuch narzędzi
+publicznych (`gpt`, `gptEdit`, `flux2`, `flux2Edit`, `recraft` – kolejność prób w `api/_lib/imageModels.js`),
+ostatnie zapasy i EduInfluencer (`text` = flux/dev, `design` = recraft-v3, `imageToImage` = SDXL)
+oraz powiększanie (`upscale` = Recraft Crisp, `upscaleFallback` = ESRGAN ×2). Wcześniej te same liczby
+stały osobno w `generate.js`, `malarz.js`, `ewa-generate.js` i `upscale.js`. Testy:
+`node api/_lib/falModels.test.js` (w `npm test` przez `npm run api:check`) – cicha zmiana modelu albo
+parametrów jest niemożliwa (świadoma zmiana wymaga poprawienia testu); pilnują też, że łańcuch używa
+wyłącznie adresów z rejestru, że pierwsza próba to GPT Image 2.5 i że Recraft V4.1 dostaje styl `any`.
+**Ceny** są w `REVIEW.prices`: GPT Image 2.5 zmierzone na żywo (~0,014–0,02 USD za obraz), Recraft Crisp
+0,004 USD (strona modelu), reszta oznaczona „do potwierdzenia”. Kandydat: **FLUX.2 [dev] Turbo** jako
+tańszy zapas zamiast FLUX.2 pro. **NIE podmieniaj bez testu na żywo** – `flux/schnell` był już raz
+wdrożony i wycofany („pszczółki" jako ptaki); odrzucone po testach 6.10.2026: Nano Banana 2, Seedream 4.5,
+FLUX 3, Ideogram v3. Test bez wdrażania (tylko preview, chronione logowaniem Vercel): `/api/generate`
+przyjmuje `testEndpoint` + `testPayload` (albo `openai-direct:<model>`), `/api/ewa-generate` –
+`testFalEndpoint` + `testFalParams` (slug przez `SAFE_SLUG`, ochrona przed SSRF).
+**Cykliczny przegląd:** `REVIEW` w tym samym pliku trzyma datę ostatniego przeglądu, zapisane ceny,
+kandydatów i ostrzeżenie o schnellu – jako DANE, nie komentarz. `npm run fal:check`
+(`scripts/check-fal-models.js`) kończy się błędem, gdy od przeglądu minęło >90 dni;
+`.github/workflows/fal-models-check.yml` robi to 3. dnia miesiąca (czerwony przebieg = mail).
+Celowo **nie** jest to automat sprawdzający ceny: fal.ai nie daje cennika w formie do rzetelnego
+odczytu, a skrobanie strony dawałoby fałszywy alarm albo fałszywy spokój – skrypt pilnuje więc
+tylko regularności i wypisuje konkretne kroki. Z tego samego powodu `fal:check` jest POZA
+`npm test` (jak `legal:check`) – po 90 dniach załamałby CI na każdym PR.
 
 **Kody PRO za wsparcie (Buycoffee.to):** `api/coffee-check.js` wydaje kod `KAWA-…` (7 dni, weryfikacja
 w Make, scenariusz Coffee-Verify) albo – od 49 zł – `ROK-…` (365 dni od wygenerowania), który
@@ -317,10 +424,28 @@ przez `bonus/until` (eduboxBonusUntil).
   jednoznaczny język.
 - *"Jak to działa"* — info-box (ℹ️, 2–3 zdania + konkretny przykład) blisko
   góry formularza w każdym narzędziu, pisany z faktycznego czytania kodu
-  strony, nie tylko opisu z `apps.js`.
+  strony, nie tylko opisu z `apps.js`. **Jest już we wszystkich 60 narzędziach**
+  (klasa `.eb-note` ze wspólnej warstwy). Uwaga przy wstawianiu: gdy box ma
+  wejść do `{stage === 'form' && (` albo innego warunku, musi być JEDNYM
+  korzeniem — wkładaj go więc do środka panelu formularza, nie obok niego,
+  inaczej Babel zgłasza „Unexpected token, expected ,". Numery linii z błędu
+  Babela są względne do skryptu, nie do pliku.
 - *Body payloady do serwerlessów*: zdjęcia zawsze skalować/kompresować przez
   `<canvas>` w przeglądarce PRZED wysyłką (base64 potrafi łatwo przebić
   limit ~4,5 MB na body zapytania na Vercelu — realny błąd, już naprawiany).
+
+**Spis stanu portfolio — zacznij tutaj (od 10.2026):** `docs/STAN-PORTFOLIO.md` odpowiada na pytanie
+„co jest już zrobione, a co zostało?" dla wszystkich 60 stron narzędzi: wzorzec kartki, strumień,
+prawdziwy `.docx`, czysty wydruk, nowy wygląd, info-box „Jak to działa", wspólna pula limitów oraz
+objęcie kontrolą ISAP. **Plik jest GENEROWANY** z faktycznych plików (`npm run stan`), nie pisany
+ręcznie, więc nie może się rozjechać z rzeczywistością; `npm test` pilnuje aktualności
+(`npm run stan:check`). Czytaj go na starcie sesji zamiast szacować na oko albo liczyć na pamięć —
+sesja Claude Code zawsze startuje od zera i zna tylko repo + ten plik.
+Kontrola przepisów działa po NUMERACH aktów: akt cytowany przez numer tekstu jednolitego albo noweli
+(np. Dz.U. 2023 poz. 2572 → `DU/2019/373`, Dz.U. 2026 poz. 1122 → `DU/2019/373`, Dz.U. 2026 poz. 515 →
+`DU/1982/19`) jest pilnowany pod numerem pierwotnym, bo snapshot ISAP wymienia jedno i drugie — bez tej
+reguły raport krzyczałby o aktach, które są w porządku. Nowy plik cytujący przepis trzeba dopisać do
+`usedIn` właściwego aktu, inaczej raport nie wskaże go do przeglądu po nowelizacji.
 
 **Otwarte/niedawno zamknięte wątki** (stan na koniec tej sesji):
 - Generator Wideo Ani: `stitch:true` dodane, żeby zmniejszyć nadmierne

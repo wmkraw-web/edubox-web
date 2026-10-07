@@ -1,0 +1,37 @@
+name: Przegląd modeli graficznych (Fal.ai)
+
+# Raz w miesiącu przypomina o przeglądzie modeli obrazkowych. Czerwony przebieg = mail
+# z GitHuba, gdy od ostatniego przeglądu minęło więcej niż 90 dni (REVIEW.maxAgeDays
+# w api/_lib/falModels.js).
+#
+# To NIE jest automat sprawdzający ceny: fal.ai nie udostępnia cennika w formie, którą
+# dałoby się rzetelnie odczytać, a skrobanie strony rozsypałoby się przy pierwszej zmianie
+# layoutu – dając fałszywy alarm albo, gorzej, fałszywy spokój. Skrypt pilnuje więc tylko
+# tego, żeby ktoś regularnie na to patrzył, i wypisuje co sprawdzić oraz jak przetestować
+# kandydata na preview bez wdrażania (testFalEndpoint).
+#
+# Po przeglądzie: popraw ceny i REVIEW.reviewedAt w api/_lib/falModels.js i zacommituj.
+# Samo przesunięcie daty wystarczy, jeśli nic nie zmieniasz.
+
+on:
+  schedule:
+    - cron: '0 7 3 * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fal:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pobierz repozytorium
+        uses: actions/checkout@v7
+
+      - name: Ustaw Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 20
+
+      - name: Sprawdź, czy przegląd modeli nie zalega
+        run: node scripts/check-fal-models.js

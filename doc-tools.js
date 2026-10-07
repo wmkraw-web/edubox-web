@@ -181,7 +181,10 @@
     return docxPromise;
   }
 
-  function htmlToDocxBlocks(html, D, numbering) {
+  function htmlToDocxBlocks(html, D, numbering, opts) {
+    const o = opts || {};
+    const ALIGN = { center: 'CENTER', right: 'RIGHT', justify: 'JUSTIFIED', left: 'LEFT' };
+    const bodyAlign = ALIGN[o.align] ? D.AlignmentType[ALIGN[o.align]] : undefined;
     const doc = new DOMParser().parseFromString('<div>' + html + '</div>', 'text/html');
     const container = doc.body.firstElementChild;
 
@@ -222,7 +225,9 @@
         if (tag === 'h1') out.push(para(node, { heading: D.HeadingLevel.HEADING_1, alignment: D.AlignmentType.CENTER, spacing: { after: 200 } }));
         else if (tag === 'h2') out.push(para(node, { heading: D.HeadingLevel.HEADING_2, spacing: { before: 240, after: 120 }, keepNext: true }));
         else if (tag === 'h3' || tag === 'h4') out.push(para(node, { heading: D.HeadingLevel.HEADING_3, spacing: { before: 160, after: 80 }, keepNext: true }));
-        else if (tag === 'p' || tag === 'blockquote') out.push(para(node, tag === 'blockquote' ? { indent: { left: 567 } } : null, { bold: false, size: ctx && ctx.small ? 18 : undefined }));
+        else if (tag === 'p' || tag === 'blockquote') out.push(para(node,
+          Object.assign({}, tag === 'blockquote' ? { indent: { left: 567 } } : null, bodyAlign ? { alignment: bodyAlign } : null),
+          { bold: false, italics: !!o.italic, size: ctx && ctx.small ? 18 : (o.size || undefined) }));
         else if (tag === 'ul' || tag === 'ol') {
           const level = ctx && ctx.level ? ctx.level : 0;
           const instance = numbering.next++;
@@ -276,7 +281,7 @@
     const o = opts || {};
     const D = await loadDocx();
     const numbering = { next: 1 };
-    const children = htmlToDocxBlocks(html, D, numbering);
+    const children = htmlToDocxBlocks(html, D, numbering, { align: o.align, italic: o.italic, size: o.size });
     const document_ = new D.Document({
       creator: 'EduBox AI',
       title: o.title || 'Dokument',

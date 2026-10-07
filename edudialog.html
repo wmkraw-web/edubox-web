@@ -124,6 +124,10 @@
 }
   </script>
   <meta name="robots" content="index, follow, max-image-preview:large">
+    <!-- Wspólna warstwa wyglądu: musi stać PO wewnętrznym <style> strony,
+         bo przy tej samej specyficzności wygrywa reguła późniejsza. -->
+    <link rel="stylesheet" href="/edubox-ui.css">
+    <style>:root { --eb-accent: #60a5fa; --eb-accent-soft: rgba(96,165,250,0.14); --eb-accent-text: #0b1020; }</style>
 </head>
 <body class="min-h-screen flex flex-col">
 
@@ -199,7 +203,8 @@
                 Sparkles: <path d="m12 3 1.912 5.813a2 2 0 0 0 1.275 1.275L21 12l-5.813 1.912a2 2 0 0 0-1.275 1.275L12 21l-1.912-5.813a2 2 0 0 0-1.275-1.275L3 12l5.813-1.912a2 2 0 0 0 1.275-1.275L12 3Z"/>,
                 Copy: <><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></>,
                 AlertCircle: <><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></>,
-                Word: <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+                Word: <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>,
+                Print: <><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></>
             };
             return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>{icons[name]}</svg>;
         };
@@ -253,6 +258,7 @@ FORMAT – wyłącznie fragment HTML (h2, p, ul, li, table, thead, tbody, tr, th
             const [isPublishing, setIsPublishing] = useState(false);
 
             const resultRef = useRef(null);
+            const docRef = useRef(null);
 
             // --- LOGOWANIE (wspólny silnik) ---
             useEffect(() => {
@@ -357,9 +363,12 @@ FORMAT – wyłącznie fragment HTML (h2, p, ul, li, table, thead, tbody, tr, th
             const DT = window.EduDocTools;
             const isHtmlDoc = (t) => /<(h1|h2|table|ul|p)\b/i.test(String(t || ''));
             const pppHtml = resultTab === 'ppp' && generatedText ? DT.markPlaceholders(DT.normalize(generatedText)) : '';
+            // Opinia jest edytowalna na kartce, więc eksport bierze to, co widzi nauczyciel,
+            // a nie surowe wyjście AI.
+            const currentHtml = () => (docRef.current && docRef.current.innerHTML) || pppHtml;
             const handleCopyResult = async () => {
                 if (resultTab === 'ppp') {
-                    const ok = await DT.copyRich(pppHtml);
+                    const ok = await DT.copyRich(currentHtml());
                     showToast(ok ? '✅ Skopiowano z formatowaniem.' : 'Nie udało się skopiować.');
                 } else copyToClipboard(generatedText);
             };
@@ -374,10 +383,21 @@ FORMAT – wyłącznie fragment HTML (h2, p, ul, li, table, thead, tbody, tr, th
                 showToast('✅ Skopiowano do schowka!');
             };
 
+            const docTitle = () => (resultTab === 'nvc' ? 'Wiadomość do rodzica' : 'Fragment opinii o funkcjonowaniu ucznia');
+
             const exportToWord = (text, type) => {
                 const title = type === 'nvc' ? 'Wiadomość do rodzica' : 'Fragment opinii o funkcjonowaniu ucznia';
-                const html = isHtmlDoc(text) ? DT.markPlaceholders(DT.normalize(text)) : DT.normalize(String(text || ''));
+                const html = type === 'ppp'
+                    ? currentHtml()
+                    : (isHtmlDoc(text) ? DT.markPlaceholders(DT.normalize(text)) : DT.normalize(String(text || '')));
                 DT.downloadDocx(`<h1>${title}</h1>` + html, { filename: title.replace(/\s+/g, '_'), title }).catch(e => showToast(e.message || 'Nie udało się przygotować pliku Word.'));
+            };
+
+            const printResult = () => {
+                const html = resultTab === 'ppp'
+                    ? currentHtml()
+                    : `<h1>${docTitle()}</h1>` + DT.normalize(String(generatedText || ''));
+                DT.printDoc(html, docTitle().replace(/\s+/g, '_'));
             };
 
             const handlePublishToLibrary = async () => {
@@ -570,11 +590,17 @@ FORMAT – wyłącznie fragment HTML (h2, p, ul, li, table, thead, tbody, tr, th
                                                     <button disabled={isStreaming} onClick={handleCopyResult} className="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600 px-4 py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-colors btn-bounce">
                                                         <Icon name="Copy" size={16}/> Kopiuj
                                                     </button>
+                                                    <button disabled={isStreaming} onClick={printResult} className="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600 px-4 py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-colors btn-bounce">
+                                                        <Icon name="Print" size={16}/> Drukuj / PDF
+                                                    </button>
                                                 </div>
                                             </div>
                                             
                                             {resultTab === 'ppp' ? (
-                                                <div className={`doc-paper ${isStreaming ? 'doc-caret' : ''}`} style={{ maxWidth: '100%' }} dangerouslySetInnerHTML={{ __html: window.EduBoxCore ? window.EduBoxCore.sanitizeHtml(pppHtml) : '' }} />
+                                                <div ref={docRef} contentEditable={!isStreaming} suppressContentEditableWarning={true}
+                                                    className={`doc-paper outline-none focus:ring-2 focus:ring-emerald-400 ${isStreaming ? 'doc-caret' : ''}`}
+                                                    style={{ maxWidth: '100%' }}
+                                                    dangerouslySetInnerHTML={{ __html: window.EduBoxCore ? window.EduBoxCore.sanitizeHtml(pppHtml) : '' }} />
                                             ) : (
                                                 <div className="bg-[#0f172a] p-6 rounded-2xl border border-slate-700/50">
                                                     <p className={`text-slate-200 whitespace-pre-wrap leading-relaxed text-sm sm:text-base ${isStreaming ? 'doc-caret' : ''}`}>

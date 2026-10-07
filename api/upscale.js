@@ -10,10 +10,12 @@
 export const maxDuration = 60;
 
 import { isRateLimited } from './_lib/rateLimit.js';
+import { MODELS } from './_lib/falModels.js';
 
+// Adresy i parametry z rejestru api/_lib/falModels.js (jedno miejsce na wszystkie modele Fal).
 const ATTEMPTS = [
-  { label: 'recraft-crisp', endpoint: 'fal-ai/recraft/upscale/crisp', payload: (url) => ({ image_url: url }) },
-  { label: 'esrgan-x2', endpoint: 'fal-ai/esrgan', payload: (url) => ({ image_url: url, scale: 2 }) }
+  { label: 'recraft-crisp', endpoint: MODELS.upscale.slug, payload: (url) => ({ image_url: url, ...MODELS.upscale.params }) },
+  { label: 'esrgan-x2', endpoint: MODELS.upscaleFallback.slug, payload: (url) => ({ image_url: url, ...MODELS.upscaleFallback.params }) }
 ];
 
 export default async function handler(req, res) {

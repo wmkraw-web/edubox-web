@@ -45,6 +45,7 @@
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin=""></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="/doc-tools.js"></script>
 
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&amp;display=swap" rel="stylesheet">
 
@@ -95,6 +96,10 @@
 }
   </script>
   <meta name="robots" content="index, follow, max-image-preview:large">
+    <!-- Wspólna warstwa wyglądu: musi stać PO wewnętrznym <style> strony,
+         bo przy tej samej specyficzności wygrywa reguła późniejsza. -->
+    <link rel="stylesheet" href="/edubox-ui.css">
+    <style>:root { --eb-accent: #f43f5e; --eb-accent-soft: rgba(244,63,94,0.14); --eb-accent-text: #0b1020; }</style>
 </head>
 <body class="flex flex-col">
 
@@ -330,23 +335,25 @@ ZASADY KRYTYCZNE (ZŁAMIESZ JE = ZAWODZISZ):
                 }
             };
 
+            // Prawdziwy .docx przez wspólną bibliotekę. Wcześniej był to plik „.doc”
+            // z HTML-em w środku (mime Worda) – Word otwierał go z ostrzeżeniem, a Dokumenty
+            // Google potrafiły go odrzucić. Wyśrodkowanie i kursywę dyplomu niesie teraz
+            // opcja `align`/`italic` w downloadDocx, nie CSS w nagłówku pliku.
             const exportToWord = (textContent, isDiploma) => {
-                if(!textContent) return;
-                
-                const alignment = isDiploma ? 'center' : 'justify';
-                const fontSize = isDiploma ? '18pt' : '14pt';
-                const fontStyle = isDiploma ? 'italic' : 'normal';
-
-                const header = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>Dokument</title><style>body {font-family: 'Georgia', serif; font-size: ${fontSize}; line-height: 1.5; color: #000; text-align: ${alignment}; font-style: ${fontStyle};}</style></head><body>`;
-                const footer = `<br><br><br><p style="text-align: right; font-style: normal; font-size: 12pt;">...................................................<br>Podpis</p></body></html>`;
-                
-                const formattedText = textContent.split('\n').map(para => `<p>${para}</p>`).join('');
-                const blob = new Blob(['\ufeff', header + formattedText + footer], { type: 'application/msword' });
-                
-                const link = document.createElement('a');
-                link.href = URL.createObjectURL(blob);
-                link.download = isDiploma ? 'Dyplom.doc' : 'Podziekowanie.doc';
-                link.click();
+                if (!textContent) return;
+                const esc = (t) => String(t)
+                    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                const paragraphs = String(textContent).split('\n')
+                    .map(line => line.trim()).filter(Boolean)
+                    .map(line => `<p>${esc(line)}</p>`).join('');
+                const html = paragraphs + '<p></p><p></p><p>…………………………………<br>Podpis</p>';
+                window.EduDocTools.downloadDocx(html, {
+                    filename: isDiploma ? 'Dyplom' : 'Podziekowanie',
+                    title: isDiploma ? 'Dyplom' : 'Podziękowanie',
+                    align: isDiploma ? 'center' : 'justify',
+                    italic: !!isDiploma,
+                    size: isDiploma ? 36 : 28
+                }).catch(e => showToast(e.message || 'Nie udało się przygotować pliku Word.'));
             };
 
             const copyToClipboard = (text) => {

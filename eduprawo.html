@@ -35,6 +35,7 @@
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin=""></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="/doc-tools.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&amp;family=Playfair+Display:ital,wght@0,400;0,700;1,400&amp;display=swap" rel="stylesheet">
     
     <!-- Ikony Phosphor (Standard V3 PRO MAX) -->
@@ -155,6 +156,10 @@
 }
   </script>
   <meta name="robots" content="index, follow, max-image-preview:large">
+    <!-- Wspólna warstwa wyglądu: musi stać PO wewnętrznym <style> strony,
+         bo przy tej samej specyficzności wygrywa reguła późniejsza. -->
+    <link rel="stylesheet" href="/edubox-ui.css">
+    <style>:root { --eb-accent: #38bdf8; --eb-accent-soft: rgba(56,189,248,0.14); --eb-accent-text: #0b1020; }</style>
 </head>
 <body>
     <a href="index.html" title="Strona główna EduBox AI" class="print-hidden" style="position:fixed;bottom:14px;left:14px;z-index:9999;width:46px;height:46px;border-radius:9999px;background:rgba(15,23,42,0.88);color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(0,0,0,0.3);text-decoration:none;font-size:22px;backdrop-filter:blur(4px);border:1px solid rgba(255,255,255,0.15);">
@@ -433,24 +438,12 @@ Struktura JSON:
             const exportToWord = () => {
                 if(!aiResponse) return;
                 const content = document.getElementById('print-container').innerHTML;
-                const header = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
-                <head><meta charset='utf-8'><title>Opinia Prawna</title>
-                <style>
-                    body { font-family: 'Arial', sans-serif; font-size: 11pt; line-height: 1.5; color: #000; }
-                    h1 { font-size: 16pt; color: #1e3a8a; text-transform: uppercase; margin-bottom: 20px; text-align: center; border-bottom: 2px solid #1e3a8a; padding-bottom: 10px;}
-                    h2 { font-size: 12pt; color: #1e3a8a; margin-top: 20px; margin-bottom: 10px; text-transform: uppercase;}
-                    p { margin-bottom: 10px; text-align: justify; }
-                    .basis-box { background-color: #f1f5f9; padding: 15px; border-left: 4px solid #3b82f6; margin-bottom: 20px; font-weight: bold;}
-                    .steps-box { background-color: #f8fafc; padding: 15px; border: 1px solid #cbd5e1; margin-top: 20px; }
-                    strong { color: #000; }
-                </style></head><body>`;
-                const footer = `<\/body><\/html>`;
                 
-                const blob = new Blob(['\ufeff', header + content + footer], { type: 'application/msword' });
-                const link = document.createElement('a');
-                link.href = URL.createObjectURL(blob);
-                link.download = `Opinia_EduPrawo_${Date.now()}.doc`;
-                link.click();
+                // Prawdziwy .docx przez wspólną bibliotekę. Wcześniej był to plik „.doc”
+                // z HTML-em w środku (mime Worda) – Word otwierał go z ostrzeżeniem,
+                // a Dokumenty Google potrafiły go odrzucić.
+                window.EduDocTools.downloadDocx(content, { filename: `Opinia_EduPrawo_${Date.now()}`, title: 'Odpowiedź prawna' })
+                    .catch(e => showToast(e.message || 'Nie udało się przygotować pliku Word.'));
             };
 
             if (!coreReady) {

@@ -32,6 +32,7 @@
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin=""></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="/doc-tools.js"></script>
     
     <!-- Ikony Phosphor (Standard V3 PRO MAX) -->
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
@@ -115,6 +116,9 @@
 }
   </script>
   <meta name="robots" content="index, follow, max-image-preview:large">
+    <!-- Wspólna warstwa wyglądu: musi stać PO wewnętrznym <style> strony,
+         bo przy tej samej specyficzności wygrywa reguła późniejsza. -->
+    <link rel="stylesheet" href="/edubox-ui.css">
 </head>
 <body>
     <a href="index.html" title="Strona główna EduBox AI" class="print-hidden" style="position:fixed;bottom:14px;left:14px;z-index:9999;width:46px;height:46px;border-radius:9999px;background:rgba(15,23,42,0.88);color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(0,0,0,0.3);text-decoration:none;font-size:22px;backdrop-filter:blur(4px);border:1px solid rgba(255,255,255,0.15);">
@@ -359,25 +363,42 @@
                 }
             };
 
+            // Bilety to siatka do wycinania (float + obramowanie kreskowane). Stary eksport
+            // „.doc” był HTML-em z mime Worda: Word otwierał go z ostrzeżeniem, a Dokumenty
+            // Google odrzucały. Akapity zniszczyłyby układ, więc budujemy prawdziwy .docx
+            // z DANYCH, układając bilety w dwukolumnową tabelę – komórki zostają do wycięcia.
             const exportToWord = () => {
-                if(!generatedData) return;
-                const content = document.getElementById('print-container').innerHTML;
-                const header = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
-                <head><meta charset='utf-8'><title>Karty Wyjścia - EduMotywator</title>
-                <style>
-                    body { font-family: 'Arial', sans-serif; font-size: 11pt; color: #000; }
-                    .ticket-grid { display: block; }
-                    .ticket-card { border: 1px dashed #666; padding: 15px; margin-bottom: 20px; width: 45%; float: left; margin-right: 5%; height: 200px; box-sizing: border-box; }
-                    .ticket-header { font-size: 14pt; font-weight: bold; text-align: center; border-bottom: 1px solid #ccc; padding-bottom: 5px; margin-bottom: 10px; }
-                    .mission-card { clear: both; border: 2px solid #000; padding: 20px; background-color: #f9f9f9; margin-top: 40px; }
-                    h2 { color: #5b21b6; }
-                </style></head><body>`;
-                const footer = `<\/body><\/html>`;
-                const blob = new Blob(['\ufeff', header + content + footer], { type: 'application/msword' });
-                const link = document.createElement('a');
-                link.href = URL.createObjectURL(blob);
-                link.download = `EduMotywator_${Date.now()}.doc`;
-                link.click();
+                if (!generatedData) return;
+                const esc = (t) => String(t == null ? '' : t)
+                    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+                const tickets = generatedData.exit_tickets || [];
+                const cell = (t) => t
+                    ? `<td><p><strong>Bilet #${esc(t.id)} · ${esc(t.type)}</strong></p>`
+                      + `<p>${esc(t.question)}</p>`
+                      + '<p></p><p>Imię: ……………………………………</p>'
+                      + '<p>Odpowiedź: ……………………………………</p><p>……………………………………</p></td>'
+                    : '<td></td>';
+
+                let rows = '';
+                for (let i = 0; i < tickets.length; i += 2) {
+                    rows += `<tr>${cell(tickets[i])}${cell(tickets[i + 1])}</tr>`;
+                }
+
+                const mission = generatedData.secret_mission;
+                const missionHtml = mission
+                    ? `<h2>Tajna misja: ${esc(mission.codename)}</h2><p>${esc(mission.objective)}</p>`
+                      + `<p><strong>Nagroda za raport z misji:</strong> ${esc(mission.xp_reward)}</p>`
+                    : '';
+
+                const html = `<h1>Karty wyjścia – ${esc(generatedData.lesson_topic || '')}</h1>`
+                    + (rows ? `<table>${rows}</table>` : '')
+                    + missionHtml;
+
+                window.EduDocTools.downloadDocx(html, {
+                    filename: `Karty_wyjscia_${new Date().toISOString().slice(0, 10)}`,
+                    title: 'Karty wyjścia'
+                }).catch(e => showToast(e.message || 'Nie udało się przygotować pliku Word.'));
             };
 
             if (!coreReady) {

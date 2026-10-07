@@ -1,26 +1,22 @@
-// Wspólny dobór modeli obrazów dla /api/generate i /api/malarz (fal.ai).
-// Testy porównawcze z 6.10.2026 (kolorowanka, ilustracja do bajki, ramka dyplomu, plakat z polskim
-// napisem, piktogram AAC, zdjęcie -> kolorowanka):
-// - GPT Image 2.5 Sunburst (przez fal.ai, hostowany link) – najlepszy w 4/5 zadań: bezbłędne polskie
-//   napisy z ogonkami, najwierniej trzyma się opisu (jabłko NA kolcach jeża, piktogram z mydłem i wodą),
-//   ok. 0,015–0,03 USD za obraz w jakości "medium"; ~15–20 s.
-// - FLUX.2 [pro] – świetne ilustracje i kolorowanki, ale psuje polskie napisy; szybki (~8–10 s) – zapas.
-// - Recraft V4.1 – czyste, symetryczne ramki, szybki (~8 s), ale słabszy w medalach i zaproszeniach i droższy
-//   (~0,04 USD) – zapas dla grafiki projektowej. Przyjmuje tylko style 'any' / 'vector_illustration'.
-// - Edycja zdjęcia: GPT Image 2.5 edit; dawny SDXL image-to-image w ogóle nie przerabiał zdjęcia
-//   (zwracał prawie niezmienione zdjęcie zamiast kolorowanki).
-// FLUX.1 [dev] i Recraft V3 zostają jako ostatni zapas (sprawdzone od miesięcy).
+// Wspólny dobór modeli obrazów dla /api/generate i /api/malarz (fal.ai): kolejność prób w łańcuchu.
+// Adresy modeli, parametry, ceny i wyniki testów są w rejestrze api/_lib/falModels.js (jedno miejsce).
+// Skrót testów 6–7.10.2026: GPT Image 2.5 najlepszy prawie we wszystkim (polskie napisy, wierność opisu,
+// edycja zdjęcia, wzór postaci); FLUX.2 pro – zapas (psuje napisy); Recraft V4.1 / V3 – zapas grafiki
+// projektowej; FLUX.1 dev i SDXL – ostatnie zapasy.
+const { MODELS } = require('./falModels.js');
 
 const ENDPOINTS = {
-  gpt: 'openai/gpt-image-2.5/sunburst/text-to-image',
-  gptEdit: 'openai/gpt-image-2.5/sunburst/edit',
-  flux2: 'fal-ai/flux-2-pro',
-  flux2Edit: 'fal-ai/flux-2-pro/edit',
-  recraft: 'fal-ai/recraft/v4.1/text-to-image',
-  recraftOld: 'fal-ai/recraft-v3',
-  flux1: 'fal-ai/flux/dev',
-  sdxlEdit: 'fal-ai/fast-sdxl/image-to-image'
+  gpt: MODELS.gpt.slug,
+  gptEdit: MODELS.gptEdit.slug,
+  flux2: MODELS.flux2.slug,
+  flux2Edit: MODELS.flux2Edit.slug,
+  recraft: MODELS.recraft.slug,
+  recraftOld: MODELS.design.slug,
+  flux1: MODELS.text.slug,
+  sdxlEdit: MODELS.imageToImage.slug
 };
+// Stałe parametry modelu (quality, liczba kroków, filtr bezpieczeństwa) – kopia z rejestru.
+const P = (kind) => Object.assign({}, MODELS[kind].params);
 
 // Proporcje obrazka z różnych formatów wejścia (size "WxH", width/height, aspect_ratio "a:b", preset fal).
 function ratioOf({ width, height, size, aspect_ratio, preset }) {
@@ -58,9 +54,9 @@ function buildAttempts(o) {
     const loose = typeof o.imageStrength === 'number' && o.imageStrength >= 0.75;
     const editPrompt = `${o.prompt}${negative} ${loose ? 'Use the attached image only as loose inspiration for the subject.' : 'Keep the same subject, pose and composition as in the attached image.'}`;
     return [
-      { label: 'gpt-image-2.5-edit', endpoint: ENDPOINTS.gptEdit, payload: { prompt: editPrompt, image_urls: [o.initImage], image_size: gptSize(ratio), quality: 'medium' } },
-      { label: 'flux-2-pro-edit', endpoint: ENDPOINTS.flux2Edit, payload: { prompt: editPrompt, image_urls: [o.initImage], image_size: falPreset(ratio), enable_safety_checker: true, ...seed } },
-      { label: 'sdxl-img2img', endpoint: ENDPOINTS.sdxlEdit, payload: { prompt: o.prompt, image_url: o.initImage, strength: typeof o.imageStrength === 'number' ? o.imageStrength : 0.65, image_size: falPreset(ratio), num_inference_steps: 30, enable_safety_checker: true, ...(o.negativePrompt ? { negative_prompt: o.negativePrompt } : {}), ...seed } }
+      { label: 'gpt-image-2.5-edit', endpoint: ENDPOINTS.gptEdit, payload: { prompt: editPrompt, image_urls: [o.initImage], image_size: gptSize(ratio), ...P('gptEdit') } },
+      { label: 'flux-2-pro-edit', endpoint: ENDPOINTS.flux2Edit, payload: { prompt: editPrompt, image_urls: [o.initImage], image_size: falPreset(ratio), ...P('flux2Edit'), ...seed } },
+      { label: 'sdxl-img2img', endpoint: ENDPOINTS.sdxlEdit, payload: { prompt: o.prompt, image_url: o.initImage, strength: typeof o.imageStrength === 'number' ? o.imageStrength : 0.65, image_size: falPreset(ratio), ...P('imageToImage'), ...(o.negativePrompt ? { negative_prompt: o.negativePrompt } : {}), ...seed } }
     ];
   }
   // Wzór postaci (okładka bajki, pierwszy kadr komiksu): kolejne obrazy z tym samym bohaterem w nowej scenie.
@@ -70,9 +66,9 @@ function buildAttempts(o) {
     // Test 6.10.2026: bez zastrzeżeń model kopiował też minę (uśmiech w scenie strachu) i postacie z tła okładki.
     const refPrompt = `${o.prompt}${negative} The attached image is ONLY a character reference: draw the same main character (identical face, hair, skin tone, clothes, colors and proportions) in the same art style. Do NOT copy the pose, facial expression, background or other characters from the reference – pose, emotion and setting must follow the description above. Other characters from the reference may appear only if the description mentions them. Draw a completely new scene.`;
     return [
-      { label: 'gpt-image-2.5-ref', endpoint: ENDPOINTS.gptEdit, payload: { prompt: refPrompt, image_urls: refs, image_size: gptSize(ratio), quality: 'medium' } },
-      { label: 'flux-2-pro-ref', endpoint: ENDPOINTS.flux2Edit, payload: { prompt: refPrompt, image_urls: refs, image_size: falPreset(ratio), enable_safety_checker: true } },
-      { label: 'gpt-image-2.5', endpoint: ENDPOINTS.gpt, payload: { prompt: o.prompt + negative, image_size: gptSize(ratio), quality: 'medium' } }
+      { label: 'gpt-image-2.5-ref', endpoint: ENDPOINTS.gptEdit, payload: { prompt: refPrompt, image_urls: refs, image_size: gptSize(ratio), ...P('gptEdit') } },
+      { label: 'flux-2-pro-ref', endpoint: ENDPOINTS.flux2Edit, payload: { prompt: refPrompt, image_urls: refs, image_size: falPreset(ratio), ...P('flux2Edit') } },
+      { label: 'gpt-image-2.5', endpoint: ENDPOINTS.gpt, payload: { prompt: o.prompt + negative, image_size: gptSize(ratio), ...P('gpt') } }
     ];
   }
   if (o.kind === 'design') {
@@ -87,15 +83,15 @@ function buildAttempts(o) {
       : /hand_drawn/.test(style) ? ' Hand-drawn illustration style.' : '';
     const designPrompt = o.prompt + negative + styleWords;
     return [
-      { label: 'gpt-image-2.5', endpoint: ENDPOINTS.gpt, payload: { prompt: designPrompt, image_size: gptSize(ratio), quality: 'medium' } },
-      { label: 'recraft-v4.1', endpoint: ENDPOINTS.recraft, payload: { prompt: designPrompt, image_size: falPreset(ratio), style: 'any' } },
-      { label: 'recraft-v3', endpoint: ENDPOINTS.recraftOld, payload: { prompt: designPrompt, image_size: falPreset(ratio), style: isVector ? 'digital_illustration' : style, enable_safety_checker: true } }
+      { label: 'gpt-image-2.5', endpoint: ENDPOINTS.gpt, payload: { prompt: designPrompt, image_size: gptSize(ratio), ...P('gpt') } },
+      { label: 'recraft-v4.1', endpoint: ENDPOINTS.recraft, payload: { prompt: designPrompt, image_size: falPreset(ratio), ...P('recraft') } },
+      { label: 'recraft-v3', endpoint: ENDPOINTS.recraftOld, payload: { prompt: designPrompt, image_size: falPreset(ratio), style: isVector ? 'digital_illustration' : style, ...P('design') } }
     ];
   }
   return [
-    { label: 'gpt-image-2.5', endpoint: ENDPOINTS.gpt, payload: { prompt: o.prompt + negative, image_size: gptSize(ratio), quality: 'medium' } },
-    { label: 'flux-2-pro', endpoint: ENDPOINTS.flux2, payload: { prompt: o.prompt + negative, image_size: falPreset(ratio), enable_safety_checker: true, ...seed } },
-    { label: 'flux-1-dev', endpoint: ENDPOINTS.flux1, payload: { prompt: o.prompt, image_size: falPreset(ratio), num_inference_steps: 28, guidance_scale: 3.5, enable_safety_checker: true, ...seed } }
+    { label: 'gpt-image-2.5', endpoint: ENDPOINTS.gpt, payload: { prompt: o.prompt + negative, image_size: gptSize(ratio), ...P('gpt') } },
+    { label: 'flux-2-pro', endpoint: ENDPOINTS.flux2, payload: { prompt: o.prompt + negative, image_size: falPreset(ratio), ...P('flux2'), ...seed } },
+    { label: 'flux-1-dev', endpoint: ENDPOINTS.flux1, payload: { prompt: o.prompt, image_size: falPreset(ratio), ...P('text'), ...seed } }
   ];
 }
 
