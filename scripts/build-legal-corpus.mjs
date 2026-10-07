@@ -68,8 +68,10 @@ export function cleanPdfText(raw) {
     return keep.join('\n');
   }).join('\n');
   return cleaned
-    // dzielenie wyrazów na końcu linii; łącznik zostaje w złożeniach typu "psychologiczno-pedagogiczna"
-    .replace(/([A-Za-zÀ-ž]+)-\n(\p{Ll})/gu, (m, left, right) => (/o$/.test(left) && left.length >= 5 ? left + '-' : left) + right)
+    // dzielenie wyrazów na końcu linii; łącznik zostaje tylko w złożeniach przymiotnikowych typu
+    // "psychologiczno-pedagogiczna", "szkolno-wychowawczych" (nie w "ponadwymiaro-wych", "wycho-wawczych")
+    .replace(/([A-Za-zÀ-ž]+)-\n(\p{Ll})/gu, (m, left, right) =>
+      (left.length >= 7 && /(czn|yjn|ck|sk|ńcz|ln|rn|zn|tn|dn|ow)o$/.test(left) ? left + '-' : left) + right)
     .replace(/[ \t]+\n/g, '\n');
 }
 

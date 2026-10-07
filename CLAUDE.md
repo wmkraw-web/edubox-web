@@ -233,6 +233,22 @@ użytkownik albo CI, nigdy „z pamięci”. Publiczna strona `przepisy-i-rodo.h
 Dz.U. 2026 poz. 428 obowiązuje od 14.04.2026, § 7 ust. 6–7 i § 8 od 1.09.2026; ocena zachowania
 od 1.09.2026 – 9 obszarów z § 11 ust. 1 (Dz.U. 2026 poz. 1122); prace domowe – § 12a.
 
+**Baza przepisów EduPrawo (od 7.10.2026):** `api/_lib/legalCorpus.json` – 10 aktów (Karta Nauczyciela t.j.
+Dz.U. 2026 poz. 515, Prawo oświatowe t.j. 2026 poz. 820 + zmiana 2026/904, ustawa o systemie oświaty
+t.j. 2025/881 + 2026/319, rozporządzenie o ocenianiu t.j. 2023/2572 + zmiany 2024/438, 2025/778, 2026/1122,
+pomoc pp, kształcenie specjalne, orzeczenia 2026/428, awans 2022/1914, wycieczki 2018/1055, BHP t.j.
+2020/1604 + 2024/933), ~980 jednostek (art. / § / punkty nowelizacji z datą „obowiązuje od” i celem zmiany).
+Lista źródeł: `scripts/legal-corpus-sources.json`; budowanie: `npm i --no-save pdfjs-dist@4.10.38 && npm run
+legal:corpus` (PDF z API Sejmu → czyszczenie nagłówków, przypisów i dzielenia wyrazów → podział na jednostki;
+cytaty „…” w nowelizacjach nie tworzą nowych jednostek). Wyszukiwarka `api/_lib/legalSearch.js` (BM25 na
+rdzeniach 6/4 litery, słownik pojęć nauczycielskich, wykrywanie aktu wymienionego w pytaniu, doklejanie zmian
+do starszego brzmienia, wycinanie właściwych ustępów) działa w `api/chat.js` przy `mode: 'legal'` – baza
+ładuje się dopiero przy pierwszym pytaniu prawnym. Model cytuje WYŁĄCZNIE identyfikatory z dołączonych
+fragmentów (`cited`), a odpowiedź zawiera `sources` z dosłownym brzmieniem – EduPrawo pokazuje je pod
+podstawą prawną. Testy: `node api/_lib/legalSearch.test.js` (w `npm test`). Gdy `legal:check` zgłosi zmianę
+aktu z bazy (`usedIn: api/_lib/legalCorpus.json`): nowy tekst jednolity → popraw `text` w źródłach, nowelizacja
+→ dopisz do `amendments`, potem `npm run legal:corpus`, testy i `npm run legal:update`.
+
 **RODO – minimalizacja danych:** `api/chat.js` przed wysłaniem do OpenAI usuwa numery PESEL
 (`api/_lib/pii.js`, testy `node api/_lib/pii.test.js`; celowo NIE usuwa telefonów/e-maili/kont – nauczyciel
 wpisuje własny kontakt do pism). Gdy coś usunięto, odpowiedź ma nagłówek `X-EduBox-PII-Removed`, a
