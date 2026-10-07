@@ -266,9 +266,10 @@
                         body: JSON.stringify({ 
                             prompt: userPrompt, 
                             system: systemInstruction,
-                            temperature: 0.5,
                             format: "json",
-                            model: "gpt-4o-mini"
+                            // 'balanced' (gpt-5.4-mini): materiały terapeutyczne wymagają trzymania się zasad
+                            // (C. Gray, struktura TUS, bezpieczeństwo zabaw) – dawny model gubił je i zmyślał.
+                            model: "balanced"
                         })
                     });
                     
@@ -306,7 +307,7 @@
             // === LOGIC ===
             const generateContent = () => {
                 // Walidacja
-                if (activeTab === 'story' && (!params.childName || !params.trigger)) { showToast('Wpisz imię i opisz sytuację trudną!', 'error'); return; }
+                if (activeTab === 'story' && !params.trigger) { showToast('Opisz trudną sytuację dziecka!', 'error'); return; }
                 if (activeTab === 'tus' && !params.tusGoal) { showToast('Wpisz cel lub problem grupy!', 'error'); return; }
                 
                 window.EduBoxCore.executeWithLimitCheck(isPremium, 
@@ -325,32 +326,41 @@
                                     return;
                                 }
                                 setGenerationStep('text');
-                                setBotMessage("Piszę historyjkę i zamawiam ilustrację u malarza 3D. To potrwa kilkanaście sekund...");
-                                
-                                const sysPrompt = `Jesteś pedagogiem specjalnym. Napisz krótką Historyjkę Społeczną (Social Story) dla dziecka.
-ZASADY: 1. Bardzo prosty język, krótkie zdania. Zero metafor. 2. Struktura: Wstęp, Sytuacja trudna, Emocje (normalizacja), Rozwiązanie, Sukces.
-ZWRÓĆ WYŁĄCZNIE POPRAWNY JSON o strukturze:
+                                setBotMessage("Piszę historyjkę społeczną i dobieram do niej spokojną ilustrację. To potrwa kilkanaście sekund...");
+
+                                // Zasady historyjek społecznych (C. Gray) – te same co w Asystencie Pedagoga.
+                                // Imię dziecka NIE trafia do AI: model pisze "[imię]", a przeglądarka wstawia je na kartce.
+                                const sysPrompt = `Jesteś pedagogiem specjalnym i piszesz historyjki społeczne według zasad Carol Gray dla dzieci w spektrum autyzmu i z trudnościami w rozumieniu sytuacji społecznych.
+ZASADY:
+- Pierwsza osoba ("ja"), czas teraźniejszy, krótkie i proste zdania, bez metafor i ironii. Długość dopasuj do wieku: 3–5 lat – 6–8 zdań, 6–9 lat – 8–12 zdań, starsze dzieci – do 14 zdań.
+- Większość zdań to zdania opisowe (co się dzieje, gdzie, kto, dlaczego) i perspektywiczne (co czują lub myślą inni). Zdania o tym, co mogę zrobić, to najwyżej jedna trzecia i są pozytywne ("mogę spróbować…", "mogę poprosić…") – nigdy zakaz ani groźba.
+- Używaj słów "zwykle", "czasami" zamiast "zawsze" i "nigdy" – tekst musi być dosłownie prawdziwy.
+- Proponuj realne, bezpieczne sposoby, które dziecko naprawdę może zastosować (np. przy nadwrażliwości na dźwięki: słuchawki wygłuszające, zakrycie uszu, wcześniejsze uprzedzenie; przy złości: spokojny oddech, przejście w ciche miejsce, poproszenie dorosłego o pomoc). Nie przedstawiaj sposobów samoregulacji dziecka jako czegoś złego.
+- Jeśli nauczyciel opisał pożądane zachowanie, pokaż je jako jeden z możliwych sposobów.
+- Imię: pierwsze zdanie to dokładnie "Mam na imię [imię]." – dalej pisz w pierwszej osobie, bez imienia. W tytule nie używaj imienia.
+- Bez diagnoz i słów medycznych. Zakończ spokojnym, pozytywnym zdaniem.
+ZWRÓĆ WYŁĄCZNIE POPRAWNY JSON:
 {
-  "title": "Tytuł historyjki",
-  "content": "Treść sformatowana w HTML (używaj <p>, <strong>)",
-  "imagePrompt": "A highly concise, purely visual English description (max 15 words) of the happy ending of the story. Include a cute 3D animated style ${params.gender === 'chłopiec' ? 'boy' : 'girl'}. No text or letters."
+  "title": "Krótki tytuł bez imienia (np. Głośny dzwonek)",
+  "content": "HTML: 3–5 krótkich akapitów <p>: sytuacja i moje uczucie → co robią i czują inni → co mogę zrobić → jak będzie dobrze",
+  "imagePrompt": "One English sentence: the calm, positive final scene – a ${params.childAge} ${params.gender === 'chłopiec' ? 'boy' : 'girl'}, what the child does, facial expression, place. No text."
 }`;
-                                const usrPrompt = `Imię: ${params.childName}, Wiek: ${params.childAge}, Płeć: ${params.gender}\nTrudność (zapalnik): ${params.trigger}\nPożądane zachowanie (rozwiązanie): ${params.solution}`;
+                                const usrPrompt = `Wiek: ${params.childAge}. Płeć: ${params.gender}.
+Trudna sytuacja (co wywołuje strach lub złość): ${params.trigger}
+Pożądane zachowanie: ${params.solution.trim() || 'brak – zaproponuj realny sposób'}`;
 
                                 const textData = await fetchTherapyText(sysPrompt, usrPrompt);
 
                                 setGenerationStep('image');
                                 
                                 // Generowanie obrazka na podstawie angielskiego opisu z JSONa
-                                const hiddenInstruction = `A beautiful, highly detailed 3D animated movie style children's book illustration. MAIN SUBJECT: ${textData.imagePrompt}. The child looks calm, safe, and happy. Cozy, warm, cheerful environment. Single unified scene. CRITICAL RULE: ABSOLUTELY NO TEXT, NO LETTERS, NO WORDS anywhere on the image. Perfect masterpiece.`;
-                                
+                                // Spokojny, prosty styl jak w historyjkach Asystenta Pedagoga – czytelny dla dzieci w spektrum.
+                                const hiddenInstruction = `${textData.imagePrompt}. Simple calm flat illustration for a social story for autistic children: clean outlines, soft muted colours, plain light background, only the elements needed, clear facial expression. ABSOLUTELY NO TEXT, NO LETTERS, NO WORDS.`;
+
                                 const payload = {
-                                    prompt: hiddenInstruction, 
-                                    negative_prompt: "text, letters, words, spelling, writing, typography, watermark, creepy, scary, deformed", 
-                                    style_preset: "3d-model",
-                                    aspect_ratio: '1:1',
-                                    width: 1024,
-                                    height: 1024
+                                    prompt: hiddenInstruction,
+                                    negative_prompt: "text, letters, words, watermark, scary, deformed",
+                                    aspect_ratio: '1:1'
                                 };
 
                                 const imgData = await secureApiImageCall(payload);
@@ -366,33 +376,45 @@ ZWRÓĆ WYŁĄCZNIE POPRAWNY JSON o strukturze:
                                 }
 
                                 setGeneratedData({ type: 'story', title: textData.title, content: textData.content, image: finalImage });
-                                setBotMessage("Gotowe! Mamy przepiękną, spersonalizowaną historyjkę z obrazkiem. Dzieciakom to bardzo pomoże!");
+                                setBotMessage("Gotowe! Imię dziecka wstawiłam tylko u Ciebie w przeglądarce. Czytaj historyjkę w spokojnych chwilach, nie w trakcie trudnej sytuacji.");
 
                             } else if (activeTab === 'tus') {
                                 setBotMessage("Przygotowuję pełny scenariusz Treningu Umiejętności Społecznych...");
 
-                                const sysPrompt = `Jesteś certyfikowanym trenerem TUS (Trening Umiejętności Społecznych). Skonstruuj SZCZEGÓŁOWY i praktyczny scenariusz na 30-45 minut.
-Dopasuj zabawy do profilu grupy. ZWRÓĆ WYŁĄCZNIE POPRAWNY JSON o strukturze:
+                                const sysPrompt = `Jesteś doświadczonym trenerem TUS (Trening Umiejętności Społecznych) w szkole lub przedszkolu. Przygotuj praktyczny scenariusz jednych zajęć grupowych (45 minut) na podany cel.
+ZASADY:
+- Jedna umiejętność społeczna na zajęcia, nazwana prostym językiem (np. "czekam na swoją kolej") i rozpisana na 3–4 kroki.
+- Metody TUS: modelowanie (trener pokazuje), odgrywanie ról w parach lub małych grupach, informacja zwrotna (najpierw to, co się udało), transfer (jak ćwiczyć poza salą).
+- Dopasuj do profilu grupy: przy spektrum autyzmu stała struktura, plan zajęć na tablicy, podpowiedzi wizualne i uprzedzanie zmian; przy ADHD krótkie bloki i przerwy ruchowe; przy młodszych dzieciach zabawy i rekwizyty zamiast długich rozmów.
+- Bez zawstydzania, rywalizacji o to, kto gorszy, i bez kar. Czasy etapów sumują się do 45 minut.
+ZWRÓĆ WYŁĄCZNIE POPRAWNY JSON:
 {
   "title": "Tytuł zajęć",
-  "content": "Skrypt w HTML. Użyj <h2> Powitanie </h2>, <h2> Psychoedukacja </h2>, <h2> Scenka ról </h2>, <h2> Relaksacja </h2>. Pisz szczegółowo, dodając instrukcje (co mówi trener)."
+  "content": "HTML: <h2>Cel i umiejętność</h2> (1–2 zdania + kroki umiejętności w <ol>), <h2>Materiały</h2> (<ul>), <h2>Przebieg zajęć</h2> jako <table> z wierszem nagłówka Etap | Czas | Co robi trener (z przykładowymi słowami w cudzysłowie) | Co robią uczestnicy – etapy: powitanie i rundka, wprowadzenie, modelowanie, odgrywanie ról, informacja zwrotna, zabawa utrwalająca, wyciszenie, zakończenie i rundka; <h2>Dostosowania</h2> (<ul>), <h2>Transfer – zadanie na tydzień</h2> (<p>)"
 }`;
-                                const usrPrompt = `Wiek/Profil: ${params.childAge}, ${params.tusGroup}\nProblem do przepracowania: ${params.tusGoal}`;
+                                // Wiek jest w profilu grupy (pole "Profil grupy / Wiek"); ukryte pole wieku z zakładki historyjek tu nie trafia.
+                                const usrPrompt = `Profil grupy i wiek: ${params.tusGroup}
+Cel zajęć / problem do przepracowania: ${params.tusGoal}`;
 
                                 const textData = await fetchTherapyText(sysPrompt, usrPrompt);
                                 setGeneratedData({ type: 'tus', title: textData.title, content: textData.content });
-                                setBotMessage("Scenariusz TUS gotowy! Konkretne kroki, proste polecenia. Drukuj i wchodź na salę.");
+                                setBotMessage("Scenariusz TUS gotowy: modelowanie, odgrywanie ról, informacja zwrotna i zadanie na tydzień. Dopasuj czas do swojej grupy.");
 
                             } else if (activeTab === 'sensory') {
                                 setBotMessage("Szukam najciekawszych zabaw z użyciem tanich materiałów...");
 
-                                const sysPrompt = `Jesteś terapeutą Integracji Sensorycznej (SI). Wygeneruj 3 kreatywne, tanie w przygotowaniu zabawy sensoryczne celujące w wybrany obszar.
-ZWRÓĆ WYŁĄCZNIE POPRAWNY JSON o strukturze:
+                                const sysPrompt = `Jesteś terapeutką pracującą z dziećmi z trudnościami w przetwarzaniu sensorycznym. Zaproponuj 3 bezpieczne zabawy sensoryczne do przedszkola lub szkoły na wybrany cel, z tanich, codziennych materiałów.
+ZASADY:
+- To propozycje zabaw, nie terapia: nie obiecuj efektów leczniczych; przy nasilonych trudnościach zaproponuj konsultację z terapeutą integracji sensorycznej.
+- Bezpieczeństwo: dla dzieci do 4 lat bez drobnych elementów (ryzyko zadławienia); przy jedzeniu i zapachach zapytaj wcześniej o alergie; dziecko zawsze może przerwać – nie zmuszamy do dotyku.
+- Każda zabawa: nazwa, potrzebne materiały, przebieg krok po kroku, na co patrzeć (sygnały, że dziecko ma dość), wariant łatwiejszy i trudniejszy.
+ZWRÓĆ WYŁĄCZNIE POPRAWNY JSON:
 {
-  "title": "Nazwa Pakietu Zabaw",
-  "content": "Zabawy w formacie HTML (<h2>1. Nazwa zabawy</h2><p><strong>Potrzebne:</strong> ...</p><p><strong>Opis wykonania:</strong> ...</p>)"
+  "title": "Nazwa zestawu zabaw",
+  "content": "HTML: dla każdej zabawy <h2>1. Nazwa</h2>, <p><strong>Potrzebne:</strong> …</p>, <p><strong>Przebieg:</strong></p> z <ol>, <p><strong>Obserwuj:</strong> …</p>, <p><strong>Łatwiej / trudniej:</strong> …</p>; na końcu <h2>Bezpieczeństwo</h2> z 2–3 punktami w <ul>"
 }`;
-                                const usrPrompt = `Cel stymulacji: ${params.sensoryType}\nWiek: ${params.childAge}\nZabawy mają być bezpieczne, łatwe do zrobienia w przedszkolu ze zwykłych przedmiotów.`;
+                                const usrPrompt = `Cel: ${params.sensoryType}
+Wiek dziecka: ${params.childAge}`;
 
                                 const textData = await fetchTherapyText(sysPrompt, usrPrompt);
                                 setGeneratedData({ type: 'sensory', title: textData.title, content: textData.content });
@@ -425,7 +447,9 @@ ZWRÓĆ WYŁĄCZNIE POPRAWNY JSON o strukturze:
                     let safeData = { ...generatedData };
                     if (safeData.type === 'story') safeData.image = null; 
 
-                    const configToSave = { params, activeTab, generatedData: safeData };
+                    // Imię zostaje u nauczyciela – w treści historyjki jest token [imię], w publicznej bazie nie ma imienia.
+                    const { childName, ...publicParams } = params;
+                    const configToSave = { params: publicParams, activeTab, generatedData: safeData };
                     await window.EduBoxCore.saveToGielda('therapy_market', 'EduTerapia', safeData.title, configToSave);
                     showToast("Opublikowano na Giełdzie! 🎉", "success");
                 } catch(e) {
@@ -436,13 +460,17 @@ ZWRÓĆ WYŁĄCZNIE POPRAWNY JSON o strukturze:
             };
 
             const loadFromGielda = (item) => {
-                setParams(item.config.params);
+                setParams(p => ({ ...p, ...item.config.params, childName: '' }));
                 setActiveTab(item.config.activeTab);
                 setGeneratedData(item.config.generatedData);
                 setAppMode('generator');
                 showToast("Wczytano materiał. Jeśli to historyjka, wygeneruj grafikę ponownie!", "info");
                 setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
             };
+
+            // Imię dziecka wstawiamy dopiero na kartce (do AI ani do Giełdy nie trafia).
+            const escapeHtml = (t) => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            const withChildName = (html) => String(html || '').replace(/\[imi[eę]\]/gi, params.childName.trim() ? escapeHtml(params.childName.trim()) : '[imię]');
 
             const exportToWord = () => {
                 if(!generatedData) return;
@@ -484,10 +512,10 @@ ZWRÓĆ WYŁĄCZNIE POPRAWNY JSON o strukturze:
                                     <>
                                         <div className="flex justify-between text-sm mb-1 mt-3">
                                             <span className="text-slate-400">Opracowano:</span>
-                                            <span className="font-bold text-white">{usages} / 2</span>
+                                            <span className="font-bold text-white">{usages} / 5</span>
                                         </div>
                                         <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden mb-4">
-                                            <div className="bg-pink-500 h-full" style={{width: `${(usages/2)*100}%`}}></div>
+                                            <div className="bg-pink-500 h-full" style={{width: `${Math.min(100, (usages/5)*100)}%`}}></div>
                                         </div>
                                         
                                         <div className="space-y-2">
@@ -583,7 +611,7 @@ ZWRÓĆ WYŁĄCZNIE POPRAWNY JSON o strukturze:
 
                                 <div className="glass-panel p-4 rounded-2xl border border-slate-700/50 mb-2 print-hidden flex gap-3 items-start">
                                     <span className="text-xl flex-shrink-0">ℹ️</span>
-                                    <p className="text-xs text-slate-300 leading-relaxed"><strong className="text-white">Jak to działa:</strong> trzy zakładki poniżej - „Historyjki" napiszą bajkę terapeutyczną z obrazkiem na podstawie trudnej sytuacji dziecka, „TUS" ułoży 30-minutowy plan zajęć na konkretny problem grupy (np. agresję przy przegrywaniu), a „Sensoryka" podpowie 3 ćwiczenia z materiałów, które masz pod ręką.</p>
+                                    <p className="text-xs text-slate-300 leading-relaxed"><strong className="text-white">Jak to działa:</strong> trzy zakładki poniżej - „Historyjki" napiszą historyjkę społeczną (zasady C. Gray) ze spokojną ilustracją – imię dziecka zostaje w Twojej przeglądarce; „TUS" ułoży 45-minutowe zajęcia na konkretny problem grupy (np. złość przy przegrywaniu): modelowanie, odgrywanie ról i zadanie na tydzień; „Sensoryka" podpowie 3 bezpieczne zabawy z materiałów, które masz pod ręką.</p>
                                 </div>
 
                                 <div className="glass-panel p-2 rounded-2xl flex gap-2 flex-wrap sm:flex-nowrap">
@@ -604,7 +632,7 @@ ZWRÓĆ WYŁĄCZNIE POPRAWNY JSON o strukturze:
                                         <div className="space-y-4">
                                             <h2 className="font-bold flex items-center text-pink-400 text-sm uppercase tracking-widest border-b border-slate-700/50 pb-4"><i className="ph-bold ph-book-open mr-2 text-lg"></i> Kreator Historyjek Społecznych</h2>
                                             <div className="grid grid-cols-2 gap-3">
-                                                <div><label className="text-[10px] font-bold text-slate-400 uppercase block mb-2">Imię dziecka</label><input type="text" value={params.childName} onChange={e=>setParams({...params, childName: e.target.value})} placeholder="np. Jaś" className="w-full p-4 bg-slate-900/80 border border-slate-700 rounded-xl outline-none text-white text-sm focus:border-pink-500 transition-colors" /></div>
+                                                <div><label className="text-[10px] font-bold text-slate-400 uppercase block mb-2">Imię (zostaje u Ciebie)</label><input type="text" value={params.childName} onChange={e=>setParams({...params, childName: e.target.value})} placeholder="np. Jaś" className="w-full p-4 bg-slate-900/80 border border-slate-700 rounded-xl outline-none text-white text-sm focus:border-pink-500 transition-colors" /></div>
                                                 <div><label className="text-[10px] font-bold text-slate-400 uppercase block mb-2">Wiek i Płeć</label>
                                                     <div className="flex gap-2">
                                                         <input type="text" value={params.childAge} onChange={e=>setParams({...params, childAge: e.target.value})} className="w-1/2 p-4 bg-slate-900/80 border border-slate-700 rounded-xl outline-none text-white text-sm focus:border-pink-500 transition-colors" />
@@ -702,7 +730,7 @@ ZWRÓĆ WYŁĄCZNIE POPRAWNY JSON o strukturze:
                                                     </div>
                                                 )}
 
-                                                <div className="text-base markdown-body text-slate-800" dangerouslySetInnerHTML={{ __html: window.EduBoxCore.sanitizeHtml(generatedData.content) }} />
+                                                <div className="text-base markdown-body text-slate-800" dangerouslySetInnerHTML={{ __html: window.EduBoxCore.sanitizeHtml(generatedData.type === 'story' ? withChildName(generatedData.content) : generatedData.content) }} />
                                                 
                                                 {generatedData.type === 'story' && (
                                                     <div className="mt-16 text-center text-sm font-bold text-slate-400 print-hidden border-t border-slate-200 pt-4">
