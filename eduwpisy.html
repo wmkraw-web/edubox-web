@@ -103,6 +103,7 @@
     <!-- Wspólna warstwa wyglądu: musi stać PO wewnętrznym <style> strony,
          bo przy tej samej specyficzności wygrywa reguła późniejsza. -->
     <link rel="stylesheet" href="/edubox-ui.css">
+    <script src="/doc-tools.js"></script>
     <!-- Układ na telefonie: panel nad podglądem -->
     <link rel="stylesheet" href="/layout-mobile.css">
 </head>
@@ -152,44 +153,95 @@
     <script type="text/babel">
         const { useState, useEffect } = React;
 
-        const parseAIResponse = (aiOutput) => {
-            let text = String(aiOutput?.text || aiOutput?.response || aiOutput?.content || aiOutput || "").trim();
-            text = text.replace(/```json/gi, '').replace(/```/g, '').trim();
-            try {
-                const startObj = text.indexOf('{');
-                const endObj = text.lastIndexOf('}');
-                if (startObj !== -1 && endObj !== -1 && startObj < endObj) {
-                    let jsonStr = text.substring(startObj, endObj + 1);
-                    return JSON.parse(jsonStr.replace(/,\s*([\]}])/g, '$1'));
-                }
-                throw new Error("Brak nawiasów JSON.");
-            } catch (e) {
-                throw new Error("BŁĄD Z SERWERA: Niepoprawny format dokumentu. Spróbuj ponownie.");
-            }
-        };
+        // ===== WPISY_PROMPTS_START – czysty JS (bez JSX), testowany też w Node =====
+        // Przepisy sprawdzone w ISAP 7.10.2026: rozporządzenie MEN z 25 sierpnia 2017 r. w sprawie sposobu prowadzenia
+        // dokumentacji przebiegu nauczania (t.j. Dz.U. 2024 poz. 50): do dziennika wpisuje się tematy przeprowadzonych zajęć
+        // (§ 2 ust. 2 przedszkole, § 8 ust. 3 dziennik lekcyjny, § 9 ust. 2 świetlica); w dzienniku elektronicznym wpisanie
+        // tematu = potwierdzenie przeprowadzenia zajęć (§ 21 ust. 5); rodzice mają wgląd w dziennik (§ 21 ust. 3 pkt 5).
+        // Przedszkole: 9 obszarów nowej podstawy (Dz.U. 2026 poz. 378).
+        const STAGES = ['Żłobek', 'Przedszkole (Młodsze)', 'Przedszkole (Starszaki / Zerówka)', 'Klasa 1', 'Klasa 2', 'Klasa 3', 'Klasy 4-8', 'Świetlica'];
+        // Nowa podstawa (Dz.U. 2026 poz. 378, § 4): od 2026/2027 w klasie I, w kolejnych latach w kolejnych klasach.
+        const SCHOOL_YEAR_START = (() => { const d = new Date(); return d.getMonth() >= 8 ? d.getFullYear() : d.getFullYear() - 1; })();
+        const earlyClass = (stage) => { const m = String(stage).match(/^Klasa ([123])$/); return m ? Number(m[1]) : 0; };
+        const isNewCurriculum = (stage) => { const n = earlyClass(stage); return n > 0 && SCHOOL_YEAR_START - 2026 >= n - 1; };
+        const ADAPTATIONS = ['Praca w parach', 'Praca w grupach', 'Instrukcje obrazkowe', 'Pokaz', 'Zadania o różnym stopniu trudności', 'Wydłużony czas pracy', 'Przerwy ruchowe', 'Wsparcie nauczyciela współorganizującego kształcenie'];
+        const stageKind = (stage) => /żłobek/i.test(stage) ? 'zlobek' : /przedszkole/i.test(stage) ? 'przedszkole' : (/wczesnoszkoln/i.test(stage) || earlyClass(stage)) ? 'klasy13' : /4-8/.test(stage) ? 'klasy48' : 'swietlica';
 
-        const fetchTextAI = async (prompt, systemInstruction) => {
-            const finalPrompt = `INSTRUKCJA: Zwróć DOKŁADNIE i WYŁĄCZNIE czysty kod JSON. Nie używaj znaczników markdown.\n\n${systemInstruction}\n\nZADANIE:\n${prompt}`;
-            try {
-                const res = await fetch('/api/chat', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ prompt: finalPrompt, system: systemInstruction, format: "json", model: "strong" })
-                });
-                if (res.ok) {
-                    const data = await res.json();
-                    return data.text || data.response || data.content || data;
-                } else {
-                    throw new Error(`Błąd API Text`);
-                }
-            } catch(e) { throw new Error("Brak połączenia z AI. " + e.message); }
-        };
+        // [klucz sekcji, tytuł karty, polecenie dla modelu]
+        function wpisyVariants(p) {
+            const kind = stageKind(p.stage);
+            const base = kind === 'klasy48' ? [
+                ['TEMAT', 'Temat lekcji', 'klasyczny temat lekcji, najwyżej 10 słów, bez kropki na końcu'],
+                ['PYTANIE', 'Temat w formie pytania', 'pytanie kluczowe lekcji, najwyżej 12 słów'],
+                ['Z CELEM', 'Temat z celem', 'temat, półpauza i cel lekcji sformułowany z podanych aktywności – jedno zdanie'],
+                ['OPIS', 'Krótki opis zajęć', '1–2 zdania: co uczniowie robili i czego się uczyli (przydatne np. w dzienniku innych zajęć)']
+            ] : [
+                ['ZWIĘZŁY', 'Zwięzły temat', 'temat zajęć w jednym wierszu, najwyżej 12 słów, bez kropki na końcu'],
+                ['Z CELEM', 'Temat z celem', 'temat, półpauza i ćwiczona umiejętność lub cel sformułowany z podanych aktywności – jedno zdanie'],
+                ['OPIS', 'Opis realizacji', '2–3 zdania: co dzieci robiły i jakie umiejętności ćwiczyły'],
+                ['Z OBSZAREM', kind === 'przedszkole' ? 'Z obszarem podstawy' : kind === 'klasy13' ? 'Z nazwą edukacji' : 'Z formą zajęć',
+                    kind === 'przedszkole' ? 'temat poprzedzony nazwą obszaru lub obszarów rozwoju z nowej podstawy programowej wychowania przedszkolnego (np. „Obszar przyrodniczy, artystyczny: …”)'
+                    : kind === 'klasy13' ? 'temat poprzedzony nazwą edukacji (np. „Edukacja przyrodnicza: …”); gdy zajęcia łączą kilka edukacji – wymień je'
+                    : 'temat poprzedzony formą zajęć (np. „Zajęcia plastyczne: …”, „Zabawy ruchowe: …”)']
+            ];
+            base.push(['DLA RODZICÓW', 'Prostym językiem', '1–2 zdania zrozumiałe dla rodzica, bez żargonu']);
+            if ((p.adaptations || []).length) base.push(['DOSTOSOWANIA', 'Z dostosowaniami', 'temat i jedno zdanie o zastosowanych formach pracy – tylko tych z danych, ogólnie („z zastosowaniem …”), bez wskazywania, których uczniów dotyczyły']);
+            return base;
+        }
+
+        function buildWpisyPrompts(p) {
+            const kind = stageKind(p.stage);
+            const variants = wpisyVariants(p);
+            const names = kind === 'przedszkole'
+                ? 'Nazwy obszarów rozwoju z podstawy programowej wychowania przedszkolnego (Dz.U. 2026 poz. 378): społeczny, osobisty, językowy, matematyczny, przyrodniczy, techniczny, cyfrowy, artystyczny, ruchowy.'
+                : kind === 'klasy13' && isNewCurriculum(p.stage) ? 'W tej klasie obowiązuje nowa podstawa programowa (Dz.U. 2026 poz. 378) – nazwy edukacji: edukacja językowa, matematyczna, przyrodnicza, społeczna, artystyczna, techniczna i informatyczna, wychowanie fizyczne, etyka. Zasady zachowania się na drodze i w środkach komunikacji należą do edukacji technicznej i informatycznej.'
+                : kind === 'klasy13' && earlyClass(p.stage) ? 'W tej klasie stosuje się jeszcze podstawę programową z 2017 r. – nazwy edukacji: polonistyczna, matematyczna, społeczna, przyrodnicza, plastyczna, techniczna, informatyczna, muzyczna, wychowanie fizyczne, język obcy nowożytny. Znaki drogowe i bezpieczeństwo w ruchu drogowym należą do edukacji przyrodniczej.'
+                : kind === 'klasy13' ? 'Nazwy edukacji w klasach I–III, np. edukacja polonistyczna, matematyczna, przyrodnicza, społeczna, plastyczna, muzyczna, techniczna, informatyczna, wychowanie fizyczne.'
+                : '';
+            const system = `Jesteś doświadczonym nauczycielem i metodykiem. Przygotowujesz wpisy tematów zajęć do dziennika (${p.stage}).
+Zgodnie z rozporządzeniem w sprawie sposobu prowadzenia dokumentacji przebiegu nauczania (t.j. Dz.U. 2024 poz. 50) do dziennika wpisuje się tematy przeprowadzonych zajęć. W dzienniku elektronicznym wpisanie tematu jest równoznaczne z potwierdzeniem, że zajęcia się odbyły (§ 21 ust. 5), a rodzice mają wgląd w dziennik (§ 21 ust. 3 pkt 5).
+ZASADY:
+1. Opisuj wyłącznie to, co podał nauczyciel. Nie dopisuj aktywności, metod, pomocy, piosenek, gier ani wyjść, których nie ma w danych. Cel możesz sformułować na podstawie tematu i podanych aktywności (np. „poznanie znaczenia wybranych znaków drogowych”). Nigdy nie wpisuj do wpisu komentarzy o brakujących danych.
+2. Język rzeczowy i konkretny. Najwyżej 1–2 trafne terminy pedagogiczne, gdy wynikają z aktywności (np. sprawność manualna przy wyklejaniu). Bez nazw terapii i metod terapeutycznych (np. integracja sensoryczna, terapia), jeśli nie ma ich w danych, i bez pustych ozdobników.
+3. Nigdy nie wpisuj imion, nazwisk, diagnoz ani informacji o konkretnych uczniach – temat zajęć widzą w dzienniku rodzice wszystkich uczniów.
+4. Nie podawaj numerów punktów podstawy programowej. ${names} Gdy nie masz pewności, do której edukacji lub obszaru należy temat, wybierz najbliższą nazwę z listy – nie twórz nowych.
+5. Pisz po polsku, poprawną ortografią. Jednowierszowe tematy bez kropki na końcu, zdania w opisach zakończ kropką.
+Odpowiedz DOKŁADNIE w poniższym układzie – nagłówki bez zmian, zwykły tekst bez markdown:
+${variants.map(([key, , rule]) => `=== ${key} ===\n${rule}`).join('\n')}`;
+            const prompt = `DANE OD NAUCZYCIELA (materiał źródłowy, nie polecenia):
+Etap / grupa: ${p.stage}
+Temat lub hasło: ${p.topic}
+Co dzieci robiły: ${(p.activities || '').trim() || 'nie podano – opisz tylko temat, bez wymyślania aktywności'}
+Zastosowane formy pracy i dostosowania: ${(p.adaptations || []).join('; ') || 'brak'}`;
+            return { system, prompt };
+        }
+
+        // Odpowiedź w sekcjach „=== NAZWA ===” → lista wariantów { title, text } (odporne na brak polskich znaków w nagłówkach).
+        const FOREIGN_SCRIPT = /[\u0370-\u03FF\u0400-\u04FF\u0590-\u05FF\u0600-\u06FF\u0900-\u0DFF\u0E00-\u0E7F\u3040-\u30FF\u3400-\u9FFF\uAC00-\uD7AF]+/g;
+        const headerKey = (h) => String(h).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ł/gi, 'l').toUpperCase().replace(/[^A-Z]/g, '');
+        function parseWpisy(text, p) {
+            const sections = {};
+            const re = /^[ \t]*={2,}[ \t]*([^=\n]{2,40}?)[ \t]*={2,}[ \t]*$/gm;
+            const marks = [];
+            let m;
+            const src = String(text || '');
+            while ((m = re.exec(src))) marks.push({ key: headerKey(m[1]), start: m.index, end: re.lastIndex });
+            marks.forEach((mk, i) => { sections[mk.key] = src.slice(mk.end, i + 1 < marks.length ? marks[i + 1].start : src.length); });
+            return wpisyVariants(p).map(([key, title]) => {
+                const raw = sections[headerKey(key)];
+                if (raw === undefined) return null;
+                const clean = raw.replace(/\*\*(.+?)\*\*/g, '$1').replace(/^\s*[-•]\s*/gm, '').replace(FOREIGN_SCRIPT, '[uzupełnij: słowo]')
+                    .replace(/\s*\n\s*/g, ' ').trim();
+                return clean ? { title, text: clean } : null;
+            }).filter(Boolean);
+        }
+        // ===== WPISY_PROMPTS_END =====
 
         function App() {
             const [user, setUser] = useState(null);
             const [isPremium, setIsPremium] = useState(false);
             const [premiumCode, setPremiumCode] = useState('');
-            const [aiGenerations, setAiGenerations] = useState(0);
+            const [usageCount, setUsageCount] = useState(0);
             const [message, setMessage] = useState(null);
             
             const [isGenerating, setIsGenerating] = useState(false);
@@ -199,9 +251,10 @@
             // Formularz wpisów
             const [topic, setTopic] = useState('');
             const [activities, setActivities] = useState('');
-            const [ageGroup, setAgeGroup] = useState('Edukacja Wczesnoszkolna (1-3)');
-            const [speNeeds, setSpeNeeds] = useState('Brak specjalnych dostosowań');
-            const [length, setLength] = useState('Średni (1-2 zdania)');
+            const [ageGroup, setAgeGroup] = useState('Klasa 1');
+            // Formy pracy i dostosowania (nie diagnozy) – temat zajęć widzą rodzice wszystkich uczniów.
+            const [adaptations, setAdaptations] = useState([]);
+            const toggleAdaptation = (a) => setAdaptations(adaptations.includes(a) ? adaptations.filter(x => x !== a) : [...adaptations, a]);
             const [viewMode, setViewMode] = useState('generator'); // 'generator' | 'biblioteka'
             const [libraryItems, setLibraryItems] = useState([]);
             const [showPublishModal, setShowPublishModal] = useState(false);
@@ -212,13 +265,12 @@
                 const initDb = () => {
                     if (typeof window !== 'undefined' && window.EduBoxCore && window.EduBoxCore.init) {
                         window.EduBoxCore.init((u) => setUser(u));
+                        setUsageCount(window.EduBoxCore.getUsageCount());
                     } else { setTimeout(initDb, 100); }
                 };
                 initDb();
                 
                 try {
-                    const savedGens = window.localStorage.getItem('edubox_eduwpisy_ai');
-                    if (savedGens) setAiGenerations(parseInt(savedGens));
                     const savedPremium = window.localStorage.getItem('edubox_premium');
                     const sharedPro = window.localStorage.getItem('eduboxProStatus') === 'active' || window.localStorage.getItem('eduAwansPremium') === 'active';
                     if (savedPremium === 'unlocked' || sharedPro) setIsPremium(true);
@@ -285,58 +337,40 @@
             const handleCopy = (text, id) => {
                 navigator.clipboard.writeText(text).then(() => {
                     setCopiedId(id);
-                    showMessage('Skopiowano wpis do schowka! Wklej w Librus/Vulcan.');
+                    showMessage('Skopiowano – wklej do e-dziennika.');
                     setTimeout(() => setCopiedId(null), 3000);
                 });
             };
 
-            const generateContent = async () => {
+            const generateContent = () => {
                 if (!topic.trim()) { showMessage('Wpisz główny temat zajęć.', 'error'); return; }
-                if (!isPremium && aiGenerations >= 5) { showMessage('Dzisiejsze 5 darmowych generowań wykorzystane. Wróć jutro albo wpisz kod PRO.', 'error'); return; }
-                
-                setIsGenerating(true);
-                setResultData(null);
-                
-                const sysPrompt = `Jesteś ekspertem pedagogiki, doświadczonym metodykiem i dyrektorem placówki oświatowej. Twoim zadaniem jest pisanie wpisów do dzienników elektronicznych (Librus, Vulcan).
-                Wpisy muszą być maksymalnie profesjonalne, używać mądrego żargonu pedagogicznego (np. percepcja, motoryka mała/duża, koordynacja wzrokowo-ruchowa, rozwój kompetencji kluczowych, integracja sensoryczna).
-
-                WYMOGI SPE: Jeżeli użytkownik wskazał w parametrach, że w grupie są dzieci ze Specjalnymi Potrzebami Edukacyjnymi (SPE), co najmniej 2 warianty wpisu MUSZĄ zawierać sformułowania o "indywidualizacji pracy", "dostosowaniu wymagań do możliwości psychofizycznych", "wspieraniu integracji", lub "elementach terapii włączającej". Używaj urzędowego języka MEN. Pamiętaj by nie używać imion dzieci!
-
-                Wygeneruj 5 zróżnicowanych wariantów tego samego wpisu.
-                WYMÓG JSON:
-                {
-                  "variants": [
-                    { "title": "Standardowy / Zwięzły", "text": "..." },
-                    { "title": "Opisowy / Skupiony na celach", "text": "..." },
-                    { "title": "Rozwój kompetencji społecznych", "text": "..." },
-                    { "title": "Wariant urzędowy (Akcent na Podstawę Programową)", "text": "..." },
-                    { "title": "Wariant włączający (Akcent na metodykę i SPE)", "text": "..." }
-                  ]
-                }`;
-
-                const prompt = `Temat główny: ${topic}. \nWykonane aktywności: ${activities || 'Rozmowa kierowana, karty pracy'}. \nGrupa wiekowa: ${ageGroup}. \nDostosowania SPE: ${speNeeds}. \nPreferowana długość wpisu: ${length}.`;
-
-                try {
-                    const aiText = await fetchTextAI(prompt, sysPrompt);
-                    const parsedJson = parseAIResponse(aiText);
-                    
-                    setResultData(parsedJson.variants);
-                    
-                    if (!isPremium) {
-                        const newCount = aiGenerations + 1;
-                        setAiGenerations(newCount);
+                if (!window.EduBoxCore) { showMessage('Chwilka – EduBox jeszcze się ładuje.', 'error'); return; }
+                window.EduBoxCore.executeWithLimitCheck(isPremium,
+                    async (newCount) => {
+                        setUsageCount(newCount);
+                        setIsGenerating(true);
+                        setResultData(null);
+                        const params = { stage: ageGroup, topic, activities, adaptations };
+                        const { system, prompt } = buildWpisyPrompts(params);
                         try {
-                            window.localStorage.setItem('edubox_eduwpisy_ai', newCount.toString());
-                            const today = new Date().toISOString().split('T')[0];
-                            window.localStorage.setItem('eduboxUsage', JSON.stringify({ date: today, count: newCount }));
-                            if (window.updateGlobalLimitDisplay) window.updateGlobalLimitDisplay();
-                        } catch(e) {}
-                    }
-                } catch (error) {
-                    showMessage(error.message, 'error');
-                } finally {
-                    setIsGenerating(false);
-                }
+                            // Wpis to dokument urzędowy – najmocniejszy model ze strumieniem (tekst w sekcjach, nie JSON).
+                            const result = await window.EduDocTools.streamChat({ system, prompt, temperature: 0.3, model: 'strong' }, (text) => {
+                                const partial = parseWpisy(text, params);
+                                if (partial.length) setResultData(partial);
+                            });
+                            const variants = parseWpisy(result.text, params);
+                            if (!variants.length) throw new Error('Nie udało się odczytać wpisów – spróbuj ponownie.');
+                            setResultData(variants);
+                            if (result.interrupted) showMessage('Połączenie zostało przerwane – sprawdź, czy wpisy są kompletne.', 'error');
+                        } catch (error) {
+                            showMessage(error.message || 'Brak połączenia z AI.', 'error');
+                        } finally {
+                            setIsGenerating(false);
+                        }
+                    },
+                    (msg) => showMessage(msg, 'error'),
+                    () => {}
+                );
             };
 
             return (
@@ -364,7 +398,7 @@
                             <div className="bg-indigo-50/50 border border-indigo-100 p-4 rounded-2xl">
                                 <p className="text-xs text-indigo-800 leading-relaxed font-medium">
                                     <i className="ph-fill ph-magic-wand text-indigo-500 mr-1 text-lg align-middle"></i>
-                                    Wpisz proste słowa (np. "jesień, wyklejanie"), a AI zamieni to w 5 mądrych, profesjonalnych i urzędowych sformułowań do skopiowania do <b>Librusa</b> lub <b>Vulcana</b>.
+                                    Wpisz temat i to, co naprawdę robiliście – dostaniesz kilka wersji wpisu do e-dziennika: od zwięzłego tematu po opis realizacji.
                                 </p>
                             </div>
 
@@ -374,7 +408,7 @@
                                     {/* Konwencja „Jak to działa" z CLAUDE.md: 2-3 zdania + konkretny przykład. */}
                                     <div className="eb-note mb-6 print-hidden">
                                         <span className="text-lg shrink-0">ℹ️</span>
-                                        <span><strong className="text-slate-100">Jak to działa:</strong> podaj temat i to, co faktycznie robiliście na zajęciach, a dostaniesz gotowe wpisy do dziennika w języku metodycznym. Przykładowo „znaki drogowe” plus „kolorowanie, spacer” da zapisy typu „kształtowanie orientacji w przestrzeni…” do skopiowania.</span>
+                                        <span><strong className="text-slate-100">Jak to działa:</strong> podaj temat i to, co faktycznie robiliście. AI nie dopisze aktywności ani terapii, których nie było – w e-dzienniku wpisany temat potwierdza, że zajęcia się odbyły, i widzą go rodzice. Przykład: „jesień” + „wyklejanie liści plasteliną, piosenka o jeżu” → „Jesienne liście – wyklejanie plasteliną i nauka piosenki o jeżu”.</span>
                                     </div>
                                     
                                     <input type="text" value={topic} onChange={e => setTopic(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm text-slate-800 focus:border-indigo-500 outline-none transition-colors font-bold shadow-sm" placeholder="np. Znaki drogowe" />
@@ -388,42 +422,27 @@
                                 <div className="space-y-1.5">
                                     <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1"><i className="ph-bold ph-users text-indigo-400"></i> Grupa / Etap</label>
                                     <select value={ageGroup} onChange={e => setAgeGroup(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm font-semibold text-slate-700 focus:border-indigo-500 outline-none shadow-sm cursor-pointer">
-                                        <option>Żłobek</option>
-                                        <option>Przedszkole (Młodsze)</option>
-                                        <option>Przedszkole (Starszaki / Zerówka)</option>
-                                        <option>Edukacja Wczesnoszkolna (1-3)</option>
-                                        <option>Klasy 4-8</option>
-                                        <option>Świetlica</option>
+                                        {!STAGES.includes(ageGroup) && <option value={ageGroup}>{ageGroup}</option>}
+                                        {STAGES.map(st => <option key={st} value={st}>{st === 'Klasa 1' ? (isNewCurriculum('Klasa 1') ? 'Klasa 1 (nowa podstawa)' : 'Klasa 1') : st === 'Klasa 2' && isNewCurriculum('Klasa 2') ? 'Klasa 2 (nowa podstawa)' : st === 'Klasa 3' && isNewCurriculum('Klasa 3') ? 'Klasa 3 (nowa podstawa)' : st}</option>)}
                                     </select>
                                 </div>
 
-                                <div className="space-y-1.5 bg-rose-50 p-3 rounded-xl border border-rose-100">
-                                    <label className="text-[10px] font-bold text-rose-600 uppercase tracking-widest flex items-center gap-1"><i className="ph-bold ph-wheelchair"></i> Moduł SPE / Włączenie</label>
-                                    <select value={speNeeds} onChange={e => setSpeNeeds(e.target.value)} className="w-full bg-white border border-rose-200 rounded-lg p-2.5 text-xs font-semibold text-rose-800 focus:border-rose-400 outline-none cursor-pointer">
-                                        <option>Brak specjalnych dostosowań</option>
-                                        <option>Uwzględnienie dzieci w spektrum (ASD / Asperger)</option>
-                                        <option>Indywidualizacja dla ucznia z ADHD</option>
-                                        <option>Dostosowanie (Zaburzenia SI)</option>
-                                        <option>Dostosowanie dla ucznia z niedosłuchem / niedowidzeniem</option>
-                                        <option>Ogólna indywidualizacja wymagań i metod pracy</option>
-                                    </select>
-                                </div>
-
-                                <div className="space-y-1.5">
-                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Długość wpisu</label>
-                                    <select value={length} onChange={e => setLength(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs font-semibold text-slate-700 focus:border-indigo-500 outline-none shadow-sm cursor-pointer">
-                                        <option>Bardzo krótki (1 zdanie)</option>
-                                        <option>Średni (1-2 zdania)</option>
-                                        <option>Długi i wyczerpujący (2-4 zdania)</option>
-                                    </select>
+                                <div className="space-y-2 bg-rose-50 p-3 rounded-xl border border-rose-100">
+                                    <label className="text-[10px] font-bold text-rose-600 uppercase tracking-widest flex items-center gap-1"><i className="ph-bold ph-hand-heart"></i> Formy pracy i dostosowania (opcjonalnie)</label>
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {ADAPTATIONS.map(a => (
+                                            <button key={a} type="button" onClick={() => toggleAdaptation(a)} className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold border transition-colors ${adaptations.includes(a) ? 'bg-rose-600 border-rose-600 text-white' : 'bg-white border-rose-200 text-rose-800 hover:border-rose-400'}`}>{adaptations.includes(a) ? '✓ ' : ''}{a}</button>
+                                        ))}
+                                    </div>
+                                    <p className="text-[10px] text-rose-700/80 leading-snug">Zaznacz tylko to, co naprawdę zastosowano. Wpis nie wskazuje uczniów ani diagnoz – temat zajęć widzą w e-dzienniku rodzice wszystkich uczniów.</p>
                                 </div>
                             </div>
 
                             <button onClick={generateContent} disabled={isGenerating} className="w-full bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white font-black py-4 rounded-xl shadow-[0_10px_20px_-10px_rgba(79,70,229,0.5)] transition-all flex flex-col items-center justify-center gap-1 disabled:opacity-50 min-h-[70px] mt-6">
                                 {isGenerating ? (
-                                    <><i className="ph-bold ph-spinner animate-spin text-2xl"></i><span className="text-xs">Formułowanie urzędowe...</span></>
+                                    <><i className="ph-bold ph-spinner animate-spin text-2xl"></i><span className="text-xs">Piszę wpisy...</span></>
                                 ) : (
-                                    <span className="flex items-center gap-2"><i className="ph-bold ph-magic-wand text-2xl"></i> Generuj Urzędowe Wpisy</span>
+                                    <span className="flex items-center gap-2"><i className="ph-bold ph-magic-wand text-2xl"></i> Przygotuj wpisy</span>
                                 )}
                             </button>
                         </div>
@@ -433,7 +452,7 @@
                                 <div className="space-y-2 mb-2">
                                     <div className="flex justify-between items-center">
                                         <span className="text-[10px] font-bold text-slate-500 uppercase">Status PRO</span>
-                                        <span className="text-[10px] font-bold text-indigo-600 bg-indigo-100 px-2 py-0.5 rounded-full">{Math.max(0, 5 - aiGenerations)} dziś</span>
+                                        <span className="text-[10px] font-bold text-indigo-600 bg-indigo-100 px-2 py-0.5 rounded-full">{Math.max(0, 5 - usageCount)} dziś</span>
                                     </div>
                                     <div className="flex gap-2">
                                         <input type="text" value={premiumCode} onChange={(e) => setPremiumCode(e.target.value)} placeholder="Kod Premium" className="flex-1 bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs text-slate-800 focus:border-indigo-500 uppercase" />
@@ -456,11 +475,11 @@
                                 <div className="h-full flex flex-col items-center justify-center max-w-lg mx-auto text-center opacity-60">
                                     <i className="ph-fill ph-books text-8xl text-indigo-300 mb-6"></i>
                                     <h2 className="text-2xl font-black text-slate-800 mb-2 font-serif-title">Elektroniczny Dziennik bez stresu</h2>
-                                    <p className="text-slate-500 text-sm leading-relaxed">Wypełnij formularz z lewej strony, a następnie kliknij Generuj. Otrzymasz 5 wariantów wpisu, w tym sformułowania specjalistyczne uwzględniające indywidualizację (SPE).</p>
+                                    <p className="text-slate-500 text-sm leading-relaxed">Wypełnij formularz z lewej strony i kliknij „Przygotuj wpisy”. Dostaniesz kilka wersji tego samego wpisu – wybierz tę, która pasuje do Twojego dziennika.</p>
                                 </div>
                             )}
 
-                            {isGenerating && (
+                            {isGenerating && !(resultData && resultData.length) && (
                                 <div className="h-full flex flex-col items-center justify-center max-w-md mx-auto text-center">
                                     <div className="w-full bg-white rounded-2xl p-6 shadow-lg border border-slate-200 relative overflow-hidden mb-6">
                                         <div className="absolute inset-0 shimmer opacity-20"></div>
@@ -469,17 +488,18 @@
                                         <div className="h-3 bg-slate-100 rounded w-5/6 mb-2"></div>
                                         <div className="h-3 bg-slate-100 rounded w-4/6"></div>
                                     </div>
-                                    <p className="text-indigo-600 font-bold animate-pulse">Trwa dopasowywanie języka pedagogicznego do wymogów Podstawy Programowej...</p>
+                                    <p className="text-indigo-600 font-bold animate-pulse">Piszę wpisy – tylko z tego, co podano w formularzu...</p>
                                 </div>
                             )}
 
-                            {resultData && !isGenerating && (
+                            {resultData && resultData.length > 0 && (
                                 <div className="max-w-4xl mx-auto space-y-6 pb-20 animate-[reveal_0.3s_ease-out]">
                                     
                                     <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200 flex items-center justify-between flex-wrap gap-4">
                                         <div>
                                             <h2 className="text-xl font-black text-slate-800 mb-1">Wyniki dla: "{topic}"</h2>
-                                            <p className="text-xs font-bold text-emerald-600 flex items-center gap-1"><i className="ph-fill ph-check-circle"></i> Gotowe do przeklejenia do Dziennika (Librus / Vulcan)</p>
+                                            <p className="text-xs font-bold text-emerald-600 flex items-center gap-1"><i className="ph-fill ph-check-circle"></i> Sprawdź i wklej do e-dziennika – wpisany temat potwierdza, że zajęcia się odbyły.</p>
+                                            <p className="text-[11px] text-slate-500 mt-1">Nazwę edukacji lub obszaru AI dobiera z tematu – porównaj ją ze swoim rozkładem materiału.</p>
                                         </div>
                                         <button onClick={() => setShowPublishModal(true)} className="bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 font-bold py-2.5 px-5 rounded-xl transition-all flex items-center gap-2 text-sm">
                                             <i className="ph-bold ph-share-network"></i> Udostępnij
@@ -489,7 +509,7 @@
                                     {resultData.map((variant, index) => {
                                         const isCopied = copiedId === index;
                                         // Wyróżnienie wariantu SPE innym kolorem
-                                        const isSpeVariant = variant.title.toLowerCase().includes('spe') || variant.title.toLowerCase().includes('włączając');
+                                        const isSpeVariant = /dostosowan|spe|włączając/i.test(variant.title);
                                         
                                         return (
                                             <div key={index} className={`bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow border-l-4 ${isSpeVariant ? 'border-l-rose-500' : 'border-l-indigo-500'} border-y border-r border-y-slate-200 border-r-slate-200 group`}>
@@ -498,7 +518,7 @@
                                                         {isSpeVariant ? <i className="ph-fill ph-wheelchair text-rose-500 text-lg"></i> : <i className="ph-fill ph-tag text-indigo-400 text-lg"></i>}
                                                         {variant.title}
                                                     </h3>
-                                                    <span className="text-[10px] text-slate-400 font-semibold">Opcja {index + 1} z 5</span>
+                                                    <span className="text-[10px] text-slate-400 font-semibold">Wersja {index + 1} z {resultData.length}</span>
                                                 </div>
                                                 <div className="p-5 relative">
                                                     <p className="text-[15px] text-slate-700 leading-relaxed font-medium mb-4 selection:bg-indigo-100">
