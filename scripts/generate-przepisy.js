@@ -29,6 +29,9 @@ const toolLabel = (f) => f.startsWith('wzory-drukow/') ? null : (TOOL_NAMES[f] |
 
 // Rejestr zmian po przeglądach (najnowsze na górze).
 const CHANGELOG = [
+  ['7 października 2026', [
+    'Polityka prywatności: nowa sekcja o grafikach AI i wgrywanych zdjęciach (dostawcy: Fal.ai i modele OpenAI GPT Image, opis wzoru przez OpenAI) z prośbą, by nie wgrywać zdjęć osób; zamiana zdjęcia w kolorowankę w MagicColor działa lokalnie.'
+  ]],
   ['6 października 2026', [
     'Ocena zachowania: 9 podstawowych obszarów obowiązujących od 1 września 2026 r. (nowe brzmienie § 11 ust. 1, Dz.U. 2026 poz. 1122) – w EduOcena i na stronie z przykładami.',
     'Orzeczenia i opinie poradni (Dz.U. 2026 poz. 428): doprecyzowane daty (rozporządzenie obowiązuje od 14 kwietnia 2026 r., przepisy o treści opinii szkoły – od 1 września 2026 r.) i termin 10 dni na przekazanie opinii przez szkołę; nowy wzór opinii zgodny z § 7 ust. 6–7.',
@@ -144,7 +147,7 @@ ${actsHtml}
       <h2 class="text-xl font-extrabold text-slate-900 mb-3">Dane i RODO – co dzieje się z tekstem, który wpisujesz</h2>
       <ul class="space-y-3">
         <li class="flex gap-3"><span class="text-indigo-600 font-bold">•</span><span><strong>Bez rejestracji i bez konta.</strong> Nie znamy Twojego imienia ani adresu e-mail, chyba że sam/-a zapiszesz się na powiadomienia.</span></li>
-        <li class="flex gap-3"><span class="text-indigo-600 font-bold">•</span><span><strong>Tekst trafia do dostawcy AI tylko po to, by przygotować odpowiedź</strong> (teksty: OpenAI, obrazy: Fal.ai). Nie zapisujemy go na naszych serwerach ani w logach.</span></li>
+        <li class="flex gap-3"><span class="text-indigo-600 font-bold">•</span><span><strong>Tekst trafia do dostawcy AI tylko po to, by przygotować odpowiedź</strong> (teksty: OpenAI; obrazy: Fal.ai, który część grafik wykonuje modelami OpenAI). Nie zapisujemy go na naszych serwerach ani w logach. Nie wgrywaj zdjęć dzieci ani innych osób jako wzoru grafiki – wystarczy rysunek albo zdjęcie przedmiotu.</span></li>
         <li class="flex gap-3"><span class="text-indigo-600 font-bold">•</span><span><strong>OpenAI (API) nie używa tych treści do trenowania modeli</strong> i – zgodnie ze swoimi zasadami – przechowuje je do 30 dni wyłącznie w celu wykrywania nadużyć. Przekazanie danych do USA odbywa się w ramach EU-U.S. Data Privacy Framework i standardowych klauzul umownych.</span></li>
         <li class="flex gap-3"><span class="text-indigo-600 font-bold">•</span><span><strong>Automatyczna ochrona:</strong> zanim tekst trafi do AI, nasz serwer usuwa z niego numery PESEL. Przy publikacji w Giełdzie Wzorów EduOcena zamienia imię ucznia na inicjał. W Asystencie Pedagoga imię i nazwisko ucznia w ogóle nie trafia do AI – wstawiamy je do gotowego dokumentu dopiero w Twojej przeglądarce.</span></li>
         <li class="flex gap-3"><span class="text-indigo-600 font-bold">•</span><span><strong>Twoja rola jest najważniejsza:</strong> nie wpisuj imion, nazwisk, PESEL-i, adresów ani diagnoz. Używaj inicjałów i ogólnych opisów, a dane ucznia uzupełniaj dopiero w dokumencie szkoły.</span></li>
