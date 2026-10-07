@@ -76,7 +76,7 @@
             .print-hidden, #wspolne-menu-kontener, nav { display: none !important; }
             main { padding: 0 !important; margin: 0 !important; }
             .glass-panel { background: transparent !important; border: none !important; box-shadow: none !important; }
-            #print-container { border: none !important; box-shadow: none !important; padding: 0 !important; margin: 0 !important; width: 100% !important; max-width: 100% !important; background: white !important; }
+            #print-container { border: none !important; box-shadow: none !important; padding: 0 !important; margin: 0 !important; width: 100% !important; max-width: 100% !important; min-height: 0 !important; background: white !important; }
             .page-break { page-break-before: always; }
             .doc-editable { box-shadow: none !important; }
             .page-break-inside-avoid { break-inside: avoid; page-break-inside: avoid; }
@@ -155,7 +155,8 @@
         // Przepisy sprawdzone w ISAP 7.10.2026: art. 44i ust. 1 pkt 2 ustawy o systemie oświaty (w klasach I–III
         // oceny klasyfikacyjne z zajęć i z zachowania są opisowe), § 8, § 9 ust. 3 i § 11 ust. 1 i 3 rozporządzenia
         // w sprawie oceniania (zmiany Dz.U. 2026 poz. 1122 od 1.09.2026), podstawa programowa Dz.U. 2026 poz. 378
-        // (§ 4: od 2026/2027 w klasie I, w kolejnych latach w kolejnych klasach; klasy II–III – podstawa z 2017 r.).
+        // (§ 4: od 2026/2027 w klasie I, w kolejnych latach w kolejnych klasach; klasy II–III – przejściowo podstawa z 2017 r.,
+        // formalnie uchylona od 1.09.2026 przez Dz.U. 2026 poz. 1012, ale stosowana na mocy § 4 ust. 2).
         const SCHOOL_YEAR_START = (() => { const d = new Date(); return d.getMonth() >= 8 ? d.getFullYear() : d.getFullYear() - 1; })();
         const SCHOOL_YEAR = `${SCHOOL_YEAR_START}/${SCHOOL_YEAR_START + 1}`;
         const classNumber = (level) => parseInt(String(level).replace(/\D/g, ''), 10) || 0;
@@ -269,7 +270,7 @@ Zakończ jednym zdaniem wskazówki do dalszej pracy.`;
             } else {
                 task = `Jesteś doświadczonym nauczycielem edukacji wczesnoszkolnej. Piszesz ${yearly ? 'roczną' : 'śródroczną'} opisową ocenę klasyfikacyjną z zajęć edukacyjnych ${nounGen} klasy ${classNumber(p.classLevel)} szkoły podstawowej (w klasach I–III jest ona opisowa – art. 44i ust. 1 pkt 2 ustawy o systemie oświaty).
 Zgodnie z § 8 rozporządzenia w sprawie oceniania ocena: (1) opisuje poziom i postępy w opanowaniu wiadomości i umiejętności w odniesieniu do wymagań podstawy programowej; (2) wskazuje potrzeby rozwojowe i edukacyjne ${nounGen} związane z przezwyciężaniem trudności w nauce lub rozwijaniem uzdolnień – zakończ tekst 1–2 zdaniami o tym, co warto dalej rozwijać i w czym potrzebne jest wsparcie.
-${newPP ? 'W tej klasie obowiązuje nowa podstawa programowa (Dz.U. 2026 poz. 378): edukacja językowa, matematyczna, przyrodnicza, społeczna, artystyczna, techniczna i informatyczna, wychowanie fizyczne, etyka.' : 'W tej klasie obowiązuje podstawa programowa z 2017 r. (edukacje: polonistyczna, matematyczna, społeczna, przyrodnicza, plastyczna, techniczna, informatyczna, muzyczna, wychowanie fizyczne, język obcy nowożytny).'} Nazywaj edukacje tak jak w danych i opisz tylko te, które podano – w płynnym tekście (np. „W edukacji matematycznej…”), bez listy.
+${newPP ? 'W tej klasie obowiązuje nowa podstawa programowa (Dz.U. 2026 poz. 378): edukacja językowa, matematyczna, przyrodnicza, społeczna, artystyczna, techniczna i informatyczna, wychowanie fizyczne, etyka.' : `W tej klasie w roku szkolnym ${SCHOOL_YEAR} stosuje się jeszcze podstawę programową z 2017 r. (edukacje: polonistyczna, matematyczna, społeczna, przyrodnicza, plastyczna, techniczna, informatyczna, muzyczna, wychowanie fizyczne, język obcy nowożytny).`} Nazywaj edukacje tak jak w danych i opisz tylko te, które podano – w płynnym tekście (np. „W edukacji matematycznej…”), bez listy.
 Przy wychowaniu fizycznym i działaniach plastycznych, muzycznych i technicznych opisuj przede wszystkim wysiłek, zaangażowanie i systematyczność, a nie talent.${yearly && newPP && p.experiences ? `
 To ocena roczna, a podstawa programowa przewiduje doświadczenia edukacyjne – uwzględnij zaangażowanie ${nounGen} w ich realizację (§ 9 ust. 3 rozporządzenia w sprawie oceniania, od 1.09.2026).` : ''}
 ${yearly ? 'To ocena roczna – podsumuj cały rok szkolny i pokaż postępy.' : 'To ocena śródroczna – opisz stan po I półroczu i wskaż, nad czym pracować w II półroczu.'}`;
@@ -332,10 +333,12 @@ Napisz tekst zgodnie z instrukcją.`;
             if (name.length <= 2) return null;
             const LETTERS = 'A-Za-zĄĆĘŁŃÓŚŹŻąćęłńóśźż';
             const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            const first = name.split(/\s+/)[0];
+            // Imię zawsze z wielkiej litery i dopasowanie z rozróżnianiem wielkości liter – „Ola” nie zamieni słowa „olej”.
+            const raw = name.split(/\s+/)[0];
+            const first = raw.charAt(0).toUpperCase() + raw.slice(1);
             const stem = /a$/i.test(first) ? first.slice(0, Math.max(2, first.length - 1))
                 : first.length >= 5 ? first.slice(0, first.length - 2) : first;
-            return new RegExp('(^|[^' + LETTERS + '])' + escapeRe(stem) + '[' + LETTERS + ']{0,5}(?![' + LETTERS + '])', 'gi');
+            return new RegExp('(^|[^' + LETTERS + '])' + escapeRe(stem) + '[' + LETTERS + ']{0,5}(?![' + LETTERS + '])', 'g');
         }
         function scrubName(text, fullName) {
             const re = nameMatcher(fullName);
@@ -736,7 +739,7 @@ Napisz tekst zgodnie z instrukcją.`;
                                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Długość tekstu</label>
                                     <div className="grid grid-cols-3 gap-2 p-1 bg-slate-900 border border-slate-700 rounded-xl">
                                         {Object.entries(OCENA_LENGTHS).map(([k, l]) => (
-                                            <button key={k} type="button" title={l.hint} onClick={() => setParams({...params, length: k})} className={`py-2 px-1 rounded-lg text-[11px] font-bold leading-tight transition-colors ${params.length === k ? 'bg-violet-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}>{l.label}</button>
+                                            <button key={k} type="button" title={l.hint} onClick={() => setParams({...params, length: k})} className={`py-2 px-1 rounded-lg text-[11px] font-bold leading-tight transition-colors ${params.length === k ? 'bg-violet-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}>{isPreschool ? l.label.split(' – ')[0] : l.label}</button>
                                         ))}
                                     </div>
                                     <p className="text-[11px] text-slate-500 mt-1.5">{(OCENA_LENGTHS[params.length] || OCENA_LENGTHS.srednia).hint}</p>

@@ -288,6 +288,17 @@ narzędziach – także tego, że eksport czyta `innerHTML` kartki przez ref, a 
 Wydruk z ciemnych paneli dawał jasnoszary tekst – w narzędziach bez białej kartki dodawaj do
 `@media print` regułę `#root * { color:#000 !important }` albo używaj `printDoc`.
 
+**EduOcena (od 10.2026):** instrukcje są w bloku `OCENA_PROMPTS_START…END` w `eduocena.html` (czysty JS,
+testy `npm run ocena:check` przez `vm`). Przepisy sprawdzone w ISAP: art. 44i ust. 1 pkt 2 UoSO, § 8 (poziom
+i postępy + potrzeby rozwojowe i edukacyjne), § 9 ust. 3 (klasa w nowej podstawie, ocena roczna: zaangażowanie
+w doświadczenia edukacyjne) i § 11 ust. 1 i 3 rozporządzenia o ocenianiu. Nowa podstawa (Dz.U. 2026 poz. 378)
+działa według roku szkolnego (`isNewCurriculum`: 2026/27 klasa I, potem kolejne), klasy starsze – przejściowo
+podstawa z 2017 r. (formalnie uchylona przez Dz.U. 2026 poz. 1012, stosowana z § 4 ust. 2). Przedszkole =
+„Informacja o rozwoju dziecka” (9 obszarów podstawy, bez oceny zachowania). Imię nie trafia do AI: model pisze
+`[imię]` tylko w mianowniku, `scrubName` usuwa imię także z uwag, Giełda zapisuje tekst z tokenem. Model
+`strong` ze strumieniem (tekst, nie JSON), kartka edytowalna, „Kopiuj tekst” do dziennika, licznik znaków, Word
+z metryczką i podpisami w tabelach.
+
 **Wydruk – sprawdzanie bez drukarki:** kopia strony z wstrzykniętymi danymi wyniku → Chrome
 headless `--print-to-pdf` → strony PDF do PNG (`pdfjs-dist` + `@napi-rs/canvas`). Tak wyszły:
 baner cookies drukujący się na każdej stronie (naprawione w `cookie-consent.js`), cienie jako

@@ -123,7 +123,7 @@ Wskazówki do dalszej pracy: Warto codziennie czytać z uczniem na głos przez 1
       ['Czy w klasach 1–3 ocena klasyfikacyjna musi być opisowa?', 'Tak. W klasach I–III szkoły podstawowej śródroczne i roczne oceny klasyfikacyjne z obowiązkowych i dodatkowych zajęć edukacyjnych są ocenami opisowymi (art. 44i ust. 1 pkt 2 ustawy o systemie oświaty). Sposób ustalania ocen bieżących określa statut szkoły.'],
       ['Czym różni się ocena śródroczna od rocznej?', 'Ocena śródroczna podsumowuje pierwsze półrocze i zwykle zawiera więcej wskazówek do dalszej pracy. Ocena roczna podsumowuje cały rok szkolny i trafia na świadectwo.'],
       ['Czy w ocenie rocznej trzeba uwzględnić „doświadczenia edukacyjne”?', 'Od 1 września 2026 r. przy ustalaniu rocznej oceny klasyfikacyjnej z zajęć, dla których podstawa programowa przewiduje doświadczenia edukacyjne, bierze się pod uwagę także zaangażowanie ucznia w ich realizację (§ 9 ust. 3 rozporządzenia w sprawie oceniania, dodany rozporządzeniem z 20 sierpnia 2026 r., Dz.U. 2026 poz. 1122). Nowa podstawa programowa obowiązuje w roku szkolnym 2026/2027 w klasach I i IV.'],
-      ['Czy mogę użyć AI do pisania ocen opisowych?', 'Tak, jako pomocy w redagowaniu tekstu – ale zawsze na podstawie własnych obserwacji, bez wpisywania danych osobowych dziecka (zamiast imienia użyj inicjału) i z uważnym sprawdzeniem wyniku. Ocenę wystawia nauczyciel.'],
+      ['Czy mogę użyć AI do pisania ocen opisowych?', 'Tak, jako pomocy w redagowaniu tekstu – ale zawsze na podstawie własnych obserwacji, bez wpisywania danych osobowych dziecka (imię zostaw tylko u siebie – np. w EduOcena imię wpisane w polu nie trafia do AI) i z uważnym sprawdzeniem wyniku. Ocenę wystawia nauczyciel.'],
       ['Jak długa powinna być ocena opisowa?', 'Na tyle, by była konkretna – zwykle kilka zdań na każdą edukację. Ważniejsze od długości są trafność i wskazówki, z których rodzic może skorzystać.']
     ],
     legal: [
@@ -135,7 +135,7 @@ Wskazówki do dalszej pracy: Warto codziennie czytać z uczniem na głos przez 1
       name: 'EduOcena AI',
       url: 'eduocena.html',
       campaign: 'oceny-opisowe',
-      text: 'Wybierz z list poziom ucznia (edukacja polonistyczna, matematyczna, rozwój społeczno-emocjonalny), dopisz własne obserwacje, a AI złoży z tego spójny, życzliwy tekst oceny. Za darmo, bez rejestracji. Zamiast imienia wpisz inicjał.'
+      text: 'Wybierz okres (śródroczna lub roczna) i z list poziom ucznia w edukacjach – polonistycznej, matematycznej, społecznej i, jeśli chcesz, pozostałych. Dopisz własne obserwacje, a AI złoży z tego spójny, życzliwy tekst: poziom i postępy oraz to, co dalej rozwijać (§ 8 rozporządzenia o ocenianiu). Tekst poprawisz na kartce i skopiujesz do dziennika. Za darmo, bez rejestracji; imię zostaje w Twojej przeglądarce.'
     }
   },
   {
@@ -234,7 +234,7 @@ Wskazówki: Warto chwalić ucznia za każdą sytuację, w której zachował spok
       name: 'EduOcena AI',
       url: 'eduocena.html?typ=zachowanie',
       campaign: 'ocena-zachowania',
-      text: 'Otwiera się od razu w trybie oceny zachowania: wybierz poziom w trzech obszarach (obowiązki, relacje, kultura i bezpieczeństwo), dopisz własne obserwacje, a AI zredaguje spójny, życzliwy opis z uwzględnieniem obszarów obowiązujących od 1 września 2026 r. Za darmo, bez rejestracji. Zamiast imienia wpisz inicjał.'
+      text: 'Otwiera się od razu w trybie oceny zachowania: wybierz poziom w trzech głównych obszarach (obowiązki, relacje, kultura i bezpieczeństwo) i – jeśli chcesz – w pozostałych z 9 obszarów obowiązujących od 1 września 2026 r., dopisz własne obserwacje, a AI zredaguje spójny, życzliwy opis. Za darmo, bez rejestracji; imię zostaje w Twojej przeglądarce.'
     },
     extraLink: { text: 'Trudna rozmowa z rodzicem? Zobacz przykłady spokojnych wiadomości →', url: 'wiadomosc-do-rodzica-przyklady.html' }
   },

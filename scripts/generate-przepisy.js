@@ -30,6 +30,7 @@ const toolLabel = (f) => f.startsWith('wzory-drukow/') ? null : (TOOL_NAMES[f] |
 // Rejestr zmian po przeglądach (najnowsze na górze).
 const CHANGELOG = [
   ['7 października 2026', [
+    'EduOcena: ocena opisowa zgodna z § 8 rozporządzenia o ocenianiu (poziom i postępy oraz potrzeby rozwojowe i edukacyjne ucznia), nazwy edukacji według podstawy programowej obowiązującej w danej klasie (klasa I – nowa podstawa, Dz.U. 2026 poz. 378; klasy II–III – przejściowo podstawa z 2017 r.), przy ocenie rocznej w klasie I – zaangażowanie w doświadczenia edukacyjne (§ 9 ust. 3, od 1 września 2026 r.), w ocenie zachowania – wpływ trudności ucznia z orzeczeniem lub opinią poradni (§ 11 ust. 3). Imię dziecka nie jest wysyłane do AI.',
     'EduPrawo odpowiada na podstawie bazy przepisów EduBox: teksty jednolite z ISAP (m.in. Karta Nauczyciela – Dz.U. 2026 poz. 515, Prawo oświatowe – Dz.U. 2026 poz. 820, ustawa o systemie oświaty, rozporządzenia o ocenianiu, pomocy psychologiczno-pedagogicznej, kształceniu specjalnym, orzeczeniach, awansie, wycieczkach i BHP) wraz z późniejszymi zmianami, np. ocenianie od 1 września 2026 r. (Dz.U. 2026 poz. 1122). Pod odpowiedzią widać dosłowne brzmienie cytowanych przepisów.',
     'Polityka prywatności: nowa sekcja o grafikach AI i wgrywanych zdjęciach (dostawcy: Fal.ai i modele OpenAI GPT Image, opis wzoru przez OpenAI) z prośbą, by nie wgrywać zdjęć osób; zamiana zdjęcia w kolorowankę w MagicColor działa lokalnie.'
   ]],
