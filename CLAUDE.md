@@ -351,6 +351,22 @@ MagicLetters) dołącza `layout-mobile.css`: poniżej 1024 px panel nad podgląd
 (wcześniej stały panel 320–380 px zasłaniał wynik), na komputerze układ kończy się równo pod menu.
 Nowe narzędzie z panelem `<aside>` obok `<main>` = dołącz ten plik. Ruch z filmików (YouTube Shorts)
 to głównie telefony – każdą zmianę wyglądu sprawdzaj też w widoku 375 px.
+Przegląd wszystkich stron w 375 px (7.10.2026): 20 stron przewijało się w bok (do 559 px). Przyczyny, które
+się powtarzały: poświata `.hero-glow` ze starych stylów (`width: 1000px` + `translateX(-50%)`, 15 stron –
+`edubox-ui.css` przycina ją do szerokości ekranu), element `flex-1` obok paska bocznego bez `min-w-0`,
+siatka bez `grid-cols-1` (jedyna kolumna rośnie do szerokości tekstu z `truncate`), pasek przycisków bez
+`flex-wrap`, dekoracja z ujemnym `-right-*`, panel `w-72` obok treści na każdej szerokości (Asystent
+Pedagoga – teraz nad treścią poniżej `lg`). Tabele w `doc-paper.css` nie łamią już wyrazów w połowie
+(szeroka tabela przewija się w obrębie kartki). Szybki test: po wczytaniu strony w emulacji telefonu
+`document.documentElement.scrollWidth` ma być 375.
+
+**EduPrezentacja / PptxGenJS (7.10.2026):** `slide.addImage({ data })` przyjmuje WYŁĄCZNIE base64 – link https
+z fal.media zapisuje się bez błędu, ale w pliku ląduje uszkodzony obrazek. Obrazki idą przez `<canvas>` do
+JPEG (`toSlideImage`, max 1280 px; fal.media ma CORS). Darmowy użytkownik ma 1 grafikę na start, więc
+„Otwórz prezentację” i PPTX muszą działać bez kompletu grafik (slajd bez obrazka = tekst na całą szerokość).
+Quiz: odpowiedzi A/B/C na slajdzie, poprawna tylko w notatkach. Podgląd slajdu skaluje się jednostkami
+`cqw` (`.slide-frame`), więc na telefonie i rzutniku wygląda tak samo; pełny ekran działa też dotykiem
+(prawa/lewa połowa) i na iPhonie (bez API pełnego ekranu – sama nakładka z przyciskiem zamknięcia).
 
 **Podstawa prawna NIGDY od AI (od 10.2026):** modele halucynują numery artykułów i paragrafów, więc
 instrukcja dla AI zawiera zakaz powoływania przepisów, a blok „Podstawa prawna” dokleja kod z aktów
