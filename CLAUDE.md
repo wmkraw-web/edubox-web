@@ -365,6 +365,15 @@ w źródłach; nowe święto dopisuj tylko z potwierdzoną datą (usunięty „D
 (14.03) to solidarność z dziećmi z EB – instrukcja każe przy takich dniach pisać z szacunkiem, bez litowania się
 i szczegółów medycznych. Plan ma czasy części, materiały z sali i uwagę o alergiach; eksport `planToHtml` → EduDocTools.
 
+**Narzędzia zajęciowe – stan po audycie 8.10.2026:** EduEscape generuje na gpt-6.1 (`strong` + strumień, JSON
+wycinany z tekstu) – gpt-5.4-mini dla klas I–III uparcie dawał „12 + 5, podaj cyfrę” (cyfra jedności); każda stacja
+ma cyfrę wprost, a `runEscapeCheck` rozwiązuje stacje niezależnie i rozstrzyga różnice (testy `escape:check`).
+EduZastępstwo: usunięty awaryjny scenariusz z „czarną historią” o samobójstwie i kanibalizmie (pokazywał się KAŻDEJ
+grupie przy błędzie serwera), bez „czarnych historii”, granice tematów debaty (`zastepstwo:check`). Zasada dla całego
+portfolio: **przy błędzie API żadnych wbudowanych treści „demo”** – tylko komunikat (wyjątek: plik otwarty lokalnie).
+EduFiszki: `json_object` wymaga obiektu – struktura `{"cards": [...]}` opisana w instrukcji. EduGry nie używa AI
+(druk i zapis w Giełdzie zużywają jednak dzienną pulę – decyzja właściciela, nie zmieniane).
+
 **CSP a obrazki z fal.media:** `connect-src` NIE obejmuje fal.media, więc `fetch(urlObrazka)` w przeglądarce kończy
 się „Failed to fetch” (realny błąd w MagicLetters: obrazek opłacony, użytkownik dostawał błąd, licznik się nie
 zwiększał). Obrazek z fal.media zamieniamy na dane przez `<img crossOrigin="anonymous">` + `<canvas>` (img-src
