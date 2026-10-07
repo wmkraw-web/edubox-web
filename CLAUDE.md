@@ -309,6 +309,16 @@ rodzica odpowiedzialność za szkody (w czasie wycieczki nadzór sprawuje szkoł
 AI (token `[telefon kierownika]`), Giełda bez telefonu i nazwy szkoły. Dwa strumienie równolegle (dokumenty i gra,
 `strong` = gpt-6.1-sol), odpowiedź w sekcjach. Wydruk: karta/regulamin/gra przez `printDoc`, zgody 2 × 124 mm na A4.
 
+**EduWpisy (od 10.2026):** blok `WPISY_PROMPTS_START…END` w `eduwpisy.html` (testy `npm run wpisy:check`).
+Rozporządzenie o dokumentacji przebiegu nauczania (t.j. Dz.U. 2024 poz. 50, sprawdzone w ISAP): do dziennika
+wpisuje się tematy przeprowadzonych zajęć (§ 2 ust. 2, § 8 ust. 3, § 9 ust. 2), w e-dzienniku wpisanie tematu
+potwierdza przeprowadzenie zajęć (§ 21 ust. 5), a rodzice mają wgląd (§ 21 ust. 3 pkt 5). Dlatego: bez dopisanych
+aktywności i nazw terapii, bez imion i diagnoz (dawny „Moduł SPE” z ASD/ADHD wpisywał diagnozy do tematu
+widocznego dla rodziców całej klasy) – zamiast tego formy pracy (`ADAPTATIONS`, test pilnuje braku diagnoz).
+Klasy 1, 2, 3 osobno: nazwy edukacji według podstawy obowiązującej w danym roku (ruch drogowy: 2017 →
+edukacja przyrodnicza, 2026 → techniczna i informatyczna). Warianty w sekcjach, `strong` ze strumieniem,
+wspólny dzienny limit (`executeWithLimitCheck`).
+
 **Wydruk – sprawdzanie bez drukarki:** kopia strony z wstrzykniętymi danymi wyniku → Chrome
 headless `--print-to-pdf` → strony PDF do PNG (`pdfjs-dist` + `@napi-rs/canvas`). Tak wyszły:
 baner cookies drukujący się na każdej stronie (naprawione w `cookie-consent.js`), cienie jako
