@@ -20,12 +20,12 @@ w podglądzie wydruku (Ctrl+P), nie jako listę błędów.
 | Cecha | Jest | Do zrobienia | Brak | Po co to |
 | --- | --- | --- | --- | --- |
 | Kartka A4 | 9 | 0 | 51 | wzorzec generatorów dokumentów: AI zwraca czysty HTML, podgląd jako kartka, edycja przed eksportem |
-| Strumień | 13 | 0 | 47 | tekst pojawia się na bieżąco; bez tego nauczyciel czeka w ciszy nawet 100 s |
+| Strumień | 14 | 0 | 46 | tekst pojawia się na bieżąco; bez tego nauczyciel czeka w ciszy nawet 100 s |
 | Prawdziwy .docx | 21 | 0 | 39 | plik „.doc" z HTML-em w środku (mime application/msword) Word otwiera z ostrzeżeniem, a Dokumenty Google potrafią go odrzucić |
 | Czysty wydruk | 49 | 0 | 0 | jasnoszary tekst (`text-slate-400` i pokrewne – 1284 wystąpienia) jest na wydruku praktycznie niewidoczny, a `body { color: black }` go nie przebija, bo klasa Tailwinda ma wyższą specyficzność. Od 10.2026 załatwia to wspólna reguła w `edubox-ui.css` w `@media print`, więc wystarcza podpięcie warstwy; `printDoc` albo własna reguła czerni też się liczą. Dekoratory drukują w kolorze – tam `text-white` celowo zostaje białe. |
 | Nowy wygląd | 60 | 0 | 0 | wspólna warstwa edubox-ui.css: spokojne powierzchnie z prawdziwym cieniem zamiast neonowych poświat i pływających bąbli z 2021. Neony wpisane w markup wygasza reguła [class*="shadow-[0_0_"] w tym pliku, więc podpięcie linku wystarcza – klas nie trzeba czyścić z markupu. |
 | „Jak to działa" | 60 | 0 | 0 | info-box blisko góry formularza - konwencja z CLAUDE.md |
-| Wspólna pula | 25 | 0 | 17 | EduBoxCore.executeWithLimitCheck zamiast własnego licznika per-aplikacja |
+| Wspólna pula | 25 | 0 | 16 | EduBoxCore.executeWithLimitCheck zamiast własnego licznika per-aplikacja |
 
 ## Przepisy
 
@@ -81,7 +81,7 @@ przy okazji innych zmian w danym pliku. Nie ma potrzeby robić z tego osobnej ak
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Asystent Pedagoga (IPET/WWRD) | `asystent-pedagoga.html` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | – | ✅ ISAP |
 | Kreator Awansu AI | `awans.html` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | · | ✅ ISAP |
-| EduAwans | `eduawans.html` | – | – | ✅ | ✅ | ✅ | ✅ | – | ✅ ISAP |
+| EduAwans | `eduawans.html` | – | ✅ | ✅ | ✅ | ✅ | ✅ | · | ✅ ISAP |
 | EduBiurokrata AI | `edubiurokrata.html` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | · | ✅ ISAP |
 | Baza Druków | `edudruki.html` | – | – | – | ✅ | ✅ | ✅ | · | ✅ ISAP |
 | EduKatalog (Generator Ofert) | `edukatalog.html` | – | – | – | ✅ | ✅ | ✅ | · | · |
