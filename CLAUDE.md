@@ -319,6 +319,19 @@ Klasy 1, 2, 3 osobno: nazwy edukacji według podstawy obowiązującej w danym ro
 edukacja przyrodnicza, 2026 → techniczna i informatyczna). Warianty w sekcjach, `strong` ze strumieniem,
 wspólny dzienny limit (`executeWithLimitCheck`).
 
+**Awans zawodowy – która ścieżka, jaki dokument (sprawdzone w ISAP 7.10.2026):** po reformie (rozporządzenie
+z 6.09.2022, Dz.U. 2022 poz. 1914) na **dyplomowanego** do wniosku dołącza się „opis i analizę sposobu realizacji
+wymagań” z § 7 ust. 1 z uzyskanymi efektami – najwyżej 4 strony A4, czytelny podpis (§ 5 ust. 1 pkt 4; art. 9b
+ust. 2b KN); pkt 4 spełnia jedno z zadań lit. a–e. Na **mianowanego** nie ma sprawozdania – komisja egzaminacyjna
+zna opinię o zajęciach i ocenę pracy, a egzamin dotyczy wymagań z § 6 (§ 10). „Plan rozwoju zawodowego”
+i sprawozdanie zostały tylko dla stażu na dotychczasowych zasadach (art. 10 ust. 1 i 5 – kontraktowy do
+31.08.2027; art. 11 – staż na dyplomowanego rozpoczęty przed 1.09.2022) oraz w KN dla szkół za granicą.
+`eduawans.html` (edytor z fragmentów): ścieżki `PATHS`, wymagania § 7 ust. 1 / § 6 w `AWANS_DATA`, szablony
+z `[uzupełnij]` i zapisem `{am|em}` (`gText`, przełącznik formy), licznik stron, AI strumieniem. `awans.html`:
+tryb nauczyciela wybiera `DOC_TYPES.dyplomowany` (opis i analiza) albo `nauczyciel` (sprawozdanie ze stażu) według
+pola „Cel awansu” (`LEVEL_DYPL`/`LEVEL_STAZ`). Linia `const docType = DOC_TYPES[mode]…` musi być jedną linią –
+test `awans:check` wycina ją w vm.
+
 **Wydruk – sprawdzanie bez drukarki:** kopia strony z wstrzykniętymi danymi wyniku → Chrome
 headless `--print-to-pdf` → strony PDF do PNG (`pdfjs-dist` + `@napi-rs/canvas`). Tak wyszły:
 baner cookies drukujący się na każdej stronie (naprawione w `cookie-consent.js`), cienie jako
