@@ -89,6 +89,14 @@ const text = (n) => (n.children || []).map(r => r.text || '').join('');
   ok('div rozwijany, naglowki sekcji zachowane', ch.filter(n => n.heading === 'H2').length === 2);
   ok('tresc w divie nie ginie', ch.some(n => text(n) === 'Treść.'));
 
+  // 7. Sprawdzian: linie do pisania i kazda grupa od nowej strony
+  ch = await build('<h1>Sprawdzian – grupa A</h1><p><strong>Zadanie 1. (2 pkt)</strong> Wyjaśnij.</p><p class="linia"></p><p class="linia"></p><div class="page-break"></div><h1>Sprawdzian – grupa B</h1>');
+  const lines = ch.filter(n => n.border && n.border.bottom);
+  ok('linia do pisania -> akapit z kropkowana dolna krawedzia', lines.length === 2 && lines[0].border.bottom.style === 'dotted', lines.length);
+  ok('podzial strony -> akapit z pageBreakBefore', ch.some(n => n.pageBreakBefore === true));
+  ok('grupa B po podziale strony jako naglowek 1', ch.filter(n => n.heading === 'H1').length === 2);
+  ok('akapit z tekstem i klasa linia nie znika', (await build('<p class="linia">Odp.</p>')).some(n => text(n) === 'Odp.'));
+
   console.log('\n[Word] ' + (fail ? fail + ' bledow' : 'OK - eksport .docx daje poprawne naglowki, listy, tabele i wysrodkowany dyplom.'));
   process.exit(fail ? 1 : 0);
 })().catch(e => { console.error('WYJATEK:', e.message); process.exit(1); });

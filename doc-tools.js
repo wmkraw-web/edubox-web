@@ -97,7 +97,9 @@
       .replace(/<mark>/gi, '<mark style="background:#FFF3A3">')
       .replace(/<h1>/gi, '<h1 style="font-size:16pt;text-align:center;margin:0 0 10pt">')
       .replace(/<h2>/gi, '<h2 style="font-size:13pt;margin:14pt 0 6pt;color:#1F3864">')
-      .replace(/<h3>/gi, '<h3 style="font-size:11.5pt;margin:10pt 0 4pt">');
+      .replace(/<h3>/gi, '<h3 style="font-size:11.5pt;margin:10pt 0 4pt">')
+      .replace(/<p class="linia"><\/p>/gi, '<p style="border-bottom:1px dotted #808080;margin:0;line-height:22pt">&nbsp;</p>')
+      .replace(/<div class="page-break"><\/div>/gi, '<br style="page-break-before:always">');
   }
 
   function plainText(html) {
@@ -146,7 +148,9 @@
         'html.edubox-printing,html.edubox-printing body{background:#fff!important;color:#000!important;padding:0!important;margin:0!important}' +
         '#edubox-print-root{display:block!important;font-family:Calibri,Carlito,Arial,sans-serif;font-size:11pt;line-height:1.4;color:#000}' +
         '#edubox-print-root table{page-break-inside:auto}#edubox-print-root tr{page-break-inside:avoid}#edubox-print-root h2,#edubox-print-root h3{page-break-after:avoid}' +
-        '#edubox-print-root mark{background:#FFF3A3!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}}' +
+        '#edubox-print-root mark{background:#FFF3A3!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}' +
+        '#edubox-print-root p.linia{border-bottom:1px dotted #555;height:8mm;margin:0}' +
+        '#edubox-print-root .page-break{page-break-before:always;break-before:page;height:0}}' +
         '#edubox-print-root{display:none}';
       document.head.appendChild(style);
     }
@@ -223,6 +227,15 @@
         }
         if (node.nodeType !== 1) return;
         const tag = node.tagName.toLowerCase();
+        const cls = String(node.getAttribute && node.getAttribute('class') || '');
+        if (tag === 'p' && /\blinia\b/.test(cls) && !node.textContent.trim()) {
+          out.push(new D.Paragraph({ spacing: { before: 300, after: 0 }, border: { bottom: { style: (D.BorderStyle && D.BorderStyle.DOTTED) || 'dotted', size: 6, color: '808080', space: 1 } }, children: [] }));
+          return;
+        }
+        if (tag === 'div' && /\bpage-break\b/.test(cls)) {
+          out.push(new D.Paragraph({ pageBreakBefore: true, children: [] }));
+          return;
+        }
         if (tag === 'h1') out.push(para(node, { heading: D.HeadingLevel.HEADING_1, alignment: D.AlignmentType.CENTER, spacing: { after: 200 } }));
         else if (tag === 'h2') out.push(para(node, { heading: D.HeadingLevel.HEADING_2, spacing: { before: 240, after: 120 }, keepNext: true }));
         else if (tag === 'h3' || tag === 'h4') out.push(para(node, { heading: D.HeadingLevel.HEADING_3, spacing: { before: 160, after: 80 }, keepNext: true }));

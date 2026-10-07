@@ -36,7 +36,8 @@ const PAPER_TOOLS = [
   'edubiurokrata.html',
   'awans.html',
   'edunotariusz.html',
-  'eduraport.html'
+  'eduraport.html',
+  'edusprawdzian.html'
 ];
 
 // Narzędzia, które korzystają z EduDocTools, ale budują HTML same (nie ze strumienia AI).
