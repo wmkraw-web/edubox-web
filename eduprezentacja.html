@@ -316,7 +316,7 @@
                         2. Jeśli contentStyle to 'bullets', pole "bullets" ma zawierać 3-5 równoważników zdań.
                         3. Jeśli contentStyle to 'descriptive', pole "bullets" ma zawierać 2 krótkie, pełne akapity narracji.
                         4. Zawsze pierwszy slajd to tytuł.
-                        5. Jeśli zażądano quizu, ostatni slajd to pytanie, a odpowiedzi są w 'bullets' (A, B, C, Poprawna: ...).
+                        5. Jeśli zażądano quizu, ostatni slajd to pytanie quizowe: "title" to pytanie, w "bullets" 3 odpowiedzi zaczynające się od "A) ", "B) ", "C) " – BEZ wskazania poprawnej (slajd widzą uczniowie); poprawną odpowiedź z jednym zdaniem wyjaśnienia wpisz do "notes".
                         6. Rzetelność: tylko pewne, sprawdzone fakty; bez dokładnych liczb, dat i cytatów, których nie jesteś pewien; poziom i słownictwo dopasowane do grupy; poprawna polszczyzna.`;
 
                         const userPrompt = `Temat: ${topic}. Grupa: ${audience}. Liczba slajdów: ${slideCount}. Styl: ${contentStyle}. Quiz: ${includeQuiz ? 'Tak' : 'Nie'}. Język: Polski.`;
@@ -424,8 +424,31 @@
                 e.target.value = null;
             };
 
-            const exportToPPTX = () => {
+            // Obrazek do PPTX jako JPEG w base64 (PptxGenJS: pole data = tylko base64; link https psuł obrazek w pliku).
+            // Max 1280 px – zdjęcie z telefonu nie rozdmucha pliku.
+            const toSlideImage = (src) => new Promise((resolve) => {
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                img.onload = () => {
+                    try {
+                        const scale = Math.min(1, 1280 / img.naturalWidth);
+                        const c = document.createElement('canvas');
+                        c.width = Math.max(1, Math.round(img.naturalWidth * scale));
+                        c.height = Math.max(1, Math.round(img.naturalHeight * scale));
+                        const ctx = c.getContext('2d');
+                        ctx.fillStyle = '#ffffff';
+                        ctx.fillRect(0, 0, c.width, c.height);
+                        ctx.drawImage(img, 0, 0, c.width, c.height);
+                        resolve({ data: c.toDataURL('image/jpeg', 0.85), w: c.width, h: c.height });
+                    } catch (e) { resolve(null); }
+                };
+                img.onerror = () => resolve(null);
+                img.src = src;
+            });
+
+            const exportToPPTX = async () => {
                 showToast("Przygotowuję plik PowerPoint...", "info");
+                const images = await Promise.all(slides.map(sl => sl.imageUrl ? toSlideImage(sl.imageUrl) : null));
                 let pres = new PptxGenJS();
                 pres.layout = 'LAYOUT_16x9';
 
@@ -441,11 +464,13 @@
 
                     slideObj.addText(slide.title, { 
                         x: 0.5, y: 0.5, w: "90%", h: 1.0, 
-                        fontSize: 36, color: colorHex, bold: true,
+                        fontSize: 36, color: colorHex, bold: true, fit: 'shrink',
                         border: { type: 'bottom', color: '3b82f6', pt: 2 }
                     });
 
                     let isEven = idx % 2 === 0;
+                    const img = images[idx];
+                    const hasImg = !!img;
                     let bulletText = slide.bullets.map(b => ({ 
                         text: b, 
                         options: { 
@@ -458,15 +483,26 @@
                     }));
 
                     slideObj.addText(bulletText, {
-                        x: isEven ? 0.5 : 5.5, y: 1.8, w: "45%", h: 4.5, align: 'left', valign: 'top'
+                        x: hasImg && !isEven ? 5.5 : 0.5, y: 1.8, w: hasImg ? "45%" : "90%", h: 3.4, align: 'left', valign: 'top', fit: 'shrink'
                     });
 
-                    if (slide.imageUrl) {
-                        try { slideObj.addImage({ data: slide.imageUrl, x: isEven ? 5.5 : 0.5, y: 1.8, w: "40%", h: "60%", sizing: { type: 'contain' } }); } 
-                        catch(e) { console.error(e); }
+                    if (hasImg) {
+                        // Ramka 4 × 3,375 cala; obrazek wpasowany z zachowaniem proporcji i wyśrodkowany.
+                        const boxW = 4, boxH = 3.375, boxX = isEven ? 5.5 : 0.5, boxY = 1.8;
+                        const k = Math.min(boxW / img.w, boxH / img.h);
+                        const w = img.w * k, h = img.h * k;
+                        slideObj.addImage({ data: img.data, x: boxX + (boxW - w) / 2, y: boxY + (boxH - h) / 2, w, h });
                     }
                 });
-                pres.writeFile({ fileName: `EduPrezentacja_${topic.replace(/\s+/g, '_')}.pptx` });
+                if (images.some((im, i) => slides[i].imageUrl && !im)) {
+                    showToast('Część grafik nie dała się dołączyć do pliku – sprawdź połączenie i spróbuj ponownie.', 'error');
+                }
+                try {
+                    await pres.writeFile({ fileName: `EduPrezentacja_${topic.replace(/\s+/g, '_')}.pptx` });
+                } catch (e) {
+                    console.error(e);
+                    showToast('Nie udało się zapisać pliku PPTX. Spróbuj ponownie.', 'error');
+                }
             };
 
             const publishToGielda = async () => {
@@ -777,9 +813,15 @@
                                 <h1 className="text-xl font-bold text-white flex items-center gap-2"><span className="bg-blue-600 text-xs px-2 py-1 rounded">KROK 2</span> Edycja Treści i Grafik</h1>
                                 
                                 {slides.filter(s => !s.imageUrl).length > 0 ? (
-                                    <button onClick={generateImages} className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-900 px-6 py-2.5 rounded-xl font-black flex items-center gap-2 shadow-lg transition-transform active:scale-95">
-                                        Generuj Grafiki ({slides.filter(s => !s.imageUrl).length}) <i className="ph-bold ph-magic-wand"></i>
-                                    </button>
+                                    <div className="flex flex-wrap items-center justify-center gap-2">
+                                        <button onClick={generateImages} className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-900 px-5 py-2.5 rounded-xl font-black flex items-center gap-2 shadow-lg transition-transform active:scale-95">
+                                            Generuj Grafiki ({slides.filter(s => !s.imageUrl).length}) <i className="ph-bold ph-magic-wand"></i>
+                                        </button>
+                                        {/* Bez tego darmowy użytkownik (1 grafika na start) nie mógł obejrzeć ani pobrać prezentacji. */}
+                                        <button onClick={() => setStep('final')} className="bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white px-4 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 transition-colors">
+                                            Otwórz bez grafik <i className="ph-bold ph-presentation-chart"></i>
+                                        </button>
+                                    </div>
                                 ) : (
                                     <button onClick={() => setStep('final')} className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white px-6 py-2.5 rounded-xl font-black flex items-center gap-2 shadow-lg transition-transform active:scale-95">
                                         Otwórz Prezentację <i className="ph-bold ph-presentation-chart"></i>
@@ -900,7 +942,7 @@
                                 </div>
 
                                 {/* Główny podgląd */}
-                                <div className="flex-1 p-4 lg:p-8 flex flex-col items-center justify-center bg-black/40 relative print-only:p-0 print-only:block">
+                                <div className="flex-1 min-w-0 overflow-y-auto p-4 lg:p-8 flex flex-col items-center justify-start md:justify-center bg-black/40 relative print-only:p-0 print-only:block">
                                     
                                     {/* Print Mode renders all slides sequentially */}
                                     <div className="hidden print-only:block">
@@ -942,20 +984,17 @@
                                                         <ul className="sf-list">{s.bullets.map((b, i) => <li key={i} className="sf-li flex items-start"><span className="text-blue-500">●</span><span>{b}</span></li>)}</ul>
                                                     )}
                                                 </div>
-                                                <div className={`flex-1 relative ${isEven ? 'order-2' : 'order-1'}`}>
-                                                    {s.imageUrl ? (
-                                                        <img src={s.imageUrl} className="absolute inset-0 w-full h-full object-cover" />
-                                                    ) : (
-                                                        <div className="absolute inset-0 bg-slate-800 flex items-center justify-center"><i className="ph-thin ph-image text-6xl text-slate-600"></i></div>
-                                                    )}
-                                                    <div className={`absolute inset-y-0 w-32 ${isEven ? 'left-0 bg-gradient-to-r' : 'right-0 bg-gradient-to-l'} from-[inherit] to-transparent opacity-80`}></div>
-                                                </div>
+                                                {s.imageUrl && (
+                                                    <div className={`flex-1 relative ${isEven ? 'order-2' : 'order-1'}`}>
+                                                        <img src={s.imageUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                                                    </div>
+                                                )}
                                             </div>
                                         );
                                     })()}
 
                                     {/* Controls */}
-                                    <div className="absolute bottom-4 sm:bottom-8 left-1/2 -translate-x-1/2 bg-slate-900/90 backdrop-blur border border-slate-700 rounded-full flex items-center p-1.5 sm:p-2 shadow-[0_0_40px_rgba(0,0,0,0.5)] gap-2 sm:gap-4 z-30 print-hidden">
+                                    <div className="mt-4 md:mt-0 md:absolute md:bottom-8 md:left-1/2 md:-translate-x-1/2 bg-slate-900/90 backdrop-blur border border-slate-700 rounded-full flex items-center p-1.5 sm:p-2 shadow-[0_0_40px_rgba(0,0,0,0.5)] gap-2 sm:gap-4 z-30 print-hidden">
                                         <button onClick={() => setCurrentSlideIndex(p => Math.max(p - 1, 0))} disabled={currentSlideIndex === 0} className="w-12 h-12 rounded-full bg-slate-800 text-white flex items-center justify-center hover:bg-blue-600 disabled:opacity-30 transition-colors"><i className="ph-bold ph-caret-left text-xl"></i></button>
                                         <div className="flex gap-1.5 px-2 sm:px-4">
                                             {slides.map((_, idx) => (
@@ -963,6 +1002,11 @@
                                             ))}
                                         </div>
                                         <button onClick={() => setCurrentSlideIndex(p => Math.min(p + 1, slides.length - 1))} disabled={currentSlideIndex === slides.length - 1} className="w-12 h-12 rounded-full bg-slate-800 text-white flex items-center justify-center hover:bg-blue-600 disabled:opacity-30 transition-colors"><i className="ph-bold ph-caret-right text-xl"></i></button>
+                                    </div>
+
+                                    <div className="md:hidden w-full mt-4 bg-slate-900/80 border border-slate-800 rounded-xl p-4 print-hidden">
+                                        <h3 className="font-bold text-emerald-400 uppercase tracking-widest text-[10px] mb-2 flex items-center gap-2"><i className="ph-bold ph-microphone-stage text-sm"></i> Co powiedzieć do slajdu {currentSlideIndex + 1}/{slides.length}:</h3>
+                                        <p className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap">{slides[currentSlideIndex].notes || 'Brak notatek do tego slajdu.'}</p>
                                     </div>
                                 </div>
                             </div>
@@ -988,10 +1032,11 @@
                                                     <ul className="sf-list">{s.bullets.map((b, i) => <li key={i} className="sf-li flex items-start"><span className="text-blue-500">●</span><span>{b}</span></li>)}</ul>
                                                 )}
                                             </div>
-                                            <div className={`flex-1 relative ${isEven ? 'order-2' : 'order-1'}`}>
-                                                {s.imageUrl && <img src={s.imageUrl} className="absolute inset-0 w-full h-full object-cover" />}
-                                                <div className={`absolute inset-y-0 w-48 ${isEven ? 'left-0 bg-gradient-to-r' : 'right-0 bg-gradient-to-l'} from-[inherit] to-transparent opacity-90`}></div>
-                                            </div>
+                                            {s.imageUrl && (
+                                                <div className={`flex-1 relative ${isEven ? 'order-2' : 'order-1'}`}>
+                                                    <img src={s.imageUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                                                </div>
+                                            )}
                                             <div className="absolute bottom-6 right-8 text-slate-500/50 text-sm font-bold uppercase hidden md:flex gap-6 z-50">
                                                 <span>Strzałki lub kliknięcie <i className="ph-bold ph-arrows-left-right"></i></span>
                                                 <span>ESC – wyjście</span>
