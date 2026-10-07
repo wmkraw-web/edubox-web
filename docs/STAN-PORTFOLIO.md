@@ -33,7 +33,7 @@ Narzędzia cytujące przepisy (`§`, `art.`, `Dz.U.`): **13**, z tego objętych 
 
 ✅ Każde narzędzie cytujące przepisy jest objęte kontrolą.
 
-Ostatnia ręczna weryfikacja aktów w ISAP: **2026-10-06** (15 aktów).
+Ostatnia ręczna weryfikacja aktów w ISAP: **2026-10-07** (17 aktów).
 
 ✅ Każdy akt cytowany w kodzie jest objęty kontrolą.
 
@@ -47,6 +47,7 @@ Cytowane przez numer tekstu jednolitego lub noweli — pilnowane pod numerem pie
 - Dz.U. 2026 poz. 110 → `DU/2016/862` (Standardy ochrony małoletnich)
 - Dz.U. 2026 poz. 1122 → `DU/2019/373` (Ocenianie – dostosowanie wymagań (§ 2), zachowanie (§ 11), prace domowe (§ 12a))
 - Dz.U. 2026 poz. 515 → `DU/1982/19` (Karta Nauczyciela (awans zawodowy))
+- Dz.U. 2026 poz. 820 → `DU/2017/59` (Prawo oświatowe)
 
 ## Porządki (nie błędy)
 

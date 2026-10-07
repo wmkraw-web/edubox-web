@@ -327,7 +327,7 @@
             const askAI = async () => {
                 setIsGenerating(true);
                 setAiResponse(null);
-                setBotMessage("Przeszukuję zwoje ustaw, rozporządzeń oraz Kartę Nauczyciela. Proszę o cierpliwość...");
+                setBotMessage("Szukam przepisów w bazie EduBox (Karta Nauczyciela, Prawo oświatowe, ocenianie, pomoc psychologiczno-pedagogiczna i inne – teksty z ISAP)...");
 
                 const systemPrompt = `Jesteś ekspertem prawa oświatowego w Polsce. Masz za zadanie udzielić rzetelnej, opartej na przepisach porady prawnej dla dyrektora lub nauczyciela.
 
@@ -337,7 +337,7 @@ WAŻNY KONTEKST CZASOWY: Dzisiejsza data to ${new Date().toLocaleDateString('pl-
 - zmiany w zasadach wydawania orzeczeń i opinii przez poradnie psychologiczno-pedagogiczne (rozporządzenie z 2 marca 2026 r., Dz.U. 2026 poz. 428, obowiązujące od 14 kwietnia 2026 r.): dyrektor przekazuje opinię o funkcjonowaniu ucznia w terminie 10 dni od prośby przewodniczącego zespołu lub rodzica (§ 7 ust. 2-4); od 1 września 2026 r. opinia ta opisuje funkcjonowanie w obszarach ICF i zawiera m.in. aktualną WOPFU ucznia objętego kształceniem specjalnym (§ 7 ust. 6-7), a zespół orzekający przeprowadza ocenę funkcjonowania (§ 8);
 - zmiany w ocenianiu od 1 września 2026 r. (rozporządzenie z 20 sierpnia 2026 r., Dz.U. 2026 poz. 1122): nowe obszary oceny zachowania (§ 11 ust. 1 - m.in. odpowiedzialność za własny rozwój, przestrzeganie norm społecznych, zaangażowanie w życie klasy, szkoły i wspólnoty lokalnej), nowe zasady prac domowych w klasach IV-VIII (pisemna praca domowa nie jest obowiązkowa i nie ustala się z niej oceny) oraz uwzględnianie zaangażowania w doświadczenia edukacyjne przy ocenie rocznej.
 
-Jeśli pytanie dotyczy obszaru, w którym niedawno zaszły zmiany, zaznacz to wyraźnie w odpowiedzi. Jeśli nie masz pewności co do najbardziej aktualnego stanu prawnego w wąskiej, szczegółowej kwestii, wyraźnie to zaznacz i zarekomenduj weryfikację w kuratorium oświaty lub u prawnika specjalizującego się w prawie oświatowym - zwłaszcza przy decyzjach wiążących lub spornych.
+Do tej instrukcji dołączone są fragmenty przepisów z bazy EduBox (teksty z Dziennika Ustaw). Opieraj się na nich – to one są źródłem numerów artykułów i paragrafów, nie Twoja pamięć. Jeśli pytanie dotyczy obszaru, w którym niedawno zaszły zmiany, zaznacz to wyraźnie w odpowiedzi. Jeśli nie masz pewności co do najbardziej aktualnego stanu prawnego w wąskiej, szczegółowej kwestii, wyraźnie to zaznacz i zarekomenduj weryfikację w kuratorium oświaty lub u prawnika specjalizującego się w prawie oświatowym - zwłaszcza przy decyzjach wiążących lub spornych.
 
 WYMAGANIA CO DO SZCZEGÓŁOWOŚCI: Pisz wyczerpująco. W polu "explanation" nie ograniczaj się do jednego zdania - wyjaśnij kontekst przepisu, jego praktyczne zastosowanie w szkole oraz - jeśli to pomaga zrozumieć sytuację - krótki przykład. W polu "action_steps" podaj konkretne, praktyczne kroki (zwykle 3-5 punktów), nie ogólniki.
 
@@ -352,10 +352,11 @@ WYBÓR ŹRÓDEŁ: W polu "related_topics" wskaż od 1 do 3 kluczy z poniższej Z
 Odpowiadaj WYŁĄCZNIE poprawnym formatem JSON. Nie dodawaj znaczników Markdown wokół JSONa, tylko sam obiekt.
 Struktura JSON:
 {
-  "legal_basis": "Dokładna podstawa prawna (np. Art. 73 ust. 2 Karty Nauczyciela)",
+  "legal_basis": "Podstawa prawna – wyłącznie przepisy z dołączonych fragmentów (np. art. 73 ust. 1 i 8 Karty Nauczyciela). Gdy fragmenty nie rozstrzygają sprawy: 'Brak przepisu w bazie EduBox – zwykle reguluje to statut szkoły' (lub inne właściwe źródło)",
   "explanation": "Wyczerpujące, rzeczowe wyjaśnienie sytuacji prawnej wraz z kontekstem praktycznym (używaj znaczników <strong> dla ważnych słów, możesz używać \\n do nowych linii)",
   "action_steps": "Rekomendowane, konkretne kroki działania dla nauczyciela/dyrektora w tej sytuacji, zwykle 3-5 punktów (tekst z wypunktowaniem za pomocą •)",
-  "related_topics": ["klucz1", "klucz2"]
+  "related_topics": ["klucz1", "klucz2"],
+  "cited": ["identyfikatory z nawiasów kwadratowych z dołączonych przepisów, np. KN art. 73"]
 }`;
 
                 try {
@@ -365,9 +366,11 @@ Struktura JSON:
                         body: JSON.stringify({ 
                             prompt: query, 
                             system: systemPrompt, 
-                            temperature: 0.2, 
+                            temperature: 0.2,
                             model: "strong",
-                            format: "json" 
+                            format: "json",
+                            // Serwer dołącza przepisy z bazy EduBox (api/_lib/legalSearch.js) i odsyła ich brzmienie.
+                            mode: "legal"
                         })
                     });
                     
@@ -421,8 +424,13 @@ Struktura JSON:
                         parsedData.related_topics = guessed.length > 0 ? guessed.slice(0, 3) : ['oswiata_ogolnie'];
                     }
 
+                    // Dosłowne brzmienie przepisów, na które powołał się model (tylko te z bazy – inne identyfikatory pomijamy).
+                    const sources = Array.isArray(data.sources) ? data.sources : [];
+                    const cited = Array.isArray(parsedData.cited) ? parsedData.cited : [];
+                    parsedData.citedSources = sources.filter(src => cited.includes(src.id));
+                    parsedData.corpusDate = data.corpusDate || '';
                     setAiResponse(parsedData);
-                    setBotMessage("Gotowe. Przygotowałem ustrukturyzowaną opinię prawną wraz z podstawą i rekomendowanymi krokami.");
+                    setBotMessage(parsedData.citedSources && parsedData.citedSources.length ? "Gotowe. Odpowiedź opiera się na przepisach z bazy – ich dosłowne brzmienie jest pod podstawą prawną." : "Gotowe. W bazie przepisów nie znalazłem zapisu, który to rozstrzyga – sprawdź statut szkoły albo zapytaj w kuratorium.");
                     
                     setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
 
@@ -581,7 +589,7 @@ Struktura JSON:
 
                                     <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-3 mb-6 flex gap-2 items-start">
                                         <span className="text-base flex-shrink-0">ℹ️</span>
-                                        <p className="text-xs text-slate-400 leading-relaxed"><strong className="text-slate-200">Jak to działa:</strong> wpisz pytanie własnymi słowami (np. „Czy dyrektor może zmusić mnie do zastępstwa w dniu wolnym?") - dostaniesz interpretację z powołaniem na konkretny artykuł. Wyżej masz też „Bazę Prawa Oświatowego" do samodzielnego przeglądania przepisów.</p>
+                                        <p className="text-xs text-slate-400 leading-relaxed"><strong className="text-slate-200">Jak to działa:</strong> wpisz pytanie własnymi słowami (np. „Czy dyrektor może zmusić mnie do zastępstwa w dniu wolnym?") - EduPrawo znajdzie właściwe przepisy w bazie EduBox (Karta Nauczyciela, Prawo oświatowe, ustawa o systemie oświaty, ocenianie, pomoc psychologiczno-pedagogiczna, orzeczenia, awans, wycieczki, BHP – teksty z ISAP) i odpowie na ich podstawie, pokazując dosłowne brzmienie cytowanych artykułów. Wyżej masz też „Bazę Prawa Oświatowego" do samodzielnego przeglądania przepisów.</p>
                                     </div>
 
                                     <textarea
@@ -653,6 +661,25 @@ Struktura JSON:
                                                 <p className="font-bold text-slate-800 m-0" dangerouslySetInnerHTML={{ __html: formatAIResponse(aiResponse.legal_basis) }}></p>
                                             </div>
 
+                                            {/* Dosłowne brzmienie cytowanych przepisów (baza EduBox, teksty z ISAP) */}
+                                            {aiResponse.citedSources && aiResponse.citedSources.length > 0 && (
+                                                <div className="border border-blue-100 rounded-xl p-5 print-bg-light">
+                                                    <h3 className="text-xs font-black uppercase text-blue-800 tracking-widest mb-3 flex items-center gap-2"><i className="ph-bold ph-scroll"></i> Brzmienie przepisów</h3>
+                                                    <div className="space-y-2">
+                                                        {aiResponse.citedSources.map(src => (
+                                                            <details key={src.id} className="bg-slate-50 rounded-lg px-4 py-3 text-sm">
+                                                                <summary className="cursor-pointer font-bold text-slate-800">
+                                                                    {src.label}
+                                                                    <span className="block text-[11px] font-medium text-slate-500">{src.source}</span>
+                                                                </summary>
+                                                                <p className="mt-3 text-slate-700 whitespace-pre-line leading-relaxed text-left">{src.text}</p>
+                                                            </details>
+                                                        ))}
+                                                    </div>
+                                                    <p className="text-[10px] text-slate-500 mt-3">Tekst z Dziennika Ustaw pobrany z oficjalnego API Sejmu (ISAP){aiResponse.corpusDate ? `, stan na ${aiResponse.corpusDate.split('-').reverse().join('.')}` : ''}. Zmiany oznaczone datą obowiązują od wskazanego dnia.</p>
+                                                </div>
+                                            )}
+
                                             {/* Wyjaśnienie */}
                                             <div>
                                                 <h3 className="text-xs font-black uppercase text-slate-400 tracking-widest mb-3 border-b border-slate-200 pb-2">Wyjaśnienie i Analiza</h3>
@@ -688,7 +715,7 @@ Struktura JSON:
 
                                         <div className="mt-20 pt-4 border-t border-slate-300 text-center">
                                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Dokument wygenerowany przez system EduPrawo AI PRO.</p>
-                                            <p className="text-[9px] text-slate-400 mt-1">Pamiętaj, że porada ma charakter informacyjny. W sytuacjach spornych skonsultuj się z prawnikiem organu prowadzącego szkołę.</p>
+                                            <p className="text-[9px] text-slate-400 mt-1">Odpowiedź ma charakter informacyjny i opiera się na przepisach z bazy EduBox (teksty z ISAP). Szczegóły mogą zależeć od statutu szkoły. W sytuacjach spornych skonsultuj się z prawnikiem organu prowadzącego albo z kuratorium.</p>
                                         </div>
                                     </div>
                                 )}

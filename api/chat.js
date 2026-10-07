@@ -173,11 +173,27 @@ export default async function handler(req, res) {
   const rawVerbosity = isPreview && req.body.testVerbosity ? req.body.testVerbosity : req.body.verbosity;
   const verbosity = ['low', 'medium', 'high'].includes(rawVerbosity) ? rawVerbosity : undefined;
 
+  // EduPrawo: do instrukcji dołączamy przepisy znalezione w bazie (api/_lib/legalCorpus.json – teksty z ISAP).
+  // Model powołuje się tylko na nie, a przeglądarka dostaje ich dosłowne brzmienie (sources) do pokazania.
+  // Baza ładuje się dopiero przy pierwszym pytaniu prawnym – pozostałe narzędzia nie płacą za to czasem startu.
+  let systemForModel = system;
+  let legal = null;
+  if (req.body?.mode === 'legal') {
+    try {
+      const mod = await import('./_lib/legalSearch.js');
+      const searchLaw = mod.searchLaw || (mod.default && mod.default.searchLaw);
+      legal = searchLaw(prompt);
+      systemForModel = (system ? system + '\n\n' : '') + legal.promptBlock;
+    } catch (e) {
+      console.error('Wyszukiwarka przepisów niedostępna:', e.message);
+    }
+  }
+
   const buildPayload = (m, stream) => {
     const p = {
       model: m,
       messages: [
-        { role: "system", content: system },
+        { role: "system", content: systemForModel },
         { role: "user", content: prompt }
       ]
     };
@@ -249,7 +265,7 @@ export default async function handler(req, res) {
       throw new Error('OpenAI nie zwrócił treści (możliwy filtr bezpieczeństwa treści).');
     }
 
-    res.status(200).json({ text, model: data.model || usedModel });
+    res.status(200).json({ text, model: data.model || usedModel, ...(legal ? { sources: legal.sources, corpusDate: legal.corpusDate } : {}) });
   } catch (error) {
     console.error("Szczegóły błędu w API:", error);
     if (res.headersSent) { try { res.end(); } catch (e) {} return; }
