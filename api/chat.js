@@ -1,6 +1,7 @@
 import { isRateLimited } from './_lib/rateLimit.js';
 import { handleVerify } from './_lib/scamCheck.js';
 import { scrubPersonalData } from './_lib/pii.js';
+import { handleWordCheck } from './_lib/wordCheck.js';
 
 const TTS_RATE_WINDOW_MS = 5 * 60 * 1000;
 const TTS_RATE_MAX_REQUESTS = 12;
@@ -140,6 +141,15 @@ export default async function handler(req, res) {
   // ZanimKlikniesz (zanimklikniesz.html) - ocena ryzyka linku/oferty; osobny tryb zamiast 12. funkcji.
   if (req.body?.mode === 'verify') {
     return handleVerify(req, res);
+  }
+
+  // EduRymy: czy słowa mają hasło w Wikisłowniku. Pytamy z serwera – CSP strony blokowało pl.wiktionary.org
+  // (filtr po cichu przepuszczał wszystko), a Wikimedia nie dostaje adresu IP nauczyciela.
+  if (req.body?.mode === 'slownik') {
+    if (isRateLimited(req, { name: 'slownik', windowMs: 10 * 60 * 1000, max: 60 })) {
+      return res.status(429).json({ message: 'Zbyt wiele zapytań w krótkim czasie. Spróbuj ponownie za kilka minut.' });
+    }
+    return handleWordCheck(req, res);
   }
 
   // Endpoint tekstowy obsługuje ~50 narzędzi i był całkowicie otwarty (bez auth, bez limitu).

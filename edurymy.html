@@ -235,43 +235,43 @@
                                 return JSON.parse(jsonStr);
                             };
 
-                            const askAI = async (system, prompt) => {
+                            // Kandydaci: 'balanced' (JSON). Ocena rymów: 'strong' ze strumieniem (gpt-6.1) – słabsze modele
+                            // przepuszczały pseudo-rymy („głowę/sowa”); strumień nie przyjmuje trybu JSON, więc JSON wymusza instrukcja.
+                            const askAI = async (system, prompt, strong) => {
                                 const res = await fetch('/api/chat', {
                                     method: 'POST',
                                     headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ prompt, system, temperature: 0.2, format: 'json', model: 'gpt-4o' })
+                                    body: JSON.stringify(strong
+                                        ? { prompt, system, model: 'strong', stream: true }
+                                        : { prompt, system, temperature: 0.2, format: 'json', model: 'balanced' })
                                 });
                                 if (!res.ok) throw new Error(`Serwer główny: HTTP ${res.status}`);
+                                if (strong && !(res.headers.get('content-type') || '').includes('application/json')) {
+                                    return parseJson((await res.text()).split('<!--EDUBOX_STREAM_ERROR-->').join(''));
+                                }
                                 const data = await res.json();
                                 return parseJson(data.text);
                             };
 
-                            // Sprawdza w Wikisłowniku (prawdziwym, darmowym słowniku PL - nie AI),
-                            // czy dane słowa mają hasło. To twardy filtr niezależny od LLM-a:
-                            // AI zgaduje wzorce (i myli się na rzadszych końcówkach), słownik po
-                            // prostu wie, czy strona istnieje. Przy błędzie sieci "przepuszczamy"
-                            // słowa dalej (fail-open) - słownik to dodatkowa siatka bezpieczeństwa,
-                            // a nie jedyna linia obrony (krok AI-weryfikacji i tak jest po nim).
+                            // Sprawdza w Wikisłowniku (prawdziwym, darmowym słowniku PL - nie AI), czy słowa mają hasło.
+                            // Twardy filtr niezależny od LLM-a. Pyta SERWER (mode: 'slownik') – zapytanie z przeglądarki
+                            // blokował CSP i filtr po cichu przepuszczał wszystko. Gdy słownik nie odpowie, słowa idą dalej
+                            // (ocenia je AI), ale nauczyciel dostaje o tym informację.
+                            let dictionaryChecked = true;
                             const checkWordsExistPL = async (words) => {
-                                const unique = [...new Set(words.map(x => x.trim()).filter(Boolean))];
+                                const unique = [...new Set(words.map(x => String(x).trim().toLowerCase()).filter(Boolean))];
                                 if (!unique.length) return new Set();
                                 try {
-                                    const url = `https://pl.wiktionary.org/w/api.php?action=query&titles=${encodeURIComponent(unique.join('|'))}&format=json&origin=*&redirects=1`;
-                                    const controller = new AbortController();
-                                    const timeoutId = setTimeout(() => controller.abort(), 6000);
-                                    const res = await fetch(url, { signal: controller.signal });
-                                    clearTimeout(timeoutId);
-                                    if (!res.ok) return new Set(unique.map(x => x.toLowerCase()));
-                                    const data = await res.json();
-                                    const pages = data?.query?.pages || {};
-                                    const found = new Set();
-                                    Object.values(pages).forEach(p => {
-                                        if (p && p.missing === undefined && p.title) found.add(p.title.toLowerCase());
+                                    const res = await fetch('/api/chat', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ mode: 'slownik', prompt: 'slownik', words: unique })
                                     });
-                                    return found;
-                                } catch (e) {
-                                    return new Set(unique.map(x => x.toLowerCase())); // fail-open
-                                }
+                                    const data = res.ok ? await res.json() : { found: null };
+                                    if (Array.isArray(data.found)) return new Set(data.found);
+                                } catch (e) { /* niżej: przepuszczamy dalej */ }
+                                dictionaryChecked = false;
+                                return new Set(unique);
                             };
 
                             // KROK 1: KANDYDACI - łagodniejszy, kreatywny etap. Może zaproponować za dużo,
@@ -313,13 +313,13 @@ TWOJE ZADANIE: dla każdego kandydata sprawdź DWA niezależne warunki, oba musz
 5. Zaproponuj JEDNO konkretne ćwiczenie/zabawę z rymami dla grupy wiekowej: ${audienceMeta[audience].desc} (1-2 zdania, bez ogólników) - użyj w przykładzie WYŁĄCZNIE słów ze zweryfikowanej listy, nigdy przypadkowej pary spoza niej.
 Zwróć WYŁĄCZNIE poprawny JSON: {"exact": ["..."], "near": ["..."], "coupletLine1": "...", "coupletLine2": "...", "activity": "..."}`;
                             const verifyPrompt = `Słowo bazowe: "${w}". Kandydaci - rym dokładny: [${dictExact.join(', ')}]. Kandydaci - rym przybliżony: [${dictNear.join(', ')}].`;
-                            const parsed = await askAI(verifySys, verifyPrompt);
+                            const parsed = await askAI(verifySys, verifyPrompt, true);
 
                             if ((!parsed.exact || !parsed.exact.length) && (!parsed.near || !parsed.near.length)) {
                                 throw new Error('Po weryfikacji nie zostały żadne pewne rymy dla tego słowa. Spróbuj innego słowa.');
                             }
 
-                            setResult({ word: w, ...parsed });
+                            setResult({ word: w, ...parsed, dictionaryChecked });
                             saveRecent(w);
                             showToast(`Wykorzystano ${newCount}/5 darmowych wyszukiwań dzisiaj`);
                             setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
@@ -459,7 +459,7 @@ Zwróć WYŁĄCZNIE poprawny JSON: {"exact": ["..."], "near": ["..."], "coupletL
                                         <h2 className="text-3xl font-black">Rymy do słowa: {result.word}</h2>
                                     </div>
 
-                                    <p className="text-xs text-slate-400 mb-6 -mt-2 print-hidden">Przeczytaj rymy na głos razem z dziećmi — AI czasem się myli, a to świetna okazja, żeby wspólnie to sprawdzić.</p>
+                                    <p className="text-xs text-slate-400 mb-6 -mt-2 print-hidden">Przeczytaj rymy na głos razem z dziećmi — AI czasem się myli, a to świetna okazja, żeby wspólnie to sprawdzić.{result.dictionaryChecked === false ? ' Słownik był tym razem niedostępny – słowa oceniło tylko AI.' : ''}</p>
 
                                     <div className="mb-6">
                                         <h3 className="text-xs font-bold text-emerald-300 uppercase tracking-widest mb-3">Rymy dokładne</h3>
