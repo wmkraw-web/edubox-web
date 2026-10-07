@@ -164,6 +164,16 @@ for (const file of ['edunotariusz.html', 'eduraport.html']) {
   assert.ok(!/aiGenerations >= 5/.test(src), `${file}: druga, niezależna bramka limitu mogła się rozjechać ze wspólną pulą`);
 }
 
+// Status PRO bywa zapisany jako 'active' (menu) albo 'PRO' (strona główna i nowsze narzędzia). 34 narzędzia uznawały
+// tylko 'active' – kto wpisał kod na stronie głównej, dostawał w nich limit jak darmowy użytkownik (naprawione 8.10.2026).
+for (const file of fs.readdirSync(root).filter((f) => f.endsWith('.html'))) {
+  read(file).split('\n').forEach((line, i) => {
+    if (!/getItem\((['"])eduboxProStatus\1\)\s*===|[A-Za-z]*ProStatus\s*===/.test(line)) return;
+    assert.ok(/['"]PRO['"]/.test(line) && /['"]active['"]/.test(line),
+      `${file}:${i + 1}: status PRO porównany tylko z jedną wartością – uwzględnij 'active' i 'PRO'`);
+  });
+}
+
 // --------------------------------------------- 5. Wspólna warstwa wyglądu
 
 const ui = read('edubox-ui.css');
