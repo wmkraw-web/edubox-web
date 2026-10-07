@@ -139,7 +139,10 @@ kompilatora, który złapie błąd składni): wyciągnąć zawartość
 1 grafika AI jednorazowo (`eduboxTrialImageV1`; `executeImageLimitCheck`). Starsze aplikacje
 z własnymi licznikami (`eduboxUsage`, `edubox_*_ai`) są podpięte „mostkiem” w global-core.js
 (przesunięcie = limit zapisany w aplikacji − limit puli; tekstowe = 0, bo wszystkie mają 5).
-Kod PRO znosi limit (`localStorage.eduboxProStatus`, weryfikacja przez `/api/verify-code.js`).
+Kod PRO znosi limit (`localStorage.eduboxProStatus`, weryfikacja przez `/api/verify-code.js`). **Status ma DWA zapisy:**
+`'active'` (menu) i `'PRO'` (strona główna, nowsze narzędzia) – każda własna bramka musi uznawać oba
+(`['active', 'PRO'].includes(…)`); 34 narzędzia uznawały tylko `'active'` i dawały limit osobom z kodem ze strony
+głównej (naprawione 8.10.2026, `dokumenty:check` pilnuje każdego porównania).
 ZanimKlikniesz nie ma limitu dziennego (`freeForever`).
 
 **Link wsparcia:** zawsze `https://buycoffee.to/magiccolor` (nazwa
@@ -356,6 +359,11 @@ sekcje TEMAT / KARTA / ROZWIĄZANIA / WYNIKI, motyw (Minecraft, piłka…) tylko
 → przy rozbieżności rozstrzygnięcie (`strong` = gpt-6.1, widzi zadanie i obie odpowiedzi, `applyVerdicts`). Realny
 przypadek: klucz 11/24 km był dobry, a gpt-5.4-mini podał długość już ułożonych torów – bez rozstrzygnięcia nauczyciel
 dostałby fałszywy alarm. Rozstrzygnięcie płaci się tylko przy rozbieżności.
+
+**EduKalendarz (od 8.10.2026):** daty świąt w `HOLIDAYS` (blok `KALENDARZ_PROMPTS`, testy `kalendarz:check`) sprawdzone
+w źródłach; nowe święto dopisuj tylko z potwierdzoną datą (usunięty „Dzień Ślimaka” 24.05 – brak źródła). Dzień Motyla
+(14.03) to solidarność z dziećmi z EB – instrukcja każe przy takich dniach pisać z szacunkiem, bez litowania się
+i szczegółów medycznych. Plan ma czasy części, materiały z sali i uwagę o alergiach; eksport `planToHtml` → EduDocTools.
 
 **CSP a obrazki z fal.media:** `connect-src` NIE obejmuje fal.media, więc `fetch(urlObrazka)` w przeglądarce kończy
 się „Failed to fetch” (realny błąd w MagicLetters: obrazek opłacony, użytkownik dostawał błąd, licznik się nie
