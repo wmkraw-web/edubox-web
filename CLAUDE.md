@@ -47,9 +47,25 @@ wzorów (np. EduDialog).
   tokenów, nigdy treść) pozwalają liczyć koszty (Hobby trzyma logi 1 h). Tylko na preview
   (chronione logowaniem Vercel): `testModel`/`testEffort`/`testVerbosity` oraz
   `mode: "models-probe"` (lista modeli dostępnych dla klucza) – do porównań przy audytach.
-- Fal.ai (Flux Dev domyślnie, Recraft V3 dla grafiki projektowej przez
-  `model: "recraft"`) — generowanie obrazów, przez `/api/generate.js`,
-  `/api/malarz.js` i `/api/ewa-generate.js` (klucz `FAL_KEY`).
+- Fal.ai (klucz `FAL_KEY`) — generowanie obrazów przez `/api/generate.js`, `/api/malarz.js`
+  (oba korzystają ze wspólnego `api/_lib/imageModels.js` → `runImageChain`) i `/api/ewa-generate.js`.
+  Łańcuch z testów 6–7.10.2026: najpierw **GPT Image 2.5** (model OpenAI uruchamiany przez fal,
+  `quality: medium`, rozmiary 1024², 1024×1536, 1536×1024; bezbłędne polskie napisy, najwierniej
+  trzyma opis i kompozycję, ok. 0,015–0,02 USD, ~20 s), zapas FLUX.2 pro → FLUX.1 dev.
+  `model: "recraft"` (medale, ramki, dyplomy) → też najpierw GPT Image 2.5, zapas Recraft V4.1 →
+  Recraft V3. **Recraft V4.1 przyjmuje tylko styl `any` albo `vector_illustration`** (inne = 422),
+  a `vector_illustration` zwraca SVG (nie zadziała w canvas/PDF) – wysyłamy `any`, styl słowami.
+  Zdjęcie użytkownika (`init_image`) → GPT Image 2.5 edit (dawny SDXL img2img prawie nie przerabiał
+  zdjęcia). **`reference_image` / `reference_images`** → ten sam bohater w nowej scenie (GPT Image 2.5
+  edit z instrukcją „kopiuj wygląd, nie minę ani tło”) – EduBajka (okładka), EduKomiks (kadr 1),
+  historyjki społeczne i EduKasia (obrazek 1); kolejne obrazki rysowane równolegle. Formaty malarza:
+  medal, naklejka, zawieszka (pion), zaproszenie (pion), dyplom, `poziom` (3:2 nad tekstem A4), `pion`.
+  Linki `fal.media` są w praktyce trwałe (wpisy Giełdy z 06.2026 nadal działają). Na preview:
+  `testEndpoint`/`testPayload` w `generate.js` (dowolny model fal lub `openai-direct:<model>`).
+  `/api/upscale` (wydruk A4/A3 w EduPlakat): Recraft Crisp (~4096 px, 0,004 USD), zapas ESRGAN ×2 –
+  dawny clarity-upscaler ×4 kosztował 0,03 USD za megapiksel WYNIKU (~0,75 USD za plakat).
+  Style w promptach opisujemy słowami (bez nazw studiów typu Pixar/Disney/Ghibli i bez określeń
+  rasowych). Limit czasu po stronie przeglądarki dla obrazków: min. 120 s.
 - ElevenLabs — **tylko** wewnątrz pipeline'u Make.com/json2video (patrz
   niżej). Brak bezpośredniego klucza/dostępu z naszego własnego backendu.
 - D-ID (talking-avatar video, plan "Lekki" ~5,9 USD/mies.) — nowa integracja,
@@ -249,6 +265,26 @@ fragment opinii w obszarach ICF), EduSprawozdawca, EduBiurokrata (opinia do pora
 Wydruk z ciemnych paneli dawał jasnoszary tekst – w narzędziach bez białej kartki dodawaj do
 `@media print` regułę `#root * { color:#000 !important }` albo używaj `printDoc`.
 
+**Wydruk – sprawdzanie bez drukarki:** kopia strony z wstrzykniętymi danymi wyniku → Chrome
+headless `--print-to-pdf` → strony PDF do PNG (`pdfjs-dist` + `@napi-rs/canvas`). Tak wyszły:
+baner cookies drukujący się na każdej stronie (naprawione w `cookie-consent.js`), cienie jako
+czarne pasy (`* { box-shadow:none }` w druku), reguła `.flex { display:block }` psująca wnętrze
+stron, siatka EduKomiksu w jednej kolumnie (szerokość wydruku < 768 px = brak `md:`).
+EduBajka: ilustracje 170 × 113 mm, tekst do ~110 słów = jedna kartka A4 na stronę.
+
+**Service Worker (`service-worker.js`, v4 od 7.10.2026):** strony, skrypty, style i dane ZAWSZE
+najpierw z sieci (cache tylko offline), obrazki/czcionki z cache z odświeżaniem w tle, inne domeny
+i `/api/` poza SW. Wcześniej (v3) wszystko poza stroną główną szło „najpierw z cache” – kto raz
+otworzył narzędzie, nie dostawał poprawek. Nie wracaj do cache-first dla HTML/JS. Rejestracja
+wszędzie jako `/service-worker.js?v=4`.
+
+**Układ na telefonie:** 12 narzędzi z panelem bocznym (EduBajka, EduDekorator, EduDetox,
+EduKalendarz, EduKatalog, EduMalarz, EduNotariusz, EduPDF, EduRaport, EduWakacje, EduWpisy,
+MagicLetters) dołącza `layout-mobile.css`: poniżej 1024 px panel nad podglądem i zwykłe przewijanie
+(wcześniej stały panel 320–380 px zasłaniał wynik), na komputerze układ kończy się równo pod menu.
+Nowe narzędzie z panelem `<aside>` obok `<main>` = dołącz ten plik. Ruch z filmików (YouTube Shorts)
+to głównie telefony – każdą zmianę wyglądu sprawdzaj też w widoku 375 px.
+
 **Kody PRO za wsparcie (Buycoffee.to):** `api/coffee-check.js` wydaje kod `KAWA-…` (7 dni, weryfikacja
 w Make, scenariusz Coffee-Verify) albo – od 49 zł – `ROK-…` (365 dni od wygenerowania), który
 `api/verify-code.js` sprawdza bezpośrednio w arkuszu `Coffee_Codes` (A kod, F data). Logika planu:
@@ -264,7 +300,14 @@ przez `bonus/until` (eduboxBonusUntil).
   kreatywny tekst.
 - *Zablokowany opis wyglądu* dla powtarzalnych postaci (Ewa/Ada/Ania) — ten
   sam tekst opisu za każdym razem w prompt do fal.ai, inaczej AI losuje nową
-  twarz przy każdym wywołaniu.
+  twarz przy każdym wywołaniu. W seriach obrazków (bajka, komiks, historyjka)
+  dodatkowo pierwszy obrazek jako `reference_image` dla kolejnych – dopiero to
+  daje tę samą twarz i ubranie; opisy scen twórz z GOTOWEGO tekstu (każdy obrazek
+  pokazuje to, o czym czyta dziecko, z emocją z tej strony).
+- *Rymy po polsku* (EduTik, EduKasia, rymowanki w Asystencie): tylko mocny model
+  (`model: 'strong'` + `stream: true` → GPT-6.1); słabsze dawały pseudo-rymy
+  („głowę/sowa”, „statek/tak”). Strumień nie przyjmuje trybu JSON – JSON wymusza
+  instrukcja, a parser wycina obiekt z tekstu.
 - *NVC + żargon PPP* (EduDialog): metoda "kanapki" (pozytyw → problem →
   propozycja) dla wiadomości do rodziców; sformalizowany żargon pedagogiczny
   dla opinii do Poradni (np. "bije innych" → "przejawia zachowania
