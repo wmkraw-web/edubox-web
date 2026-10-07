@@ -332,6 +332,26 @@ tryb nauczyciela wybiera `DOC_TYPES.dyplomowany` (opis i analiza) albo `nauczyci
 pola „Cel awansu” (`LEVEL_DYPL`/`LEVEL_STAZ`). Linia `const docType = DOC_TYPES[mode]…` musi być jedną linią –
 test `awans:check` wycina ją w vm.
 
+**EduSprawdzian (od 7.10.2026):** blok `SPRAWDZIAN_PROMPTS_START…END` w `edusprawdzian.html` (testy
+`npm run sprawdzian:check`), w `PAPER_TOOLS` testu dokumentów. `strong` ze strumieniem w sekcjach TEMAT / GRUPA A /
+GRUPA B / opcjonalnie WERSJA DOSTOSOWANA / KLUCZ / ODPOWIEDZI; zadania tylko z wklejonego materiału (za mało
+materiału = `[uzupełnij]`, nie zmyślone zadania), linki nie (AI ich nie otwiera). Kontrola klucza według wzorca
+EduRymów: po napisaniu DRUGIE zapytanie (`balanced`, JSON) rozwiązuje zadania zamknięte BEZ klucza, a przeglądarka
+porównuje z liniami `A1: B` z sekcji ODPOWIEDZI (`compareKeys`, odporne na zapis „B) jądro”, „PFFP”, „1c”); sumy
+punktów i liczba zadań w grupach sprawdzane bez AI. Tabela punktów na oceny liczona lokalnie z progów WZO
+wpisanych przez nauczyciela (localStorage; domyślne opisane jako przykładowe). Giełda: tylko kartki, nigdy wklejony
+materiał (fragmenty podręczników). Wykładniki: `<sup>` – model przepisywał „(−2)^5” z materiału mimo instrukcji, więc
+`caretToSup` zamienia `^` w przeglądarce, a do kontroli tekst idzie z `^( )` (`plainText` zrobiłby z 2<sup>5</sup> „25”).
+`doc-tools`: `<p class="linia"></p>` (linia do pisania) i `<div class="page-break"></div>` działają na kartce, w druku,
+w schowku i w .docx; `sanitizeHtml` przepuszcza `sup`/`sub` (Word: superScript/subScript). Zamiany „pod Worda”
+robi tylko `clipboardHtml` – w `styledHtml` (wspólnym z wydrukiem) `<br>` zamiast podziału sklejał grupy A i B.
+
+**CSP a obrazki z fal.media:** `connect-src` NIE obejmuje fal.media, więc `fetch(urlObrazka)` w przeglądarce kończy
+się „Failed to fetch” (realny błąd w MagicLetters: obrazek opłacony, użytkownik dostawał błąd, licznik się nie
+zwiększał). Obrazek z fal.media zamieniamy na dane przez `<img crossOrigin="anonymous">` + `<canvas>` (img-src
+pozwala na https:, fal.media wysyła CORS) – tak robią EduPrezentacja (PPTX) i MagicLetters. Nie dopisuj fal.media do
+`connect-src` „na szybko”.
+
 **Wydruk – sprawdzanie bez drukarki:** kopia strony z wstrzykniętymi danymi wyniku → Chrome
 headless `--print-to-pdf` → strony PDF do PNG (`pdfjs-dist` + `@napi-rs/canvas`). Tak wyszły:
 baner cookies drukujący się na każdej stronie (naprawione w `cookie-consent.js`), cienie jako
