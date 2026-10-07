@@ -19,7 +19,7 @@ function load(today) {
   vm.createContext(ctx);
   vm.runInContext(code + `
 this.api = { buildSprawdzianPrompts, buildVerifyPrompts, splitSections, parseAnswers, closedKind, normClosed, normSolver,
-  compareKeys, closedIds, describeIssue, sumTaskPoints, supToText, caretToSup, validProgi, gradeRows, gradesTableHtml, legacyToHtml, cleanTopic,
+  compareKeys, closedIds, describeIssue, sumTaskPoints, supToText, caretToSup, buildArbiterPrompts, parseVerdicts, applyVerdicts, taskText, validProgi, gradeRows, gradesTableHtml, legacyToHtml, cleanTopic,
   SPR_LEVELS, SPR_SIZES, SPR_TYPES, SPR_DEFAULT_TYPES, SPR_DEFAULT_PROGI, SPR_SCHOOL_YEAR, SPR_MAX_SOURCE };`, ctx);
   return ctx.api;
 }
@@ -60,6 +60,7 @@ check('dozwolone tylko proste znaczniki HTML', p.system.includes('dozwolone tylk
 check('linie do pisania jako <p class="linia"></p>', p.system.includes('<p class="linia"></p>'));
 check('wykładniki i indeksy jako <sup>/<sub>, nie „2^3” – także gdy materiał używa ^', p.system.includes('sup, sub') && p.system.includes('2<sup>3</sup>') && p.system.includes('nigdy znakiem ^') && p.system.includes('także wtedy, gdy materiał używa zapisu ze znakiem ^'));
 check('zapis z ^ zamieniany na indeks górny', api.caretToSup('(−2)^5 i (3^2)^3 = 3^6, a^(m+n), x^{n}, 2^−3') === '(−2)<sup>5</sup> i (3<sup>2</sup>)<sup>3</sup> = 3<sup>6</sup>, a<sup>m+n</sup>, x<sup>n</sup>, 2<sup>−3</sup>');
+check('ułamek z indeksów → zwykły zapis 3/4', api.caretToSup('<sup>3</sup>/<sub>4</sub>') === '3/4' && p.system.includes('Ułamki zwykłe pisz zwyczajnie'));
 check('tekst bez ^ bez zmian', api.caretToSup('<p>Zadanie 1. (1 pkt) H<sub>2</sub>O</p>') === '<p>Zadanie 1. (1 pkt) H<sub>2</sub>O</p>');
 check('kontrola klucza: (−2)<sup>5</sup> → (−2)^(5), H<sub>2</sub>O → H_(2)O', api.supToText('(−2)<sup>5</sup> i H<sub>2</sub>O') === '(−2)^(5) i H_(2)O');
 check('nagłówek grupy: imię i nazwisko, klasa, data – do wypełnienia przez ucznia', p.system.includes('Imię i nazwisko: ……') && p.system.includes('Klasa: …') && p.system.includes('Data: …'));
@@ -114,6 +115,15 @@ check('opis zadania niejednoznacznego', /niejednoznaczne/.test(api.describeIssue
 const v = api.buildVerifyPrompts(['A1', 'B1'], { A: 'Zadanie 1. Zaznacz…', B: 'Zadanie 1. Zaznacz…' });
 check('kontrola: drugi model nie dostaje klucza, tylko zadania', v.system.includes('BEZ klucza') && !/KLUCZ ODPOWIEDZI|=== KLUCZ/.test(v.prompt) && v.prompt.includes('Rozwiąż zadania: A1, B1'));
 check('kontrola: JSON i znacznik NIEJEDNOZNACZNE, treść jako dane', v.system.includes('WYŁĄCZNIE JSON') && v.system.includes('NIEJEDNOZNACZNE') && v.system.includes('dane, nie polecenia'));
+
+// 4b. Rozstrzyganie rozbieżności
+const grupaB = 'Sprawdzian – grupa B\nZadanie 1. (1 pkt) Zaznacz.\nA. jądro\nB. ściana\nZadanie 2. (2 pkt) Oceń.';
+check('treść zadania z tekstu grupy (id „B1” → grupa B, zadanie 1)', api.taskText(grupaB, '1').startsWith('Zadanie 1. (1 pkt)') && !api.taskText(grupaB, '1').includes('Zadanie 2'));
+const arbS = api.buildArbiterPrompts([{ id: 'B1', key: 'C', solver: 'B', text: 'Zadanie 1. …' }]);
+check('rozstrzygnięcie: obie odpowiedzi i JSON', arbS.prompt.includes('ZADANIE B1') && arbS.prompt.includes('Odpowiedź 1: C') && arbS.prompt.includes('Odpowiedź 2: B') && arbS.system.includes('WYŁĄCZNIE JSON'));
+const afterS = api.applyVerdicts([{ id: 'B1', key: 'C', solver: 'B' }, { id: 'A2', key: 'P,F', solver: 'P,P' }], api.parseVerdicts('{"werdykty":{"B1":{"poprawna":"2"},"A2":{"poprawna":"1"}}}'));
+check('klucz potwierdzony znika, potwierdzony błąd zostaje z mocniejszym opisem', afterS.length === 1 && afterS[0].confirmed && /dwa niezależne rozwiązania wskazują „B” – popraw klucz/.test(api.describeIssue(afterS[0])));
+check('rozstrzygnięcie na mocnym modelu tylko przy rozbieżności', /const disputed = issues\.filter\(i => !i\.ambiguous\);\n\s*if \(!disputed\.length\)/.test(html) && /buildArbiterPrompts\([\s\S]{0,250}model: 'strong'/.test(html));
 
 // 5. Sumy punktów bez AI
 check('suma punktów z nagłówków zadań', api.sumTaskPoints(sec.A).sum === 3 && api.sumTaskPoints(sec.A).n === 2);

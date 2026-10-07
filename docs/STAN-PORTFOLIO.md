@@ -19,13 +19,13 @@ w podglądzie wydruku (Ctrl+P), nie jako listę błędów.
 
 | Cecha | Jest | Do zrobienia | Brak | Po co to |
 | --- | --- | --- | --- | --- |
-| Kartka A4 | 10 | 0 | 50 | wzorzec generatorów dokumentów: AI zwraca czysty HTML, podgląd jako kartka, edycja przed eksportem |
-| Strumień | 15 | 0 | 45 | tekst pojawia się na bieżąco; bez tego nauczyciel czeka w ciszy nawet 100 s |
-| Prawdziwy .docx | 22 | 0 | 38 | plik „.doc" z HTML-em w środku (mime application/msword) Word otwiera z ostrzeżeniem, a Dokumenty Google potrafią go odrzucić |
+| Kartka A4 | 11 | 0 | 49 | wzorzec generatorów dokumentów: AI zwraca czysty HTML, podgląd jako kartka, edycja przed eksportem |
+| Strumień | 16 | 0 | 44 | tekst pojawia się na bieżąco; bez tego nauczyciel czeka w ciszy nawet 100 s |
+| Prawdziwy .docx | 23 | 0 | 37 | plik „.doc" z HTML-em w środku (mime application/msword) Word otwiera z ostrzeżeniem, a Dokumenty Google potrafią go odrzucić |
 | Czysty wydruk | 49 | 0 | 0 | jasnoszary tekst (`text-slate-400` i pokrewne – 1284 wystąpienia) jest na wydruku praktycznie niewidoczny, a `body { color: black }` go nie przebija, bo klasa Tailwinda ma wyższą specyficzność. Od 10.2026 załatwia to wspólna reguła w `edubox-ui.css` w `@media print`, więc wystarcza podpięcie warstwy; `printDoc` albo własna reguła czerni też się liczą. Dekoratory drukują w kolorze – tam `text-white` celowo zostaje białe. |
 | Nowy wygląd | 60 | 0 | 0 | wspólna warstwa edubox-ui.css: spokojne powierzchnie z prawdziwym cieniem zamiast neonowych poświat i pływających bąbli z 2021. Neony wpisane w markup wygasza reguła [class*="shadow-[0_0_"] w tym pliku, więc podpięcie linku wystarcza – klas nie trzeba czyścić z markupu. |
 | „Jak to działa" | 60 | 0 | 0 | info-box blisko góry formularza - konwencja z CLAUDE.md |
-| Wspólna pula | 25 | 0 | 16 | EduBoxCore.executeWithLimitCheck zamiast własnego licznika per-aplikacja |
+| Wspólna pula | 26 | 0 | 15 | EduBoxCore.executeWithLimitCheck zamiast własnego licznika per-aplikacja |
 
 ## Przepisy
 
@@ -53,7 +53,7 @@ Cytowane przez numer tekstu jednolitego lub noweli — pilnowane pod numerem pie
 
 ## Porządki (nie błędy)
 
-Stron z martwymi klasami `shadow-[0_0_…]` w markupie: **46**.
+Stron z martwymi klasami `shadow-[0_0_…]` w markupie: **45**.
 Wygasza je reguła w `edubox-ui.css`, więc wyglądu nie psują – to tylko kod do sprzątnięcia
 przy okazji innych zmian w danym pliku. Nie ma potrzeby robić z tego osobnej akcji.
 
@@ -118,7 +118,7 @@ przy okazji innych zmian w danym pliku. Nie ma potrzeby robić z tego osobnej ak
 | EduTimer PRO | `edustoper.html` | – | – | – | ✅ | ✅ | ✅ | · | · |
 | EduTik PRO (Wierszyki i Piosenki) | `edutik.html` | – | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | · |
 | EduWakacje PRO | `eduwakacje.html` | – | – | – | ✅ | ✅ | ✅ | – | · |
-| EduZadania AI | `eduzadania.html` | – | – | – | ✅ | ✅ | ✅ | – | · |
+| EduZadania AI | `eduzadania.html` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | · |
 | EduZastępstwo 999 | `eduzastepstwo.html` | – | – | – | ✅ | ✅ | ✅ | ✅ | · |
 | EduBoxPro Studio | `studio.html` | – | – | ✅ | ✅ | ✅ | ✅ | – | · |
 | ZanimKlikniesz | `zanimklikniesz.html` | – | – | – | ✅ | ✅ | ✅ | – | · |
