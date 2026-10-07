@@ -29,7 +29,7 @@ w podglądzie wydruku (Ctrl+P), nie jako listę błędów.
 
 ## Przepisy
 
-Narzędzia cytujące przepisy (`§`, `art.`, `Dz.U.`): **15**, z tego objętych cotygodniową kontrolą ISAP (`scripts/legal-acts.json` → `npm run legal:check`): **15**.
+Narzędzia cytujące przepisy (`§`, `art.`, `Dz.U.`): **16**, z tego objętych cotygodniową kontrolą ISAP (`scripts/legal-acts.json` → `npm run legal:check`): **16**.
 
 ✅ Każde narzędzie cytujące przepisy jest objęte kontrolą.
 
@@ -113,7 +113,7 @@ przy okazji innych zmian w danym pliku. Nie ma potrzeby robić z tego osobnej ak
 | EduMotywator AI | `edumotywator.html` | – | – | ✅ | ✅ | ✅ | ✅ | ✅ | · |
 | EduPrezentacja PRO | `eduprezentacja.html` | – | – | – | ✅ | ✅ | ✅ | ✅ | · |
 | EduRymy AI | `edurymy.html` | – | – | – | ✅ | ✅ | ✅ | ✅ | · |
-| Scenariusz AI PRO | `eduscenariusz.html` | – | – | ✅ | ✅ | ✅ | ✅ | ✅ | · |
+| Scenariusz AI PRO | `eduscenariusz.html` | – | – | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ ISAP |
 | EduSprawdzian Maker | `edusprawdzian.html` | – | – | – | ✅ | ✅ | ✅ | ✅ | · |
 | EduTimer PRO | `edustoper.html` | – | – | – | ✅ | ✅ | ✅ | · | · |
 | EduTik PRO (Wierszyki i Piosenki) | `edutik.html` | – | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | · |
