@@ -188,13 +188,16 @@
             }
         };
 
+        // Neutralna zaślepka, gdy obrazek się nie narysował (wcześniej przypadkowe zdjęcie klasy z Unsplash).
+        const IMG_PLACEHOLDER = 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="12" fill="#f1f5f9"/><path d="M28 66l13-15 9 10 8-9 14 14z" fill="#cbd5e1"/><circle cx="62" cy="38" r="6" fill="#cbd5e1"/></svg>');
+
         const fetchTextAI = async (prompt, systemInstruction) => {
-            const finalPrompt = `INSTRUKCJA: Zwróć DOKŁADNIE i WYŁĄCZNIE czysty kod JSON. Nie używaj znaczników markdown.\n\n${systemInstruction}\n\nZADANIE:\n${prompt}`;
             try {
                 const res = await fetch('/api/chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ prompt: finalPrompt, system: systemInstruction, format: "json" })
+                    // 'balanced' (gpt-5.4-mini): lepsze, krótkie hasła po polsku; instrukcja tylko w polu system.
+                    body: JSON.stringify({ prompt, system: systemInstruction, format: "json", model: 'balanced' })
                 });
                 if (res.ok) {
                     const data = await res.json();
@@ -475,8 +478,9 @@ WYMÓG JSON:
   ] 
 }`;
                 } else if (layoutType === 'plakat_choroba') {
-                    sysPrompt = `Projektujesz plakat edukacyjny o objawach chorób.
-Dla każdego z 4 objawów podaj uroczy 'image_prompt' w stylu animacji 3D obrazujący chore dziecko.
+                    sysPrompt = `Projektujesz plakat edukacyjny dla rodziców: kiedy dziecko powinno zostać w domu.
+ZASADY ZDROWOTNE: ogólne, ostrożne informacje zgodne z typowymi zaleceniami pediatrów – bez nazw leków i dawek, bez diagnoz i bez sztywnych terminów powrotu; przy wątpliwościach odsyłaj do lekarza i procedury przedszkola. Opis każdego objawu to 1–2 krótkie, życzliwe zdania (bez straszenia i obwiniania rodziców). W 'subtitle' przypomnij, że decyzję o powrocie podejmuje się z lekarzem i zgodnie z zasadami przedszkola.
+Dla każdego z 4 objawów podaj uroczy 'image_prompt' w stylu animacji 3D obrazujący chore dziecko (spokojnie, bez drastycznych szczegółów).
 WYMÓG JSON:
 {
   "title": "Zostaw dziecko w domu, gdy:",
@@ -517,7 +521,7 @@ WYMÓG JSON:
                     const itemsWithImages = await Promise.all(
                         parsedJson.items.map(async (item) => {
                             const imgUrl = await fetchImageAI(item.image_prompt);
-                            return { ...item, imgUrl: imgUrl || 'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?q=80&w=400&auto=format&fit=crop' }; 
+                            return { ...item, imgUrl: imgUrl || IMG_PLACEHOLDER };
                         })
                     );
                     
