@@ -221,6 +221,7 @@ ZASADY MERYTORYCZNE:
 - Każde zadanie ma jedną, jednoznaczną poprawną odpowiedź, a zadanie otwarte – jasne kryteria. Błędne odpowiedzi w zadaniach wyboru są wiarygodne, ale jednoznacznie błędne; bez „wszystkie powyższe” i bez podwójnych przeczeń.
 - Polecenia krótkie, w trybie rozkazującym („Zaznacz…”, „Uzupełnij…”, „Wyjaśnij…”); słownictwo i trudność dopasowane do poziomu. Poprawna polszczyzna.
 - W zadaniach obliczeniowych sprawdź każdy rachunek; w kluczu podaj wynik i krótkie rozwiązanie.
+- Wykładniki i indeksy zapisuj znacznikami <sup> i <sub> (2<sup>3</sup>, H<sub>2</sub>O) – także wtedy, gdy materiał używa zapisu ze znakiem ^.
 - Grupa A i grupa B: ta sama liczba zadań, te same typy w tej samej kolejności, ta sama punktacja i porównywalna trudność, ale INNE pytania lub dane (nie tylko przestawione odpowiedzi). Poprawne odpowiedzi w zadaniach wyboru rozłóż na różne litery.
 - Liczba zadań w każdej grupie: ${size.tasks}. Czas pracy: ${size.minutes} minut. Typy zadań (dobierz do materiału): ${typeList}.
 - Gdy materiału nie wystarczy na rzetelne ${size.tasks} zadań, ułóż mniej i na końcu grupy dodaj akapit <p>[uzupełnij: brakuje materiału na kolejne zadania]</p> – nie dopisuj zadań spoza materiału.
@@ -241,7 +242,8 @@ FORMAT – zwróć dokładnie poniższe sekcje, każdą zaczynaj od osobnej lini
 === ODPOWIEDZI ===
 (zwykły tekst do automatycznej kontroli)
 
-HTML – dozwolone tylko: h1, h2, p, br, strong, em, table, tr, th, td. Bez Markdown i bez \`\`\`. Słowa TEMAT i SUMA poniżej zastąp właściwymi treściami.
+HTML – dozwolone tylko: h1, h2, p, br, strong, em, sup, sub, table, tr, th, td. Bez Markdown i bez \`\`\`. Słowa TEMAT i SUMA poniżej zastąp właściwymi treściami.
+Wykładniki i indeksy zapisuj znacznikami: 2<sup>3</sup>, (a · b)<sup>n</sup>, H<sub>2</sub>O, m/s<sup>2</sup> – nigdy znakiem ^ ani _.
 Każda grupa${adapted ? ' i wersja dostosowana' : ''} zaczyna się tak:
 <h1>${size.name}: TEMAT – grupa A</h1>
 <p>Imię i nazwisko: ……………………………………… Klasa: ………… Data: …………</p>
@@ -283,6 +285,17 @@ Format: wybór – jedna litera; prawda/fałsz – litery P/F po przecinku w kol
             if (texts.B) parts.push('GRUPA B (zadania B1, B2, …):\n' + texts.B);
             if (texts.D) parts.push('WERSJA DOSTOSOWANA (zadania D1, D2, …):\n' + texts.D);
             return { system, prompt: `Rozwiąż zadania: ${ids.join(', ')}.\n\n${parts.join('\n\n')}` };
+        }
+
+        // Zapis „2^3”, „a^(m+n)”, „x^{n}” → indeks górny (model potrafi przepisać ^ z materiału mimo instrukcji).
+        function caretToSup(html) {
+            return String(html || '')
+                .replace(/\^\(([^()<>]{1,15})\)/g, '<sup>$1</sup>')
+                .replace(/\^\{([^{}<>]{1,15})\}/g, '<sup>$1</sup>')
+                .replace(/\^([−–-]?[0-9A-Za-z]{1,6})/g, '<sup>$1</sup>');
+        }
+        function supToText(html) {
+            return String(html || '').replace(/<sup>([\s\S]*?)<\/sup>/gi, '^($1)').replace(/<sub>([\s\S]*?)<\/sub>/gi, '_($1)');
         }
 
         const SPR_SECTION_KEYS = { 'TEMAT': 'topic', 'GRUPA A': 'A', 'GRUPA B': 'B', 'WERSJA DOSTOSOWANA': 'D', 'KLUCZ': 'K', 'ODPOWIEDZI': 'answers' };
@@ -507,7 +520,7 @@ Format: wybór – jedna litera; prawda/fałsz – litery P/F po przecinku w kol
             const paperBase = (k) => {
                 if (k === 'K' && keyHtml) return DT.markPlaceholders(keyHtml);
                 const raw = sections[k];
-                return raw ? DT.markPlaceholders(DT.normalize(raw)) : '';
+                return raw ? DT.markPlaceholders(caretToSup(DT.normalize(raw))) : '';
             };
             // Eksport zawsze z kartki – z poprawkami nauczyciela, nie z surowej odpowiedzi AI.
             const paperHtml = (k) => {
@@ -541,7 +554,7 @@ Format: wybór – jedna litera; prawda/fałsz – litery P/F po przecinku w kol
                 setChecks({ status: 'running', issues: [], checked: 0, notes });
                 try {
                     const texts = {};
-                    ['A', 'B', 'D'].forEach(k => { if (sec[k]) texts[k] = DT.plainText(DT.normalize(sec[k])); });
+                    ['A', 'B', 'D'].forEach(k => { if (sec[k]) texts[k] = DT.plainText(supToText(DT.normalize(sec[k]))); });
                     const v = buildVerifyPrompts(ids, texts);
                     const res = await fetch('/api/chat', {
                         method: 'POST',
@@ -597,7 +610,7 @@ Format: wybór – jedna litera; prawda/fałsz – litery P/F po przecinku w kol
                             const { answers, total } = parseAnswers(sec.answers);
                             const totalPts = total || sumTaskPoints(sec.A).sum;
                             setSections(sec);
-                            setKeyHtml(DT.normalize(sec.K || '') + (withGrades ? gradesTableHtml(totalPts, progi) : ''));
+                            setKeyHtml(caretToSup(DT.normalize(sec.K || '')) + (withGrades ? gradesTableHtml(totalPts, progi) : ''));
                             setActiveTab('A');
                             followRef.current = false;
                             if (result.interrupted) showToast('Połączenie przerwane – sprawdzian może być niepełny. Zajrzyj na koniec kartek.', 'error');

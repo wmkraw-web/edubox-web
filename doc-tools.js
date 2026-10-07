@@ -199,7 +199,7 @@
         if (ch.nodeType === 3) {
           const t = ch.textContent.replace(/\s+/g, ' ');
           if (t && t !== ' ' || (t === ' ' && runs.length)) {
-            runs.push(new D.TextRun({ text: t, bold: !!st.bold, italics: !!st.italics, underline: st.underline ? {} : undefined, highlight: st.mark ? 'yellow' : undefined, size: st.size }));
+            runs.push(new D.TextRun({ text: t, bold: !!st.bold, italics: !!st.italics, underline: st.underline ? {} : undefined, highlight: st.mark ? 'yellow' : undefined, size: st.size, superScript: st.sup || undefined, subScript: st.sub || undefined }));
           }
         } else if (ch.nodeType === 1) {
           const tag = ch.tagName.toLowerCase();
@@ -209,7 +209,9 @@
             italics: st.italics || tag === 'em' || tag === 'i',
             underline: st.underline || tag === 'u',
             mark: st.mark || tag === 'mark',
-            size: tag === 'small' ? 18 : st.size
+            size: tag === 'small' ? 18 : st.size,
+            sup: st.sup || tag === 'sup',
+            sub: st.sub || tag === 'sub'
           }));
         }
       });

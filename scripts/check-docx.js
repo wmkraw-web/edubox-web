@@ -96,6 +96,9 @@ const text = (n) => (n.children || []).map(r => r.text || '').join('');
   ok('podzial strony -> akapit z pageBreakBefore', ch.some(n => n.pageBreakBefore === true));
   ok('grupa B po podziale strony jako naglowek 1', ch.filter(n => n.heading === 'H1').length === 2);
   ok('akapit z tekstem i klasa linia nie znika', (await build('<p class="linia">Odp.</p>')).some(n => text(n) === 'Odp.'));
+  ch = await build('<p>2<sup>3</sup> i H<sub>2</sub>O</p>');
+  ok('indeks gorny -> superScript, dolny -> subScript', ch[0].children.some(r => r.text === '3' && r.superScript === true) && ch[0].children.some(r => r.text === '2' && r.subScript === true));
+  ok('zwykly tekst bez indeksow', ch[0].children.filter(r => r.superScript || r.subScript).length === 2);
 
   console.log('\n[Word] ' + (fail ? fail + ' bledow' : 'OK - eksport .docx daje poprawne naglowki, listy, tabele i wysrodkowany dyplom.'));
   process.exit(fail ? 1 : 0);

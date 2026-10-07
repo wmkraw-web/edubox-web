@@ -19,7 +19,7 @@ function load(today) {
   vm.createContext(ctx);
   vm.runInContext(code + `
 this.api = { buildSprawdzianPrompts, buildVerifyPrompts, splitSections, parseAnswers, closedKind, normClosed, normSolver,
-  compareKeys, closedIds, describeIssue, sumTaskPoints, validProgi, gradeRows, gradesTableHtml, legacyToHtml, cleanTopic,
+  compareKeys, closedIds, describeIssue, sumTaskPoints, supToText, caretToSup, validProgi, gradeRows, gradesTableHtml, legacyToHtml, cleanTopic,
   SPR_LEVELS, SPR_SIZES, SPR_TYPES, SPR_DEFAULT_TYPES, SPR_DEFAULT_PROGI, SPR_SCHOOL_YEAR, SPR_MAX_SOURCE };`, ctx);
   return ctx.api;
 }
@@ -56,8 +56,12 @@ check('bez wersji dostosowanej – brak sekcji i kolumny', !p.system.includes('=
 const pd = api.buildSprawdzianPrompts({ ...base, adapted: true });
 check('wersja dostosowana: sekcja, kolumna w kluczu i litera D w kontroli', pd.system.includes('=== WERSJA DOSTOSOWANA ===') && pd.system.includes('| Wersja dostosowana |') && pd.system.includes('(litera D)'));
 check('wersja dostosowana: te same zadania i punkty, A–C, bank słów, bez diagnoz', ['te same zadania co w grupie A', 'tą samą punktacją', 'A–C', 'bank słów', 'Bez nazw zaburzeń i diagnoz'].every(x => pd.system.includes(x)));
-check('dozwolone tylko proste znaczniki HTML', p.system.includes('dozwolone tylko: h1, h2, p, br, strong, em, table, tr, th, td'));
+check('dozwolone tylko proste znaczniki HTML', p.system.includes('dozwolone tylko: h1, h2, p, br, strong, em, sup, sub, table, tr, th, td'));
 check('linie do pisania jako <p class="linia"></p>', p.system.includes('<p class="linia"></p>'));
+check('wykładniki i indeksy jako <sup>/<sub>, nie „2^3” – także gdy materiał używa ^', p.system.includes('sup, sub') && p.system.includes('2<sup>3</sup>') && p.system.includes('nigdy znakiem ^') && p.system.includes('także wtedy, gdy materiał używa zapisu ze znakiem ^'));
+check('zapis z ^ zamieniany na indeks górny', api.caretToSup('(−2)^5 i (3^2)^3 = 3^6, a^(m+n), x^{n}, 2^−3') === '(−2)<sup>5</sup> i (3<sup>2</sup>)<sup>3</sup> = 3<sup>6</sup>, a<sup>m+n</sup>, x<sup>n</sup>, 2<sup>−3</sup>');
+check('tekst bez ^ bez zmian', api.caretToSup('<p>Zadanie 1. (1 pkt) H<sub>2</sub>O</p>') === '<p>Zadanie 1. (1 pkt) H<sub>2</sub>O</p>');
+check('kontrola klucza: (−2)<sup>5</sup> → (−2)^(5), H<sub>2</sub>O → H_(2)O', api.supToText('(−2)<sup>5</sup> i H<sub>2</sub>O') === '(−2)^(5) i H_(2)O');
 check('nagłówek grupy: imię i nazwisko, klasa, data – do wypełnienia przez ucznia', p.system.includes('Imię i nazwisko: ……') && p.system.includes('Klasa: …') && p.system.includes('Data: …'));
 check('klucz: tabela z zasadami punktowania i wierszem „Razem”', p.system.includes('Zasady punktowania') && p.system.includes('wiersz „Razem”'));
 check('kontrola: wybór, P/F, dopasowanie i RAZEM', ['A1: B', 'A2: P, F, F, P', 'A3: 1-c, 2-a, 3-b', 'RAZEM'].every(x => p.system.includes(x)));

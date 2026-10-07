@@ -307,7 +307,7 @@ const escapeHtml = (value) => {
 const sanitizeHtml = (rawHtml) => DOMPurify.sanitize(String(rawHtml ?? ''), {
     ALLOWED_TAGS: ['b', 'i', 'em', 'strong', 'u', 'p', 'br', 'ul', 'ol', 'li',
         'h1', 'h2', 'h3', 'h4', 'span', 'div', 'blockquote', 'table', 'thead',
-        'tbody', 'tr', 'td', 'th', 'small', 'mark'],
+        'tbody', 'tr', 'td', 'th', 'small', 'mark', 'sup', 'sub'],
     ALLOWED_ATTR: ['class']
 });
 
