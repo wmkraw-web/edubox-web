@@ -81,6 +81,15 @@
             * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
         }
         
+        /* Slajd skaluje się z szerokością (jednostki cqw), jak prawdziwy slajd: na telefonie to samo co na
+           rzutniku, tylko mniejsze – wcześniej stałe text-3xl/p-10 wylewały się poza slajd 16:9. */
+        .slide-frame { container-type: inline-size; }
+        .slide-frame .sf-pad { padding: 5cqw 5.5cqw; }
+        .slide-frame .sf-title { font-size: 3.9cqw; line-height: 1.15; margin-bottom: 2.4cqw; padding-bottom: 1.2cqw; }
+        .slide-frame .sf-list > * + * { margin-top: 1.4cqw; }
+        .slide-frame .sf-li { font-size: 2.1cqw; line-height: 1.35; gap: 1.2cqw; }
+        .slide-frame .sf-p { font-size: 1.65cqw; line-height: 1.5; }
+
         .loader-dots div { animation-timing-function: cubic-bezier(0, 1, 1, 0); }
         .loader-dots div:nth-child(1) { left: 8px; animation: loader-dots1 0.6s infinite; }
         .loader-dots div:nth-child(2) { left: 8px; animation: loader-dots2 0.6s infinite; }
@@ -153,6 +162,9 @@
 
 <script type="text/babel">
         const { useState, useEffect, useRef } = React;
+
+        // Wspólna, dzienna pula darmowych generowań tekstu w całym EduBox (global-core.js: TEXT_TRIAL_LIMIT).
+        const DAILY_LIMIT = 5;
 
         function App() {
             // === SYSTEM & LIMITS STATE ===
@@ -354,7 +366,7 @@
                 } else {
                     for (const i of todo) {
                         if (window.EduBoxCore.getImageUsageCount() >= 2) {
-                            showToast('⚠️ Dzienny limit darmowych obrazków (2/2) wyczerpany. Pozostałe slajdy zostaną bez grafiki - wpisz kod odblokowujący, by kontynuować.', 'error');
+                            showToast('⚠️ Darmowa grafika na start została już wykorzystana. Pozostałe slajdy zostaną bez ilustracji – możesz wgrać własne obrazki albo odblokować PRO.', 'error');
                             break;
                         }
                         await drawOne(i);
@@ -374,7 +386,7 @@
                 const proStatus = localStorage.getItem('eduboxProStatus');
                 const isPro = proStatus === 'PRO' || proStatus === 'active' || isPremium;
                 if (!isPro && window.EduBoxCore.getImageUsageCount() >= 2) {
-                    showToast('⚠️ Dzienny limit darmowych obrazków (2/2) wyczerpany. Wpisz kod odblokowujący!', 'error');
+                    showToast('⚠️ Darmowa grafika na start została już wykorzystana. Wgraj własny obrazek albo odblokuj PRO.', 'error');
                     return;
                 }
                 setIsRegeneratingImage(index);
@@ -488,21 +500,32 @@
 
             // === KEYBOARD & FULLSCREEN ===
             const toggleFullscreen = () => {
-                if (!document.fullscreenElement) {
-                    presentationRef.current?.requestFullscreen().catch(err => showToast("Błąd pełnego ekranu.", "error"));
-                    setIsFullscreen(true);
-                } else {
+                if (document.fullscreenElement) {
                     document.exitFullscreen();
                     setIsFullscreen(false);
+                    return;
                 }
+                if (isFullscreen) { setIsFullscreen(false); return; }
+                setIsFullscreen(true);
+                // iPhone nie obsługuje pełnego ekranu dla zwykłych elementów – wtedy zostaje sama nakładka na całe okno.
+                const el = presentationRef.current;
+                if (el && el.requestFullscreen) el.requestFullscreen().catch(() => {});
+            };
+
+            // Dotknięcie / kliknięcie: prawa połowa – dalej, lewa – wstecz (tablica interaktywna, tablet, telefon).
+            const tapNavigate = (e) => {
+                const forward = e.clientX > window.innerWidth / 2;
+                setCurrentSlideIndex(p => forward ? Math.min(p + 1, slides.length - 1) : Math.max(p - 1, 0));
             };
 
             useEffect(() => {
-                const handleFullscreenChange = () => setIsFullscreen(!!document.fullscreenElement);
+                // Wyjście z pełnego ekranu (ESC) zamyka też nakładkę; wejście ustawia ją przycisk.
+                const handleFullscreenChange = () => { if (!document.fullscreenElement) setIsFullscreen(false); };
                 const handleKeyDown = (e) => {
                     if (step !== 'final' || appMode !== 'generator') return;
-                    if (e.key === 'ArrowRight' || e.key === 'Space') {
-                        if (e.key === 'Space') e.preventDefault(); 
+                    if (e.key === 'Escape') { setIsFullscreen(false); return; }
+                    if (e.key === 'ArrowRight' || e.key === ' ') {
+                        if (e.key === ' ') e.preventDefault(); 
                         setCurrentSlideIndex(prev => Math.min(prev + 1, slides.length - 1));
                     } else if (e.key === 'ArrowLeft') {
                         setCurrentSlideIndex(prev => Math.max(prev - 1, 0));
@@ -557,10 +580,10 @@
                                     <>
                                         <div className="flex justify-between text-sm mb-1 mt-3">
                                             <span className="text-slate-400">Użycia dziś:</span>
-                                            <span className="font-bold text-white">{usages} / 2</span>
+                                            <span className="font-bold text-white">{usages} / {DAILY_LIMIT}</span>
                                         </div>
                                         <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden mb-4">
-                                            <div className="bg-blue-500 h-full" style={{width: `${(usages/2)*100}%`}}></div>
+                                            <div className="bg-blue-500 h-full" style={{width: `${Math.min(100, (usages / DAILY_LIMIT) * 100)}%`}}></div>
                                         </div>
                                         
                                         <div className="space-y-2">
@@ -578,6 +601,21 @@
                 </div>
             );
 
+            // Pasek boczny znika poniżej 768 px – na telefonie przełącznik Generator / Giełda nad treścią.
+            const renderMobileNav = () => (
+                <div className="md:hidden w-full mb-4 print-hidden">
+                    <div className="grid grid-cols-2 gap-1 p-1 bg-slate-900/80 border border-slate-800 rounded-xl">
+                        <button onClick={() => setAppMode('generator')} aria-pressed={appMode === 'generator'} className={`py-2.5 rounded-lg text-sm font-bold flex items-center justify-center gap-2 ${appMode === 'generator' ? 'bg-blue-600/20 text-blue-300 border border-blue-500/50' : 'text-slate-400'}`}>
+                            <i className="ph-bold ph-magic-wand"></i> Generator
+                        </button>
+                        <button onClick={() => setAppMode('gielda')} aria-pressed={appMode === 'gielda'} className={`py-2.5 rounded-lg text-sm font-bold flex items-center justify-center gap-2 ${appMode === 'gielda' ? 'bg-purple-600/20 text-purple-300 border border-purple-500/50' : 'text-slate-400'}`}>
+                            <i className="ph-bold ph-globe"></i> Giełda Wzorów
+                        </button>
+                    </div>
+                    <p className="text-xs text-slate-400 mt-2 text-center">{isPremium ? 'Wersja PRO – bez limitów' : `Dziś za darmo: ${usages} / ${DAILY_LIMIT} generowań tekstu`}</p>
+                </div>
+            );
+
             // === GIEŁDA VIEW ===
             if (appMode === 'gielda') {
                 return (
@@ -585,7 +623,8 @@
                         {renderSidebar()}
                         {toast.visible && <div className={`fixed top-6 right-6 z-50 px-6 py-3 rounded-xl font-bold shadow-2xl transition-all ${toast.type === 'error' ? 'bg-red-500 text-white' : 'bg-emerald-500 text-slate-900'}`}>{toast.message}</div>}
                         
-                        <div className="flex-1 p-8">
+                        <div className="flex-1 min-w-0 p-4 sm:p-8">
+                            {renderMobileNav()}
                             <h2 className="text-3xl font-black mb-2">Giełda Wzorów</h2>
                             <p className="text-slate-400 mb-8">Pobieraj prezentacje udostępnione przez innych nauczycieli.</p>
 
@@ -627,11 +666,12 @@
                     {toast.visible && <div className={`fixed top-6 right-6 z-[9999] px-6 py-3 rounded-xl font-bold shadow-2xl transition-all ${toast.type === 'error' ? 'bg-red-500 text-white' : 'bg-emerald-500 text-slate-900'}`}>{toast.message}</div>}
 
                     {step === 'config' && (
-                        <div className="flex-1 flex flex-col items-center justify-center p-6 lg:p-12">
-                            <div className="w-full max-w-3xl glass-panel p-8 md:p-12 rounded-[2rem] shadow-2xl relative overflow-hidden">
+                        <div className="flex-1 min-w-0 flex flex-col items-center justify-center p-4 sm:p-6 lg:p-12">
+                            <div className="w-full max-w-3xl">{renderMobileNav()}</div>
+                            <div className="w-full max-w-3xl glass-panel p-5 sm:p-8 md:p-12 rounded-[2rem] shadow-2xl relative overflow-hidden">
                                 <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
                                 
-                                <h1 className="text-4xl font-black mb-2 relative z-10">Nowa <span className="text-blue-400">Prezentacja</span></h1>
+                                <h1 className="text-3xl sm:text-4xl font-black mb-2 relative z-10">Nowa <span className="text-blue-400">Prezentacja</span></h1>
                                 <p className="text-slate-400 mb-8 relative z-10">Sztuczna inteligencja przygotuje plan, treści i ilustracje zoptymalizowane pod ucznia.</p>
 
                                 <div className="bg-slate-900/60 border border-slate-700 rounded-xl p-3 mb-6 flex gap-2 items-start relative z-10">
@@ -662,7 +702,7 @@
                                     
                                     <div className="pt-4 border-t border-slate-800">
                                         <label className="text-xs font-bold text-slate-400 uppercase tracking-widest block mb-3">Styl Treści</label>
-                                        <div className="flex gap-4">
+                                        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
                                             <label className={`flex-1 flex items-center gap-3 p-4 border rounded-xl cursor-pointer transition-colors ${contentStyle === 'bullets' ? 'bg-blue-900/20 border-blue-500' : 'bg-slate-900/80 border-slate-700 hover:border-slate-500'}`}>
                                                 <input type="radio" name="contentStyle" value="bullets" checked={contentStyle === 'bullets'} onChange={() => setContentStyle('bullets')} className="hidden" />
                                                 <i className={`ph-bold ph-list-bullets text-xl ${contentStyle === 'bullets' ? 'text-blue-400' : 'text-slate-500'}`}></i>
@@ -678,14 +718,14 @@
 
                                     <div className="pt-4 border-t border-slate-800">
                                         <label className="text-xs font-bold text-slate-400 uppercase tracking-widest block mb-3">Motyw Wizualny</label>
-                                        <div className="grid grid-cols-3 gap-3">
-                                            <button onClick={() => setTheme('modern')} className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition-all ${theme === 'modern' ? 'border-blue-500 bg-blue-900/20' : 'border-slate-700 bg-slate-900 hover:border-slate-500'}`}>
+                                        <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                                            <button onClick={() => setTheme('modern')} className={`p-3 sm:p-4 rounded-xl border flex flex-col items-center gap-2 transition-all ${theme === 'modern' ? 'border-blue-500 bg-blue-900/20' : 'border-slate-700 bg-slate-900 hover:border-slate-500'}`}>
                                                 <div className="w-full h-8 bg-slate-100 rounded"></div><span className="text-xs font-bold text-white">Nowoczesny</span>
                                             </button>
-                                            <button onClick={() => setTheme('chalkboard')} className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition-all ${theme === 'chalkboard' ? 'border-emerald-500 bg-emerald-900/20' : 'border-slate-700 bg-slate-900 hover:border-slate-500'}`}>
+                                            <button onClick={() => setTheme('chalkboard')} className={`p-3 sm:p-4 rounded-xl border flex flex-col items-center gap-2 transition-all ${theme === 'chalkboard' ? 'border-emerald-500 bg-emerald-900/20' : 'border-slate-700 bg-slate-900 hover:border-slate-500'}`}>
                                                 <div className="w-full h-8 bg-[#1a472a] rounded"></div><span className="text-xs font-bold text-white">Tablica / Kreda</span>
                                             </button>
-                                            <button onClick={() => setTheme('space')} className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition-all ${theme === 'space' ? 'border-purple-500 bg-purple-900/20' : 'border-slate-700 bg-slate-900 hover:border-slate-500'}`}>
+                                            <button onClick={() => setTheme('space')} className={`p-3 sm:p-4 rounded-xl border flex flex-col items-center gap-2 transition-all ${theme === 'space' ? 'border-purple-500 bg-purple-900/20' : 'border-slate-700 bg-slate-900 hover:border-slate-500'}`}>
                                                 <div className="w-full h-8 bg-slate-950 rounded border border-slate-800"></div><span className="text-xs font-bold text-white">Kosmos</span>
                                             </button>
                                         </div>
@@ -714,7 +754,7 @@
                                 <i className="ph-fill ph-brain text-4xl text-blue-400 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"></i>
                             </div>
                             <h2 className="text-3xl font-black mb-3">Układam treść...</h2>
-                            <p className="text-slate-400 max-w-md">Gemini AI analizuje temat i dobiera odpowiednie słownictwo dla grupy: {audience}.</p>
+                            <p className="text-slate-400 max-w-md">AI układa plan slajdów i dobiera słownictwo dla grupy: {audience}.</p>
                         </div>
                     )}
 
@@ -722,7 +762,7 @@
                         <div className="flex-1 flex items-center justify-center flex-col text-center p-6">
                             <i className="ph-fill ph-palette animate-bounce text-7xl text-purple-500 mb-6 drop-shadow-[0_0_20px_rgba(168,85,247,0.5)]"></i>
                             <h2 className="text-3xl font-black mb-3">Maluję dedykowane ilustracje...</h2>
-                            <p className="text-slate-400 max-w-md mb-8">Używam potężnego modelu obrazowego z nakładką stylu Premium.</p>
+                            <p className="text-slate-400 max-w-md mb-8">Każda ilustracja powstaje osobno, w wybranym motywie – to może potrwać chwilę.</p>
                             
                             <div className="w-full max-w-md bg-slate-800 h-4 rounded-full overflow-hidden border border-slate-700 relative">
                                 <div className="h-full bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 transition-all duration-500 ease-out absolute left-0 top-0" style={{ width: `${loadingProgress}%` }}></div>
@@ -732,8 +772,8 @@
                     )}
 
                     {step === 'review' && (
-                        <div className="flex-1 flex flex-col h-screen overflow-hidden">
-                            <div className="glass-nav h-20 px-8 flex flex-col sm:flex-row justify-center sm:justify-between items-center z-10 shrink-0 gap-4">
+                        <div className="flex-1 min-w-0 flex flex-col h-screen overflow-hidden">
+                            <div className="glass-nav sm:h-20 py-3 sm:py-0 px-4 sm:px-8 flex flex-col sm:flex-row justify-center sm:justify-between items-center z-10 shrink-0 gap-3 sm:gap-4">
                                 <h1 className="text-xl font-bold text-white flex items-center gap-2"><span className="bg-blue-600 text-xs px-2 py-1 rounded">KROK 2</span> Edycja Treści i Grafik</h1>
                                 
                                 {slides.filter(s => !s.imageUrl).length > 0 ? (
@@ -822,15 +862,15 @@
                     )}
 
                     {step === 'final' && (
-                        <div className="flex-1 flex flex-col h-screen overflow-hidden bg-slate-950 relative">
-                            <nav className="glass-nav h-16 flex items-center justify-between px-6 border-b border-slate-800 print-hidden z-20 shrink-0">
+                        <div className="flex-1 min-w-0 flex flex-col h-screen overflow-hidden bg-slate-950 relative">
+                            <nav className="glass-nav h-16 flex items-center justify-between gap-2 px-3 sm:px-6 border-b border-slate-800 print-hidden z-20 shrink-0">
                                 <h1 className="text-lg font-bold text-white flex items-center gap-2"><i className="ph-fill ph-check-circle text-emerald-400"></i> Gotowe!</h1>
-                                <div className="flex gap-3">
+                                <div className="flex items-center gap-2 sm:gap-3">
                                     <button onClick={publishToGielda} disabled={isSavingToGielda} className="hidden sm:flex bg-purple-900/30 text-purple-400 border border-purple-500/30 hover:bg-purple-800 hover:text-white px-4 py-2 rounded-lg font-bold text-sm items-center gap-2 transition-colors disabled:opacity-50">
                                         <i className="ph-bold ph-globe"></i> Publikuj
                                     </button>
                                     <button onClick={toggleFullscreen} className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 transition-colors">
-                                        <i className="ph-bold ph-presentation-chart"></i> Tryb Kina
+                                        <i className="ph-bold ph-presentation-chart"></i> <span className="hidden sm:inline">Tryb Kina</span>
                                     </button>
                                     <button onClick={exportToPPTX} className="bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 transition-colors">
                                         <i className="ph-bold ph-file-ppt"></i> PPTX
@@ -893,13 +933,13 @@
                                         const tc = getThemeClasses(theme);
                                         const isEven = currentSlideIndex % 2 === 0;
                                         return (
-                                            <div className={`w-full max-w-[1280px] aspect-video relative rounded-2xl overflow-hidden shadow-2xl flex transition-all print-hidden ${tc.bg} ${tc.text}`}>
-                                                <div className={`flex-1 p-10 lg:p-16 flex flex-col justify-center z-10 relative ${isEven ? 'order-1' : 'order-2'}`}>
-                                                    <h2 className={`text-3xl lg:text-5xl font-black mb-8 pb-4 ${tc.title}`}>{s.title}</h2>
+                                            <div className={`slide-frame w-full max-w-[1280px] aspect-video relative rounded-xl sm:rounded-2xl overflow-hidden shadow-2xl flex transition-all print-hidden ${tc.bg} ${tc.text}`}>
+                                                <div className={`sf-pad flex-1 min-w-0 flex flex-col justify-center z-10 relative ${isEven ? 'order-1' : 'order-2'}`}>
+                                                    <h2 className={`sf-title font-black ${tc.title}`}>{s.title}</h2>
                                                     {contentStyle === 'descriptive' ? (
-                                                        <div className="space-y-6">{s.bullets.map((b, i) => <p key={i} className="text-lg lg:text-xl leading-relaxed text-justify opacity-90">{b}</p>)}</div>
+                                                        <div className="sf-list">{s.bullets.map((b, i) => <p key={i} className="sf-p text-justify opacity-90">{b}</p>)}</div>
                                                     ) : (
-                                                        <ul className="space-y-4 lg:space-y-6">{s.bullets.map((b, i) => <li key={i} className="text-xl lg:text-2xl flex items-start gap-4"><span className="text-blue-500 mt-1">●</span><span>{b}</span></li>)}</ul>
+                                                        <ul className="sf-list">{s.bullets.map((b, i) => <li key={i} className="sf-li flex items-start"><span className="text-blue-500">●</span><span>{b}</span></li>)}</ul>
                                                     )}
                                                 </div>
                                                 <div className={`flex-1 relative ${isEven ? 'order-2' : 'order-1'}`}>
@@ -915,9 +955,9 @@
                                     })()}
 
                                     {/* Controls */}
-                                    <div className="absolute bottom-8 left-1/2 -translate-x-1/2 bg-slate-900/90 backdrop-blur border border-slate-700 rounded-full flex items-center p-2 shadow-[0_0_40px_rgba(0,0,0,0.5)] gap-4 z-30 print-hidden">
+                                    <div className="absolute bottom-4 sm:bottom-8 left-1/2 -translate-x-1/2 bg-slate-900/90 backdrop-blur border border-slate-700 rounded-full flex items-center p-1.5 sm:p-2 shadow-[0_0_40px_rgba(0,0,0,0.5)] gap-2 sm:gap-4 z-30 print-hidden">
                                         <button onClick={() => setCurrentSlideIndex(p => Math.max(p - 1, 0))} disabled={currentSlideIndex === 0} className="w-12 h-12 rounded-full bg-slate-800 text-white flex items-center justify-center hover:bg-blue-600 disabled:opacity-30 transition-colors"><i className="ph-bold ph-caret-left text-xl"></i></button>
-                                        <div className="flex gap-1.5 px-4">
+                                        <div className="flex gap-1.5 px-2 sm:px-4">
                                             {slides.map((_, idx) => (
                                                 <div key={idx} className={`w-2 h-2 rounded-full transition-all ${idx === currentSlideIndex ? 'bg-blue-500 w-6' : 'bg-slate-600'}`}></div>
                                             ))}
@@ -928,28 +968,33 @@
                             </div>
 
                             {/* NATIVE FULLSCREEN OVERLAY */}
-                            <div ref={presentationRef} className={isFullscreen ? 'presentation-mode' : 'hidden'}>
+                            <div ref={presentationRef} onClick={tapNavigate} className={isFullscreen ? 'presentation-mode cursor-pointer select-none' : 'hidden'}>
+                                {isFullscreen && (
+                                    <button onClick={(e) => { e.stopPropagation(); toggleFullscreen(); }} aria-label="Zamknij pokaz" className="absolute top-3 right-3 z-[60] w-11 h-11 rounded-full bg-black/50 text-white flex items-center justify-center hover:bg-black/70">
+                                        <i className="ph-bold ph-x text-xl"></i>
+                                    </button>
+                                )}
                                 {isFullscreen && (() => {
                                     const s = slides[currentSlideIndex];
                                     const tc = getThemeClasses(theme);
                                     const isEven = currentSlideIndex % 2 === 0;
                                     return (
-                                        <div className={`slide-container flex ${tc.bg} ${tc.text}`}>
-                                            <div className={`flex-1 p-16 xl:p-24 flex flex-col justify-center z-10 relative ${isEven ? 'order-1' : 'order-2'}`}>
-                                                <h2 className={`text-6xl xl:text-7xl font-black mb-12 pb-6 leading-tight ${tc.title}`}>{s.title}</h2>
+                                        <div className={`slide-container slide-frame flex ${tc.bg} ${tc.text}`}>
+                                            <div className={`sf-pad flex-1 min-w-0 flex flex-col justify-center z-10 relative ${isEven ? 'order-1' : 'order-2'}`}>
+                                                <h2 className={`sf-title font-black ${tc.title}`}>{s.title}</h2>
                                                 {contentStyle === 'descriptive' ? (
-                                                    <div className="space-y-8 xl:space-y-10">{s.bullets.map((b, i) => <p key={i} className="text-2xl xl:text-3xl leading-relaxed text-justify opacity-90">{b}</p>)}</div>
+                                                    <div className="sf-list">{s.bullets.map((b, i) => <p key={i} className="sf-p text-justify opacity-90">{b}</p>)}</div>
                                                 ) : (
-                                                    <ul className="space-y-8 xl:space-y-10">{s.bullets.map((b, i) => <li key={i} className="text-3xl xl:text-4xl flex items-start gap-6 leading-relaxed"><span className="text-blue-500 mt-2">●</span><span>{b}</span></li>)}</ul>
+                                                    <ul className="sf-list">{s.bullets.map((b, i) => <li key={i} className="sf-li flex items-start"><span className="text-blue-500">●</span><span>{b}</span></li>)}</ul>
                                                 )}
                                             </div>
                                             <div className={`flex-1 relative ${isEven ? 'order-2' : 'order-1'}`}>
                                                 {s.imageUrl && <img src={s.imageUrl} className="absolute inset-0 w-full h-full object-cover" />}
                                                 <div className={`absolute inset-y-0 w-48 ${isEven ? 'left-0 bg-gradient-to-r' : 'right-0 bg-gradient-to-l'} from-[inherit] to-transparent opacity-90`}></div>
                                             </div>
-                                            <div className="absolute bottom-6 right-8 text-slate-500/50 text-sm font-bold uppercase flex gap-6 z-50">
-                                                <span>Użyj strzałek <i className="ph-bold ph-arrows-left-right"></i></span>
-                                                <span>ESC wyjście</span>
+                                            <div className="absolute bottom-6 right-8 text-slate-500/50 text-sm font-bold uppercase hidden md:flex gap-6 z-50">
+                                                <span>Strzałki lub kliknięcie <i className="ph-bold ph-arrows-left-right"></i></span>
+                                                <span>ESC – wyjście</span>
                                             </div>
                                         </div>
                                     )
