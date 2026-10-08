@@ -31,6 +31,12 @@ check('EduDyplomy: rymy na gpt-6.1 (strong + strumień), podziękowania na balan
 check('EduDyplomy: zasady rymu – prawdziwe rymy, bez form zależnych od płci, życzliwie', dyp.includes('bez pseudo-rymów') && dyp.includes('bez form zależnych od płci') && dyp.includes('bez ośmieszania'));
 check('EduDyplomy: podziękowanie bez dopisywania faktów', dyp.includes('Nie dopisuj faktów, dat, liczb ani nazw'));
 
+// EduBajka: imię bohatera (często prawdziwe imię dziecka obok jego „problemu”) nie trafia do AI ani do Biblioteki
+const baj = read('edubajka.html');
+check('EduBajka: do AI token [imię] tylko w mianowniku, imię wstawia przeglądarka', baj.includes("const nameRule = childName.trim()") && baj.includes('TYLKO w mianowniku') && baj.includes('Imię bohatera: ${nameRule}.') && !baj.includes('Imię bohatera: ${childName'));
+check('EduBajka: podgląd i wydruk podmieniają token (tytuł i strony)', baj.split('withName(resultData.title)').length === 3 && baj.split('withName(page.text)').length === 3);
+check('EduBajka: imię nie zostaje w tytule', baj.includes('parsedJson.title = parsedJson.title.replace('));
+
 // EduDetox: prawdziwe tytuły, uprzejmy autoresponder, gpt-6.1
 const det = read('edudetox.html');
 check('EduDetox: gpt-6.1 ze strumieniem (balanced polecił nieistniejącą książkę)', det.includes('model: "strong", stream: true') && !det.includes('format: "json",\n'));

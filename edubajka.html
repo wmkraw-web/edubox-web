@@ -275,6 +275,8 @@
             const [isGenerating, setIsGenerating] = useState(false);
             const [genStatus, setGenStatus] = useState(''); 
             const [resultData, setResultData] = useState(null);
+            // „[imię]” z tekstu AI → imię z pola (tylko w przeglądarce); bez imienia zostaje widoczny token do uzupełnienia.
+            const withName = (t) => String(t || '').replace(/\[imi[eę]\]/gi, childName.trim() || '[imię]');
             const [redrawing, setRedrawing] = useState(null); // 'cover' albo numer strony
 
             // Formularz
@@ -401,7 +403,11 @@ ZWRÓĆ DOKŁADNIE TEN JSON:
     { "text": "Tekst trzeciej strony (bohater sam sobie radzi, ciepłe zakończenie)...", "image_prompt": "[character_description] English description of scene 3, with the hero's emotion" }
   ]
 }`;
-                const prompt = `Imię bohatera: ${childName.trim() || 'brak – wymyśl ciepłe, polskie imię pasujące do bohatera'}.
+                // Imię dziecka NIE trafia do AI ani do Biblioteki: model pisze „[imię]” (tylko w mianowniku), przeglądarka wstawia imię.
+                const nameRule = childName.trim()
+                    ? '[imię] – pisz dokładnie „[imię]” i TYLKO w mianowniku (np. „[imię] bardzo się bał…”); w innych przypadkach „bohater”/„bohaterka”, „on”/„ona”, „jego”/„jej”. NIGDY w dopełniaczu ani w wołaczu: źle „serce [imię]”, „Dasz radę, [imię]” – dobrze „jego serce”, „Dasz radę!”. W tytule nie używaj imienia. Prawdziwe imię wstawi przeglądarka.'
+                    : 'brak – wymyśl ciepłe, polskie imię pasujące do bohatera';
+                const prompt = `Imię bohatera: ${nameRule}.
 Płeć: ${gender}.
 Ulubiony motyw/świat: ${theme}.
 Problem dziecka do oswojenia: ${problem}.
@@ -411,6 +417,8 @@ Problem dziecka do oswojenia: ${problem}.
                     setGenStatus('Krok 1/3: Piszę bajkę terapeutyczną...');
                     const aiText = await fetchTextAI(prompt, sysPrompt);
                     const parsedJson = parseAIResponse(aiText);
+                    // Imię nie ma stać w tytule (model czasem dopisywał „Gwiezdny pokój [imię]” – do tego w dopełniaczu).
+                    if (parsedJson && typeof parsedJson.title === 'string') parsedJson.title = parsedJson.title.replace(/\s*\[imi[eę]\]\s*/gi, ' ').replace(/\s+([,.!?:])/g, '$1').trim().replace(/^\p{Ll}/u, (c) => c.toUpperCase());
                     if (!Array.isArray(parsedJson.pages) || parsedJson.pages.length === 0) throw new Error('AI nie zwróciło stron bajki. Spróbuj ponownie.');
                     
                     // STABILIZACJA POSTACI cz.2: sam identyczny opis tekstowy nie gwarantuje
@@ -525,7 +533,7 @@ Problem dziecka do oswojenia: ${problem}.
 
                             <div className="space-y-4 bg-slate-800/50 border border-slate-700 rounded-2xl p-5 shadow-inner">
                                 <div className="space-y-1.5">
-                                    <label className="text-[10px] font-bold text-slate-400 uppercase">Imię bohatera (Opcjonalnie)</label>
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase">Imię bohatera (opcjonalnie – nie trafia do AI)</label>
                                     <input 
                                         type="text" 
                                         value={childName} 
@@ -648,7 +656,7 @@ Problem dziecka do oswojenia: ${problem}.
                                         </div>
                                         <div className="px-12 flex-1 flex flex-col items-center justify-center">
                                             <p className="text-sm font-bold text-purple-600 uppercase tracking-[0.3em] mb-4">Biblioteczka Terapeutyczna</p>
-                                            <h1 className="text-4xl md:text-5xl font-magic font-normal text-slate-800 leading-tight mb-8">{resultData.title}</h1>
+                                            <h1 className="text-4xl md:text-5xl font-magic font-normal text-slate-800 leading-tight mb-8">{withName(resultData.title)}</h1>
                                             <div className="w-16 h-1 bg-purple-200 rounded-full"></div>
                                         </div>
                                     </div>
@@ -670,7 +678,7 @@ Problem dziecka do oswojenia: ${problem}.
                                                     <div className="h-px bg-slate-200 flex-1"></div>
                                                 </div>
                                                 <p className="font-story text-lg md:text-2xl text-slate-700 leading-[1.7] md:leading-[1.8] text-left md:text-justify drop-shadow-sm">
-                                                    {page.text}
+                                                    {withName(page.text)}
                                                 </p>
                                             </div>
                                         </div>
@@ -700,7 +708,7 @@ Problem dziecka do oswojenia: ${problem}.
                                     </div>
                                     <div className="px-12 flex-1 flex flex-col items-center justify-center">
                                         <p className="text-sm font-bold text-purple-600 uppercase tracking-[0.3em] mb-4">Biblioteczka Terapeutyczna</p>
-                                        <h1 className="text-5xl font-magic font-normal text-slate-800 leading-tight mb-8">{resultData.title}</h1>
+                                        <h1 className="text-5xl font-magic font-normal text-slate-800 leading-tight mb-8">{withName(resultData.title)}</h1>
                                         <div className="w-16 h-1 bg-purple-200 rounded-full"></div>
                                     </div>
                                 </div>
@@ -717,7 +725,7 @@ Problem dziecka do oswojenia: ${problem}.
                                                 <div className="h-px bg-slate-200 flex-1"></div>
                                             </div>
                                             <p className="font-story text-xl text-slate-700 leading-[1.7] text-justify">
-                                                {page.text}
+                                                {withName(page.text)}
                                             </p>
                                         </div>
                                     </div>
