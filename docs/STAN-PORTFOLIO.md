@@ -29,11 +29,11 @@ w podglądzie wydruku (Ctrl+P), nie jako listę błędów.
 
 ## Przepisy
 
-Narzędzia cytujące przepisy (`§`, `art.`, `Dz.U.`): **16**, z tego objętych cotygodniową kontrolą ISAP (`scripts/legal-acts.json` → `npm run legal:check`): **16**.
+Narzędzia cytujące przepisy (`§`, `art.`, `Dz.U.`): **17**, z tego objętych cotygodniową kontrolą ISAP (`scripts/legal-acts.json` → `npm run legal:check`): **17**.
 
 ✅ Każde narzędzie cytujące przepisy jest objęte kontrolą.
 
-Ostatnia ręczna weryfikacja aktów w ISAP: **2026-10-07** (21 aktów).
+Ostatnia ręczna weryfikacja aktów w ISAP: **2026-10-07** (24 aktów).
 
 ✅ Każdy akt cytowany w kodzie jest objęty kontrolą.
 
@@ -108,7 +108,7 @@ przy okazji innych zmian w danym pliku. Nie ma potrzeby robić z tego osobnej ak
 | EduGrupy (Koło Fortuny) | `edugrupy.html` | – | – | – | ✅ | ✅ | ✅ | · | · |
 | EduGry (Ja Mam) | `edugry.html` | – | – | – | ✅ | ✅ | ✅ | · | · |
 | Edukacja Obywatelska AI | `edukacja2025.html` | – | – | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ ISAP |
-| EduKalendarz | `edukalendarz.html` | – | – | ✅ | ✅ | ✅ | ✅ | – | · |
+| EduKalendarz | `edukalendarz.html` | – | – | ✅ | ✅ | ✅ | ✅ | – | ✅ ISAP |
 | EduKomiks AI | `edukomiks.html` | – | – | – | ✅ | ✅ | ✅ | ✅ | · |
 | EduLekcja 360 | `edulekcja360.html` | – | – | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ ISAP |
 | EduMotywator AI | `edumotywator.html` | – | – | ✅ | ✅ | ✅ | ✅ | ✅ | · |
