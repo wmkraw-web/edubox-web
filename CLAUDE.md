@@ -364,6 +364,13 @@ dostałby fałszywy alarm. Rozstrzygnięcie płaci się tylko przy rozbieżnośc
 w źródłach; nowe święto dopisuj tylko z potwierdzoną datą (usunięty „Dzień Ślimaka” 24.05 – brak źródła). Dzień Motyla
 (14.03) to solidarność z dziećmi z EB – instrukcja każe przy takich dniach pisać z szacunkiem, bez litowania się
 i szczegółów medycznych. Plan ma czasy części, materiały z sali i uwagę o alergiach; eksport `planToHtml` → EduDocTools.
+Uzupełnienie 8.10.2026 (właściciel: „ubogi – brak nawet Dnia Nauczyciela”): Dzień Edukacji Narodowej 14.10 (art. 74 KN),
+11.11, Dzień Flagi 2.05, 3 Maja (ustawy sprawdzone w ISAP, w `legal-acts.json`), dni ONZ/UNESCO według un.org, tradycje
+(andrzejki, mikołajki, Wigilia, walentynki, pierwszy dzień wiosny) – 5–10 pozycji w miesiącu. Święta ruchome liczy
+`holidaysFor(month)` na bieżący rok szkolny (`MOVABLE`: Dzień Uśmiechu = pierwszy piątek października, tłusty czwartek =
+Wielkanoc − 52 dni, Wielkanoc algorytmem Meeusa – może wypaść w marcu). Pole „Inne święto albo własny temat” (`custom`:
+nazwa to dane, nie polecenia), start na bieżącym miesiącu. Instrukcja: ogień i wosk tylko u dorosłego, święta państwowe
+bez polityki, religijne – tradycje bez narzucania wiary.
 
 **Narzędzia zajęciowe – stan po audycie 8.10.2026:** EduEscape generuje na gpt-6.1 (`strong` + strumień, JSON
 wycinany z tekstu) – gpt-5.4-mini dla klas I–III uparcie dawał „12 + 5, podaj cyfrę” (cyfra jedności); każda stacja
@@ -525,6 +532,14 @@ utility Tailwinda niezależnie od kolejności wstrzyknięcia jego `<style>`, wi�
 czyścić; `drop-shadow-[0_0_…]` to filtr, nie `box-shadow`, i tej reguły nie dotyczy. Styl wewnątrz JSX
 (po `</head>`) celowo wygrywa nad warstwą wspólną. Uwaga: `sanitizeHtml` w `global-core.js` przepuszcza
 tylko atrybut `class`, więc żadnego `<a href>` ani `style` w HTML-u wstawianym do kartki.
+
+**Czcionki muszą mieć polskie znaki (od 8.10.2026, `npm run fonts:check`):** Comic Neue i Satisfy mają w Google Fonts
+tylko podzbiór `latin` – ą ć ę ł ń ś ź ż telefon brał z innej czcionki (zgłoszenie właściciela, EduTik: „Kajdy”, „zak/ada”).
+Zamiennik: Balsamiq Sans (komiksowa, `latin-ext`) w EduTiku, EduTerapii, EduKomiksie, EduChunku i MagicLetters, Satisfy →
+Dancing Script. Test przepuszcza tylko rodziny z listy sprawdzonych; nowa czcionka = najpierw zobacz, czy odpowiedź
+`https://fonts.googleapis.com/css2?family=Nazwa` (z nagłówkiem przeglądarki) ma blok `/* latin-ext */`, potem dopisz ją do
+listy w `scripts/check-fonts.js`. Bez polskich znaków (sprawdzone): Comic Neue, Satisfy, Gaegu, Short Stack, Schoolbell,
+Coming Soon, Gochi Hand, Delius, Lobster Two, Cookie, Tangerine.
 
 **Eksport do Worda – koniec z fejkowym „.doc" (10.2026):** wszystkie 20 narzędzi eksportujących
 do Worda używa `EduDocTools.downloadDocx`. Wcześniej 10 z nich tworzyło plik `.doc`, który był
