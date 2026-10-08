@@ -33,21 +33,17 @@ Narzędzia cytujące przepisy (`§`, `art.`, `Dz.U.`): **16**, z tego objętych 
 
 ✅ Każde narzędzie cytujące przepisy jest objęte kontrolą.
 
-Ostatnia ręczna weryfikacja aktów w ISAP: **2026-10-07** (19 aktów).
+Ostatnia ręczna weryfikacja aktów w ISAP: **2026-10-07** (21 aktów).
 
-⚠️ **Akty cytowane w kodzie, których NIE MA w `legal-acts.json`** — ich nowelizacja nie wywoła alertu:
-
-- **Dz.U. 2024 poz. 1673** — w 1 plikach: `sos-porady.js`
-- **Dz.U. 2025 poz. 363** — w 2 plikach: `edukacja2025.html`, `scripts\check-edukacja.js`
-
-Domknięcie: potwierdź tytuł aktu w ISAP, dopisz go do `scripts/legal-acts.json` (z listą plików w `usedIn`), potem `npm run legal:update`.
+✅ Każdy akt cytowany w kodzie jest objęty kontrolą.
 
 Cytowane przez numer tekstu jednolitego lub noweli — pilnowane pod numerem pierwotnym, więc w porządku:
 
 - Dz.U. 2020 poz. 1309 → `DU/2017/1578` (Kształcenie specjalne – IPET i WOPFU (§ 6))
-- Dz.U. 2023 poz. 1606 → `DU/2016/862` (Standardy ochrony małoletnich)
+- Dz.U. 2023 poz. 1606 → `DU/2005/1493` (Przemoc domowa – procedura „Niebieskie Karty” (t.j. Dz.U. 2024 poz. 1673))
 - Dz.U. 2023 poz. 1798 → `DU/2017/1591` (Pomoc psychologiczno-pedagogiczna (m.in. § 20 – ocena efektywności))
 - Dz.U. 2023 poz. 2572 → `DU/2019/373` (Ocenianie – dostosowanie wymagań (§ 2), zachowanie (§ 11), prace domowe (§ 12a))
+- Dz.U. 2024 poz. 1673 → `DU/2005/1493` (Przemoc domowa – procedura „Niebieskie Karty” (t.j. Dz.U. 2024 poz. 1673))
 - Dz.U. 2024 poz. 50 → `DU/2017/1646` (Dokumentacja przebiegu nauczania – dzienniki (tekst jednolity Dz.U. 2024 poz. 50))
 - Dz.U. 2025 poz. 881 → `DU/1991/425` (Ocenianie w ustawie (art. 44c, 44f, 44i))
 - Dz.U. 2026 poz. 1012 → `DU/2017/356` (Podstawa programowa z 2017 r. – uchylona od 1.09.2026, ale w 2026/2027 nadal stosowana w klasach II–III i V–VIII (§ 4 ust. 2 Dz.U. 2026 poz. 378))
