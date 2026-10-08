@@ -401,6 +401,36 @@ procedur). Rozmowa z rodzicem: nic o innych dzieciach (RODO), bez diagnozowania 
 i diagnozę („Krzyś, 5 lat z autyzmem”). W EduKasi błąd porady nigdy się nie wyświetlał (`sosError` bez widoku).
 Formy: czas teraźniejszy i druga osoba („pokazujesz”) – zakaz neutralnych płciowo form dawał „pokazałoś”.
 
+**Giełda jest publiczna – zasada dla każdego zapisu (od 8.10.2026):** przed `saveToGielda` usuwaj pola z imionami
+i podpisami oraz wgrane zdjęcia (`data:`), a przy treściach z wolnego tekstu pytaj `confirm` PRZED zużyciem puli.
+Realne przypadki: EduSOS publikował surowy opis z imieniem i diagnozą (teraz anonimowy tytuł/opis od AI), EduWizualizator
+– imię z tablicy żetonowej (`withoutChildName`), EduGenerator – imię ucznia z dyplomu, podpis i wgrane zdjęcie
+(zostaje tylko grafika AI z adresu https), EduPlakat – plakat ze zdjęcia (image-to-image) może zachować wizerunek,
+więc osobne pytanie (`fromPhoto`). Imię dziecka na dyplomie / tablicy wpisuje przeglądarka, nie AI (EduDyplomy).
+
+**`\b` w JS nie zna polskich liter:** `/\bświatła\b/` nigdy nie trafi (ś, ę, ą to dla `\b` „nie-litery”) – w EduChunku
+pogrubianie słów kluczowych z ogonkami po prostu nie działało. Granice słowa: `(^|[^\p{L}\p{N}])(słowo)(?![\p{L}\p{N}])`
+z flagą `u` i zamiana `'$1<b>$2</b>'`. Bez lookbehind `(?<!…)` – Safari przed 16.4 (starsze iPady w szkołach) rzuca błędem.
+
+**Terapia – stan po audycie 8.10.2026:** EduWizualizator (blok `WIZUALIZATOR_PROMPTS`, testy `wizualizator:check`):
+gpt-6.1 ze strumieniem (2–10 s) – gpt-4.1-mini dawał kroki dorosłego („Płacę za usługę”), rękawiczki przed kurtką i 🧻
+przy myciu zębów; karty z perspektywy dziecka, jedna czynność na kartę, zasady w formie „my”. EduChunk (blok
+`CHUNK_PROMPTS`, `chunk:check`): balanced trzyma się tekstu (gpt-4.1-mini dopisywał fakty), wspólna pula; Biblioteka
+przez EduBoxCore w tej samej kolekcji `chunking_docs` (stare wpisy `title/chunkedData`, nowe `name/config`).
+Uwaga: `window.__firebase_config` w nagłówku stron JEST zdefiniowany – osobne inicjalizacje Firebase w starszych
+narzędziach działają (łatwo to przeoczyć i uznać Bibliotekę za martwą). EduOddech: oddech kończy się po `maxCycles`
+(4-7-8: 4, żwawy: 8; reszta z czasu ćwiczenia) – wcześniej pętla bez końca, a szybki oddech 2/2 s grozi hiperwentylacją.
+EduDyplom Wideo: `MediaRecorder` – MP4 najpierw, WebM jako zapas (Safari na iPhonie nie nagrywa WebM, ekran wisiał
+na „Nagrywam”), rozszerzenie pliku według formatu.
+
+**Grafika i dyplomy – stan po audycie 8.10.2026 (`grafika:check`):** komunikat „Dzienny limit darmowych obrazków (2/2)”
+w 8 narzędziach był nieprawdziwy – jest 1 darmowa grafika na start (`eduboxTrialImageV1`; stare liczniki obsługuje
+mostek w global-core.js). EduDyplomy: rymowanki na gpt-6.1 bez imienia i bez form zależnych od płci, „żartobliwe” tytuły
+(„gaduła”) życzliwie; podziękowania na balanced bez dopisywania faktów. EduDetox: balanced polecił nieistniejącą książkę,
+więc gpt-6.1 (~30 s) z zasadą „tylko prawdziwe tytuły z autorem albo rokiem”; autoresponder uprzejmy wobec rodziców
+(`[data powrotu]`, sekretariat). Narzędzia prywatne: posty Ewy i scenariusze Ani na balanced; Ania nie czyta adresu
+„…html?mode=…” – link do opisu filmu jest w panelu z przyciskiem Kopiuj.
+
 **CSP a obrazki z fal.media:** `connect-src` NIE obejmuje fal.media, więc `fetch(urlObrazka)` w przeglądarce kończy
 się „Failed to fetch” (realny błąd w MagicLetters: obrazek opłacony, użytkownik dostawał błąd, licznik się nie
 zwiększał). Obrazek z fal.media zamieniamy na dane przez `<img crossOrigin="anonymous">` + `<canvas>` (img-src

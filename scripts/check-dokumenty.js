@@ -101,7 +101,8 @@ const withoutLineComments = (src) => src
 
 // "Bez podniosłego tonu" i "bez pustych formułek (…swobodna eksploracja…)" to ZAKAZY
 // w instrukcji - dokładnie to, czego chcemy. Liczy się tylko zwrot BEZ negacji przed nim.
-const NEGATION = /(?:\bbez\b|\bnie\b|\bunikaj\b|\bzakaz|\bżadn)/i;
+// \b nie zna polskich liter: dawne „\bżadn” nigdy nie trafiało (ż to dla \b „nie-litera”).
+const NEGATION = /(?:\bbez\b|\bnie\b|\bunikaj\b|\bzakaz|(?<!\p{L})żadn)/iu;
 
 const offendingPhrase = (src) => {
   const code = withoutLineComments(src);
