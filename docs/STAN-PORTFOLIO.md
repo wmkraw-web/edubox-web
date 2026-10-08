@@ -2,7 +2,7 @@
 
 <!-- PLIK GENEROWANY: node scripts/stan-portfolio.js. Nie edytuj ręcznie. -->
 
-Wygenerowano: 2026-10-07 · stron narzędzi: **60** · kafelków w katalogu: **68** (część to głębokie linki `?mode=` do tej samej strony).
+Wygenerowano: 2026-10-08 · stron narzędzi: **60** · kafelków w katalogu: **68** (część to głębokie linki `?mode=` do tej samej strony).
 
 Ten plik odpowiada na pytanie „co jest już zrobione, a co zostało?" bez zgadywania:
 powstaje z faktycznych plików, nie z notatek. Po każdej większej zmianie odpal
@@ -35,7 +35,11 @@ Narzędzia cytujące przepisy (`§`, `art.`, `Dz.U.`): **16**, z tego objętych 
 
 Ostatnia ręczna weryfikacja aktów w ISAP: **2026-10-07** (19 aktów).
 
-✅ Każdy akt cytowany w kodzie jest objęty kontrolą.
+⚠️ **Akty cytowane w kodzie, których NIE MA w `legal-acts.json`** — ich nowelizacja nie wywoła alertu:
+
+- **Dz.U. 2025 poz. 363** — w 2 plikach: `edukacja2025.html`, `scripts\check-edukacja.js`
+
+Domknięcie: potwierdź tytuł aktu w ISAP, dopisz go do `scripts/legal-acts.json` (z listą plików w `usedIn`), potem `npm run legal:update`.
 
 Cytowane przez numer tekstu jednolitego lub noweli — pilnowane pod numerem pierwotnym, więc w porządku:
 
