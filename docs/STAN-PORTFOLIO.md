@@ -20,7 +20,7 @@ w podglądzie wydruku (Ctrl+P), nie jako listę błędów.
 | Cecha | Jest | Do zrobienia | Brak | Po co to |
 | --- | --- | --- | --- | --- |
 | Kartka A4 | 11 | 0 | 49 | wzorzec generatorów dokumentów: AI zwraca czysty HTML, podgląd jako kartka, edycja przed eksportem |
-| Strumień | 22 | 0 | 38 | tekst pojawia się na bieżąco; bez tego nauczyciel czeka w ciszy nawet 100 s |
+| Strumień | 24 | 0 | 36 | tekst pojawia się na bieżąco; bez tego nauczyciel czeka w ciszy nawet 100 s |
 | Prawdziwy .docx | 24 | 0 | 36 | plik „.doc" z HTML-em w środku (mime application/msword) Word otwiera z ostrzeżeniem, a Dokumenty Google potrafią go odrzucić |
 | Czysty wydruk | 49 | 0 | 0 | jasnoszary tekst (`text-slate-400` i pokrewne – 1284 wystąpienia) jest na wydruku praktycznie niewidoczny, a `body { color: black }` go nie przebija, bo klasa Tailwinda ma wyższą specyficzność. Od 10.2026 załatwia to wspólna reguła w `edubox-ui.css` w `@media print`, więc wystarcza podpięcie warstwy; `printDoc` albo własna reguła czerni też się liczą. Dekoratory drukują w kolorze – tam `text-white` celowo zostaje białe. |
 | Nowy wygląd | 60 | 0 | 0 | wspólna warstwa edubox-ui.css: spokojne powierzchnie z prawdziwym cieniem zamiast neonowych poświat i pływających bąbli z 2021. Neony wpisane w markup wygasza reguła [class*="shadow-[0_0_"] w tym pliku, więc podpięcie linku wystarcza – klas nie trzeba czyścić z markupu. |
@@ -106,7 +106,7 @@ przy okazji innych zmian w danym pliku. Nie ma potrzeby robić z tego osobnej ak
 | Narzędzie | Plik | Kartka A4 | Strumień | Prawdziwy .docx | Czysty wydruk | Nowy wygląd | „Jak to działa" | Wspólna pula | Przepisy |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | EduBystrzak AI | `edubystrzak.html` | – | – | – | ✅ | ✅ | ✅ | · | · |
-| EduDetox AI | `edudetox.html` | – | – | – | ✅ | ✅ | ✅ | – | · |
+| EduDetox AI | `edudetox.html` | – | ✅ | – | ✅ | ✅ | ✅ | – | · |
 | EduEscape PRO | `eduescape.html` | – | ✅ | – | ✅ | ✅ | ✅ | – | · |
 | EduFiszki i Memory AI | `edufiszki.html` | – | – | – | ✅ | ✅ | ✅ | – | · |
 | EduGrupy (Koło Fortuny) | `edugrupy.html` | – | – | – | ✅ | ✅ | ✅ | · | · |
@@ -134,7 +134,7 @@ przy okazji innych zmian w danym pliku. Nie ma potrzeby robić z tego osobnej ak
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | EduWystrój AI | `edudekorator.html` | – | – | – | · | ✅ | ✅ | – | · |
 | EduDyplom Wideo | `edudyplom.html` | – | – | – | ✅ | ✅ | ✅ | ✅ | · |
-| EduDyplomy AI | `edudyplomy.html` | – | – | ✅ | · | ✅ | ✅ | – | · |
+| EduDyplomy AI | `edudyplomy.html` | – | ✅ | ✅ | · | ✅ | ✅ | – | · |
 | EduGazetka AI | `edugazetka.html` | – | – | – | · | ✅ | ✅ | – | · |
 | EduGenerator PRO | `edugenerator.html` | – | – | – | · | ✅ | ✅ | ✅ | · |
 | EduMalarz AI | `edumalarz.html` | – | – | – | · | ✅ | ✅ | – | · |

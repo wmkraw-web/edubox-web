@@ -194,6 +194,8 @@
             const [orientationOption, setOrientationOption] = useState('3:4'); // Proporcje
             
             const [generatedImage, setGeneratedImage] = useState(null);
+            // true, gdy plakat powstał ze wgranego zdjęcia (image-to-image) – mógł zachować wizerunek osób.
+            const [fromPhoto, setFromPhoto] = useState(false);
             const [hiResImage, setHiResImage] = useState(null); // wersja po AI-upscale (do druku A4/A3)
             const [isUpscaling, setIsUpscaling] = useState(false);
             const [generatingStatus, setGeneratingStatus] = useState('');
@@ -284,6 +286,11 @@
                     showToast("Najpierw musisz wygenerować plakat!");
                     return;
                 }
+                // Giełda jest publiczna. Plakat ze wgranego zdjęcia może pokazywać prawdziwe osoby (wizerunek = dane osobowe).
+                const question = fromPhoto
+                    ? 'Ten plakat powstał na podstawie wgranego zdjęcia. Jeśli były na nim osoby (np. uczniowie), NIE publikuj go – wizerunek to dane osobowe. Opublikować mimo to?'
+                    : 'Plakat trafi do Bazy Plakatów widocznej dla wszystkich. Sprawdź, czy w napisach nie ma imion uczniów. Opublikować?';
+                if (!window.confirm(question)) return;
                 window.EduBoxCore.executeWithLimitCheck(isPremium, 
                     async (newCount) => {
                         setUsageCount(newCount);
@@ -499,6 +506,7 @@
                         }
                         
                         setGeneratedImage(finalImage);
+                        setFromPhoto(!!(refImage && refImageMode !== 'describe'));
                         setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
                     } else {
                         throw new Error("Pusta odpowiedź z API.");
