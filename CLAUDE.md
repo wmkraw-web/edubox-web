@@ -373,6 +373,33 @@ grupie przy błędzie serwera), bez „czarnych historii”, granice tematów de
 portfolio: **przy błędzie API żadnych wbudowanych treści „demo”** – tylko komunikat (wyjątek: plik otwarty lokalnie).
 EduFiszki: `json_object` wymaga obiektu – struktura `{"cards": [...]}` opisana w instrukcji. EduGry nie używa AI
 (druk i zapis w Giełdzie zużywają jednak dzienną pulę – decyzja właściciela, nie zmieniane).
+Studio: generowanie nie miało ŻADNEGO limitu – teraz wspólna pula; piosenki i escape room na gpt-6.1 (`strong`
++ strumień), scenki wideo na `balanced` z przypomnieniem o pisemnej zgodzie rodziców na wizerunek uczniów (RODO).
+EduWakacje: rymowane zagadki gry terenowej i okrzyki na gpt-6.1, plan i gry SOS na `balanced`, wspólne
+`WAKACJE_ZASADY` (woda tylko pod nadzorem, upał, wysokość, kryjówki na widoku opiekunów).
+
+**Edukacja obywatelska i zdrowotna (`edukacja2025.html`, od 8.10.2026):** przedmioty i klasy z ramowych planów
+nauczania (Dz.U. 2026 poz. 1028, sprawdzone w ISAP): w SP w 2026/27 treści obywatelskie są na WOS w klasie VIII
+(starsze roczniki – zał. 15 i 16, do 2029/30), edukacja obywatelska wchodzi do SP w klasach VI–VII, pierwszy raz
+w 2028/29 (zał. 1 stosuje się od klas I i IV); w szkołach ponadpodstawowych jest obowiązkowa od 2025/26 (Dz.U. 2025
+poz. 363), WOS tylko rozszerzony. Edukacja zdrowotna: klasy IV–VIII i ponadpodstawowe, „zdrowie seksualne” według
+odrębnych przepisów. Dawny tekst „przedmiot od 2025/26 zastępujący WOS” przy domyślnych klasach 7–8 był nieprawdziwy,
+a domyślny wiek spoza listy sprawiał, że lista pokazywała klasy 4–6, a do AI szły 7–8 (`normAge` naprawia też stare
+wzory z Giełdy). Blok `EDUKACJA_PROMPTS` (testy `edukacja:check`): `SUBJECT_CONTEXT` mówi AI, jak nazwać przedmiot
+dla danej grupy; fałszywy artykuł do zdemaskowania tylko fikcyjny (bez prawdziwych osób i instytucji) z kluczem;
+debata z losowaniem stron; tematy emocji bez diagnoz i zwierzeń + 116 111 / 112.
+
+**Porady SOS (`sos-porady.js`, od 8.10.2026):** jedno miejsce na instrukcje dla EduSOS i zakładki „Porady SOS”
+w EduKasi (`window.EduSosPrompts`, testy `sos:check`): hipotezy zamiast diagnoz, bez imion, najpierw bezpieczeństwo
+wszystkich dzieci, zakaz kar, izolacji, odbierania posiłku i przymusu fizycznego; przy zagrożeniu życia lub zdrowia
+odpowiedź zaczyna się od „⚠️ NAJPIERW BEZPIECZEŃSTWO” (112, osoba wyznaczona w standardach ochrony małoletnich –
+art. 22b ustawy, t.j. Dz.U. 2026 poz. 110, procedura „Niebieskie Karty”, 800 12 12 12, 116 111 – cytujemy tylko nazwy
+procedur). Rozmowa z rodzicem: nic o innych dzieciach (RODO), bez diagnozowania dziecka, notatka. Model: gpt-6.1
+(`strong` + `EduDocTools.streamChat`, ~20 s, pierwsze słowa po 1–3 s). Odpowiedź zaczyna się od anonimowych linii
+`TYTUŁ:` i `SYTUACJA:` – `splitSosAnswer` je odcina, a `gieldaEntry` publikuje w Giełdzie TYLKO je i poradę
+(po `confirm`). Wcześniej Giełda EduSOS dostawała surowy opis nauczyciela, a przykład w polu podpowiadał imię
+i diagnozę („Krzyś, 5 lat z autyzmem”). W EduKasi błąd porady nigdy się nie wyświetlał (`sosError` bez widoku).
+Formy: czas teraźniejszy i druga osoba („pokazujesz”) – zakaz neutralnych płciowo form dawał „pokazałoś”.
 
 **CSP a obrazki z fal.media:** `connect-src` NIE obejmuje fal.media, więc `fetch(urlObrazka)` w przeglądarce kończy
 się „Failed to fetch” (realny błąd w MagicLetters: obrazek opłacony, użytkownik dostawał błąd, licznik się nie
