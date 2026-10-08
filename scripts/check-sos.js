@@ -56,6 +56,8 @@ check('EduSOS: bez obietnicy „wsparcia w sieci”', !sos.includes('znajdzie ws
 check('EduKasia: błąd porady jest widoczny (sosError się wyświetla)', /\{sosError && <p/.test(kasia));
 check('przypomnienie o danych przy polu opisu', sos.includes('Bez imion, nazwisk i nazwy placówki') && kasia.includes('Bez imion, nazwisk i nazwy przedszkola'));
 
+check('EduKasia (Sukcesy): imię dziecka nie trafia do AI, bez demonstracji przy błędzie sieci', !kasia.includes('Dziecko o imieniu ${successName}') && kasia.includes('Nie używaj imienia (jest na karcie)') && !kasia.includes('err.message.includes("fetch")) {'));
+
 // Kontrola przepisów: plik z instrukcjami pilnowany przy zmianach aktów, na które się powołuje
 const acts = JSON.parse(read('scripts/legal-acts.json')).acts;
 const usedBy = (eli) => (acts.find(x => x.eli === eli) || { usedIn: [] }).usedIn.includes('sos-porady.js');
