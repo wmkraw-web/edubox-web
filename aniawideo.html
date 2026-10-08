@@ -83,7 +83,9 @@
 
             const [isWritingScript, setIsWritingScript] = useState(false);
             const [scriptError, setScriptError] = useState('');
-            const [titles, setTitles] = useState([]); // 3 propozycje tytułów do nałożenia na miniaturkę/wideo przed publikacją
+            const [titles, setTitles] = useState([]);
+            const [promotedLink, setPromotedLink] = useState(''); // pełny link do narzędzia – do opisu filmu
+            const [linkCopied, setLinkCopied] = useState(false); // 3 propozycje tytułów do nałożenia na miniaturkę/wideo przed publikacją
             const [copiedTitleIdx, setCopiedTitleIdx] = useState(null);
 
             const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
@@ -163,11 +165,14 @@
                     const app = selectedAppIndex === 'random'
                         ? apps[Math.floor(Math.random() * apps.length)]
                         : apps[Number(selectedAppIndex)];
+                    setPromotedLink(`${SITE_ORIGIN}/${app.url}`);
+                    setLinkCopied(false);
 
                     const systemPrompt = `Jesteś Anią, ciepłą i naturalną cyfrową asystentką EduBox, która nagrywa krótkie wideo do social media dla nauczycieli.
 Piszesz TYLKO tekst DO WYPOWIEDZENIA na głos (nie post pisany) - naturalny, mówiony język polski, jakbyś zwracała się bezpośrednio do widza.
-Promujesz KONKRETNIE narzędzie: "${app.title}" - ${app.desc}. Adres: eduboxpro.pl/${app.url}.
-Struktura: 1-2 zdania o problemie/temacie, 1-2 zdania co narzędzie robi, na końcu zaproszenie w stylu "Sprawdź na eduboxpro.pl/${app.url}".
+Promujesz KONKRETNIE narzędzie: "${app.title}" - ${app.desc}.
+Struktura: 1-2 zdania o problemie/temacie, 1-2 zdania co narzędzie robi, na końcu zaproszenie w stylu "Wejdź na eduboxpro.pl i wybierz ${app.title}" (pełny link trafi do opisu filmu - nie czytaj adresu z „.html” ani parametrów).
+Tylko to, co narzędzie naprawdę robi (według opisu) - bez obietnic „100% zgodności z przepisami”, gwarancji efektów i wymyślonych liczb.
 Maksymalnie 45 słów łącznie - to ma być krótkie wideo, nie referat. Bez wstępów typu "cześć, tu Ania" (to zostanie dodane osobno).
 
 Dodatkowo zaproponuj 3 krótkie, chwytliwe tytuły (max 6-8 słów każdy) do nałożenia jako napis na miniaturce/wideo przed publikacją - różne kąty (np. pytanie, obietnica korzyści, ciekawostka).
@@ -181,7 +186,8 @@ ZWRÓĆ WYŁĄCZNIE JSON w formacie:
                     const res = await fetch('/api/chat', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ prompt: `Temat: ${topic}`, system: systemPrompt, temperature: 0.8, format: 'json' })
+                        // balanced (gpt-5.4-mini) – naturalniejszy scenariusz mówiony niż domyślny model
+                        body: JSON.stringify({ prompt: `Temat: ${topic}`, system: systemPrompt, temperature: 0.8, format: 'json', model: 'balanced' })
                     });
                     if (!res.ok) throw new Error(`Błąd serwera tekstu (HTTP ${res.status}).`);
                     const data = await res.json();
@@ -333,6 +339,13 @@ ZWRÓĆ WYŁĄCZNIE JSON w formacie:
                                                 {isWritingScript ? 'Ania pisze...' : 'Napisz scenariusz'}
                                             </button>
                                             {scriptError && <p className="text-red-400 text-xs">{scriptError}</p>}
+                                        </div>
+                                    )}
+
+                                    {promotedLink && (
+                                        <div className="mt-4 flex items-center justify-between gap-2 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2">
+                                            <span className="text-xs text-slate-300 break-all"><b className="text-teal-300">Link do opisu filmu:</b> {promotedLink}</span>
+                                            <button onClick={() => { navigator.clipboard.writeText(promotedLink); setLinkCopied(true); setTimeout(() => setLinkCopied(false), 2000); }} className="shrink-0 bg-teal-600 hover:bg-teal-500 text-white px-2 py-1 rounded-md text-xs font-bold">{linkCopied ? 'Skopiowano' : 'Kopiuj'}</button>
                                         </div>
                                     )}
 
