@@ -144,6 +144,14 @@ Kod PRO znosi limit (`localStorage.eduboxProStatus`, weryfikacja przez `/api/ver
 (`['active', 'PRO'].includes(…)`); 34 narzędzia uznawały tylko `'active'` i dawały limit osobom z kodem ze strony
 głównej (naprawione 8.10.2026, `dokumenty:check` pilnuje każdego porównania).
 ZanimKlikniesz nie ma limitu dziennego (`freeForever`).
+**Limit tylko na generowanie przez AI (decyzja właściciela 8.10.2026, `npm run limits:check`):** druk i publikacja
+w Giełdzie NIE zużywają puli, a narzędzia bez AI nie mają limitów wcale – ich kafelki mają `freeForever: true`
+(„Zawsze za darmo, bez limitów”: EduGry, BINGO, EduGrupy, EduBystrzak, EduTimer, EduOddech, EduPDF, Baza Druków,
+EduKatalog). Wcześniej każde zakręcenie kołem w EduGrupach, druk w EduGrach/EduBystrzaku/EduGeneratorze i publikacja
+w 8 narzędziach zabierały 1 z 5 dziennych generowań całego EduBoxa; BINGO miało dla darmowych max 5 plansz.
+Test pilnuje, że funkcje `*Print*`/`*Share*`/`*Publish*` nie wołają `executeWithLimitCheck`. **EduGrupy nie mają
+Giełdy** – „Udostępnij swoją Listę” publikowało listę klasy z imionami uczniów (Giełda była pusta); lista zostaje
+tylko w przeglądarce.
 
 **Link wsparcia:** zawsze `https://buycoffee.to/magiccolor` (nazwa
 historyczna z czasów, gdy strona nazywała się "Magic Color" — NIE
@@ -379,7 +387,7 @@ EduZastępstwo: usunięty awaryjny scenariusz z „czarną historią” o samob�
 grupie przy błędzie serwera), bez „czarnych historii”, granice tematów debaty (`zastepstwo:check`). Zasada dla całego
 portfolio: **przy błędzie API żadnych wbudowanych treści „demo”** – tylko komunikat (wyjątek: plik otwarty lokalnie).
 EduFiszki: `json_object` wymaga obiektu – struktura `{"cards": [...]}` opisana w instrukcji. EduGry nie używa AI
-(druk i zapis w Giełdzie zużywają jednak dzienną pulę – decyzja właściciela, nie zmieniane).
+(od 8.10.2026 bez żadnych limitów – patrz „Limit tylko na generowanie przez AI”).
 Studio: generowanie nie miało ŻADNEGO limitu – teraz wspólna pula; piosenki i escape room na gpt-6.1 (`strong`
 + strumień), scenki wideo na `balanced` z przypomnieniem o pisemnej zgodzie rodziców na wizerunek uczniów (RODO).
 EduWakacje: rymowane zagadki gry terenowej i okrzyki na gpt-6.1, plan i gry SOS na `balanced`, wspólne
