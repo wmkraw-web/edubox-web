@@ -128,14 +128,15 @@
                     type: 'breathing',
                     pattern: [{ label: 'Wdech', sec: 4 }, { label: 'Zatrzymaj', sec: 4 }, { label: 'Wydech', sec: 4 }, { label: 'Zatrzymaj', sec: 4 }],
                     intro: 'Usiądź wygodnie, jeśli możesz - oprzyj stopy o podłogę. Będziemy oddychać w równym rytmie 4-4-4-4.',
-                    outro: 'Zauważ, jak zwolniło tętno. Nie musisz robić nic więcej przez najbliższą chwilę.'
+                    outro: 'Zauważ, czy ciało trochę zwolniło. Nie musisz robić nic więcej przez najbliższą chwilę.'
                 },
                 {
                     title: 'Oddech 4-7-8',
                     time: 3,
                     type: 'breathing',
                     pattern: [{ label: 'Wdech nosem', sec: 4 }, { label: 'Zatrzymaj', sec: 7 }, { label: 'Wydech ustami', sec: 8 }],
-                    intro: 'Ta technika delikatnie aktywuje układ uspokajający ciała. Wydech jest dłuższy niż wdech - to naturalne, że na początku może być trudny.',
+                    maxCycles: 4,
+                    intro: 'Długi wydech pomaga ciału się wyciszyć. Zrobimy tylko 4 cykle – jeśli zatrzymanie oddechu jest nieprzyjemne, skróć je.',
                     outro: 'Wystarczy nawet kilka takich oddechów, żeby ciało zaczęło się wyciszać.'
                 },
                 {
@@ -158,8 +159,9 @@
                     title: 'Oddech energetyzujący',
                     time: 2,
                     type: 'breathing',
-                    pattern: [{ label: 'Szybki wdech nosem', sec: 2 }, { label: 'Wydech ustami', sec: 2 }],
-                    intro: 'Kilka szybszych, energicznych oddechów - jak lekka rozgrzewka dla układu nerwowego.',
+                    pattern: [{ label: 'Żwawy wdech nosem', sec: 2 }, { label: 'Wydech ustami', sec: 2 }],
+                    maxCycles: 8,
+                    intro: 'Tylko 8 żwawszych oddechów – jak lekka rozgrzewka. Jeśli zakręci się w głowie, od razu wróć do zwykłego oddechu.',
                     outro: 'Poczuj, czy wróciła Ci trochę czujności. To dobry moment na powrót do klasy.'
                 },
                 {
@@ -170,10 +172,10 @@
                         'Wstań, jeśli możesz. Unieś ręce nad głowę i porozciągaj się jak najwyżej.',
                         'Delikatnie przekręć głowę w jedną, potem w drugą stronę.',
                         'Zrób kilka krążeń barkami do tyłu.',
-                        'Potrząśnij dłońmi, jakbyś strząsał z nich wodę.',
+                        'Potrząśnij dłońmi, jakby strząsając z nich wodę.',
                         'Weź głęboki oddech i się uśmiechnij - nawet na siłę, to działa.'
                     ],
-                    intro: '90 sekund ruchu potrafi zdziałać więcej niż kawa. Rób tyle, ile możesz w swojej przestrzeni.',
+                    intro: 'Krótka chwila ruchu potrafi dodać energii. Rób tyle, ile możesz w swojej przestrzeni.',
                     outro: 'Ruch to jeden z najszybszych sposobów na odzyskanie energii w ciągu dnia.'
                 }
             ],
@@ -221,7 +223,7 @@
                     time: 2,
                     type: 'reflection',
                     steps: [
-                        'Pomyśl, co powiedziałbyś/powiedziałabyś koledze lub koleżance z pracy w Twojej dzisiejszej sytuacji.',
+                        'Pomyśl, jakie zdanie usłyszałby od Ciebie kolega lub koleżanka z pracy w Twojej dzisiejszej sytuacji.',
                         'Prawdopodobnie byłoby to coś życzliwego, prawda?',
                         'Powiedz teraz to samo zdanie sobie - najlepiej na głos, choćby szeptem.',
                         'Zasługujesz na tę samą życzliwość, którą dajesz innym.'
@@ -243,18 +245,24 @@
             const [stepIdx, setStepIdx] = useState(0);
             const [secondsLeft, setSecondsLeft] = useState(exercise.pattern[0].sec);
             const [cycles, setCycles] = useState(0);
+            // Dawniej pętla bez końca – przy szybkim oddechu 2/2 s groziło to hiperwentylacją (zawroty, mrowienie).
+            const cycleSec = exercise.pattern.reduce((sum, p) => sum + p.sec, 0);
+            const maxCycles = exercise.maxCycles || Math.max(1, Math.round((exercise.time || 2) * 60 / cycleSec));
 
             useEffect(() => {
                 if (secondsLeft <= 0) {
                     const nextIdx = (stepIdx + 1) % exercise.pattern.length;
-                    if (nextIdx === 0) setCycles(c => c + 1);
+                    if (nextIdx === 0) {
+                        if (cycles + 1 >= maxCycles) { onDone(); return; }
+                        setCycles(cycles + 1);
+                    }
                     setStepIdx(nextIdx);
                     setSecondsLeft(exercise.pattern[nextIdx].sec);
                     return;
                 }
                 const timer = setTimeout(() => setSecondsLeft(s => s - 1), 1000);
                 return () => clearTimeout(timer);
-            }, [secondsLeft, stepIdx, exercise.pattern]);
+            }, [secondsLeft, stepIdx, cycles, maxCycles, exercise.pattern, onDone]);
 
             const currentStep = exercise.pattern[stepIdx];
             const isIn = currentStep.label.toLowerCase().includes('wdech');
@@ -267,7 +275,8 @@
                         <span className="text-white font-black text-3xl">{secondsLeft}</span>
                     </div>
                     <p className="text-xl font-bold text-slate-700 mb-2">{currentStep.label}</p>
-                    <p className="text-slate-400 text-sm mb-8">Cykl {cycles + 1}</p>
+                    <p className="text-slate-400 text-sm mb-2">Cykl {cycles + 1} z {maxCycles}</p>
+                    <p className="text-slate-500 text-xs mb-8 max-w-xs text-center">Oddychaj w swoim tempie. Jeśli zakręci się w głowie albo poczujesz mrowienie, wróć do zwykłego oddechu.</p>
                     <button onClick={onDone} className="text-slate-500 hover:text-slate-800 text-sm font-bold underline">
                         Zakończ i zobacz podsumowanie
                     </button>

@@ -148,6 +148,7 @@
             const [statusText, setStatusText] = useState('');
             const [progressPct, setProgressPct] = useState(0);
             const [downloadUrl, setDownloadUrl] = useState(null);
+            const [videoExt, setVideoExt] = useState('mp4');
 
             const canvasRef = useRef(null);
             const generatedImgRef = useRef(null);
@@ -313,13 +314,20 @@
                 const timeline = buildTimeline();
                 const duration = 15000;
 
+                if (typeof MediaRecorder === 'undefined' || !canvas.captureStream) {
+                    throw new Error('Ta przeglądarka nie potrafi nagrać wideo. Otwórz EduDyplom w aktualnym Chrome, Edge albo Safari.');
+                }
                 const stream = canvas.captureStream(30);
-                const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9' : 'video/webm';
-                const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 4000000 });
+                // MP4 najpierw (odtworzy go każdy telefon), WebM jako zapas; Safari na iPhonie nie nagrywa WebM.
+                const mimeType = ['video/mp4;codecs=avc1.42E01E', 'video/mp4;codecs=avc1', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm']
+                    .find(t => MediaRecorder.isTypeSupported(t)) || '';
+                const recorder = mimeType ? new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 4000000 }) : new MediaRecorder(stream);
+                const recordedType = recorder.mimeType || mimeType || 'video/webm';
+                setVideoExt(recordedType.includes('mp4') ? 'mp4' : 'webm');
                 chunksRef.current = [];
                 recorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
                 recorder.onstop = () => {
-                    const blob = new Blob(chunksRef.current, { type: 'video/webm' });
+                    const blob = new Blob(chunksRef.current, { type: recordedType.split(';')[0] });
                     setDownloadUrl(URL.createObjectURL(blob));
                     setStage('done');
                     setStatusText('');
@@ -380,7 +388,8 @@
                                 generatedImgRef.current = img;
                                 setStage('recording');
                                 setStatusText('Nagrywam wideo...');
-                                playAndRecord(img);
+                                try { playAndRecord(img); }
+                                catch (e) { showToast(e.message || 'Nie udało się nagrać wideo w tej przeglądarce.'); setStage('form'); }
                             };
                             img.onerror = () => { showToast('Błąd wczytywania wygenerowanego obrazka.'); setStage('form'); };
                             img.src = finalSrc;
@@ -395,7 +404,10 @@
             };
 
             const handleReplay = () => {
-                if (generatedImgRef.current) { setStage('recording'); setStatusText('Nagrywam wideo...'); playAndRecord(generatedImgRef.current); }
+                if (!generatedImgRef.current) return;
+                setStage('recording'); setStatusText('Nagrywam wideo...');
+                try { playAndRecord(generatedImgRef.current); }
+                catch (e) { showToast(e.message || 'Nie udało się nagrać wideo w tej przeglądarce.'); setStage('form'); }
             };
 
             return (
@@ -486,7 +498,7 @@
                                 )}
                                 {stage === 'done' && (
                                     <div className="flex gap-2 mt-4 max-w-[300px] mx-auto">
-                                        <a href={downloadUrl} download="edudyplom.webm" className="flex-1 bg-[#4ECDC4] text-white text-center font-bold text-sm py-3 rounded-xl">⬇ Pobierz wideo</a>
+                                        <a href={downloadUrl} download={`edudyplom.${videoExt}`} className="flex-1 bg-[#4ECDC4] text-white text-center font-bold text-sm py-3 rounded-xl">⬇ Pobierz wideo</a>
                                         <button onClick={handleReplay} className="flex-1 bg-white border-2 border-[#FFD972] text-[#B0501F] font-bold text-sm py-3 rounded-xl">↻ Podgląd</button>
                                     </div>
                                 )}
@@ -496,7 +508,7 @@
                             </div>
                         )}
 
-                        <p className="text-center text-[11px] text-[#A9895F] mt-6 leading-relaxed">Nagrywanie tworzy prawdziwy plik wideo (WebM) w Twojej przeglądarce.</p>
+                        <p className="text-center text-[11px] text-[#A9895F] mt-6 leading-relaxed">Nagrywanie tworzy prawdziwy plik wideo (MP4 albo WebM – zależnie od przeglądarki) na Twoim urządzeniu. Imię dziecka nie trafia do AI.</p>
                     </main>
 
                     {toastMessage && (

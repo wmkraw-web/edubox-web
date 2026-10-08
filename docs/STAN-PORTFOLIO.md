@@ -20,12 +20,12 @@ w podglądzie wydruku (Ctrl+P), nie jako listę błędów.
 | Cecha | Jest | Do zrobienia | Brak | Po co to |
 | --- | --- | --- | --- | --- |
 | Kartka A4 | 11 | 0 | 49 | wzorzec generatorów dokumentów: AI zwraca czysty HTML, podgląd jako kartka, edycja przed eksportem |
-| Strumień | 21 | 0 | 39 | tekst pojawia się na bieżąco; bez tego nauczyciel czeka w ciszy nawet 100 s |
+| Strumień | 22 | 0 | 38 | tekst pojawia się na bieżąco; bez tego nauczyciel czeka w ciszy nawet 100 s |
 | Prawdziwy .docx | 24 | 0 | 36 | plik „.doc" z HTML-em w środku (mime application/msword) Word otwiera z ostrzeżeniem, a Dokumenty Google potrafią go odrzucić |
 | Czysty wydruk | 49 | 0 | 0 | jasnoszary tekst (`text-slate-400` i pokrewne – 1284 wystąpienia) jest na wydruku praktycznie niewidoczny, a `body { color: black }` go nie przebija, bo klasa Tailwinda ma wyższą specyficzność. Od 10.2026 załatwia to wspólna reguła w `edubox-ui.css` w `@media print`, więc wystarcza podpięcie warstwy; `printDoc` albo własna reguła czerni też się liczą. Dekoratory drukują w kolorze – tam `text-white` celowo zostaje białe. |
 | Nowy wygląd | 60 | 0 | 0 | wspólna warstwa edubox-ui.css: spokojne powierzchnie z prawdziwym cieniem zamiast neonowych poświat i pływających bąbli z 2021. Neony wpisane w markup wygasza reguła [class*="shadow-[0_0_"] w tym pliku, więc podpięcie linku wystarcza – klas nie trzeba czyścić z markupu. |
 | „Jak to działa" | 60 | 0 | 0 | info-box blisko góry formularza - konwencja z CLAUDE.md |
-| Wspólna pula | 26 | 0 | 14 | EduBoxCore.executeWithLimitCheck zamiast własnego licznika per-aplikacja |
+| Wspólna pula | 27 | 0 | 13 | EduBoxCore.executeWithLimitCheck zamiast własnego licznika per-aplikacja |
 
 ## Przepisy
 
@@ -68,7 +68,7 @@ przy okazji innych zmian w danym pliku. Nie ma potrzeby robić z tego osobnej ak
 
 | Narzędzie | Plik | Kartka A4 | Strumień | Prawdziwy .docx | Czysty wydruk | Nowy wygląd | „Jak to działa" | Wspólna pula | Przepisy |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| EduChunk AI | `chunking.html` | – | – | ✅ | ✅ | ✅ | ✅ | – | · |
+| EduChunk AI | `chunking.html` | – | – | ✅ | ✅ | ✅ | ✅ | ✅ | · |
 | EduBajka PRO (Ilustrowana) | `edubajka.html` | – | – | – | ✅ | ✅ | ✅ | ✅ | · |
 | EduDialog AI (Tłumacz) | `edudialog.html` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | · | ✅ ISAP |
 | Asystent Dostosowań | `edudostosowania.html` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | · | ✅ ISAP |
@@ -78,7 +78,7 @@ przy okazji innych zmian w danym pliku. Nie ma potrzeby robić z tego osobnej ak
 | EduSOS PRO | `edusos.html` | – | ✅ | – | ✅ | ✅ | ✅ | · | · |
 | EduSymbol AI | `edusymbol.html` | – | – | – | · | ✅ | ✅ | – | · |
 | EduTerapia PRO (TUS) | `eduterapia.html` | – | – | ✅ | ✅ | ✅ | ✅ | ✅ | · |
-| EduWizualizator (AAC) | `eduwizualizator.html` | – | – | – | ✅ | ✅ | ✅ | ✅ | · |
+| EduWizualizator (AAC) | `eduwizualizator.html` | – | ✅ | – | ✅ | ✅ | ✅ | ✅ | · |
 
 ### Dokumenty i biurokracja (16)
 
