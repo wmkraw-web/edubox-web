@@ -671,3 +671,11 @@ reguły raport krzyczałby o aktach, które są w porządku. Nowy plik cytujący
   Persony (Ewa/Ada/Ania) traktowane jako świadomie ODDZIELNE tożsamości.
 - EduPodsumowanie — celowo zostawione w stanie "działa, ale niezachwycające"
   (3 rundy poprawek graficznych, user zdecydował się nie iterować dalej).
+
+**Propozycje czekające na decyzję właściciela (stan 8.10.2026 – NIE wdrażać bez zgody):**
+- EduBystrzak AI: nazwa ma „AI”, a narzędzie nie używa AI (słówka z gotowych list). Do wyboru: zmienić nazwę albo dodać prawdziwe dobieranie 31 słówek do własnego tematu przez AI (wtedy z limitem dziennym).
+- EduGenerator: druk dyplomów jest teraz bez limitu; można przywrócić limit tylko tam jako zachętę do PRO.
+- Giełda EduGeneratora: wpis id xzxa1S40JAP53ca9Xvrx („Dyplom - Pasowanie”, 10.06.2026) zawiera imię i nazwisko ucznia – do usunięcia/poprawy w konsoli Firebase (robi właściciel).
+- Reguły Firestore dla liczników stats (update blokowany) – zmiana po stronie właściciela.
+- Do sprawdzenia na prawdziwym iPhonie: EduDyplom Wideo (nagrywanie MP4 w Safari).
+- Wpisy w Giełdach EduBajki/EduKasi (AAC) sprzed 8.10.2026 mogą zawierać imiona – ewentualny przegląd w konsoli Firebase.
