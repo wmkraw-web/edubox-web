@@ -3,14 +3,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EduSOS PRO – pomoc w trudnych zachowaniach</title>
     <meta property="og:title" content="EduSOS PRO – pomoc w trudnych zachowaniach">
-    <meta property="og:description" content="Trudne zachowanie ucznia? AI podpowie metody i psychologiczne rady. Za darmo, prosto z przeglądarki – EduBox AI.">
+    <meta property="og:description" content="Trudne zachowanie dziecka albo trudna rozmowa z rodzicem? Konkretne kroki na teraz i na kolejne dni. Za darmo – EduBox AI.">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://eduboxpro.pl/edusos.html">
     <meta property="og:image" content="https://eduboxpro.pl/okladka.jpg">
     <meta property="og:locale" content="pl_PL">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="EduSOS PRO – pomoc w trudnych zachowaniach">
-    <meta name="twitter:description" content="Trudne zachowanie ucznia? AI podpowie metody i psychologiczne rady. Za darmo, prosto z przeglądarki – EduBox AI.">
+    <meta name="twitter:description" content="Trudne zachowanie dziecka albo trudna rozmowa z rodzicem? Konkretne kroki na teraz i na kolejne dni. Za darmo – EduBox AI.">
     <meta name="twitter:image" content="https://eduboxpro.pl/okladka.jpg">
 
     
@@ -90,13 +90,13 @@
     </style>
 
   <link rel="canonical" href="https://eduboxpro.pl/edusos.html">
-  <meta name="description" content="Trudne zachowanie ucznia? AI podpowie metody i psychologiczne rady. Za darmo, prosto z przeglądarki – EduBox AI.">
+  <meta name="description" content="Trudne zachowanie dziecka albo trudna rozmowa z rodzicem? Konkretne kroki na teraz i na kolejne dni. Za darmo – EduBox AI.">
   <link rel="icon" href="/favicon.ico" type="image/x-icon">  <script type="application/ld+json">
 {
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
   "name": "EduSOS PRO - EduBox AI",
-  "description": "Trudne zachowanie ucznia? AI podpowie metody i psychologiczne rady. Za darmo, prosto z przeglądarki – EduBox AI.",
+  "description": "Trudne zachowanie dziecka albo trudna rozmowa z rodzicem? Konkretne kroki na teraz i na kolejne dni. Za darmo – EduBox AI.",
   "url": "https://eduboxpro.pl/edusos.html",
   "applicationCategory": "EducationalApplication",
   "operatingSystem": "Web",
@@ -116,6 +116,9 @@
     <!-- Google tag (gtag.js) -->
     <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-CL194R0J5H"></script>
     <script src="/cookie-consent.js" defer></script>
+    <!-- Instrukcje porad SOS (wspólne z EduKasią) i strumień odpowiedzi -->
+    <script src="/sos-porady.js"></script>
+    <script src="/doc-tools.js"></script>
     <script>
       window.dataLayer = window.dataLayer || [];
       function gtag(){dataLayer.push(arguments);}
@@ -151,22 +154,9 @@
 <script type="text/babel">
         const { useState, useEffect, useRef } = React;
 
-        const PROMPTS = {
-            zachowanie: `Jesteś wybitnym pedagogiem specjalnym, terapeutą integracji sensorycznej (SI) oraz analitykiem zachowania (ABA) w placówce edukacyjnej.
-Zadanie: Przeanalizuj opisane zachowanie dziecka i podaj natychmiastowe rozwiązanie.
-Twoja odpowiedź musi być podzielona na 3 wyraźne sekcje:
-1. 🧠 POTENCJALNA PRZYCZYNA: Dlaczego dziecko tak robi? (funkcja zachowania: ucieczka, stymulacja, potrzeba uwagi, namacalne wzmocnienie, czy przebodźcowanie).
-2. 🚨 SZYBKA REAKCJA: 3 punkty, co zrobić tu i teraz, w momencie napadu (jak uspokoić, jak zadbać o bezpieczeństwo).
-3. 🛠️ DZIAŁANIE DŁUGOTERMINOWE: Jak pracować z dzieckiem nad tym problemem w kolejne dni.
-Pisz krótko, empatycznie i językiem bardzo praktycznym. Omiń suchą teorię, daj same narzędzia.`,
-
-            rodzic: `Jesteś empatycznym psychologiem i mediatorem edukacyjnym. 
-Zadanie: Nauczyciel ma problem we współpracy z rodzicem (rodzic wypiera problem, jest roszczeniowy, lub bezradny).
-Podziel poradę na 3 sekcje:
-1. 💡 PERSPEKTYWA RODZICA: Wyjaśnij krótko nauczycielowi, z czego może wynikać postawa rodzica (żal, stres, mechanizmy obronne).
-2. 🗣️ GOTOWE ZDANIA: Podaj 3 gotowe sformułowania (konkretne zdania w cudzysłowach), których nauczyciel może użyć w rozmowie, by nie atakować rodzica, a wejść z nim w sojusz (język NVC).
-3. 🚧 STRATEGIA ROZMOWY: Jak ustalić granice i zaplanować współpracę.`
-        };
+        // Instrukcje dla AI: sos-porady.js (window.EduSosPrompts) – wspólne z zakładką „Porady SOS” w EduKasi.
+        // Dawne instrukcje nie zakazywały diagnoz i nie miały ścieżki kryzysowej, a model był słabszy (bez strumienia).
+        const SOS = window.EduSosPrompts;
 
         function App() {
             // === SYSTEM & LIMITS STATE ===
@@ -180,6 +170,7 @@ Podziel poradę na 3 sekcje:
             // === APP STATE ===
             const [activeMode, setActiveMode] = useState('zachowanie'); // 'zachowanie' | 'rodzic'
             const [inputText, setInputText] = useState('');
+            const [childAge, setChildAge] = useState('');
             const [adviceData, setAdviceData] = useState(null); // { text: string, sources: array }
             const [isGenerating, setIsGenerating] = useState(false);
 
@@ -226,38 +217,39 @@ Podziel poradę na 3 sekcje:
                 }
             };
 
-            // === API FUNCTIONS ===
-            const fetchEduBoxSOS = async (promptText, systemInstruction) => {
-                const finalPrompt = `Sytuacja/Problem do rozwiązania:\n"""\n${promptText}\n"""`;
-                const res = await fetch('/api/chat', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ prompt: finalPrompt, system: systemInstruction, temperature: 0.5, model: 'strong' })
-                });
-                const data = await res.json().catch(() => ({}));
-                if (!res.ok) throw new Error(data.message || data.details || `Błąd serwera AI (${res.status}).`);
-                const text = data.text;
-                if (!text || !text.trim()) throw new Error('Pusta odpowiedź z AI.');
-                return { text, sources: [] };
-            };
-
             // === LOGIC ===
+            const errorText = (err) => /fetch|network|load failed/i.test(String(err && err.message))
+                ? 'Brak połączenia z serwerem – sprawdź internet i spróbuj ponownie.'
+                : ((err && err.message) || 'Nie udało się przygotować porady. Spróbuj ponownie.');
+
             const generateAdvice = () => {
                 if (!inputText.trim()) { showToast('Opisz krótko sytuację, zanim poprosisz o poradę.', 'error'); return; }
-                
-                window.EduBoxCore.executeWithLimitCheck(isPremium, 
+
+                window.EduBoxCore.executeWithLimitCheck(isPremium,
                     async (newCount) => {
                         setUsages(newCount);
                         setIsGenerating(true);
                         setAdviceData(null);
-                        
+                        const { system, prompt } = SOS.buildSosPrompts(activeMode, inputText, { place: 'szkola', age: childAge });
+                        let scrolled = false;
                         try {
-                            const result = await fetchEduBoxSOS(inputText, PROMPTS[activeMode]);
-                            setAdviceData(result);
-                            setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
+                            // gpt-6.1 (strong) działa tylko ze strumieniem – porada pojawia się na bieżąco.
+                            const r = await window.EduDocTools.streamChat({ system, prompt, model: 'strong' }, (t) => {
+                                const part = SOS.splitSosAnswer(t);
+                                setAdviceData({ ...part, raw: t, sources: [] });
+                                if (!scrolled && part.advice) {
+                                    scrolled = true;
+                                    setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150);
+                                }
+                            });
+                            const done = SOS.splitSosAnswer(r.text);
+                            if (!done.advice) throw new Error('Pusta odpowiedź z AI. Spróbuj ponownie.');
+                            setAdviceData({ ...done, raw: r.text, sources: [] });
+                            if (r.interrupted) showToast('Odpowiedź urwała się – kliknij jeszcze raz.', 'error');
                         } catch (err) {
                             console.error(err);
-                            showToast('Błąd połączenia z siecią. Spróbuj ponownie.', 'error');
+                            setAdviceData(null);
+                            showToast(errorText(err), 'error');
                         } finally {
                             setIsGenerating(false);
                         }
@@ -267,21 +259,24 @@ Podziel poradę na 3 sekcje:
                 );
             };
 
+            const copyAdvice = async () => {
+                if (!adviceData) return;
+                try { await navigator.clipboard.writeText(adviceData.advice); showToast('Skopiowano poradę.', 'success'); }
+                catch (e) { showToast('Nie udało się skopiować – zaznacz tekst i użyj Ctrl+C.', 'error'); }
+            };
+
+            // Do Giełdy (publicznej) trafia tylko anonimowy tytuł i opis przygotowany przez AI oraz porada.
+            // Wcześniej publikował się surowy opis nauczyciela (a jego początek był tytułem na liście) – często z imieniem
+            // i diagnozą dziecka, bo tak podpowiadał przykład w polu.
             const publishToGielda = async () => {
-                if(!adviceData) return;
+                if (!adviceData || isGenerating) return;
+                const entry = SOS.gieldaEntry(activeMode, adviceData.raw || adviceData.advice);
+                const ok = window.confirm('Do Giełdy (widocznej dla wszystkich) trafi anonimowy tytuł, opis i porada – bez Twojego oryginalnego tekstu:\n\n„' + entry.name + '”\n' + (entry.config.situation || '') + '\n\nSprawdź, czy nie ma tu imion, nazwisk ani nazw. Opublikować?');
+                if (!ok) return;
                 setIsSavingToGielda(true);
                 try {
-                    const configToSave = { 
-                        mode: activeMode, 
-                        problem: inputText, 
-                        advice: adviceData.text,
-                        sources: adviceData.sources 
-                    };
-                    // Tworzymy krótki, reprezentatywny tytuł z tekstu wejściowego
-                    const shortTitle = inputText.substring(0, 40) + (inputText.length > 40 ? '...' : '');
-                    
-                    await window.EduBoxCore.saveToGielda('sos_advices', 'EduSOS', shortTitle, configToSave);
-                    showToast("Opublikowano na Giełdzie Porad! 🎉", "success");
+                    await window.EduBoxCore.saveToGielda('sos_advices', 'EduSOS', entry.name, entry.config);
+                    showToast("Opublikowano w Giełdzie Przypadków! 🎉", "success");
                 } catch(e) {
                     showToast(e.message, "error");
                 } finally {
@@ -290,13 +285,29 @@ Podziel poradę na 3 sekcje:
             };
 
             const loadFromGielda = (item) => {
-                setActiveMode(item.config.mode || 'zachowanie');
-                setInputText(item.config.problem || '');
-                setAdviceData({ text: item.config.advice, sources: item.config.sources || [] });
+                const c = item.config || {};
+                setActiveMode(c.mode === 'rodzic' ? 'rodzic' : 'zachowanie');
+                setInputText(c.situation || c.problem || '');
+                setAdviceData({ title: item.name || '', situation: c.situation || '', advice: c.advice || '', raw: '', sources: c.sources || [] });
                 setAppMode('generator');
                 showToast("Wczytano poradę z Giełdy!", "info");
                 setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
             };
+
+            // Przełącznik Interwencja / Giełda na telefonie (panel boczny jest tylko na komputerze)
+            const renderMobileNav = () => (
+                <div className="md:hidden w-full mb-5 print-hidden">
+                    <div className="grid grid-cols-2 gap-1 p-1 bg-slate-900/80 border border-slate-800 rounded-xl">
+                        <button onClick={() => setAppMode('generator')} aria-pressed={appMode === 'generator'} className={`py-2.5 rounded-lg text-sm font-bold flex items-center justify-center gap-2 ${appMode === 'generator' ? 'bg-pink-600/20 text-pink-300 border border-pink-500/50' : 'text-slate-400'}`}>
+                            <i className="ph-bold ph-lifebuoy"></i> Porada
+                        </button>
+                        <button onClick={() => setAppMode('gielda')} aria-pressed={appMode === 'gielda'} className={`py-2.5 rounded-lg text-sm font-bold flex items-center justify-center gap-2 ${appMode === 'gielda' ? 'bg-purple-600/20 text-purple-300 border border-purple-500/50' : 'text-slate-400'}`}>
+                            <i className="ph-bold ph-books"></i> Giełda
+                        </button>
+                    </div>
+                    <p className="text-xs text-slate-400 mt-2 text-center">{isPremium ? 'Wersja PRO – bez limitów' : `Dziś za darmo: ${usages} / 5 generowań tekstu`}</p>
+                </div>
+            );
 
             // === RENDERERS ===
             const renderSidebar = () => (
@@ -354,9 +365,10 @@ Podziel poradę na 3 sekcje:
                         {renderSidebar()}
                         {toast.visible && <div className={`fixed top-6 right-6 z-[9999] px-6 py-3 rounded-xl font-bold shadow-2xl transition-all ${toast.type === 'error' ? 'bg-red-500 text-white' : 'bg-emerald-500 text-slate-900'}`}>{toast.message}</div>}
                         
-                        <div className="flex-1 p-8">
+                        <div className="flex-1 min-w-0 p-4 sm:p-8">
+                            {renderMobileNav()}
                             <h2 className="text-3xl font-black mb-2 text-white">Giełda Przypadków</h2>
-                            <p className="text-slate-400 mb-8">Czytaj rozwiązania trudnych sytuacji opublikowane przez innych nauczycieli.</p>
+                            <p className="text-slate-400 mb-8">Czytaj rozwiązania trudnych sytuacji opublikowane przez innych nauczycieli (anonimowo – bez danych dzieci).</p>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                                 {gieldaItems.map(item => (
@@ -365,7 +377,7 @@ Podziel poradę na 3 sekcje:
                                             <div className={`p-3 rounded-xl group-hover:scale-110 transition-transform ${item.config.mode === 'zachowanie' ? 'bg-fuchsia-500/10 text-fuchsia-400' : 'bg-blue-500/10 text-blue-400'}`}>
                                                 {item.config.mode === 'zachowanie' ? <i className="ph-fill ph-brain text-2xl"></i> : <i className="ph-fill ph-users text-2xl"></i>}
                                             </div>
-                                            <span className="text-xs font-bold text-slate-500">{new Date(item.createdAt?.toMillis()).toLocaleDateString('pl-PL')}</span>
+                                            <span className="text-xs font-bold text-slate-500">{item.createdAt?.toMillis ? new Date(item.createdAt.toMillis()).toLocaleDateString('pl-PL') : ''}</span>
                                         </div>
                                         <h3 className="text-base font-bold text-white mb-2 line-clamp-2">"{item.name}"</h3>
                                         <div className="mt-auto pt-4 flex gap-2">
@@ -396,8 +408,9 @@ Podziel poradę na 3 sekcje:
                     
                     {toast.visible && <div className={`fixed top-6 right-6 z-[9999] px-6 py-3 rounded-xl font-bold shadow-2xl transition-all ${toast.type === 'error' ? 'bg-red-500 text-white' : 'bg-emerald-500 text-slate-900'}`}>{toast.message}</div>}
 
-                    <div className="flex-1 p-4 md:p-8 xl:p-12 overflow-y-auto">
+                    <div className="flex-1 min-w-0 p-4 md:p-8 xl:p-12 overflow-y-auto">
                         <div className="max-w-4xl mx-auto print-hidden">
+                            {renderMobileNav()}
                             
                             {/* Nagłówek */}
                             <div className="text-center mb-10">
@@ -408,14 +421,14 @@ Podziel poradę na 3 sekcje:
                                     Zawsze wiesz, <span className="text-gradient">co zrobić.</span>
                                 </h1>
                                 <p className="text-slate-300 text-lg max-w-2xl mx-auto font-medium">
-                                    Trudne zachowanie ucznia? Roszczeniowy rodzic? Opisz sytuację, a AI podpowie profesjonalne metody i znajdzie wsparcie w sieci.
+                                    Trudne zachowanie dziecka? Trudna rozmowa z rodzicem? Opisz sytuację, a dostaniesz konkretne kroki na teraz i na kolejne dni.
                                 </p>
                             </div>
 
                             {/* Krótkie wyjaśnienie jak działa narzędzie - Warstwa 2 dokumentacji */}
                             <div className="glass-panel p-4 rounded-2xl border border-slate-700/50 mb-6 flex gap-3 items-start max-w-2xl mx-auto">
                                 <span className="text-xl flex-shrink-0">ℹ️</span>
-                                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed"><strong className="text-white">Jak to działa:</strong> wybierz jeden z dwóch trybów poniżej - „Zachowanie Dziecka" (opisz sytuację, dostaniesz konkretne metody działania) albo „Trudna Rozmowa z Rodzicem" (opisz zarzuty/postawę rodzica, dostaniesz podpowiedź jak to rozegrać) - po prostu opisz sytuację własnymi słowami.</p>
+                                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed"><strong className="text-white">Jak to działa:</strong> wybierz tryb – „Zachowanie dziecka” (możliwe przyczyny, co zrobić tu i teraz, plan na kolejne dni i z kim współpracować) albo „Trudna rozmowa z rodzicem” (perspektywa rodzica, gotowe zdania, plan rozmowy) – i opisz sytuację własnymi słowami. AI nie stawia diagnoz, a gdy w opisie jest zagrożenie zdrowia lub życia, zaczyna od kroków bezpieczeństwa. Nie wpisuj imion, nazwisk ani nazwy placówki – wystarczy wiek i opis.</p>
                             </div>
 
                             {/* Tryby Pracy */}
@@ -425,8 +438,8 @@ Podziel poradę na 3 sekcje:
                                         <i className="ph-bold ph-brain text-2xl"></i>
                                     </div>
                                     <div>
-                                        <h3 className={`font-bold text-lg ${activeMode === 'zachowanie' ? 'text-white' : 'text-slate-300'}`}>Zachowanie Dziecka</h3>
-                                        <p className="text-xs text-slate-400 mt-1">Przyczyny (SI/ABA) i taktyki wyciszania.</p>
+                                        <h3 className={`font-bold text-lg ${activeMode === 'zachowanie' ? 'text-white' : 'text-slate-300'}`}>Zachowanie dziecka</h3>
+                                        <p className="text-xs text-slate-400 mt-1">Możliwe przyczyny, reakcja tu i teraz, plan na kolejne dni.</p>
                                     </div>
                                 </button>
 
@@ -435,8 +448,8 @@ Podziel poradę na 3 sekcje:
                                         <i className="ph-bold ph-users text-2xl"></i>
                                     </div>
                                     <div>
-                                        <h3 className={`font-bold text-lg ${activeMode === 'rodzic' ? 'text-white' : 'text-slate-300'}`}>Trudna Rozmowa z Rodzicem</h3>
-                                        <p className="text-xs text-slate-400 mt-1">Granice, zrozumienie i gotowe zdania NVC.</p>
+                                        <h3 className={`font-bold text-lg ${activeMode === 'rodzic' ? 'text-white' : 'text-slate-300'}`}>Trudna rozmowa z rodzicem</h3>
+                                        <p className="text-xs text-slate-400 mt-1">Perspektywa rodzica, gotowe zdania, granice.</p>
                                     </div>
                                 </button>
                             </div>
@@ -451,19 +464,28 @@ Podziel poradę na 3 sekcje:
                                     value={inputText}
                                     onChange={(e) => setInputText(e.target.value)}
                                     placeholder={activeMode === 'zachowanie' 
-                                        ? "Np. Krzyś (5 lat z autyzmem) zaczął rzucać klockami i krzyczeć, gdy usłyszał 'koniec zabawy, idziemy na obiad'. Zatyka uszy." 
-                                        : "Np. Mama Oli przyszła rano z pretensjami, że nikt się nią nie zajmuje. Neguje, że Ola bije inne dzieci i twierdzi, że to inni ją prowokują."}
-                                    className="w-full h-32 bg-slate-900/60 border border-slate-600 text-white rounded-2xl p-5 focus:outline-none focus:border-pink-500 transition-colors custom-scrollbar resize-y text-sm sm:text-base mb-6"
+                                        ? "Np. Pięciolatek w spektrum autyzmu (ma orzeczenie) rzuca klockami i krzyczy, gdy słyszy „koniec zabawy, idziemy na obiad”. Zatyka uszy." 
+                                        : "Np. Mama uczennicy z klasy 2 przyszła rano z pretensjami, że nikt się córką nie zajmuje. Neguje, że córka bije inne dzieci, i twierdzi, że to inni ją prowokują."}
+                                    className="w-full h-32 bg-slate-900/60 border border-slate-600 text-white rounded-2xl p-5 focus:outline-none focus:border-pink-500 transition-colors custom-scrollbar resize-y text-sm sm:text-base mb-2"
                                 ></textarea>
+                                <p className="text-xs text-slate-400 mb-5"><i className="ph-bold ph-shield-check"></i> Bez imion, nazwisk i nazwy placówki – wystarczy wiek i opis sytuacji.</p>
 
-                                <div className="flex justify-end">
-                                    <button 
+                                <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+                                    <label className="flex items-center gap-2 text-sm text-slate-300">
+                                        <span className="font-bold whitespace-nowrap">Wiek dziecka:</span>
+                                        <select value={childAge} onChange={e => setChildAge(e.target.value)} className="bg-slate-900 border border-slate-600 text-white rounded-xl px-3 py-2 text-sm outline-none focus:border-pink-500">
+                                            <option value="">z opisu</option>
+                                            {SOS.AGES.map(a => <option key={a} value={a}>{a}</option>)}
+                                        </select>
+                                    </label>
+
+                                    <button
                                         onClick={generateAdvice}
                                         disabled={isGenerating || !inputText.trim()}
                                         className={`w-full sm:w-auto px-8 py-4 rounded-xl font-black text-white transition-all flex items-center justify-center gap-2 shadow-lg
                                             ${isGenerating ? 'bg-slate-700 opacity-70 cursor-not-allowed' : 'bg-gradient-to-r from-pink-500 to-violet-600 hover:scale-105 shadow-[0_10px_20px_rgba(236,72,153,0.3)] active:scale-95'}`}
                                     >
-                                        {isGenerating ? <><i className="ph-bold ph-spinner animate-spin text-xl"></i> Opracowuję interwencję...</> : <><i className="ph-bold ph-lifebuoy text-xl"></i> Ratuj Sytuację</>}
+                                        {isGenerating ? <><i className="ph-bold ph-spinner animate-spin text-xl"></i> Piszę poradę...</> : <><i className="ph-bold ph-lifebuoy text-xl"></i> Ratuj sytuację</>}
                                     </button>
                                 </div>
                             </div>
@@ -473,8 +495,11 @@ Podziel poradę na 3 sekcje:
                         {adviceData && (
                             <div ref={resultRef} className="max-w-4xl mx-auto mt-12 print:mt-0 print:block">
                                 
-                                <div className="flex justify-end gap-3 mb-6 print-hidden">
-                                    <button onClick={publishToGielda} disabled={isSavingToGielda} className="bg-purple-900/40 border border-purple-500/40 text-purple-300 hover:bg-purple-800 hover:text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-all text-sm disabled:opacity-50">
+                                <div className="flex flex-wrap justify-end gap-3 mb-6 print-hidden">
+                                    <button onClick={copyAdvice} disabled={isGenerating} className="bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-all text-sm disabled:opacity-50">
+                                        <i className="ph-bold ph-copy text-lg"></i> Kopiuj
+                                    </button>
+                                    <button onClick={publishToGielda} disabled={isSavingToGielda || isGenerating} className="bg-purple-900/40 border border-purple-500/40 text-purple-300 hover:bg-purple-800 hover:text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-all text-sm disabled:opacity-50">
                                         <i className="ph-bold ph-globe text-lg"></i> Do Giełdy
                                     </button>
                                     <button onClick={() => window.print()} className="bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-all text-sm">
@@ -482,12 +507,13 @@ Podziel poradę na 3 sekcje:
                                     </button>
                                 </div>
 
-                                <div className="glass-panel p-8 sm:p-12 rounded-[2rem] border border-pink-500/30 shadow-2xl relative overflow-hidden bg-slate-900/90 print:bg-white print:border-slate-300 print:shadow-none print:p-0">
+                                <div className="glass-panel p-5 sm:p-12 rounded-[2rem] border border-pink-500/30 shadow-2xl relative overflow-hidden bg-slate-900/90 print:bg-white print:border-slate-300 print:shadow-none print:p-0">
                                     <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-pink-500 to-violet-600 print-hidden"></div>
+                                    <p className="text-xs text-slate-400 mb-6 print:text-slate-600">Porada AI to podpowiedź, nie diagnoza ani opinia specjalisty. Postępuj zgodnie z procedurami swojej placówki.</p>
                                     
                                     <div className="hidden print-only mb-8 pb-4 border-b-2 border-slate-200 text-center">
                                         <h2 className="text-2xl font-black uppercase tracking-widest text-slate-800">Raport Interwencyjny EduSOS</h2>
-                                        <p className="text-sm text-slate-500">Dotyczy: {activeMode === 'zachowanie' ? 'Praca z zachowaniem ucznia' : 'Współpraca z rodzicem'}</p>
+                                        <p className="text-sm text-slate-500">Dotyczy: {activeMode === 'zachowanie' ? 'Praca z zachowaniem dziecka' : 'Współpraca z rodzicem'}</p>
                                     </div>
 
                                     <div className="mb-8 p-4 bg-slate-800/50 rounded-xl border border-slate-700 print:bg-slate-50 print:border-slate-200">
@@ -500,7 +526,7 @@ Podziel poradę na 3 sekcje:
                                     </h3>
                                     
                                     <div className="text-slate-200 whitespace-pre-wrap text-base sm:text-[17px] leading-relaxed font-medium print:text-slate-800 print:leading-normal">
-                                        {adviceData.text}
+                                        {adviceData.advice}{isGenerating && <span className="animate-pulse"> ▍</span>}
                                     </div>
                                 </div>
                                 

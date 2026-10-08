@@ -17,6 +17,9 @@
     <!-- Google tag (gtag.js) -->
     <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-CL194R0J5H"></script>
     <script src="/cookie-consent.js" defer></script>
+    <!-- Porady SOS: instrukcje wspólne z EduSOS i strumień odpowiedzi -->
+    <script src="/sos-porady.js"></script>
+    <script src="/doc-tools.js"></script>
     <script>
       window.dataLayer = window.dataLayer || [];
       function gtag(){dataLayer.push(arguments);}
@@ -175,10 +178,9 @@
             );
         };
 
-        const PROMPTS = {
-            sos_zachowanie: `Jesteś pedagogiem specjalnym i terapeutą integracji sensorycznej (SI). Przeanalizuj opisane zachowanie dziecka (np. autyzm, ADHD) i podaj natychmiastowe rozwiązanie. Odpowiedź podziel na: 1. 🧠 POTENCJALNA PRZYCZYNA: Funkcja zachowania. 2. 🚨 SZYBKA REAKCJA: 3 punkty, co zrobić tu i teraz. 3. 🛠️ DZIAŁANIE NA JUTRO: Jak zapobiec temu w przyszłości.`,
-            sos_rodzic: `Jesteś psychologiem i mediatorem (NVC). Nauczyciel ma problem we współpracy z rodzicem. Podziel poradę na: 1. 💡 PERSPEKTYWA RODZICA: Z czego to wynika. 2. 🗣️ GOTOWE ZDANIA: 3 gotowe sformułowania do użycia przez nauczyciela. 3. 🚧 STRATEGIA: Jak ustalić granice.`
-        };
+        // Instrukcje porad SOS: sos-porady.js (window.EduSosPrompts), wspólne z EduSOS. Dawniej: jedno zdanie
+        // „Jesteś asystentem pedagoga” na domyślnym modelu, bez zakazu diagnoz i bez ścieżki kryzysowej.
+        const SOS = window.EduSosPrompts;
 
         const ALL_APPS = [
             { title: 'Asystent Pedagoga (IPET)', desc: 'Tworzy kompletne IPET-y i WOPFU w oparciu o prawo oświatowe.', url: 'asystent-pedagoga.html', icon: '📝' },
@@ -393,38 +395,34 @@
 
             const generateSos = async () => {
                 setIsGeneratingSos(true); setSosError(''); setSosResult('');
+                if (window.location.protocol === 'file:') { setDemoSOS(); return; }
+                const { system, prompt } = SOS.buildSosPrompts(sosMode, sosInput, { place: 'przedszkole' });
+                let scrolled = false;
                 try {
-                    const fullText = `SYSTEM: ${PROMPTS[`sos_${sosMode}`]}\n\nPROBLEM DO ROZWIĄZANIA: ${sosInput}`;
-                    
-                    if (window.location.protocol === 'file:') { throw new Error("Local"); }
-
-                    const response = await fetch('/api/chat', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ prompt: fullText, system: "Jesteś asystentem pedagoga.", temperature: 0.5 })
+                    // gpt-6.1 (strong) działa tylko ze strumieniem – porada pojawia się na bieżąco.
+                    const r = await window.EduDocTools.streamChat({ system, prompt, model: 'strong' }, (t) => {
+                        const part = SOS.splitSosAnswer(t).advice;
+                        setSosResult(part);
+                        if (!scrolled && part) { scrolled = true; setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100); }
                     });
-                    
-                    if (!response.ok) throw new Error("Błąd serwera");
-                    const data = await response.json();
-                    
-                    let text = data.text;
-                    if (text) {
-                        setSosResult(text);
-                        setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
-                    } else throw new Error("Pusta odpowiedź z API.");
-                } catch (err) { 
-                    // Wersja demonstracyjna tylko przy pliku otwartym lokalnie. Wcześniej każdy błąd połączenia na produkcji
-                    // pokazywał gotową, ogólną „radę SOS” – niezależnie od opisanej sytuacji w klasie.
-                    if (err.message === "Local") {
-                        setDemoSOS();
-                    } else if (String(err.message).includes("fetch")) {
-                        setSosError('Brak połączenia z serwerem – sprawdź internet i spróbuj ponownie.');
-                    } else {
-                        setSosError('Błąd: ' + err.message); 
-                    }
-                } finally { 
-                    if(window.location.protocol !== 'file:') setIsGeneratingSos(false); 
+                    const advice = SOS.splitSosAnswer(r.text).advice;
+                    if (!advice) throw new Error('Pusta odpowiedź z AI. Spróbuj ponownie.');
+                    setSosResult(advice);
+                    if (r.interrupted) setSosError('Odpowiedź urwała się – kliknij jeszcze raz.');
+                } catch (err) {
+                    // Bez gotowej „rady demonstracyjnej” – ogólna rada niezależna od opisu byłaby myląca.
+                    setSosResult('');
+                    setSosError(/fetch|network|load failed/i.test(String(err && err.message))
+                        ? 'Brak połączenia z serwerem – sprawdź internet i spróbuj ponownie.'
+                        : ((err && err.message) || 'Nie udało się przygotować porady. Spróbuj ponownie.'));
+                } finally {
+                    setIsGeneratingSos(false);
                 }
+            };
+
+            const copySos = async () => {
+                try { await navigator.clipboard.writeText(sosResult); showToast('Skopiowano poradę.'); }
+                catch (e) { showToast('Nie udało się skopiować – zaznacz tekst i użyj Ctrl+C.'); }
             };
 
             const handleSuccessGenerateWithLimit = () => {
@@ -669,15 +667,23 @@ IMG4: [prompt 4]`;
                                 <div className="glass-panel p-6 sm:p-8 rounded-[2rem] fade-in border border-blue-500/30 print-hidden">
                                     <h2 className="text-3xl font-black text-blue-400 mb-6">Przedszkolne SOS 🚨</h2>
                                     <div className="flex gap-4 mb-4">
-                                        <button onClick={() => setSosMode('zachowanie')} className={`flex-1 py-3 rounded-xl font-bold transition-all ${sosMode === 'zachowanie' ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400'}`}>Kryzys Dziecka</button>
-                                        <button onClick={() => setSosMode('rodzic')} className={`flex-1 py-3 rounded-xl font-bold transition-all ${sosMode === 'rodzic' ? 'bg-fuchsia-600 text-white' : 'bg-slate-800 text-slate-400'}`}>Trudny Rodzic</button>
+                                        <button onClick={() => setSosMode('zachowanie')} aria-pressed={sosMode === 'zachowanie'} className={`flex-1 py-3 rounded-xl font-bold transition-all ${sosMode === 'zachowanie' ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400'}`}>Zachowanie dziecka</button>
+                                        <button onClick={() => setSosMode('rodzic')} aria-pressed={sosMode === 'rodzic'} className={`flex-1 py-3 rounded-xl font-bold transition-all ${sosMode === 'rodzic' ? 'bg-fuchsia-600 text-white' : 'bg-slate-800 text-slate-400'}`}>Rozmowa z rodzicem</button>
                                     </div>
-                                    <textarea value={sosInput} onChange={(e) => setSosInput(e.target.value)} placeholder="Opisz problem..." className="w-full h-32 bg-slate-900 border border-slate-600 text-white rounded-2xl p-5 focus:ring-2 focus:ring-blue-500 outline-none mb-4 custom-scrollbar"></textarea>
+                                    <textarea value={sosInput} onChange={(e) => setSosInput(e.target.value)} placeholder={sosMode === 'zachowanie' ? 'Np. Czterolatek w szatni gryzie inne dzieci, gdy jest tłok przy wyjściu na podwórko.' : 'Np. Tata dziecka z grupy starszaków twierdzi, że w przedszkolu nikt nie pilnuje syna, i podnosi głos przy innych rodzicach.'} className="w-full h-32 bg-slate-900 border border-slate-600 text-white rounded-2xl p-5 focus:ring-2 focus:ring-blue-500 outline-none mb-2 custom-scrollbar"></textarea>
+                                    <p className="text-xs text-slate-400 mb-4">Bez imion, nazwisk i nazwy przedszkola – wystarczy wiek i opis sytuacji. AI nie stawia diagnoz, a przy zagrożeniu zdrowia zaczyna od kroków bezpieczeństwa.</p>
                                     <button onClick={generateSosWithLimit} disabled={isGeneratingSos || !sosInput} className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-black py-4 rounded-xl shadow-lg btn-bounce disabled:opacity-50 flex items-center justify-center gap-2">
-                                        {isGeneratingSos ? 'Szukam rozwiązania...' : `Ratuj Sytuację! ${!isPremium ? '(' + Math.max(0, 5 - usageCount) + ')' : ''}`}
+                                        {isGeneratingSos ? 'Piszę poradę...' : `Ratuj sytuację ${!isPremium ? '(' + Math.max(0, 5 - usageCount) + ')' : ''}`}
                                     </button>
+                                    {sosError && <p className="mt-4 text-sm font-bold text-red-300" role="alert">{sosError}</p>}
                                     {sosResult && (
-                                        <div ref={resultRef} className="mt-8 bg-slate-900 p-6 rounded-2xl border border-blue-500/30 text-slate-200 whitespace-pre-wrap leading-relaxed">{sosResult}</div>
+                                        <div ref={resultRef} className="mt-8 bg-slate-900 p-6 rounded-2xl border border-blue-500/30">
+                                            <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                                                <p className="text-xs text-slate-400">Porada AI to podpowiedź, nie diagnoza ani opinia specjalisty.</p>
+                                                <button onClick={copySos} disabled={isGeneratingSos} className="bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white px-4 py-2 rounded-xl font-bold text-sm disabled:opacity-50">Kopiuj</button>
+                                            </div>
+                                            <div className="text-slate-200 whitespace-pre-wrap leading-relaxed">{sosResult}{isGeneratingSos && <span className="animate-pulse"> ▍</span>}</div>
+                                        </div>
                                     )}
                                 </div>
                             )}
