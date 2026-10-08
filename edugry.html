@@ -236,35 +236,22 @@
                 } else { showToast('Nieprawidłowy kod dostępu!'); }
             };
 
-            const executePrint = () => {
-                window.EduBoxCore.executeWithLimitCheck(isPremium, 
-                    (newCount) => {
-                        setUsageCount(newCount);
-                        window.print();
-                    },
-                    (msg) => showToast(msg),
-                    (msg) => showToast(msg)
-                );
-            };
+            // Limit dotyczy tylko generowania przez AI (decyzja 8.10.2026). EduGry nie używa AI, więc druk i Giełda są bez limitu
+            // – wcześniej każde kliknięcie zabierało 1 z 5 dziennych generowań całego EduBoxa.
+            const executePrint = () => window.print();
 
             const executeSharePattern = async () => {
-                window.EduBoxCore.executeWithLimitCheck(isPremium, 
-                    async (newCount) => {
-                        setUsageCount(newCount);
-                        try {
-                            const name = `${activeTab === 'jamam' ? 'Ja mam, kto ma' : 'BINGO'} (${wordsInput.split('\n').filter(w=>w.trim()).length} słów)`;
-                            const type = activeTab === 'jamam' ? 'Ja mam' : 'Bingo';
-                            const config = { activeTab, wordsInput, bingoSize, bingoCount, cardTheme };
-                            
-                            await window.EduBoxCore.saveToGielda('gielda_wzorow_edugry', type, name, config);
-                            showToast("✨ Zapisano w Giełdzie Wzorów!");
-                        } catch (e) {
-                            showToast(e.message || "🚨 Błąd podczas zapisu w chmurze.");
-                        }
-                    },
-                    (msg) => showToast(msg),
-                    (msg) => showToast(msg)
-                );
+                if (!window.confirm('Do Giełdy (widocznej dla wszystkich) trafi lista słów. Sprawdź, czy nie ma w niej imion uczniów. Opublikować?')) return;
+                try {
+                    const name = `${activeTab === 'jamam' ? 'Ja mam, kto ma' : 'BINGO'} (${wordsInput.split('\n').filter(w=>w.trim()).length} słów)`;
+                    const type = activeTab === 'jamam' ? 'Ja mam' : 'Bingo';
+                    const config = { activeTab, wordsInput, bingoSize, bingoCount, cardTheme };
+
+                    await window.EduBoxCore.saveToGielda('gielda_wzorow_edugry', type, name, config);
+                    showToast("✨ Zapisano w Giełdzie Wzorów!");
+                } catch (e) {
+                    showToast(e.message || "🚨 Błąd podczas zapisu w chmurze.");
+                }
             };
 
             const loadPattern = (pattern) => {
@@ -319,12 +306,8 @@
                         return;
                     }
 
-                    let safeCount = bingoCount;
-                    if (!isPremium && bingoCount > 5) {
-                        showToast('Wersja Free pozwala na max 5 plansz. Użyto wartości 5.');
-                        safeCount = 5;
-                        setBingoCount(5);
-                    }
+                    // Bez limitu planszy dla darmowych (dawniej max 5 – za mało na klasę); górna granica tylko techniczna.
+                    const safeCount = Math.min(100, Math.max(1, Number(bingoCount) || 1));
 
                     const boards = [];
                     for (let i = 0; i < safeCount; i++) {
@@ -366,19 +349,7 @@
                             
                             {appMode === 'editor' ? (
                                 <>
-                                    {/* Panel darmowych użyć i weryfikacji */}
-                                    {!isPremium && (
-                                        <div className="glass-panel p-4 rounded-2xl flex flex-col gap-2 border border-rose-500/30 bg-rose-950/20">
-                                            <div className="flex justify-between items-center">
-                                                <span className="text-[10px] font-bold text-rose-300 uppercase tracking-widest">Darmowe użycia: {Math.max(0, 5 - usageCount)}/5</span>
-                                                <span className="text-[10px] text-slate-400">Wersja Free</span>
-                                            </div>
-                                            <div className="flex items-center gap-2 mt-1">
-                                                <input value={accessCode} onChange={e => setAccessCode(e.target.value)} placeholder="Kod odblokowujący..." className="flex-1 px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs outline-none text-white focus:border-rose-500 transition-colors"/>
-                                                <button onClick={handleVerifyCode} className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-xs font-bold transition-all shadow-md">OK</button>
-                                            </div>
-                                        </div>
-                                    )}
+                                    <p className="text-xs text-emerald-300 bg-emerald-950/30 border border-emerald-500/30 rounded-2xl px-4 py-3"><i className="ph-bold ph-heart"></i> Bez limitów – EduGry nie korzysta z AI, więc druk i Giełda są zawsze za darmo.</p>
 
                                     {/* Przycisk przejścia do Giełdy & Instrukcji */}
                                     <div className="flex gap-2">
@@ -443,8 +414,7 @@
                                                 </div>
                                                 <div>
                                                     <label className="text-[10px] font-bold text-slate-400 uppercase block mb-2">Liczba kart dla uczniów</label>
-                                                    <input type="number" min="1" max={isPremium ? "100" : "5"} value={bingoCount} onChange={e=>setBingoCount(e.target.value)} className="w-full p-3 bg-slate-900 border border-slate-700 rounded-xl outline-none text-white text-sm focus:border-indigo-500 font-bold" />
-                                                    {!isPremium && <p className="text-[9px] text-indigo-400 mt-1 uppercase font-bold">Darmowa wersja: Max 5 plansz</p>}
+                                                    <input type="number" min="1" max="100" value={bingoCount} onChange={e=>setBingoCount(e.target.value)} className="w-full p-3 bg-slate-900 border border-slate-700 rounded-xl outline-none text-white text-sm focus:border-indigo-500 font-bold" />
                                                 </div>
                                             </div>
                                         )}
@@ -515,7 +485,7 @@
                                 <div className="w-full max-w-[210mm] animate-[reveal_0.5s_ease-out] print:max-w-full">
                                     <div className="flex justify-end gap-3 mb-6 print-hidden bg-slate-900/50 p-2 rounded-2xl border border-slate-800 backdrop-blur-md">
                                         <button onClick={executePrint} className={`w-full hover:bg-slate-50 text-slate-900 px-6 py-4 rounded-xl font-black flex items-center justify-center gap-3 transition-all text-sm active:scale-95 uppercase tracking-widest shadow-xl ${generatedCards.type === 'jamam' ? 'bg-rose-100' : 'bg-indigo-100'}`}>
-                                            <Icon name="Printer" size={20}/> Wydrukuj Projekt {!isPremium && `(${Math.max(0, 5 - usageCount)})`}
+                                            <Icon name="Printer" size={20}/> Wydrukuj Projekt
                                         </button>
                                     </div>
 

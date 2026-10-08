@@ -258,15 +258,7 @@
                 }
             }, [coreReady]);
 
-            // Nasłuchiwanie Giełdy
-            useEffect(() => {
-                if (!user || !coreReady || !window.EduBoxCore) return;
-                const unsubscribe = window.EduBoxCore.subscribeToGielda('gielda_wzorow_edugrupy', 
-                    (loadedData) => setPatterns(loadedData),
-                    (error) => console.error("Błąd odczytu Giełdy:", error)
-                );
-                return () => unsubscribe();
-            }, [user, coreReady]);
+            // Giełda wyłączona (8.10.2026): lista klasy to imiona uczniów – nie publikujemy jej ani nie pokazujemy cudzych list.
 
             // --- STATE APLIKACJI ---
             const [activeTab, setActiveTab] = useState('wheel'); // wheel | groups
@@ -313,33 +305,6 @@
                 } catch(e) {}
             };
 
-            // --- GIEŁDA WZORÓW ACTIONS ---
-            const executeSharePattern = async () => {
-                window.EduBoxCore.executeWithLimitCheck(isPremium, 
-                    async (newCount) => {
-                        setUsageCount(newCount);
-                        try {
-                            const name = `Lista Klasy (${students.length} os.)`;
-                            await window.EduBoxCore.saveToGielda('gielda_wzorow_edugrupy', 'Lista Uczniów', name, { students });
-                            showToast("✨ Zapisano w Giełdzie Wzorów!");
-                        } catch (e) {
-                            showToast(e.message || "🚨 Błąd podczas zapisu w chmurze.");
-                        }
-                    },
-                    (msg) => showToast(msg),
-                    (msg) => showToast(msg)
-                );
-            };
-
-            const loadPattern = (pattern) => {
-                if(pattern.config && pattern.config.students) {
-                    setStudents(pattern.config.students);
-                    setWinner(null);
-                    setGroups([]);
-                    setAppMode('editor');
-                    showToast("✨ Lista załadowana pomyślnie!");
-                }
-            };
 
             // --- ZARZĄDZANIE LISTĄ ---
             const addStudent = (e) => {
@@ -381,16 +346,8 @@
             };
 
             // --- LOGIKA KOŁA FORTUNY ---
-            const executeSpinWheel = () => {
-                window.EduBoxCore.executeWithLimitCheck(isPremium, 
-                    (newCount) => {
-                        setUsageCount(newCount);
-                        spinWheel();
-                    },
-                    (msg) => showToast(msg),
-                    (msg) => showToast(msg)
-                );
-            };
+            // Bez limitu: losowanie nie używa AI (wcześniej każde zakręcenie zabierało 1 z 5 dziennych generowań EduBoxa).
+            const executeSpinWheel = () => spinWheel();
 
             const spinWheel = () => {
                 if (students.length === 0 || isSpinning) return;
@@ -431,16 +388,7 @@
             };
 
             // --- LOGIKA PODZIAŁU NA GRUPY ---
-            const executeDivideClass = () => {
-                window.EduBoxCore.executeWithLimitCheck(isPremium, 
-                    (newCount) => {
-                        setUsageCount(newCount);
-                        divideClass();
-                    },
-                    (msg) => showToast(msg),
-                    (msg) => showToast(msg)
-                );
-            };
+            const executeDivideClass = () => divideClass();
 
             const divideClass = () => {
                 if (students.length === 0) return;
@@ -479,30 +427,13 @@
                     <main className="flex-grow max-w-[90rem] w-full mx-auto px-4 sm:px-6 py-8 relative z-10 flex flex-col xl:flex-row gap-8 items-start mt-10">
                         
                         {/* ================================== */}
-                        {/* LEWA KOLUMNA: Menedżer Listy / Giełda */}
+                        {/* LEWA KOLUMNA: Menedżer Listy */}
                         {/* ================================== */}
                         <div className="w-full xl:w-3/12 flex flex-col gap-6 shrink-0 print-hidden">
                             
                             {appMode === 'editor' ? (
                                 <>
-                                    {/* Panel darmowych użyć i weryfikacji */}
-                                    {!isPremium && (
-                                        <div className="glass-panel p-4 rounded-2xl flex flex-col gap-2 border border-indigo-500/30 bg-indigo-950/20">
-                                            <div className="flex justify-between items-center">
-                                                <span className="text-[10px] font-bold text-indigo-300 uppercase tracking-widest">Darmowe użycia: {Math.max(0, 5 - usageCount)}/5</span>
-                                                <span className="text-[10px] text-slate-400">Wersja Free</span>
-                                            </div>
-                                            <div className="flex items-center gap-2 mt-1">
-                                                <input value={accessCode} onChange={e => setAccessCode(e.target.value)} placeholder="Kod odblokowujący..." className="flex-1 px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs outline-none text-white focus:border-indigo-500 transition-colors"/>
-                                                <button onClick={handleVerifyCode} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold transition-all shadow-md">OK</button>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* Przycisk przejścia do Giełdy */}
-                                    <button onClick={() => setAppMode('gielda')} className="w-full bg-slate-800 border border-slate-700 text-white p-3 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-fuchsia-900/30 hover:border-fuchsia-500/50 transition-all shadow-md btn-bounce flex items-center justify-center gap-2">
-                                        <i className="ph-bold ph-cloud text-lg text-fuchsia-400"></i> Giełda Wzorów (Współdzielone)
-                                    </button>
+                                    <p className="text-xs text-emerald-300 bg-emerald-950/30 border border-emerald-500/30 rounded-2xl px-4 py-3"><i className="ph-bold ph-shield-check"></i> Bez limitów – EduGrupy nie korzysta z AI. Lista uczniów zostaje tylko w tej przeglądarce i nigdzie jej nie wysyłamy.</p>
 
                                     {/* Właściwy Menedżer Listy Klasy */}
                                     <div className="glass-panel rounded-[2rem] p-6 border-t-4 border-pink-500 flex flex-col h-[700px]">
@@ -564,41 +495,7 @@
                                         </div>
                                     </div>
                                 </>
-                            ) : (
-                                /* Widok Giełdy Wzorów */
-                                <div className="glass-panel p-6 rounded-[2rem] border-t-4 border-fuchsia-500 shadow-lg h-[800px] flex flex-col">
-                                    <div className="flex justify-between items-center mb-6">
-                                        <h2 className="font-black text-white uppercase tracking-widest text-sm flex items-center gap-2"><i className="ph-bold ph-users text-fuchsia-400"></i> Giełda Wzorów</h2>
-                                        <button onClick={() => setAppMode('editor')} className="text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-lg text-xs font-bold uppercase transition-colors btn-bounce"><i className="ph-bold ph-arrow-left"></i> Wróć</button>
-                                    </div>
-                                    
-                                    <button onClick={executeSharePattern} className="w-full bg-fuchsia-600 hover:bg-fuchsia-500 text-white p-3 rounded-xl font-bold text-sm mb-6 shadow-lg transition-all btn-bounce flex justify-center items-center gap-2">
-                                        <i className="ph-bold ph-cloud-arrow-up text-lg"></i> Udostępnij swoją Listę
-                                    </button>
-                                    
-                                    <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Ostatnio dodane listy</h3>
-                                    <div className="overflow-y-auto custom-scrollbar flex-1 space-y-3 pr-2">
-                                        {patterns.map(p => (
-                                            <div key={p.id} className="bg-slate-900 border border-slate-700 p-4 rounded-xl hover:border-fuchsia-500 transition-colors cursor-pointer group flex flex-col gap-2" onClick={() => loadPattern(p)}>
-                                                <div className="flex justify-between items-start gap-2">
-                                                    <span className="text-xs font-bold text-white group-hover:text-fuchsia-400 transition-colors line-clamp-2 leading-tight">{p.name}</span>
-                                                    <span className="text-[9px] font-bold px-2 py-1 rounded shrink-0 bg-fuchsia-900/50 text-fuchsia-300"><i className="ph-bold ph-list-numbers"></i> {p.config.students?.length}</span>
-                                                </div>
-                                                <div className="flex justify-between items-center">
-                                                    <p className="text-[9px] text-slate-500">Autor: <span className="text-slate-400">{p.userId.substring(0,6)}</span></p>
-                                                    <p className="text-[9px] text-slate-500">{p.createdAt?.toDate().toLocaleDateString()}</p>
-                                                </div>
-                                            </div>
-                                        ))}
-                                        {patterns.length === 0 && (
-                                            <div className="text-center py-10 opacity-50">
-                                                <i className="ph-bold ph-cloud-arrow-down text-4xl mb-2 text-slate-500"></i>
-                                                <p className="text-xs text-slate-400">Pobieranie list z chmury...</p>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
+                            ) : null}
                         </div>
 
                         {/* ================================== */}
@@ -650,7 +547,7 @@
                                                     className="absolute z-20 w-24 h-24 md:w-32 md:h-32 bg-slate-900 rounded-full border-4 border-white/10 shadow-[0_0_30px_rgba(0,0,0,0.8)] flex flex-col items-center justify-center text-white font-black hover:bg-slate-800 transition-colors disabled:opacity-80 group active:scale-95"
                                                 >
                                                     <span className="text-lg md:text-2xl tracking-widest text-pink-400 group-hover:text-pink-300">SPIN</span>
-                                                    <span className="text-[9px] text-slate-400 mt-1 uppercase tracking-widest block font-normal">{!isPremium && `(${Math.max(0, 5 - usageCount)})`}</span>
+                                                    <span className="text-[9px] text-slate-400 mt-1 uppercase tracking-widest block font-normal"></span>
                                                 </button>
 
                                                 <div className="w-full h-full rounded-full overflow-hidden shadow-[0_0_50px_rgba(236,72,153,0.3)] border-8 border-slate-800"
@@ -721,7 +618,7 @@
                                                 disabled={students.length < numGroups}
                                                 className="bg-amber-600 hover:bg-amber-500 text-white disabled:opacity-50 px-10 py-4 rounded-xl font-bold shadow-[0_10px_30px_-10px_rgba(245,158,11,0.5)] transition-all btn-bounce uppercase tracking-widest text-sm w-full sm:w-auto"
                                             >
-                                                <i className="ph-bold ph-shuffle mr-2 text-lg"></i> Przydziel Magicznie {!isPremium && `(${Math.max(0, 5 - usageCount)})`}
+                                                <i className="ph-bold ph-shuffle mr-2 text-lg"></i> Przydziel Magicznie 
                                             </button>
                                             {students.length < numGroups && (
                                                 <p className="text-red-400 text-xs mt-3">Masz mniej uczniów na liście niż żądanych grup!</p>

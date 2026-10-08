@@ -17,7 +17,7 @@ const gen = read('edugenerator.html');
 const share = gen.slice(gen.indexOf('const sharePattern = async () => {'), gen.indexOf('const loadPattern = '));
 check('EduGenerator: Giełda bez imienia ucznia i podpisu', share.includes("studentName: ''") && share.includes("diplomaSignature: ''"));
 check('EduGenerator: do Giełdy tylko grafika z adresu https, nie wgrane zdjęcie (data:)', share.includes("/^https:\\/\\//.test(customImage)) ? customImage : null"));
-check('EduGenerator: potwierdzenie przed publikacją (przed zużyciem puli)', share.indexOf('window.confirm(') > -1 && share.indexOf('window.confirm(') < share.indexOf('executeWithLimitCheck'));
+check('EduGenerator: potwierdzenie przed publikacją, publikacja bez zużywania puli (decyzja 8.10.2026)', share.indexOf('window.confirm(') > -1 && share.indexOf('executeWithLimitCheck') === -1);
 
 // EduPlakat: plakat ze wgranego zdjęcia może zachować wizerunek – pytanie przed publikacją
 const pl = read('eduplakat.html');
