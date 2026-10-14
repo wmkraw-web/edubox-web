@@ -39,6 +39,7 @@ check('tradycje: andrzejki 29.11 (ogień tylko u dorosłego), mikołajki 6.12, W
 check('dni ONZ/UNESCO: Kobiet 8.03, Szczęścia 20.03, Książki 23.04, Środowiska 5.06, Tolerancji 16.11, Osób z Niepełnosprawnościami 3.12',
   find(3, 'Dzień Kobiet').day === 8 && find(3, 'Międzynarodowy Dzień Szczęścia').day === 20 && find(4, 'Światowy Dzień Książki').day === 23 && find(6, 'Światowy Dzień Środowiska').day === 5 && find(11, 'Międzynarodowy Dzień Tolerancji').day === 16 && find(12, 'Międzynarodowy Dzień Osób z Niepełnosprawnościami').day === 3);
 check('Pierwszy Dzień Wiosny 21.03, Dzień Kundelka 25.10, Dzień Muzyki 1.10, Dzień Teatru 27.03', find(3, 'Pierwszy Dzień Wiosny').day === 21 && find(10, 'Dzień Kundelka').day === 25 && find(10, 'Międzynarodowy Dzień Muzyki').day === 1 && find(3, 'Międzynarodowy Dzień Teatru').day === 27);
+check('Dzień Dyni 31.10 – jesienne zbiory, bez Halloween', find(10, 'Dzień Dyni').day === 31 && /bez motywów Halloween/.test(find(10, 'Dzień Dyni').desc));
 const ymd = (d) => [d.getFullYear(), d.getMonth() + 1, d.getDate()].join('-');
 check('Wielkanoc liczona poprawnie (2024–2028)', ['2024-3-31', '2025-4-20', '2026-4-5', '2027-3-28', '2028-4-16'].join() === [2024, 2025, 2026, 2027, 2028].map(y => ymd(api.easterDate(y))).join(), [2024, 2025, 2026, 2027, 2028].map(y => ymd(api.easterDate(y))));
 const oct2026 = new Date(2026, 9, 8);
