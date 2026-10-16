@@ -393,7 +393,12 @@ zapytań i może pobrać PDF (podgląd dla starych pakietów). **Katalog zapisuj
 Firestore blokują anonimowy zapis („Missing or insufficient permissions” przy pierwszym teście 16.10.2026), więc panel
 woła akcję `materialy-zapisz` (`op`: create/update/delete, Basic Auth), a `api/verify-code.js` pisze przez REST
 Firestore kontem usługi `FIREBASE_SERVICE_ACCOUNT_KEY` (zakres `datastore`), z białą listą pól `sanitizePakiet`.
-Odczyt katalogu nadal z przeglądarki (onSnapshot). Testy: `materialy:check`, `api/_lib/materialy.test.js`.
+Odczyt katalogu nadal z przeglądarki (onSnapshot). **Duże pliki (HTTP 413):** funkcja Vercela przyjmuje i oddaje najwyżej ~4,5 MB, więc pliki pakietów jej omijają:
+wgrywanie = akcja `materialy-upload-start` otwiera sesję resumable w Cloud Storage (z nagłówkiem `Origin`, dzięki czemu
+GCS odpowiada z CORS bez konfiguracji bucketu), a panel wysyła plik `PUT` bezpośrednio (zapas: base64 dla plików < 3 MB);
+pobieranie = `materialy-download` z `mode: 'link'` zwraca podpisany link V4 ważny 5 min (`signedGetUrl`, tylko ścieżki
+`materialy/`), strona przechodzi pod niego zwykłym linkiem. Odświeżenie podglądu starego pakietu: link → stara droga →
+wybór PDF z dysku. Testy: `materialy:check`, `api/_lib/materialy.test.js`.
 
 **Narzędzia zajęciowe – stan po audycie 8.10.2026:** EduEscape generuje na gpt-6.1 (`strong` + strumień, JSON
 wycinany z tekstu) – gpt-5.4-mini dla klas I–III uparcie dawał „12 + 5, podaj cyfrę” (cyfra jedności); każda stacja

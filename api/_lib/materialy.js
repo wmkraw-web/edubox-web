@@ -83,4 +83,41 @@ const FIRESTORE_DOCS = 'https://firestore.googleapis.com/v1/projects/edubox-pro/
 const KATALOG_PATH = 'artifacts/eduboxpro/public/data/materialy_katalog';
 const DOC_ID = /^[A-Za-z0-9_-]{1,100}$/;
 
-module.exports = { PREVIEW_PATH, isPreviewPath, isUploadPath, SEKCJE, sanitizePakiet, toFields, FIRESTORE_DOCS, KATALOG_PATH, DOC_ID };
+// ---- Duże pliki (od 16.10.2026) ----
+// Vercel przyjmuje i oddaje najwyżej ~4,5 MB w jednym zapytaniu (HTTP 413). Dlatego pliki pakietów nie
+// przechodzą już przez funkcję: pobieranie = krótko ważny podpisany link V4 do Cloud Storage (przeglądarka
+// pobiera plik bezpośrednio), wgrywanie = sesja „resumable” otwarta przez serwer, do której przeglądarka
+// wysyła plik sama (PUT).
+const crypto = require('crypto');
+
+function rfc3986(str) {
+  return encodeURIComponent(str).replace(/[!'()*]/g, (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase());
+}
+
+function signedGetUrl({ bucket, path, clientEmail, privateKey, fileName, now = new Date(), expiresSeconds = 300 }) {
+  const iso = now.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, ''); // 20261016T150000Z
+  const date = iso.slice(0, 8);
+  const scope = `${date}/auto/storage/goog4_request`;
+  const params = {
+    'X-Goog-Algorithm': 'GOOG4-RSA-SHA256',
+    'X-Goog-Credential': `${clientEmail}/${scope}`,
+    'X-Goog-Date': iso,
+    'X-Goog-Expires': String(expiresSeconds),
+    'X-Goog-SignedHeaders': 'host',
+  };
+  if (fileName) params['response-content-disposition'] = `attachment; filename*=UTF-8''${rfc3986(fileName)}`;
+  const query = Object.keys(params).sort().map((k) => `${rfc3986(k)}=${rfc3986(params[k])}`).join('&');
+  const resource = `/${bucket}/${path.split('/').map(rfc3986).join('/')}`;
+  const canonical = ['GET', resource, query, 'host:storage.googleapis.com', '', 'host', 'UNSIGNED-PAYLOAD'].join('\n');
+  const toSign = ['GOOG4-RSA-SHA256', iso, scope, crypto.createHash('sha256').update(canonical).digest('hex')].join('\n');
+  const signature = crypto.createSign('RSA-SHA256').update(toSign).sign(privateKey, 'hex');
+  return `https://storage.googleapis.com${resource}?${query}&X-Goog-Signature=${signature}`;
+}
+
+// Origin, z którego przeglądarka wyśle plik do sesji resumable (Cloud Storage zwraca nagłówki CORS
+// tylko dla originu podanego przy otwieraniu sesji). Tylko nasza domena i podglądy Vercela.
+function allowedOrigin(origin) {
+  return typeof origin === 'string' && /^https:\/\/((www\.)?eduboxpro\.pl|[a-z0-9-]+\.vercel\.app)$/.test(origin) ? origin : 'https://eduboxpro.pl';
+}
+
+module.exports = { signedGetUrl, allowedOrigin, rfc3986, PREVIEW_PATH, isPreviewPath, isUploadPath, SEKCJE, sanitizePakiet, toFields, FIRESTORE_DOCS, KATALOG_PATH, DOC_ID };
