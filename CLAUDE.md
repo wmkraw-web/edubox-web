@@ -477,6 +477,11 @@ Sama strona w Wikisłowniku to za mało (są tam też słowa obce: „basa”, �
 albo polskiej formy fleksyjnej (`clcategories`). Ocena rymów w EduRymach: `strong` ze strumieniem (gpt-6.1).
 Przed dodaniem `fetch` do obcej domeny w przeglądarce sprawdź `connect-src` w `vercel.json`.
 
+**CSP bez `'unsafe-eval'`:** `new Function`/`eval` w przeglądarce są blokowane (po cichu w `try`). Redaktor Ogłoszeń
+i Redaktor Bloga czytały tak `ogloszenie.js`/`zmiany.js`/`blog-posts.js` i przestały się łączyć („Nie udało się odczytać
+pliku ogloszenie.js”, 16.10.2026). Teraz parser literałów `js-literal.js` (`EduJsLiteral.readWindowValue`, bez wykonywania
+kodu; testy `jsliteral:check` pilnują też braku eval w redaktorach). Nie dopisuj `'unsafe-eval'` do CSP.
+
 **Wydruk – sprawdzanie bez drukarki:** kopia strony z wstrzykniętymi danymi wyniku → Chrome
 headless `--print-to-pdf` → strony PDF do PNG (`pdfjs-dist` + `@napi-rs/canvas`). Tak wyszły:
 baner cookies drukujący się na każdej stronie (naprawione w `cookie-consent.js`), cienie jako
