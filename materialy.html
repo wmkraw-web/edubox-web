@@ -244,7 +244,8 @@
 
             if (!strony.length) return null;
             const s = strony[i];
-            return (
+            // Portal do <body>: #root ma z-10, a menu z-50 – bez portalu pasek z „Zamknij” chował się pod menu.
+            return ReactDOM.createPortal(
                 <div className="fixed inset-0 z-[100] bg-slate-950/95 flex flex-col" role="dialog" aria-modal="true" aria-label={`Podgląd: ${pakiet.title}`}>
                     <div className="flex items-center gap-3 px-4 py-3 border-b border-slate-800">
                         <div className="min-w-0 flex-1">
@@ -269,7 +270,8 @@
                             </button>
                         ))}
                     </div>
-                </div>
+                </div>,
+                document.body
             );
         }
 
@@ -336,6 +338,8 @@
             const [search, setSearch] = useState('');
             const [pro, setPro] = useState(jestPro());
             const [podglad, setPodglad] = useState(null);
+            // Link do konkretnego pakietu (?pakiet=<id>, np. z pina albo z panelu) od razu otwiera jego podgląd.
+            const [pakietZAdresu, setPakietZAdresu] = useState(() => new URLSearchParams(window.location.search).get('pakiet'));
 
             useEffect(() => { window.__materialyPublicReady.then(setDeps); }, []);
 
@@ -357,6 +361,16 @@
                 }, (err) => console.error('Firestore sync error', err));
                 return () => unsub();
             }, [deps]);
+
+            useEffect(() => {
+                if (!pakietZAdresu || !pakiety.length) return;
+                const p = pakiety.find((x) => x.id === pakietZAdresu);
+                if (p) {
+                    setSekcja(sekcjaPakietu(p));
+                    if ((p.podglad || []).length) setPodglad(p);
+                }
+                setPakietZAdresu(null);
+            }, [pakiety, pakietZAdresu]);
 
             const wybierzSekcje = (id) => {
                 setSekcja(id);
