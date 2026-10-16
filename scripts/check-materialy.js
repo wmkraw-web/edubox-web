@@ -40,5 +40,7 @@ check('API: wgrywanie tylko do materialy/ i podglady/', api.includes('isUploadPa
 
 check('panel nie pisze do Firestore sam (reguły bazy) – zapis przez materialy-zapisz', !/api\.(addDoc|updateDoc|deleteDoc)\(/.test(panel) && panel.includes("'materialy-zapisz'") && api.includes("action === 'materialy-zapisz'"));
 
+check('link ?pakiet=<id> otwiera podgląd pakietu; panel linkuje do podglądu', pub.includes("get('pakiet')") && panel.includes('&pakiet=${pakiet.id}'));
+
 console.log(`\n[Baza Materiałów] ${ok} OK, ${fail} błędów`);
 if (fail) process.exit(1);
