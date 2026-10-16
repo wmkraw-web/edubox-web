@@ -1,6 +1,7 @@
 import { getServiceAccountAccessToken } from './_lib/googleServiceAccountAuth.js';
 import { isRateLimited } from './_lib/rateLimit.js';
 import { YEAR_CODE_PATTERN, yearCodeUntil } from './_lib/coffeePlan.js';
+import { isPreviewPath, isUploadPath } from './_lib/materialy.js';
 
 // UWAGA: ten plik obsługuje TERAZ dwie sprawy pod jednym endpointem, celowo -
 // dokładnie ten sam kompromis co api/ewa-generate.js (obrazy fal.ai + wideo D-ID
@@ -12,6 +13,9 @@ import { YEAR_CODE_PATTERN, yearCodeUntil } from './_lib/coffeePlan.js';
 // Bazę Materiałów (materialy.html + panel-materialy.html) - jedyne miejsce w EduBox,
 // gdzie plik do pobrania jest naprawdę zablokowany po stronie serwera, a nie tylko
 // honorowym sprawdzeniem flagi w przeglądarce.
+// GET ?podglad=podglady/… (od 10.2026) oddaje publiczny obrazek podglądu pakietu (strony PDF ze
+// znakiem wodnym, generowane w panelu). Odpowiedź ma długi Cache-Control, więc Vercel trzyma ją
+// w CDN i funkcja uruchamia się tylko przy pierwszym wyświetleniu danego obrazka.
 
 const STORAGE_BUCKET = 'edubox-pro.firebasestorage.app';
 const STORAGE_SCOPE = 'https://www.googleapis.com/auth/devstorage.read_write';
@@ -125,7 +129,8 @@ async function handleMaterialyDownload(req, res) {
   if (!objectPath || typeof objectPath !== 'string') {
     return res.status(400).json({ error: 'Brak ścieżki pliku.' });
   }
-  const valid = await isCodeCurrentlyValid(code);
+  // Panel (Basic Auth) też pobiera pliki – żeby utworzyć podgląd dla pakietu dodanego wcześniej.
+  const valid = checkAdminBasicAuth(req) || await isCodeCurrentlyValid(code);
   if (!valid) {
     return res.status(403).json({ error: 'Nieprawidłowy lub wygasły kod PRO. Wesprzyj kawą (górne menu) i wpisz otrzymany kod.' });
   }
@@ -166,6 +171,9 @@ async function handleMaterialyUpload(req, res) {
   const { path: objectPath, contentType, dataBase64 } = req.body || {};
   if (!objectPath || typeof objectPath !== 'string' || !dataBase64) {
     return res.status(400).json({ error: 'Brak danych pliku.' });
+  }
+  if (!isUploadPath(objectPath)) {
+    return res.status(400).json({ error: 'Niedozwolona ścieżka pliku.' });
   }
 
   let token;
@@ -231,7 +239,37 @@ async function handleMaterialyDelete(req, res) {
   return res.status(200).json({ ok: true });
 }
 
+async function handleMaterialyPreview(req, res) {
+  const objectPath = String(req.query.podglad || '');
+  if (!isPreviewPath(objectPath)) {
+    return res.status(400).json({ error: 'Nieprawidłowa ścieżka podglądu.' });
+  }
+  let token;
+  try {
+    token = await getStorageAccessToken();
+  } catch (e) {
+    console.error('materialy-preview token error', e);
+    return res.status(500).json({ error: 'Błąd konfiguracji serwera (dostęp do plików).' });
+  }
+  const gcsRes = await fetch(
+    `https://storage.googleapis.com/storage/v1/b/${STORAGE_BUCKET}/o/${encodeURIComponent(objectPath)}?alt=media`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+  if (!gcsRes.ok) {
+    res.setHeader('Cache-Control', 'no-store');
+    return res.status(gcsRes.status === 404 ? 404 : 502).json({ error: 'Brak podglądu.' });
+  }
+  const buffer = Buffer.from(await gcsRes.arrayBuffer());
+  res.setHeader('Content-Type', 'image/jpeg');
+  // Nazwa pliku jest unikalna (znacznik czasu), więc obrazek nigdy się nie zmienia pod tym adresem.
+  res.setHeader('Cache-Control', 'public, max-age=86400, s-maxage=31536000, immutable');
+  return res.status(200).send(buffer);
+}
+
 export default async function handler(req, res) {
+  if (req.method === 'GET' && req.query && req.query.podglad) {
+    return handleMaterialyPreview(req, res);
+  }
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Metoda niedozwolona' });
   }
@@ -240,7 +278,9 @@ export default async function handler(req, res) {
   // zapytań ktoś mógłby próbować "zgadnąć" PREMIUM_CODE skryptem wysyłającym tysiące prób.
   // 20 prób / 10 min / IP to sporo dla kogoś, kto się pomylił przy przepisywaniu kodu,
   // a praktycznie uniemożliwia brute-force (ten sam mechanizm co w chat.js/generate.js).
-  if (isRateLimited(req, { name: 'verify-code', windowMs: 10 * 60 * 1000, max: 20 })) {
+  // Zalogowany panel (wgrywanie pakietu z podglądem to kilkanaście zapytań naraz) omija limit;
+  // nieudane logowania nadal się do niego liczą.
+  if (!checkAdminBasicAuth(req) && isRateLimited(req, { name: 'verify-code', windowMs: 10 * 60 * 1000, max: 20 })) {
     return res.status(429).json({ valid: false, error: 'Zbyt wiele prób w krótkim czasie. Spróbuj ponownie za kilka minut.' });
   }
 
