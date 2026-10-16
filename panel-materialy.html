@@ -268,6 +268,11 @@
             }
         }
 
+        // Zapis katalogu idzie przez serwer (konto usługi) – reguły Firestore nie pozwalają przeglądarce zmieniać katalogu.
+        function zapiszKatalog(authHeader, op, id, data) {
+            return apiCall(authHeader, 'materialy-zapisz', { op, id, data });
+        }
+
         const sciezkiPodgladu = (pakiet) => [...(pakiet.podglad || []).map((p) => p.path), pakiet.okladka && pakiet.okladka.path];
         const jestPdf = (nazwa) => /\.pdf$/i.test(nazwa || '');
 
@@ -358,11 +363,8 @@
 
                     setPostep('Zapisuję dane pakietu…');
                     const dane = { title: tytul.trim(), opis: opis.trim(), sekcja, kategoria: finalFolder, pliki: plikiZapisane, ...zmiany };
-                    if (edytowany) {
-                        await api.updateDoc(api.doc(api.collectionRef(deps), edytowany.id), { ...dane, updatedAt: api.serverTimestamp() });
-                    } else {
-                        await api.addDoc(api.collectionRef(deps), { ...dane, createdAt: api.serverTimestamp() });
-                    }
+                    if (edytowany) await zapiszKatalog(authHeader, 'update', edytowany.id, dane);
+                    else await zapiszKatalog(authHeader, 'create', null, dane);
                     onZapisano(sekcja);
                 } catch (e) {
                     console.error(e);
@@ -458,8 +460,8 @@
             const api = window.__materialyApi;
 
             const zmienSekcje = async (id) => {
-                try { await api.updateDoc(api.doc(api.collectionRef(deps), pakiet.id), { sekcja: id }); }
-                catch (e) { alert('Nie udało się zmienić sekcji: ' + e.message); }
+                try { await zapiszKatalog(authHeader, 'update', pakiet.id, { sekcja: id }); }
+                catch (e) { if (e.status === 401) { onAuthError(); return; } alert('Nie udało się zmienić sekcji: ' + e.message); }
             };
 
             const odswiezPodglad = async () => {
@@ -471,7 +473,7 @@
                     const dane = await pobierzJakoAdmin(authHeader, pdf.path);
                     const wynik = await utworzPodglad({ authHeader, dane, strony, onPostep: setPraca });
                     const stare = (pakiet.podglad || []).map((p) => p.path);
-                    await api.updateDoc(api.doc(api.collectionRef(deps), pakiet.id), { podglad: wynik.podglad, stron: wynik.stron, updatedAt: api.serverTimestamp() });
+                    await zapiszKatalog(authHeader, 'update', pakiet.id, { podglad: wynik.podglad, stron: wynik.stron });
                     await usunPliki(authHeader, stare);
                 } catch (e) {
                     console.error(e);
@@ -544,7 +546,7 @@
                 const api = window.__materialyApi;
                 try {
                     await usunPliki(authHeader, [...(pakiet.pliki || []).map((p) => p.path), ...sciezkiPodgladu(pakiet)]);
-                    await api.deleteDoc(api.doc(api.collectionRef(deps), pakiet.id));
+                    await zapiszKatalog(authHeader, 'delete', pakiet.id);
                 } catch (e) {
                     if (e.status === 401) { onWyloguj(); return; }
                     alert('Błąd usuwania: ' + e.message);
@@ -562,16 +564,19 @@
                 const nowaNazwa = window.prompt('Nowa nazwa katalogu:', staraNazwa);
                 if (!nowaNazwa || !nowaNazwa.trim() || nowaNazwa.trim() === staraNazwa) return;
                 const api = window.__materialyApi;
-                for (const p of wSekcji.filter((x) => x.kategoria === staraNazwa)) {
-                    await api.updateDoc(api.doc(api.collectionRef(deps), p.id), { kategoria: nowaNazwa.trim(), sekcja });
-                }
+                try {
+                    for (const p of wSekcji.filter((x) => x.kategoria === staraNazwa)) {
+                        await zapiszKatalog(authHeader, 'update', p.id, { kategoria: nowaNazwa.trim(), sekcja });
+                    }
+                } catch (e) { if (e.status === 401) { onWyloguj(); return; } alert('Nie udało się zmienić nazwy: ' + e.message); return; }
                 if (aktywnyFolder === staraNazwa) setAktywnyFolder(nowaNazwa.trim());
             };
 
             const zatwierdzWszystkie = async () => {
                 if (!window.confirm(`Zapisać automatycznie przypisane sekcje dla ${bezSekcji.length} pakietów? Sprawdź je wcześniej w zakładkach.`)) return;
                 const api = window.__materialyApi;
-                for (const p of bezSekcji) await api.updateDoc(api.doc(api.collectionRef(deps), p.id), { sekcja: sekcjaPakietu(p) });
+                try { for (const p of bezSekcji) await zapiszKatalog(authHeader, 'update', p.id, { sekcja: sekcjaPakietu(p) }); }
+                catch (e) { if (e.status === 401) { onWyloguj(); return; } alert('Nie udało się zapisać sekcji: ' + e.message); }
             };
 
             const widoczne = aktywnyFolder ? wSekcji.filter((p) => p.kategoria === aktywnyFolder) : wSekcji;

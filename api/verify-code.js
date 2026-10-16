@@ -1,7 +1,7 @@
 import { getServiceAccountAccessToken } from './_lib/googleServiceAccountAuth.js';
 import { isRateLimited } from './_lib/rateLimit.js';
 import { YEAR_CODE_PATTERN, yearCodeUntil } from './_lib/coffeePlan.js';
-import { isPreviewPath, isUploadPath } from './_lib/materialy.js';
+import { isPreviewPath, isUploadPath, sanitizePakiet, toFields, FIRESTORE_DOCS, KATALOG_PATH, DOC_ID } from './_lib/materialy.js';
 
 // UWAGA: ten plik obsługuje TERAZ dwie sprawy pod jednym endpointem, celowo -
 // dokładnie ten sam kompromis co api/ewa-generate.js (obrazy fal.ai + wideo D-ID
@@ -239,6 +239,68 @@ async function handleMaterialyDelete(req, res) {
   return res.status(200).json({ ok: true });
 }
 
+// Zapis katalogu (dodanie, zmiana, usunięcie pakietu) kontem usługi przez REST Firestore – reguły bazy
+// blokują zapis anonimowym użytkownikom przeglądarki („Missing or insufficient permissions”), więc panel
+// nie pisze już do Firestore sam. Tylko z Basic Auth panelu; pola z białej listy (sanitizePakiet).
+async function handleMaterialyZapisz(req, res) {
+  if (!checkAdminBasicAuth(req)) {
+    res.setHeader('WWW-Authenticate', 'Basic realm="Prywatna aplikacja EduBox"');
+    return res.status(401).json({ error: 'Niepoprawny login lub hasło.' });
+  }
+  const { op, id } = req.body || {};
+  if (!['create', 'update', 'delete'].includes(op)) return res.status(400).json({ error: 'Nieznana operacja.' });
+  if (op !== 'create' && (typeof id !== 'string' || !DOC_ID.test(id))) return res.status(400).json({ error: 'Brak identyfikatora pakietu.' });
+
+  let dane = {};
+  try {
+    dane = op === 'delete' ? {} : sanitizePakiet(req.body.data);
+  } catch (e) {
+    return res.status(400).json({ error: e.message });
+  }
+  const teraz = new Date();
+  if (op === 'create') {
+    if (!dane.title || !dane.kategoria || !dane.sekcja) return res.status(400).json({ error: 'Brak tytułu, sekcji albo katalogu.' });
+    dane.createdAt = teraz;
+  } else if (op === 'update') {
+    dane.updatedAt = teraz;
+  }
+
+  let token;
+  try {
+    if (!process.env.FIREBASE_SERVICE_ACCOUNT_KEY) throw new Error('Brak FIREBASE_SERVICE_ACCOUNT_KEY.');
+    token = await getServiceAccountAccessToken(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY), 'https://www.googleapis.com/auth/datastore');
+  } catch (e) {
+    console.error('materialy-zapisz token error', e);
+    return res.status(500).json({ error: 'Błąd konfiguracji serwera (dostęp do bazy).' });
+  }
+
+  const kolekcja = `${FIRESTORE_DOCS}/${KATALOG_PATH}`;
+  let url = `${kolekcja}/${id}`;
+  let method = 'DELETE';
+  if (op === 'create') {
+    url = kolekcja;
+    method = 'POST';
+  } else if (op === 'update') {
+    const maska = Object.keys(dane).map((k) => `updateMask.fieldPaths=${encodeURIComponent(k)}`).join('&');
+    url = `${kolekcja}/${id}?${maska}&currentDocument.exists=true`;
+    method = 'PATCH';
+  }
+  const fsRes = await fetch(url, {
+    method,
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: method === 'DELETE' ? undefined : JSON.stringify({ fields: toFields(dane) }),
+  });
+  if (!fsRes.ok && !(method === 'DELETE' && fsRes.status === 404)) {
+    const details = await fsRes.text().catch(() => '');
+    console.error('materialy-zapisz firestore error', fsRes.status, details.slice(0, 300));
+    let szczegol = '';
+    try { szczegol = JSON.parse(details)?.error?.message || ''; } catch (e) { szczegol = ''; }
+    return res.status(502).json({ error: `Nie udało się zapisać w bazie (HTTP ${fsRes.status})${szczegol ? ': ' + szczegol : ''}.` });
+  }
+  const wynik = method === 'DELETE' ? {} : await fsRes.json().catch(() => ({}));
+  return res.status(200).json({ ok: true, id: op === 'create' ? String(wynik.name || '').split('/').pop() : id });
+}
+
 async function handleMaterialyPreview(req, res) {
   const objectPath = String(req.query.podglad || '');
   if (!isPreviewPath(objectPath)) {
@@ -289,6 +351,7 @@ export default async function handler(req, res) {
   if (action === 'materialy-download') return handleMaterialyDownload(req, res);
   if (action === 'materialy-upload') return handleMaterialyUpload(req, res);
   if (action === 'materialy-delete') return handleMaterialyDelete(req, res);
+  if (action === 'materialy-zapisz') return handleMaterialyZapisz(req, res);
 
   // --- Zachowanie domyślne, dokładnie jak dotychczas (menu.html, activatePro) ---
   const { code } = req.body;
