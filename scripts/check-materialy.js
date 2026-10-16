@@ -38,5 +38,7 @@ check('panel: wybór sekcji, podgląd ze znakiem wodnym, usuwanie podglądu raze
 check('API: podgląd GET obsłużony przed limitem i tylko dla podglady/', api.indexOf('handleMaterialyPreview(req, res)') < api.indexOf('isRateLimited(req') && api.includes('isPreviewPath(objectPath)') && api.includes("s-maxage=31536000"));
 check('API: wgrywanie tylko do materialy/ i podglady/', api.includes('isUploadPath(objectPath)'));
 
+check('panel nie pisze do Firestore sam (reguły bazy) – zapis przez materialy-zapisz', !/api\.(addDoc|updateDoc|deleteDoc)\(/.test(panel) && panel.includes("'materialy-zapisz'") && api.includes("action === 'materialy-zapisz'"));
+
 console.log(`\n[Baza Materiałów] ${ok} OK, ${fail} błędów`);
 if (fail) process.exit(1);

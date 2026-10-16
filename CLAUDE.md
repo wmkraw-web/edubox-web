@@ -389,7 +389,11 @@ a panel prosi o zatwierdzenie. Podgląd: panel renderuje wybrane strony PDF w pr
 i są PUBLICZNE: `GET /api/verify-code?podglad=podglady/…` (bez nowej funkcji Vercel, przed limitem zapytań,
 `s-maxage` = CDN), a pliki pakietów (`materialy/…`) nadal tylko z kodem PRO. Ścieżki pilnuje
 `api/_lib/materialy.js` (wgrywanie tylko do `materialy/` i `podglady/`), zalogowany panel omija limit
-zapytań i może pobrać PDF (podgląd dla starych pakietów). Testy: `materialy:check`, `api/_lib/materialy.test.js`.
+zapytań i może pobrać PDF (podgląd dla starych pakietów). **Katalog zapisuje serwer**, nie przeglądarka: reguły
+Firestore blokują anonimowy zapis („Missing or insufficient permissions” przy pierwszym teście 16.10.2026), więc panel
+woła akcję `materialy-zapisz` (`op`: create/update/delete, Basic Auth), a `api/verify-code.js` pisze przez REST
+Firestore kontem usługi `FIREBASE_SERVICE_ACCOUNT_KEY` (zakres `datastore`), z białą listą pól `sanitizePakiet`.
+Odczyt katalogu nadal z przeglądarki (onSnapshot). Testy: `materialy:check`, `api/_lib/materialy.test.js`.
 
 **Narzędzia zajęciowe – stan po audycie 8.10.2026:** EduEscape generuje na gpt-6.1 (`strong` + strumień, JSON
 wycinany z tekstu) – gpt-5.4-mini dla klas I–III uparcie dawał „12 + 5, podaj cyfrę” (cyfra jedności); każda stacja
