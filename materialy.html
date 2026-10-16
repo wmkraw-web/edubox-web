@@ -160,22 +160,21 @@
                 const res = await fetch('/api/verify-code', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ action: 'materialy-download', path: sciezka, code: kod }),
+                    body: JSON.stringify({ action: 'materialy-download', path: sciezka, code: kod, mode: 'link', name: nazwaPliku }),
                 });
-                if (!res.ok) {
-                    const data = await res.json().catch(() => ({}));
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok || !data.url) {
                     onBlad(data.error || 'Nie udało się pobrać pliku.');
                     return;
                 }
-                const blob = await res.blob();
-                const url = URL.createObjectURL(blob);
+                // Serwer oddaje link ważny 5 minut prosto do pliku (duże pakiety nie mieszczą się
+                // w odpowiedzi funkcji Vercela); nazwę pliku i „pobierz” ustawia sam link.
                 const a = document.createElement('a');
-                a.href = url;
-                a.download = nazwaPliku;
+                a.href = data.url;
+                a.rel = 'noopener';
                 document.body.appendChild(a);
                 a.click();
                 a.remove();
-                setTimeout(() => URL.revokeObjectURL(url), 2000);
             } catch (e) {
                 onBlad('Błąd połączenia z serwerem.');
             }

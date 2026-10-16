@@ -1,7 +1,7 @@
 import { getServiceAccountAccessToken } from './_lib/googleServiceAccountAuth.js';
 import { isRateLimited } from './_lib/rateLimit.js';
 import { YEAR_CODE_PATTERN, yearCodeUntil } from './_lib/coffeePlan.js';
-import { isPreviewPath, isUploadPath, sanitizePakiet, toFields, FIRESTORE_DOCS, KATALOG_PATH, DOC_ID } from './_lib/materialy.js';
+import { signedGetUrl, allowedOrigin, isPreviewPath, isUploadPath, sanitizePakiet, toFields, FIRESTORE_DOCS, KATALOG_PATH, DOC_ID } from './_lib/materialy.js';
 
 // UWAGA: ten plik obsługuje TERAZ dwie sprawy pod jednym endpointem, celowo -
 // dokładnie ten sam kompromis co api/ewa-generate.js (obrazy fal.ai + wideo D-ID
@@ -135,6 +135,25 @@ async function handleMaterialyDownload(req, res) {
     return res.status(403).json({ error: 'Nieprawidłowy lub wygasły kod PRO. Wesprzyj kawą (górne menu) i wpisz otrzymany kod.' });
   }
 
+  // Tryb „link” (od 16.10.2026): krótko ważny podpisany link – przeglądarka pobiera plik bezpośrednio
+  // z Cloud Storage, więc rozmiar pliku nie jest ograniczony limitem odpowiedzi Vercela (~4,5 MB).
+  if (req.body.mode === 'link') {
+    if (!isUploadPath(objectPath) || !objectPath.startsWith('materialy/')) {
+      return res.status(400).json({ error: 'Niedozwolona ścieżka pliku.' });
+    }
+    try {
+      const sa = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY || '{}');
+      if (!sa.client_email || !sa.private_key) throw new Error('Brak klucza konta usługi.');
+      const fileName = String(req.body.name || objectPath.split('/').pop()).slice(0, 200);
+      const url = signedGetUrl({ bucket: STORAGE_BUCKET, path: objectPath, clientEmail: sa.client_email, privateKey: String(sa.private_key).replace(/\\n/g, '\n'), fileName });
+      res.setHeader('Cache-Control', 'no-store');
+      return res.status(200).json({ url });
+    } catch (e) {
+      console.error('materialy-download link error', e);
+      return res.status(500).json({ error: 'Błąd konfiguracji serwera (dostęp do plików).' });
+    }
+  }
+
   let token;
   try {
     token = await getStorageAccessToken();
@@ -204,6 +223,45 @@ async function handleMaterialyUpload(req, res) {
   }
 
   return res.status(200).json({ ok: true, path: objectPath });
+}
+
+// Otwiera sesję wgrywania „resumable” w Cloud Storage – przeglądarka wysyła do niej plik sama (PUT), więc
+// duże pakiety nie przechodzą przez funkcję Vercela (limit ~4,5 MB = HTTP 413). Tylko panel (Basic Auth).
+async function handleMaterialyUploadStart(req, res) {
+  if (!checkAdminBasicAuth(req)) {
+    res.setHeader('WWW-Authenticate', 'Basic realm="Prywatna aplikacja EduBox"');
+    return res.status(401).json({ error: 'Niepoprawny login lub hasło.' });
+  }
+  const { path: objectPath, contentType, size } = req.body || {};
+  if (!isUploadPath(objectPath) || !String(objectPath).startsWith('materialy/')) {
+    return res.status(400).json({ error: 'Niedozwolona ścieżka pliku.' });
+  }
+  let token;
+  try {
+    token = await getStorageAccessToken();
+  } catch (e) {
+    console.error('materialy-upload-start token error', e);
+    return res.status(500).json({ error: 'Błąd konfiguracji serwera (dostęp do plików).' });
+  }
+  const typ = typeof contentType === 'string' && contentType ? contentType : 'application/octet-stream';
+  const headers = {
+    Authorization: `Bearer ${token}`,
+    'Content-Type': 'application/json; charset=UTF-8',
+    'X-Upload-Content-Type': typ,
+    Origin: allowedOrigin(req.headers.origin),
+  };
+  if (Number.isFinite(Number(size)) && Number(size) > 0) headers['X-Upload-Content-Length'] = String(Math.round(Number(size)));
+  const gcsRes = await fetch(
+    `https://storage.googleapis.com/upload/storage/v1/b/${STORAGE_BUCKET}/o?uploadType=resumable&name=${encodeURIComponent(objectPath)}`,
+    { method: 'POST', headers, body: JSON.stringify({ name: objectPath, contentType: typ }) }
+  );
+  const uploadUrl = gcsRes.headers.get('location');
+  if (!gcsRes.ok || !uploadUrl) {
+    const details = await gcsRes.text().catch(() => '');
+    console.error('materialy-upload-start gcs error', gcsRes.status, details.slice(0, 300));
+    return res.status(502).json({ error: `Nie udało się rozpocząć wgrywania (HTTP ${gcsRes.status}).` });
+  }
+  return res.status(200).json({ uploadUrl });
 }
 
 async function handleMaterialyDelete(req, res) {
@@ -352,6 +410,7 @@ export default async function handler(req, res) {
   if (action === 'materialy-upload') return handleMaterialyUpload(req, res);
   if (action === 'materialy-delete') return handleMaterialyDelete(req, res);
   if (action === 'materialy-zapisz') return handleMaterialyZapisz(req, res);
+  if (action === 'materialy-upload-start') return handleMaterialyUploadStart(req, res);
 
   // --- Zachowanie domyślne, dokładnie jak dotychczas (menu.html, activatePro) ---
   const { code } = req.body;

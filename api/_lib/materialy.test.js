@@ -46,3 +46,27 @@ test('format REST Firestore', () => {
 
 console.log(`\n[Materiały – ścieżki] ${passed} OK, ${failed} błędów`);
 if (failed) process.exit(1);
+
+// ---- Duże pliki: podpisany link V4 i origin sesji wgrywania ----
+{
+  const crypto = require('crypto');
+  const { signedGetUrl, allowedOrigin } = require('./materialy.js');
+  const { privateKey, publicKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
+  const pem = privateKey.export({ type: 'pkcs8', format: 'pem' });
+  const args = { bucket: 'b.firebasestorage.app', path: 'materialy/1_Pakiet ś.pdf', clientEmail: 'sa@x.iam.gserviceaccount.com', privateKey: pem, fileName: 'Pakiet ś.pdf', now: new Date('2026-10-16T15:00:00Z') };
+  const url = signedGetUrl(args);
+  const assert = require('assert');
+  assert.strictEqual(url, signedGetUrl(args), 'link deterministyczny');
+  assert.ok(url.startsWith('https://storage.googleapis.com/b.firebasestorage.app/materialy/1_Pakiet%20%C5%9B.pdf?'), url);
+  assert.ok(url.includes('X-Goog-Expires=300'));
+  assert.ok(url.includes('X-Goog-Date=20261016T150000Z'));
+  assert.ok(url.includes("response-content-disposition=attachment%3B%20filename%2A%3DUTF-8%27%27Pakiet%2520%25C5%259B.pdf"), url);
+  const sig = url.split('X-Goog-Signature=')[1];
+  assert.match(sig, /^[0-9a-f]{512}$/);
+  assert.strictEqual(allowedOrigin('https://eduboxpro.pl'), 'https://eduboxpro.pl');
+  assert.strictEqual(allowedOrigin('https://edubox-web-abc.vercel.app'), 'https://edubox-web-abc.vercel.app');
+  assert.strictEqual(allowedOrigin('https://zly.pl'), 'https://eduboxpro.pl');
+  assert.strictEqual(allowedOrigin(undefined), 'https://eduboxpro.pl');
+  void publicKey;
+  console.log('materialy: podpisany link i origin – OK');
+}
