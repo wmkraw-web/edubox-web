@@ -3,6 +3,13 @@
 // Najnowsze wpisy na początku tablicy.
 window.CO_NOWEGO = [
     {
+        "id": "2026-10-16-nowe-materia-y-do-pobrania",
+        "date": "2026-10-16",
+        "tag": "Nowość",
+        "title": "Nowe materiały do pobrania.",
+        "description": "Dodałem pakiety : \"Dzień Czystych Rąk\", \"Światowy Dzień Żywności\", \"Dzień Kundelka\""
+    },
+    {
         "id": "2026-08-24-nowosc-w-edubox-ai",
         "date": "2026-08-24",
         "tag": "Nowość",
