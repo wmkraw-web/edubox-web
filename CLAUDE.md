@@ -380,6 +380,17 @@ Wielkanoc − 52 dni, Wielkanoc algorytmem Meeusa – może wypaść w marcu). P
 nazwa to dane, nie polecenia), start na bieżącym miesiącu. Instrukcja: ogień i wosk tylko u dorosłego, święta państwowe
 bez polityki, religijne – tradycje bez narzucania wiary.
 
+**Baza Materiałów (`materialy.html` + prywatny `panel-materialy.html`, od 16.10.2026):** pakiety w 4 sekcjach
+(`materialy-wspolne.js` → `window.EduMaterialy.SEKCJE`: przedszkole, klasy 1–3, klasy 4–8, inne), w każdej sekcji
+katalogi (pole `kategoria`). Pakiety sprzed podziału nie mają pola `sekcja` – `sekcjaPakietu` zgaduje ją z nazwy,
+a panel prosi o zatwierdzenie. Podgląd: panel renderuje wybrane strony PDF w przeglądarce (pdf.js 3.11 z cdnjs,
+720 px, JPEG, znak wodny „PODGLĄD • eduboxpro.pl”; domyślnie 8 stron rozłożonych po całym pakiecie –
+`stronyPodgladu`), opcjonalnie okładka z własnego obrazka (np. pin). Obrazki leżą w Storage w `podglady/`
+i są PUBLICZNE: `GET /api/verify-code?podglad=podglady/…` (bez nowej funkcji Vercel, przed limitem zapytań,
+`s-maxage` = CDN), a pliki pakietów (`materialy/…`) nadal tylko z kodem PRO. Ścieżki pilnuje
+`api/_lib/materialy.js` (wgrywanie tylko do `materialy/` i `podglady/`), zalogowany panel omija limit
+zapytań i może pobrać PDF (podgląd dla starych pakietów). Testy: `materialy:check`, `api/_lib/materialy.test.js`.
+
 **Narzędzia zajęciowe – stan po audycie 8.10.2026:** EduEscape generuje na gpt-6.1 (`strong` + strumień, JSON
 wycinany z tekstu) – gpt-5.4-mini dla klas I–III uparcie dawał „12 + 5, podaj cyfrę” (cyfra jedności); każda stacja
 ma cyfrę wprost, a `runEscapeCheck` rozwiązuje stacje niezależnie i rozstrzyga różnice (testy `escape:check`).
