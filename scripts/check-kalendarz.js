@@ -1,6 +1,7 @@
 // Testy EduKalendarza (blok KALENDARZ_PROMPTS w edukalendarz.html – czysty JS, uruchamiany w vm).
 // Pilnują: dat świąt (sprawdzonych 8.10.2026), instrukcji dla AI (bez zmyślonej historii święta, materiały z sali,
 // bezpieczeństwo, czasy części) i eksportu planu (ucieczka znaków, czasy, materiały).
+let check0;
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
@@ -10,7 +11,11 @@ const start = html.indexOf('// ===== KALENDARZ_PROMPTS_START');
 const end = html.indexOf('// ===== KALENDARZ_PROMPTS_END');
 if (start < 0 || end < 0) { console.error('[EduKalendarz] Brak bloku KALENDARZ_PROMPTS w edukalendarz.html'); process.exit(1); }
 const ctx = {};
+ctx.window = ctx;
 vm.createContext(ctx);
+// Daty świąt są w kalendarz-dane.js (wspólne z ewamarketing.html) – ładowane przed blokiem, jak na stronie.
+check0 = html.includes('src="/kalendarz-dane.js"');
+vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'kalendarz-dane.js'), 'utf8'), ctx);
 vm.runInContext(html.slice(start, end) + '\nthis.api = { HOLIDAYS, MONTHS, MONTH_GEN, buildKalendarzPrompts, planToHtml, holidaysFor, easterDate, currentSchoolMonth };', ctx);
 const api = ctx.api;
 
@@ -19,6 +24,9 @@ function check(name, cond, extra) {
   if (cond) { ok++; console.log('✅ ' + name); } else { fail++; console.log('❌ ' + name + (extra !== undefined ? '  → ' + JSON.stringify(extra) : '')); }
 }
 const find = (m, name) => (api.HOLIDAYS[m] || []).find(h => h.name === name);
+
+check('edukalendarz.html ładuje kalendarz-dane.js', check0);
+check('ewamarketing.html korzysta z tych samych dat', fs.readFileSync(path.join(__dirname, '..', 'ewamarketing.html'), 'utf8').includes('kalendarz-dane.js'));
 
 // 1. Daty
 const DAYS = { 1: 31, 2: 29, 3: 31, 4: 30, 5: 31, 6: 30, 9: 30, 10: 31, 11: 30, 12: 31 };
@@ -83,8 +91,9 @@ check('eksport: wpis z Biblioteki bez daty nie wywraca planu', api.planToHtml({ 
 
 // 4. Strona
 check('lista z holidaysFor (stałe + ruchome), start na bieżącym miesiącu, pole własnego tematu',
-  html.includes('{monthHolidays.map((h, i) => (') && !html.includes('HOLIDAYS[activeMonth]') && html.includes('useState(() => currentSchoolMonth())') && html.includes('value={customTopic}'));
+  html.includes('{monthHolidays.map((h, i) => (') && !html.includes('HOLIDAYS[activeMonth]') && html.includes(': currentSchoolMonth()))') && html.includes('value={customTopic}'));
 check('model balanced, eksport przez EduDocTools, Biblioteka zapisuje święto', /model: "balanced"/.test(html) && /EduDocTools\.downloadDocx\(planToHtml/.test(html) && /EduDocTools\.printDoc\(planToHtml/.test(html) && /holiday: selectedHoliday/.test(html));
+check('głęboki link ?m=…&swieto=… (z postów Ewy) otwiera miesiąc i kreator', html.includes("q.get('swieto')") && html.includes('linkStart.holiday'));
 check('domyślna grupa i potrzeby zgodne z opcjami listy', /useState\('Przedszkole \(Starszaki \/ Zerówka\)'\)/.test(html) && /<option>Przedszkole \(Starszaki \/ Zerówka\)<\/option>/.test(html) && /useState\('Brak \(Grupa standardowa\)'\)/.test(html) && /<option>Brak \(Grupa standardowa\)<\/option>/.test(html));
 
 console.log(`\n[EduKalendarz] ${ok} OK, ${fail} błędów`);

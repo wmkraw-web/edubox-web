@@ -2,7 +2,7 @@
 
 <!-- PLIK GENEROWANY: node scripts/stan-portfolio.js. Nie edytuj ręcznie. -->
 
-Wygenerowano: 2026-10-08 · stron narzędzi: **60** · kafelków w katalogu: **68** (część to głębokie linki `?mode=` do tej samej strony).
+Wygenerowano: 2026-10-18 · stron narzędzi: **60** · kafelków w katalogu: **68** (część to głębokie linki `?mode=` do tej samej strony).
 
 Ten plik odpowiada na pytanie „co jest już zrobione, a co zostało?" bez zgadywania:
 powstaje z faktycznych plików, nie z notatek. Po każdej większej zmianie odpal
