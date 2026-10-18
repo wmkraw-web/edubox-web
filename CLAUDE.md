@@ -121,6 +121,15 @@ category, tags`.
 `EWA_AUTH_USER`/`EWA_AUTH_PASS`):
 - `ewamarketing.html` — "EduInfluencer Studio", posty + zdjęcia (Ewa: blond,
   szary garnitur — ta sama postać co `powitanie.mp4` na stronie głównej).
+  **Od 18.10.2026 pięć źródeł postów** (zakładki): narzędzie z katalogu, dzień z EduKalendarza (najbliższe 60 dni,
+  z pasującymi pakietami; link `edukalendarz.html?m=10&swieto=<nazwa>` otwiera od razu kreator święta), pakiet z Bazy
+  Materiałów (katalog czytany REST-em z Firestore; grafiką może być okładka-pin; link `materialy.html?sekcja=…&pakiet=<id>`,
+  przy kilku pakietach na jedno święto `materialy.html?szukaj=<nazwa>`), własny temat (AI dobiera 1–2 narzędzia WYŁĄCZNIE
+  z listy – `parsujOdpowiedz` odrzuca resztę) i plan tygodnia (`planTygodnia` bez AI: święto ~3 dni wcześniej, pakiet
+  najwyżej raz, reszta narzędzia; szkice pisane po kolei, bez zdjęć). Logika i instrukcje w `ewa-tematy.js`
+  (`window.EwaTematy`, testy `ewa:check`), daty świąt w `kalendarz-dane.js` – wspólnym z `edukalendarz.html`
+  (nowe święto dopisuj TYLKO tam). Pinterest: dodatkowo tytuł pina i słowa kluczowe. Adresy wpisane przez AI w treść
+  są wycinane – link dokleja system.
 - `aniawideo.html` — "Generator Wideo Ani", mówiące wideo przez D-ID (Ania:
   trzecia, osobna postać, zdjęcie wgrywane ręcznie przez użytkownika i
   trzymane w `localStorage`, nie w repo). Ręczne pobieranie, bez automatyzacji
@@ -368,7 +377,7 @@ sekcje TEMAT / KARTA / ROZWIĄZANIA / WYNIKI, motyw (Minecraft, piłka…) tylko
 przypadek: klucz 11/24 km był dobry, a gpt-5.4-mini podał długość już ułożonych torów – bez rozstrzygnięcia nauczyciel
 dostałby fałszywy alarm. Rozstrzygnięcie płaci się tylko przy rozbieżności.
 
-**EduKalendarz (od 8.10.2026):** daty świąt w `HOLIDAYS` (blok `KALENDARZ_PROMPTS`, testy `kalendarz:check`) sprawdzone
+**EduKalendarz (od 8.10.2026):** daty świąt w `HOLIDAYS` (od 18.10.2026 w `kalendarz-dane.js`, wspólnym z postami Ewy; testy `kalendarz:check`) sprawdzone
 w źródłach; nowe święto dopisuj tylko z potwierdzoną datą (usunięty „Dzień Ślimaka” 24.05 – brak źródła). Dzień Motyla
 (14.03) to solidarność z dziećmi z EB – instrukcja każe przy takich dniach pisać z szacunkiem, bez litowania się
 i szczegółów medycznych. Plan ma czasy części, materiały z sali i uwagę o alergiach; eksport `planToHtml` → EduDocTools.

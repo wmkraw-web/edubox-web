@@ -26,6 +26,11 @@
         document.head.appendChild(eduboxAppsScript);
     </script>
 
+    <!-- Wspólne dane: święta (jak EduKalendarz), sekcje Bazy Materiałów, tematy i instrukcje postów -->
+    <script src="/kalendarz-dane.js"></script>
+    <script src="/materialy-wspolne.js"></script>
+    <script src="/ewa-tematy.js"></script>
+
     <script>
         tailwind.config = {
             darkMode: 'class',
@@ -52,7 +57,8 @@
     </a>
     <div id="root"></div>
     <script type="text/babel">
-        const { useState, useEffect } = React;
+        const { useState, useEffect, useMemo } = React;
+        const T = window.EwaTematy;
 
         const CAT_LABELS = {
             'terapia': 'Terapia i SPE',
@@ -61,156 +67,150 @@
             'grafika': 'Grafika i Kreatywne',
             'inne': 'Pozostałe Aplikacje'
         };
-        const SITE_ORIGIN = 'https://eduboxpro.pl';
+        // Publiczny klucz projektu Firebase (ten sam co na stronach) – tylko do ODCZYTU katalogu pakietów.
+        const FIREBASE_KEY = 'AIzaSyDL_mvepNJjMmZYQzifN2cXzoKwCE8jNd0';
+        const ZRODLA = [
+            { id: 'narzedzie', label: 'Narzędzie', icon: 'ph-app-window' },
+            { id: 'swieto', label: 'Dzień z kalendarza', icon: 'ph-calendar-star' },
+            { id: 'pakiet', label: 'Pakiet', icon: 'ph-package' },
+            { id: 'temat', label: 'Własny temat', icon: 'ph-chat-text' },
+            { id: 'plan', label: 'Plan tygodnia', icon: 'ph-calendar-dots' },
+        ];
+        const TYP_ETYKIETA = { narzedzie: 'Narzędzie', swieto: 'Święto', pakiet: 'Pakiet', temat: 'Temat' };
+        const BASE_EWA_PROMPT = "SOLO PORTRAIT, ONLY ONE PERSON. A 32-year-old beautiful Polish female teacher named Ewa, short wavy blonde hair, wearing a stylish grey suit and a white shirt. Friendly expression, looking directly at the camera, photorealistic, 8k, highly detailed, alone in the scene.";
+        const dzisISO = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+
+        // Tekst posta przez wspólny /api/chat (balanced = gpt-5.4-mini – lepszy język postów niż domyślny model).
+        async function napiszPost(z, platform) {
+            const { system, prompt } = T.promptEwy(z, platform);
+            const res = await fetch('/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ prompt, system, format: 'json', temperature: 0.7, model: 'balanced' })
+            });
+            if (!res.ok) throw new Error('Błąd serwera tekstu (' + res.status + '). Spróbuj ponownie.');
+            const data = await res.json();
+            const raw = data.text || data.message || data.response || (data.choices && data.choices[0]?.message?.content);
+            if (!raw) throw new Error('Serwer nie zwrócił tekstu.');
+            const wynik = T.parsujOdpowiedz(raw, z.apps || []);
+            return { ...wynik, linki: T.linkiPosta(z, wynik) };
+        }
+
+        // Zdjęcie Ewy (fal.ai przez /api/ewa-generate) – zablokowany opis wyglądu, żeby twarz była zawsze ta sama.
+        async function zdjecieEwy(imagePrompt) {
+            const res = await fetch('/api/ewa-generate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    type: 'image',
+                    prompt: `${BASE_EWA_PROMPT} ${imagePrompt || 'Ewa smiling in a bright classroom'}. NO TEXT, NO WATERMARKS.`,
+                    negative_prompt: "text, words, letters, watermark, mutated, ugly, multiple people, extra person, man, men, crowd, boyfriend, date, background characters",
+                    aspect_ratio: '4:5',
+                    size: '1024x1280'
+                })
+            });
+            if (!res.ok) throw new Error('Nie udało się wygenerować zdjęcia z FAL AI.');
+            const d = await res.json();
+            let url = d.imageUrl || d.url || (d.data && d.data[0]?.url) || d.image;
+            if (url && url.length > 1000 && !url.startsWith('http')) url = `data:image/png;base64,${url}`;
+            return url;
+        }
+
+        const tekstDoSkopiowania = (post, linki) => (linki && linki.length ? `${post}\n\n${linki.map((l) => `🔗 ${l.url}`).join('\n')}` : post);
+
+        function KopiujPrzycisk({ tekst, etykieta = 'Kopiuj', className = '' }) {
+            const [ok, setOk] = useState(false);
+            return (
+                <button onClick={() => { navigator.clipboard.writeText(tekst); setOk(true); setTimeout(() => setOk(false), 1800); }}
+                    className={`shrink-0 bg-pink-600 hover:bg-pink-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors ${className}`}>
+                    <i className={ok ? 'ph-bold ph-check' : 'ph-bold ph-copy'}></i> {ok ? 'Skopiowano' : etykieta}
+                </button>
+            );
+        }
 
         function App() {
+            const [zrodlo, setZrodlo] = useState(() => { try { const z = localStorage.getItem('ewaZrodlo'); return ZRODLA.some((x) => x.id === z) ? z : 'narzedzie'; } catch (e) { return 'narzedzie'; } });
+            const [platform, setPlatform] = useState('Facebook - Grupy dla Nauczycieli');
             const [topic, setTopic] = useState('');
-            const [platform, setPlatform] = useState('Facebook Grupy');
             const [includeImage, setIncludeImage] = useState(true);
+            const [uzyjOkladki, setUzyjOkladki] = useState(true);
             const [loading, setLoading] = useState(false);
-            const [postContent, setPostContent] = useState('');
-            const [imageUrl, setImageUrl] = useState('');
             const [errorMsg, setErrorMsg] = useState('');
 
-            // Baza aplikacji (do linkowania w postach) + wybór promowanej aplikacji
             const [apps, setApps] = useState([]);
             const [appsError, setAppsError] = useState(false);
             const [selectedAppIndex, setSelectedAppIndex] = useState('random');
-            const [promotedApp, setPromotedApp] = useState(null); // aplikacja faktycznie wypromowana w ostatnio wygenerowanym poście
-            const [linkCopied, setLinkCopied] = useState(false);
-            const [titles, setTitles] = useState([]); // 3 propozycje tytułów do nałożenia na zdjęcie/wideo przed publikacją
-            const [copiedTitleIdx, setCopiedTitleIdx] = useState(null);
+            const [pakiety, setPakiety] = useState(null); // null = jeszcze się wczytuje
+            const [pakietyError, setPakietyError] = useState('');
+            const [pakietId, setPakietId] = useState('');
+            const [swietoKlucz, setSwietoKlucz] = useState('');
+
+            // Wynik (jeden post)
+            const [wynik, setWynik] = useState(null); // { post, titles, pinTitle, keywords, imagePrompt, linki, nazwa, typ }
+            const [imageUrl, setImageUrl] = useState('');
+            const [imageLoading, setImageLoading] = useState(false);
+
+            // Plan tygodnia
+            const [planStart, setPlanStart] = useState(dzisISO());
+            const [plan, setPlan] = useState([]); // [{ ...slot, stan: 'nowy'|'pisze'|'gotowy'|'blad', wynik, blad }]
+            const [planPisze, setPlanPisze] = useState(false);
+
+            useEffect(() => { try { if (ZRODLA.some((x) => x.id === zrodlo)) localStorage.setItem('ewaZrodlo', zrodlo); } catch (e) {} }, [zrodlo]);
 
             useEffect(() => {
                 let attempts = 0;
                 const checkData = setInterval(() => {
-                    if (window.appsJsError) {
-                        clearInterval(checkData);
-                        setAppsError(true);
-                        return;
-                    }
-                    if (window.EduBoxData && window.EduBoxData.APPS) {
-                        setApps(window.EduBoxData.APPS);
-                        clearInterval(checkData);
-                    } else {
-                        attempts++;
-                        if (attempts > 25) { // ok. 5 sekund
-                            clearInterval(checkData);
-                            setAppsError(true);
-                        }
-                    }
+                    if (window.appsJsError) { clearInterval(checkData); setAppsError(true); return; }
+                    if (window.EduBoxData && window.EduBoxData.APPS) { setApps(window.EduBoxData.APPS); clearInterval(checkData); }
+                    else if (++attempts > 25) { clearInterval(checkData); setAppsError(true); }
                 }, 200);
                 return () => clearInterval(checkData);
             }, []);
 
-            const groupedApps = apps.reduce((acc, app, idx) => {
-                const cat = app.category || 'inne';
-                if (!acc[cat]) acc[cat] = [];
-                acc[cat].push({ ...app, idx });
-                return acc;
-            }, {});
-            // Główna funkcja generująca post i zdjęcie Ewy
-            const generateContent = async () => {
-                if (!topic.trim() || apps.length === 0) return;
-                setLoading(true);
-                setErrorMsg('');
-                setPostContent('');
-                setImageUrl('');
-                setTitles([]);
+            useEffect(() => {
+                fetch(`${T.FIRESTORE_KATALOG}?key=${FIREBASE_KEY}&pageSize=300`)
+                    .then((r) => (r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status))))
+                    .then((j) => setPakiety(T.pakietyZFirestore(j)))
+                    .catch((e) => { console.error(e); setPakiety([]); setPakietyError('Nie udało się wczytać katalogu pakietów (' + e.message + ').'); });
+            }, []);
 
-                // Wybór promowanej aplikacji: konkretna (z listy) albo losowa - przydatne przy
-                // hurtowym generowaniu treści na wiele dni z automatyzacji.
-                const app = selectedAppIndex === 'random'
-                    ? apps[Math.floor(Math.random() * apps.length)]
-                    : apps[Number(selectedAppIndex)];
-                const appFullUrl = `${SITE_ORIGIN}/${app.url}`;
+            const swieta = useMemo(() => T.nadchodzaceSwieta(new Date(), 60).map((x) => ({ ...x, klucz: `${x.month}|${x.swieto.name}`, pakiety: T.pakietyDoSwieta(x.swieto, pakiety || []) })), [pakiety]);
+            useEffect(() => { if (!swietoKlucz && swieta.length) setSwietoKlucz(swieta[0].klucz); }, [swieta]);
+            useEffect(() => { if (!pakietId && pakiety && pakiety.length) setPakietId(pakiety[0].id); }, [pakiety]);
 
-                let platformHint = '';
-                if (platform.startsWith('Pinterest')) {
-                    platformHint = 'UWAGA: to opis PINA na Pinterest - pisz krotko i rzeczowo, z 2-3 slowami kluczowymi na samym poczatku (Pinterest to wyszukiwarka, nie feed spolecznosciowy). Ogranicz emotikony do minimum.';
-                } else if (platform.startsWith('YouTube')) {
-                    platformHint = 'UWAGA: to opis pod filmem na YouTube - pierwsze 2 zdania sa najwazniejsze (widoczne zanim widz kliknie "pokaz wiecej"), na koncu dodaj naturalne wezwanie do dzialania.';
+            const groupedApps = apps.reduce((acc, app, idx) => { const cat = app.category || 'inne'; (acc[cat] = acc[cat] || []).push({ ...app, idx }); return acc; }, {});
+            const pakietyWSekcjach = (pakiety || []).reduce((acc, p) => { const s = T.sekcjaPakietu(p); (acc[s] = acc[s] || []).push(p); return acc; }, {});
+            const wybranyPakiet = (pakiety || []).find((p) => p.id === pakietId) || null;
+            const wybraneSwieto = swieta.find((x) => x.klucz === swietoKlucz) || null;
+            const okladka = wybranyPakiet ? T.okladkaPakietu(wybranyPakiet) : '';
+
+            // Opis źródła posta (to samo, co trafia do instrukcji dla AI i do linków).
+            function biezaceZrodlo() {
+                if (zrodlo === 'narzedzie') {
+                    const app = selectedAppIndex === 'random' ? apps[Math.floor(Math.random() * apps.length)] : apps[Number(selectedAppIndex)];
+                    return app ? { typ: 'narzedzie', app, temat: topic.trim() } : null;
                 }
-                setPromotedApp(app);
-                setLinkCopied(false);
+                if (zrodlo === 'swieto') {
+                    if (!wybraneSwieto) return null;
+                    return { typ: 'swieto', swieto: wybraneSwieto.swieto, month: wybraneSwieto.month, data: wybraneSwieto.data, dniDo: T.roznicaDni(new Date(), wybraneSwieto.data), pakiety: wybraneSwieto.pakiety, temat: topic.trim() };
+                }
+                if (zrodlo === 'pakiet') return wybranyPakiet ? { typ: 'pakiet', pakiet: wybranyPakiet, temat: topic.trim() } : null;
+                if (zrodlo === 'temat') return topic.trim() ? { typ: 'temat', temat: topic.trim(), apps } : null;
+                return null;
+            }
 
+            const zGrafikaOkladki = (z) => z && z.typ === 'pakiet' && uzyjOkladki && T.okladkaPakietu(z.pakiet);
+
+            const generateContent = async () => {
+                const z = biezaceZrodlo();
+                if (!z) return;
+                setLoading(true); setErrorMsg(''); setWynik(null); setImageUrl('');
                 try {
-                    // 1. ZAPYTANIE DO GPT O TEKST POSTA
-                    const systemPrompt = `Jesteś Ewą, 32-letnią pedagożką i ambasadorką platformy EduBox PRO.
-                    Masz krótkie blond włosy i ubierasz się elegancko (szary garnitur, biała koszula).
-                    Twoim celem jest pisanie postów na ${platform} dla innych nauczycieli.
-                    Piszesz empatycznie, profesjonalnie, używasz emotikon.
-
-                    Promujesz KONKRETNIE tę aplikację: "${app.title}" - ${app.desc}
-                    W treści posta naturalnie zachęć do jej wypróbowania (np. "Link w pierwszym komentarzu 👇" albo "Sprawdź -> link poniżej").
-                    WAŻNE: NIE wymyślaj i NIE wpisuj żadnego adresu URL w treści posta - prawdziwy link zostanie doklejony automatycznie pod postem przez system.
-                    Pisz tylko o tym, co narzędzie naprawdę robi (według opisu powyżej) - bez obietnic „100% zgodności z przepisami”, gwarancji efektów i wymyślonych liczb czy opinii. Przypominaj, że do AI nie wpisuje się danych uczniów, jeśli temat tego dotyczy.
-                    ${platformHint}
-
-                    Dodatkowo zaproponuj 3 krótkie, chwytliwe tytuły (max 6-8 słów każdy) do nałożenia jako napis na zdjęciu/wideo przed publikacją - różne kąty (np. pytanie, obietnica korzyści, ciekawostka).
-
-                    ZWRÓĆ ODPOWIEDŹ W FORMACIE JSON:
-                    {
-                        "post_text": "Gotowa treść posta na social media, z naturalnym wezwaniem do działania, BEZ wpisanego adresu URL.",
-                        "image_prompt": "Krótki opis po angielsku do generatora obrazków opisujący co Ewa robi na zdjęciu pasującym do tego posta (np. Ewa siedzi przy biurku i trzyma sprawdzian, Ewa pije kawę w pokoju nauczycielskim). Pisz TYLKO samą akcję/tło.",
-                        "titles": ["Tytuł 1", "Tytuł 2", "Tytuł 3"]
-                    }`;
-                    const userPrompt = `Napisz post rozwiązujący problem: ${topic}`;
-                    // Uderzamy do właściwego endpointu dla tekstów (OpenAI) - wspólny z resztą narzędzi,
-                    // /api/ewa-chat był identycznym duplikatem (usunięty, żeby zejść z limitu funkcji Vercela)
-                    const textResponse = await fetch('/api/chat', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            prompt: userPrompt,
-                            system: systemPrompt,
-                            format: 'json',
-                            temperature: 0.7,
-                            // balanced (gpt-5.4-mini) – lepszy język postów niż domyślny model
-                            model: 'balanced'
-                        })
-                    });
-                    if (!textResponse.ok) throw new Error('Błąd serwera tekstu (' + textResponse.status + '). Spróbuj ponownie.');
-                    const textData = await textResponse.json();
-
-                    // Bezpieczne pobieranie tekstu niezależnie od nazwy zmiennej na Twoim serwerze (text, message, response, choices)
-                    const rawText = textData.text || textData.message || textData.response || (textData.choices && textData.choices[0]?.message?.content);
-
-                    if (!rawText) {
-                        console.error("Zwrócone dane z API:", textData);
-                        throw new Error("Serwer nie zwrócił tekstu. Naciśnij F12 i sprawdź zakładkę Konsola, co dokładnie zwrócił serwer.");
-                    }
-                    let jsonStr = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
-                    const parsedData = JSON.parse(jsonStr);
-                    setPostContent(parsedData.post_text);
-                    setTitles(Array.isArray(parsedData.titles) ? parsedData.titles : []);
-                    // 2. ZAPYTANIE DO FAL AI (FLUX) O ZDJĘCIE EWY
-                    // Tu wkodowujemy na sztywno wygląd Ewy z powitanie.mp4, żeby FAL generował ją spójnie!
-                    if (includeImage) {
-                    const baseEwaPrompt = "SOLO PORTRAIT, ONLY ONE PERSON. A 32-year-old beautiful Polish female teacher named Ewa, short wavy blonde hair, wearing a stylish grey suit and a white shirt. Friendly expression, looking directly at the camera, photorealistic, 8k, highly detailed, alone in the scene.";
-                    const finalImagePrompt = `${baseEwaPrompt} ${parsedData.image_prompt}. NO TEXT, NO WATERMARKS.`;
-                    const imgResponse = await fetch('/api/ewa-generate', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            type: 'image',
-                            prompt: finalImagePrompt,
-                            negative_prompt: "text, words, letters, watermark, mutated, ugly, multiple people, extra person, man, men, crowd, boyfriend, date, background characters",
-                            aspect_ratio: '4:5',
-                            size: '1024x1280'
-                        })
-                    });
-                    if (imgResponse.ok) {
-                        const imgData = await imgResponse.json();
-                        let url = imgData.imageUrl || imgData.url || (imgData.data && imgData.data[0]?.url) || imgData.image;
-                        if (url && url.length > 1000 && !url.startsWith('http')) {
-                            url = `data:image/png;base64,${url}`;
-                        }
-                        setImageUrl(url);
-                    } else {
-                        throw new Error('Nie udało się wygenerować zdjęcia z FAL AI.');
-                    }
-                    }
+                    const w = await napiszPost(z, platform);
+                    setWynik({ ...w, nazwa: T.nazwaZrodla(z), typ: z.typ });
+                    const okl = zGrafikaOkladki(z);
+                    if (okl) setImageUrl(okl);
+                    else if (includeImage) await generujZdjecie(w.imagePrompt);
                 } catch (err) {
                     console.error(err);
                     setErrorMsg(err.message || 'Wystąpił nieznany błąd podczas generowania.');
@@ -218,182 +218,203 @@
                     setLoading(false);
                 }
             };
-            const promotedAppUrl = promotedApp ? `${SITE_ORIGIN}/${promotedApp.url}` : '';
 
-            const copyToClipboard = () => {
-                const fullText = promotedAppUrl ? `${postContent}\n\n🔗 ${promotedAppUrl}` : postContent;
-                navigator.clipboard.writeText(fullText);
-                alert("Skopiowano post razem z linkiem!");
+            const generujZdjecie = async (imagePrompt) => {
+                setImageLoading(true);
+                try { setImageUrl(await zdjecieEwy(imagePrompt)); }
+                catch (e) { setErrorMsg(e.message); }
+                finally { setImageLoading(false); }
             };
-            const copyLinkOnly = () => {
-                navigator.clipboard.writeText(promotedAppUrl);
-                setLinkCopied(true);
-                setTimeout(() => setLinkCopied(false), 2000);
+
+            // ---------- Plan tygodnia ----------
+            const ulozPlan = () => {
+                const [y, m, d] = planStart.split('-').map(Number);
+                setPlan(T.planTygodnia(new Date(y, m - 1, d), { pakiety: pakiety || [], apps }).map((s) => ({ ...s, stan: 'nowy' })));
             };
-            const copyTitle = (title, idx) => {
-                navigator.clipboard.writeText(title);
-                setCopiedTitleIdx(idx);
-                setTimeout(() => setCopiedTitleIdx(null), 2000);
+            const napiszSzkic = async (i) => {
+                const slot = plan[i];
+                setPlan((p) => p.map((x, j) => (j === i ? { ...x, stan: 'pisze', blad: '' } : x)));
+                try {
+                    const w = await napiszPost(slot, platform);
+                    setPlan((p) => p.map((x, j) => (j === i ? { ...x, stan: 'gotowy', wynik: w } : x)));
+                } catch (e) {
+                    setPlan((p) => p.map((x, j) => (j === i ? { ...x, stan: 'blad', blad: e.message } : x)));
+                }
             };
+            const napiszWszystkie = async () => {
+                setPlanPisze(true);
+                for (let i = 0; i < plan.length; i += 1) { if (plan[i].stan !== 'gotowy') await napiszSzkic(i); } // po kolei – bez zalewania serwera
+                setPlanPisze(false);
+            };
+            const otworzSzkic = (slot) => {
+                setWynik({ ...slot.wynik, nazwa: T.nazwaZrodla(slot), typ: slot.typ });
+                setImageUrl(slot.typ === 'pakiet' ? T.okladkaPakietu(slot.pakiet) : '');
+                setZrodlo('wynik-planu');
+            };
+
+            const gotowyDoGeneracji = !!biezaceZrodlo() || (zrodlo === 'narzedzie' && apps.length > 0);
+            const pokazPlan = zrodlo === 'plan';
+            const pokazZdjecieEwy = zrodlo !== 'pakiet' || !uzyjOkladki || !okladka;
+
+            const selectCls = "w-full bg-slate-900 border border-slate-700 text-white p-3 rounded-xl outline-none focus:border-pink-500";
+            const labelCls = "block text-xs font-bold text-slate-400 uppercase mb-2";
+
             return (
                 <div className="min-h-screen p-4 md:p-8 font-sans">
-                    <div className="max-w-5xl mx-auto">
-
-                        <header className="mb-8 flex items-center gap-4">
-                            <div className="w-14 h-14 bg-gradient-to-br from-pink-500 to-rose-600 rounded-2xl flex items-center justify-center shadow-lg">
+                    <div className="max-w-6xl mx-auto">
+                        <header className="mb-6 flex items-center gap-4">
+                            <div className="w-14 h-14 bg-gradient-to-br from-pink-500 to-rose-600 rounded-2xl flex items-center justify-center shadow-lg shrink-0">
                                 <i className="ph-fill ph-instagram-logo text-3xl text-white"></i>
                             </div>
-                            <div>
+                            <div className="min-w-0">
                                 <h1 className="text-3xl font-display font-bold text-white">EduInfluencer Studio</h1>
-                                <p className="text-slate-400">Twój wewnętrzny moduł do tworzenia postów Ewy na social media</p>
+                                <p className="text-slate-400">Posty Ewy: narzędzia, dni z EduKalendarza, pakiety z Bazy Materiałów i własne tematy</p>
                             </div>
                         </header>
+
+                        <div className="flex flex-wrap gap-2 mb-6" role="tablist" aria-label="O czym piszemy">
+                            {ZRODLA.map((z) => (
+                                <button key={z.id} role="tab" aria-selected={zrodlo === z.id} onClick={() => setZrodlo(z.id)}
+                                    className={`px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 border transition-colors ${zrodlo === z.id ? 'bg-pink-600 border-pink-500 text-white' : 'bg-slate-900 border-slate-700 text-slate-300 hover:border-pink-500'}`}>
+                                    <i className={`ph-bold ${z.icon}`}></i>{z.label}
+                                </button>
+                            ))}
+                        </div>
+
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                            {/* LEWA KOLUMNA – PARAMETRY */}
+                            <div className="lg:col-span-1 space-y-6 min-w-0">
+                                <div className="glass-panel p-6 rounded-2xl shadow-xl space-y-5">
+                                    <div>
+                                        <label className={labelCls}>Gdzie Ewa publikuje?</label>
+                                        <select value={platform} onChange={(e) => setPlatform(e.target.value)} className={selectCls}>
+                                            <option>Facebook - Grupy dla Nauczycieli</option>
+                                            <option>Instagram - Profil EduBox</option>
+                                            <option>LinkedIn - Profil Profesjonalny</option>
+                                            <option>Pinterest - Piny EduBox</option>
+                                            <option>YouTube - Opis pod filmem</option>
+                                            <option>Blog EduBoxPRO</option>
+                                        </select>
+                                    </div>
 
-                            {/* LEWA KOLUMNA - PANEL STEROWANIA */}
-                            <div className="lg:col-span-1 space-y-6">
-                                <div className="glass-panel p-6 rounded-2xl shadow-xl">
-                                    <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                                        <i className="ph-fill ph-faders text-pink-500"></i> Parametry Posta
-                                    </h2>
+                                    {zrodlo === 'narzedzie' && (
+                                        <div>
+                                            <label className={labelCls}>Którą aplikację promujemy?</label>
+                                            <select value={selectedAppIndex} onChange={(e) => setSelectedAppIndex(e.target.value)} className={selectCls}>
+                                                <option value="random">🎲 Zaskocz mnie (losowa aplikacja)</option>
+                                                {Object.keys(CAT_LABELS).map((cat) => groupedApps[cat] && (
+                                                    <optgroup key={cat} label={CAT_LABELS[cat]}>
+                                                        {groupedApps[cat].map((app) => <option key={app.idx} value={app.idx}>{app.title}</option>)}
+                                                    </optgroup>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    )}
 
-                                    <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Gdzie Ewa publikuje?</label>
-                                    <select
-                                        value={platform}
-                                        onChange={e => setPlatform(e.target.value)}
-                                        className="w-full bg-slate-900 border border-slate-700 text-white p-3 rounded-xl mb-6 outline-none focus:border-pink-500"
-                                    >
-                                        <option>Facebook - Grupy dla Nauczycieli</option>
-                                        <option>Instagram - Profil EduBox</option>
-                                        <option>LinkedIn - Profil Profesjonalny</option>
-                                        <option>Pinterest - Piny EduBox</option>
-                                        <option>YouTube - Opis pod filmem</option>
-                                        <option>Blog EduBoxPRO</option>
-                                    </select>
-                                    <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Którą aplikację promujemy?</label>
-                                    <select
-                                        value={selectedAppIndex}
-                                        onChange={e => setSelectedAppIndex(e.target.value)}
-                                        className="w-full bg-slate-900 border border-slate-700 text-white p-3 rounded-xl mb-6 outline-none focus:border-pink-500"
-                                    >
-                                        <option value="random">🎲 Zaskocz mnie (losowa aplikacja)</option>
-                                        {Object.keys(CAT_LABELS).map(cat => (
-                                            groupedApps[cat] && groupedApps[cat].length > 0 && (
-                                                <optgroup key={cat} label={CAT_LABELS[cat]}>
-                                                    {groupedApps[cat].map(app => (
-                                                        <option key={app.idx} value={app.idx}>{app.title}</option>
+                                    {zrodlo === 'swieto' && (
+                                        <div>
+                                            <label className={labelCls}>Które święto? (najbliższe 60 dni)</label>
+                                            {swieta.length === 0 ? (
+                                                <p className="text-sm text-slate-400">W najbliższych tygodniach nie ma świąt w kalendarzu (wakacje).</p>
+                                            ) : (
+                                                <select value={swietoKlucz} onChange={(e) => setSwietoKlucz(e.target.value)} className={selectCls}>
+                                                    {swieta.map((x) => (
+                                                        <option key={x.klucz} value={x.klucz}>{T.dataKrotko(x.data)} – {x.swieto.name}{x.pakiety.length ? `  📦${x.pakiety.length}` : ''}</option>
                                                     ))}
-                                                </optgroup>
-                                            )
-                                        ))}
-                                    </select>
-                                    <label className="flex items-center gap-3 mb-6 bg-slate-900 border border-slate-700 rounded-xl p-3 cursor-pointer select-none">
-                                        <input type="checkbox" checked={includeImage} onChange={e => setIncludeImage(e.target.checked)} className="w-5 h-5 accent-pink-600" />
-                                        <span className="text-sm font-bold text-slate-200">Generuj też zdjęcie Ewy</span>
-                                    </label>
-                                    <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Jaki problem rozwiązujemy?</label>
-                                    <textarea
-                                        value={topic}
-                                        onChange={e => setTopic(e.target.value)}
-                                        placeholder="np. Długie pisanie ocen opisowych, trudni rodzice, awans zawodowy..."
-                                        className="w-full h-32 bg-slate-900 border border-slate-700 text-white p-4 rounded-xl resize-none outline-none focus:border-pink-500 mb-6"
-                                    ></textarea>
-                                    <button
-                                        onClick={generateContent}
-                                        disabled={loading || !topic.trim() || apps.length === 0}
-                                        className="w-full bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-500 hover:to-rose-500 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                                    >
-                                        {loading ? <i className="ph-bold ph-spinner animate-spin text-xl"></i> : <i className="ph-bold ph-magic-wand text-xl"></i>}
-                                        {loading ? 'Ewa przygotowuje materiał...' : apps.length === 0 && !appsError ? 'Ładowanie listy aplikacji...' : includeImage ? 'Wygeneruj Post i Zdjęcie' : 'Wygeneruj Sam Post'}
-                                    </button>
-                                    {errorMsg && (
-                                        <div className="mt-4 p-3 bg-red-900/50 border border-red-500/50 text-red-300 rounded-xl text-sm">
-                                            <i className="ph-fill ph-warning-circle"></i> {errorMsg}
+                                                </select>
+                                            )}
+                                            {wybraneSwieto && (
+                                                <div className="mt-3 text-xs text-slate-400 space-y-1">
+                                                    <p>{T.dataSlownie(wybraneSwieto.data)} · {wybraneSwieto.swieto.desc}</p>
+                                                    <p>{wybraneSwieto.pakiety.length ? `Pakiety do tego dnia: ${wybraneSwieto.pakiety.map((p) => p.title).join(', ')}` : 'Brak pakietu do tego dnia – post poleci EduKalendarz.'}</p>
+                                                </div>
+                                            )}
                                         </div>
                                     )}
-                                    {appsError && (
-                                        <div className="mt-4 p-3 bg-amber-900/50 border border-amber-500/50 text-amber-300 rounded-xl text-sm">
-                                            <i className="ph-fill ph-warning-circle"></i> Nie udało się wczytać listy aplikacji (apps.js). Upewnij się, że plik jest w tym samym folderze co strona.
+
+                                    {zrodlo === 'pakiet' && (
+                                        <div>
+                                            <label className={labelCls}>Który pakiet?</label>
+                                            {pakiety === null ? <p className="text-sm text-slate-400">Wczytuję katalog…</p> : pakiety.length === 0 ? (
+                                                <p className="text-sm text-slate-400">{pakietyError || 'Katalog jest pusty – dodaj pakiet w panelu materiałów.'}</p>
+                                            ) : (
+                                                <select value={pakietId} onChange={(e) => setPakietId(e.target.value)} className={selectCls}>
+                                                    {Object.keys(T.SEKCJE).map((s) => pakietyWSekcjach[s] && (
+                                                        <optgroup key={s} label={T.SEKCJE[s]}>
+                                                            {pakietyWSekcjach[s].map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}
+                                                        </optgroup>
+                                                    ))}
+                                                </select>
+                                            )}
+                                            {wybranyPakiet && (
+                                                <div className="mt-3 flex gap-3 items-start">
+                                                    {okladka && <img src={okladka} alt="" className="w-16 h-20 object-cover object-top rounded-lg border border-slate-700 shrink-0" />}
+                                                    <p className="text-xs text-slate-400 min-w-0">{T.zawartoscPakietu(wybranyPakiet) || 'Bez informacji o zawartości'}{wybranyPakiet.opis ? ` · ${wybranyPakiet.opis}` : ''}</p>
+                                                </div>
+                                            )}
+                                            {okladka && (
+                                                <label className="mt-3 flex items-center gap-3 bg-slate-900 border border-slate-700 rounded-xl p-3 cursor-pointer select-none">
+                                                    <input type="checkbox" checked={uzyjOkladki} onChange={(e) => setUzyjOkladki(e.target.checked)} className="w-5 h-5 accent-pink-600" />
+                                                    <span className="text-sm font-bold text-slate-200">Grafika: okładka pakietu (pin) zamiast zdjęcia Ewy</span>
+                                                </label>
+                                            )}
                                         </div>
                                     )}
+
+                                    {zrodlo === 'plan' && (
+                                        <div className="space-y-3">
+                                            <label className={labelCls}>Plan od dnia</label>
+                                            <input type="date" value={planStart} onChange={(e) => setPlanStart(e.target.value)} className={selectCls} />
+                                            <p className="text-xs text-slate-400">7 dni: święta z EduKalendarza ok. 3 dni przed datą (z pasującymi pakietami), resztę wypełniają na zmianę pakiety i narzędzia. Szkice bez zdjęć – zdjęcie dorobisz po „Otwórz”.</p>
+                                            <button onClick={ulozPlan} disabled={apps.length === 0 || pakiety === null} className="w-full bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 disabled:opacity-50">
+                                                <i className="ph-bold ph-calendar-plus"></i> Ułóż plan
+                                            </button>
+                                            {plan.length > 0 && (
+                                                <button onClick={napiszWszystkie} disabled={planPisze} className="w-full bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-500 hover:to-rose-500 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 disabled:opacity-50">
+                                                    {planPisze ? <i className="ph-bold ph-spinner animate-spin"></i> : <i className="ph-bold ph-magic-wand"></i>}
+                                                    {planPisze ? 'Ewa pisze szkice…' : 'Napisz wszystkie szkice'}
+                                                </button>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {['narzedzie', 'swieto', 'pakiet', 'temat'].includes(zrodlo) && (
+                                        <>
+                                            <div>
+                                                <label className={labelCls}>{zrodlo === 'temat' ? 'Temat posta *' : zrodlo === 'narzedzie' ? 'Jaki problem rozwiązujemy? (opcjonalnie)' : 'Wskazówka dla Ewy (opcjonalnie)'}</label>
+                                                <textarea value={topic} onChange={(e) => setTopic(e.target.value)}
+                                                    placeholder={zrodlo === 'temat' ? 'np. Wywiadówki w listopadzie, jak przetrwać grudzień w przedszkolu…' : zrodlo === 'narzedzie' ? 'np. Długie pisanie ocen opisowych, trudni rodzice…' : 'np. podkreśl piosenki, post na wtorek rano…'}
+                                                    className="w-full h-28 bg-slate-900 border border-slate-700 text-white p-4 rounded-xl resize-none outline-none focus:border-pink-500"></textarea>
+                                            </div>
+                                            {pokazZdjecieEwy && (
+                                                <label className="flex items-center gap-3 bg-slate-900 border border-slate-700 rounded-xl p-3 cursor-pointer select-none">
+                                                    <input type="checkbox" checked={includeImage} onChange={(e) => setIncludeImage(e.target.checked)} className="w-5 h-5 accent-pink-600" />
+                                                    <span className="text-sm font-bold text-slate-200">Generuj też zdjęcie Ewy</span>
+                                                </label>
+                                            )}
+                                            <button onClick={generateContent} disabled={loading || !gotowyDoGeneracji}
+                                                className="w-full bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-500 hover:to-rose-500 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+                                                {loading ? <i className="ph-bold ph-spinner animate-spin text-xl"></i> : <i className="ph-bold ph-magic-wand text-xl"></i>}
+                                                {loading ? 'Ewa przygotowuje materiał...' : apps.length === 0 && !appsError ? 'Ładowanie listy aplikacji...' : (pokazZdjecieEwy && includeImage) ? 'Wygeneruj post i zdjęcie' : 'Wygeneruj post'}
+                                            </button>
+                                        </>
+                                    )}
+
+                                    {errorMsg && <div className="p-3 bg-red-900/50 border border-red-500/50 text-red-300 rounded-xl text-sm"><i className="ph-fill ph-warning-circle"></i> {errorMsg}</div>}
+                                    {appsError && <div className="p-3 bg-amber-900/50 border border-amber-500/50 text-amber-300 rounded-xl text-sm"><i className="ph-fill ph-warning-circle"></i> Nie udało się wczytać listy aplikacji (apps.js).</div>}
                                 </div>
                             </div>
-                            {/* PRAWA KOLUMNA - WYNIK (GOTOWY POST) */}
-                            <div className="lg:col-span-2">
+
+                            {/* PRAWA KOLUMNA – WYNIK */}
+                            <div className="lg:col-span-2 min-w-0">
                                 <div className="glass-panel p-6 md:p-8 rounded-2xl shadow-xl min-h-[500px]">
-                                    {!postContent && !loading && (
-                                        <div className="h-full flex flex-col items-center justify-center text-slate-500 opacity-50 py-20">
-                                            <i className="ph-fill ph-images text-6xl mb-4"></i>
-                                            <p className="font-medium text-lg">Tutaj pojawi się gotowy post Ewy i jej zdjęcie.</p>
-                                        </div>
-                                    )}
-                                    {postContent && (
-                                        <div className="animate-fade-in">
-                                            <div className="flex items-center justify-between mb-2">
-                                                <h2 className="text-2xl font-display font-bold text-white flex items-center gap-2">
-                                                    <i className="ph-fill ph-check-circle text-green-500"></i> Gotowe do publikacji
-                                                </h2>
-                                                <button onClick={copyToClipboard} className="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors border border-slate-700">
-                                                    <i className="ph-bold ph-copy"></i> Skopiuj post + link
-                                                </button>
-                                            </div>
-                                            {promotedApp && (
-                                                <p className="text-sm text-slate-400 mb-6">Promowana aplikacja: <span className="text-pink-400 font-bold">{promotedApp.title}</span></p>
-                                            )}
-                                            <div className="flex flex-col md:flex-row gap-8">
-                                                {/* Wygenerowane zdjęcie (FAL AI) - format 4:5, pod Pinterest/Facebook. Kolumna calkowicie pomijana, gdy user wybral "Sam Post". */}
-                                                {(includeImage || imageUrl) && (
-                                                <div className="w-full md:w-1/2">
-                                                    <div className="aspect-[4/5] bg-slate-900 rounded-xl border-2 border-slate-700 overflow-hidden relative">
-                                                        {imageUrl ? (
-                                                            <img src={imageUrl} alt="Wygenerowana Ewa" className="w-full h-full object-cover" />
-                                                        ) : (
-                                                            <div className="absolute inset-0 flex items-center justify-center text-slate-500">
-                                                                {loading ? 'Generowanie zdjęcia...' : 'Brak zdjęcia'}
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                    <p className="text-xs text-slate-500 mt-2 text-center">Kliknij prawym przyciskiem myszy, aby zapisać zdjęcie Ewy.</p>
-                                                </div>
-                                                )}
-                                                {/* Tekst posta */}
-                                                <div className={`w-full flex flex-col gap-4 ${(includeImage || imageUrl) ? 'md:w-1/2' : ''}`}>
-                                                    <div className="bg-slate-900 border border-slate-700 rounded-xl p-5 flex-1">
-                                                        <p className="text-slate-200 whitespace-pre-wrap font-medium leading-relaxed">
-                                                            {postContent}
-                                                        </p>
-                                                    </div>
-                                                    {titles.length > 0 && (
-                                                        <div className="bg-slate-900 border border-pink-500/40 rounded-xl p-4">
-                                                            <p className="text-xs font-bold text-pink-300 uppercase mb-3 flex items-center gap-2">
-                                                                <i className="ph-bold ph-text-aa"></i> Propozycje tytułów (na zdjęcie/wideo)
-                                                            </p>
-                                                            <div className="space-y-2">
-                                                                {titles.map((t, idx) => (
-                                                                    <div key={idx} className="flex items-center justify-between gap-2 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2">
-                                                                        <span className="text-sm text-slate-200">{t}</span>
-                                                                        <button onClick={() => copyTitle(t, idx)} className="shrink-0 bg-pink-600 hover:bg-pink-500 text-white px-2 py-1 rounded-md text-xs font-bold flex items-center gap-1 transition-colors">
-                                                                            <i className={copiedTitleIdx === idx ? "ph-bold ph-check" : "ph-bold ph-copy"}></i> {copiedTitleIdx === idx ? 'Skopiowano' : 'Kopiuj'}
-                                                                        </button>
-                                                                    </div>
-                                                                ))}
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                    {promotedAppUrl && (
-                                                        <div className="bg-slate-900 border border-pink-500/40 rounded-xl p-4 flex items-center justify-between gap-3">
-                                                            <div className="min-w-0">
-                                                                <p className="text-xs text-slate-400 uppercase font-bold mb-1">Link do dołączenia w poście</p>
-                                                                <p className="text-pink-300 text-sm truncate">{promotedAppUrl}</p>
-                                                            </div>
-                                                            <button onClick={copyLinkOnly} className="shrink-0 bg-pink-600 hover:bg-pink-500 text-white px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors">
-                                                                <i className={linkCopied ? "ph-bold ph-check" : "ph-bold ph-link"}></i> {linkCopied ? 'Skopiowano' : 'Kopiuj'}
-                                                            </button>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </div>
+                                    {pokazPlan ? (
+                                        <PlanWidok plan={plan} onNapisz={napiszSzkic} onUsun={(i) => setPlan((p) => p.filter((_, j) => j !== i))} onOtworz={otworzSzkic} planPisze={planPisze} />
+                                    ) : (
+                                        <WynikWidok wynik={wynik} loading={loading} imageUrl={imageUrl} imageLoading={imageLoading}
+                                            pokazKolumneZdjecia={!!imageUrl || imageLoading || (loading && includeImage)}
+                                            onZdjecie={() => generujZdjecie(wynik && wynik.imagePrompt)}
+                                            zPlanu={zrodlo === 'wynik-planu'} onWrocDoPlanu={() => setZrodlo('plan')} />
                                     )}
                                 </div>
                             </div>
@@ -402,6 +423,121 @@
                 </div>
             );
         }
+
+        function WynikWidok({ wynik, loading, imageUrl, imageLoading, pokazKolumneZdjecia, onZdjecie, zPlanu, onWrocDoPlanu }) {
+            if (!wynik && !loading) {
+                return (
+                    <div className="h-full flex flex-col items-center justify-center text-slate-500 opacity-60 py-20 text-center">
+                        <i className="ph-fill ph-images text-6xl mb-4"></i>
+                        <p className="font-medium text-lg">Tutaj pojawi się gotowy post Ewy i grafika.</p>
+                    </div>
+                );
+            }
+            if (!wynik) return <div className="py-20 text-center text-slate-400"><i className="ph-bold ph-spinner animate-spin text-3xl"></i><p className="mt-3">Ewa pisze…</p></div>;
+            return (
+                <div>
+                    {zPlanu && <button onClick={onWrocDoPlanu} className="mb-4 text-sm text-pink-300 hover:text-pink-200 font-bold flex items-center gap-1"><i className="ph-bold ph-arrow-left"></i> Wróć do planu tygodnia</button>}
+                    <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
+                        <h2 className="text-2xl font-display font-bold text-white flex items-center gap-2"><i className="ph-fill ph-check-circle text-green-500"></i> Gotowe do publikacji</h2>
+                        <KopiujPrzycisk tekst={tekstDoSkopiowania(wynik.post, wynik.linki)} etykieta="Skopiuj post + link" className="!px-4 !py-2 !text-sm" />
+                    </div>
+                    <p className="text-sm text-slate-400 mb-6">{TYP_ETYKIETA[wynik.typ] || 'Post'}: <span className="text-pink-400 font-bold">{wynik.nazwa}</span></p>
+                    <div className="flex flex-col md:flex-row gap-8">
+                        {pokazKolumneZdjecia ? (
+                            <div className="w-full md:w-1/2">
+                                <div className="aspect-[4/5] bg-slate-900 rounded-xl border-2 border-slate-700 overflow-hidden relative">
+                                    {imageUrl ? <img src={imageUrl} alt="Grafika do posta" className="w-full h-full object-cover object-top" />
+                                        : <div className="absolute inset-0 flex items-center justify-center text-slate-500">{imageLoading || loading ? 'Generowanie zdjęcia...' : 'Brak zdjęcia'}</div>}
+                                </div>
+                                <p className="text-xs text-slate-500 mt-2 text-center">Prawy przycisk myszy → „Zapisz obraz jako…”.</p>
+                            </div>
+                        ) : (
+                            <div className="w-full md:w-auto">
+                                <button onClick={onZdjecie} className="bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white text-sm font-bold px-4 py-2 rounded-xl flex items-center gap-2"><i className="ph-bold ph-image"></i> Wygeneruj zdjęcie Ewy</button>
+                            </div>
+                        )}
+                        <div className={`w-full flex flex-col gap-4 min-w-0 ${pokazKolumneZdjecia ? 'md:w-1/2' : ''}`}>
+                            {wynik.pinTitle && (
+                                <div className="bg-slate-900 border border-pink-500/40 rounded-xl p-4 flex items-center justify-between gap-3">
+                                    <div className="min-w-0"><p className="text-xs text-slate-400 uppercase font-bold mb-1">Tytuł pina</p><p className="text-slate-200 text-sm">{wynik.pinTitle}</p></div>
+                                    <KopiujPrzycisk tekst={wynik.pinTitle} />
+                                </div>
+                            )}
+                            <div className="bg-slate-900 border border-slate-700 rounded-xl p-5 flex-1">
+                                <p className="text-slate-200 whitespace-pre-wrap font-medium leading-relaxed">{wynik.post}</p>
+                            </div>
+                            {wynik.keywords && wynik.keywords.length > 0 && (
+                                <div className="bg-slate-900 border border-slate-700 rounded-xl p-4">
+                                    <div className="flex items-center justify-between gap-2 mb-2"><p className="text-xs font-bold text-slate-400 uppercase">Słowa kluczowe</p><KopiujPrzycisk tekst={wynik.keywords.join(', ')} /></div>
+                                    <div className="flex flex-wrap gap-2">{wynik.keywords.map((k) => <span key={k} className="text-xs bg-slate-800 border border-slate-700 rounded-full px-2 py-1 text-slate-300">{k}</span>)}</div>
+                                </div>
+                            )}
+                            {wynik.titles && wynik.titles.length > 0 && (
+                                <div className="bg-slate-900 border border-pink-500/40 rounded-xl p-4">
+                                    <p className="text-xs font-bold text-pink-300 uppercase mb-3 flex items-center gap-2"><i className="ph-bold ph-text-aa"></i> Propozycje tytułów (na zdjęcie/wideo)</p>
+                                    <div className="space-y-2">
+                                        {wynik.titles.map((t, idx) => (
+                                            <div key={idx} className="flex items-center justify-between gap-2 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2">
+                                                <span className="text-sm text-slate-200 min-w-0">{t}</span><KopiujPrzycisk tekst={t} />
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                            {(wynik.linki || []).map((l) => (
+                                <div key={l.url} className="bg-slate-900 border border-pink-500/40 rounded-xl p-4 flex items-center justify-between gap-3">
+                                    <div className="min-w-0"><p className="text-xs text-slate-400 uppercase font-bold mb-1">{l.label}</p><p className="text-pink-300 text-sm truncate">{l.url}</p></div>
+                                    <KopiujPrzycisk tekst={l.url} etykieta="Link" />
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        function PlanWidok({ plan, onNapisz, onUsun, onOtworz, planPisze }) {
+            if (!plan.length) {
+                return (
+                    <div className="h-full flex flex-col items-center justify-center text-slate-500 opacity-60 py-20 text-center">
+                        <i className="ph-fill ph-calendar-dots text-6xl mb-4"></i>
+                        <p className="font-medium text-lg">Wybierz dzień startu i kliknij „Ułóż plan”.</p>
+                    </div>
+                );
+            }
+            const kolor = { swieto: 'bg-amber-500/15 text-amber-300 border-amber-500/40', pakiet: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40', narzedzie: 'bg-sky-500/15 text-sky-300 border-sky-500/40' };
+            return (
+                <div className="space-y-4">
+                    <h2 className="text-2xl font-display font-bold text-white flex items-center gap-2"><i className="ph-fill ph-calendar-dots text-pink-500"></i> Plan tygodnia</h2>
+                    {plan.map((s, i) => (
+                        <div key={i} className="bg-slate-900 border border-slate-700 rounded-xl p-4">
+                            <div className="flex flex-wrap items-center gap-2 mb-2">
+                                <span className="text-sm font-bold text-white">{T.duzaLitera(T.dataSlownie(s.data))}</span>
+                                <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${kolor[s.typ] || ''}`}>{TYP_ETYKIETA[s.typ]}</span>
+                                <span className="text-sm text-slate-300 min-w-0">{T.nazwaZrodla(s)}</span>
+                                {s.typ === 'swieto' && s.pakiety && s.pakiety.length > 0 && <span className="text-xs text-emerald-300">📦 {s.pakiety.length}</span>}
+                                <div className="ml-auto flex gap-2">
+                                    {s.stan !== 'gotowy' && <button onClick={() => onNapisz(i)} disabled={s.stan === 'pisze' || planPisze} className="text-xs font-bold bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white px-3 py-1.5 rounded-lg disabled:opacity-50">{s.stan === 'pisze' ? 'Pisze…' : 'Napisz szkic'}</button>}
+                                    <button onClick={() => onUsun(i)} disabled={planPisze} className="text-xs text-slate-400 hover:text-red-400 px-2" aria-label="Usuń z planu"><i className="ph-bold ph-x"></i></button>
+                                </div>
+                            </div>
+                            {s.stan === 'blad' && <p className="text-xs text-red-300">{s.blad}</p>}
+                            {s.stan === 'gotowy' && s.wynik && (
+                                <div>
+                                    <p className="text-sm text-slate-300 whitespace-pre-wrap line-clamp-4">{s.wynik.post}</p>
+                                    <div className="flex flex-wrap gap-2 mt-3">
+                                        <KopiujPrzycisk tekst={tekstDoSkopiowania(s.wynik.post, s.wynik.linki)} etykieta="Skopiuj post + link" />
+                                        <button onClick={() => onOtworz(s)} className="text-xs font-bold bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white px-3 py-1.5 rounded-lg flex items-center gap-1"><i className="ph-bold ph-arrow-square-out"></i> Otwórz (tytuły, grafika)</button>
+                                        <button onClick={() => onNapisz(i)} disabled={planPisze} className="text-xs font-bold text-slate-400 hover:text-white px-2 disabled:opacity-50">Napisz od nowa</button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            );
+        }
+
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
     </script>
