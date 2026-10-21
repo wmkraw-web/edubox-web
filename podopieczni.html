@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teczka podopiecznych — EduBox</title>
+    <meta name="description" content="Prywatna, zaszyfrowana teczka podopiecznych przedszkola specjalnego. Dane tylko na tym komputerze.">
+    <meta name="robots" content="noindex, nofollow, noarchive">
+    <!-- PRYWATNE NARZĘDZIE (21.10.2026). Dane dzieci są wyłącznie w tej przeglądarce, zaszyfrowane hasłem
+         (podopieczni-core.js). Celowo bez analityki, bazy w chmurze, wspólnego skryptu i menu EduBox – nic nie
+         może wysyłać danych w tle (pilnuje tego scripts/check-podopieczni.js). Do AI (/api/chat) idzie tylko
+         anonimowy opis, widoczny przed wysłaniem. -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js" crossorigin=""></script>
+    <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js" crossorigin=""></script>
+    <script src="https://unpkg.com/@babel/standalone@7.26.10/babel.min.js"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.7/dist/purify.min.js"></script>
+    <script src="/asystent-dokumenty.js"></script>
+    <script src="/doc-tools.js"></script>
+    <script src="/sos-porady.js"></script>
+    <script src="/podopieczni-core.js"></script>
+    <link rel="stylesheet" href="/doc-paper.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+    <style>
+        body { font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+        .field { width: 100%; background: #0b1220; border: 1px solid #334155; border-radius: 12px; padding: 10px 12px; font-size: 14px; color: #e2e8f0; outline: none; }
+        .field:focus { border-color: #34d399; box-shadow: 0 0 0 3px rgba(52,211,153,.15); }
+        textarea.field { resize: vertical; min-height: 84px; line-height: 1.5; }
+        .lbl { display: block; font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: #94a3b8; margin-bottom: 6px; }
+        .card { background: #0f172a; border: 1px solid #1e293b; border-radius: 20px; }
+        .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-weight: 800; font-size: 14px; border-radius: 12px; padding: 10px 16px; transition: background .15s, opacity .15s; }
+        .btn:disabled { opacity: .5; cursor: not-allowed; }
+        .btn-main { background: #34d399; color: #052e1c; } .btn-main:hover:not(:disabled) { background: #6ee7b7; }
+        .btn-soft { background: #1e293b; color: #e2e8f0; } .btn-soft:hover:not(:disabled) { background: #334155; }
+        .btn-danger { background: transparent; color: #fca5a5; border: 1px solid #7f1d1d; } .btn-danger:hover { background: #450a0a; }
+        .tab { padding: 8px 14px; border-radius: 999px; font-size: 13px; font-weight: 800; color: #94a3b8; white-space: nowrap; }
+        .tab[aria-pressed="true"] { background: #34d399; color: #052e1c; }
+        .tag-local { color: #fcd34d; } .tag-ai { color: #6ee7b7; }
+        .doc-paper mark { background: #fff3a3; }
+        @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+    </style>
+</head>
+<body class="min-h-screen bg-slate-950 text-slate-100">
+    <div id="root"></div>
+    <noscript><p style="padding:24px">Teczka wymaga włączonego JavaScriptu.</p></noscript>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useCallback } = React;
+        const P = window.EduPodopieczni;
+        const AD = window.EduAsystentDocs;
+        const DT = window.EduDocTools;
+        const SOS = window.EduSosPrompts;
+
+        // Te same modele co w Asystencie Pedagoga: dokumenty urzędowe – najmocniejszy, materiały robocze – szybszy.
+        const STRONG_DOCS = ['ipet', 'wopfu', 'opinia', 'gotowosc', 'diagnoza_funkcjonalna', 'ipww', 'ewaluacja_wwrd'];
+        const LOCK_MINUTES = 15;
+        const IS_LOCAL = location.protocol === 'file:';
+
+        const today = () => new Date().toISOString().slice(0, 10);
+        const escapeHtml = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        const sanitize = (h) => window.DOMPurify ? window.DOMPurify.sanitize(String(h || ''), {
+            ALLOWED_TAGS: ['h1', 'h2', 'h3', 'p', 'ul', 'ol', 'li', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'strong', 'em', 'br', 'mark', 'sup', 'sub', 'div', 'span'],
+            ALLOWED_ATTR: ['class']
+        }) : escapeHtml(h);
+        const readStored = () => { try { const r = localStorage.getItem(P.VAULT_KEY); return r ? JSON.parse(r) : null; } catch (e) { return null; } };
+        const docLabel = (module, id) => ((module === 'wwrd' ? AD.WWRD_DOC_TYPES : AD.DOC_TYPES).find(d => d.id === id) || {}).label || id;
+        const fileSafe = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/ł/g, 'l').replace(/Ł/g, 'L').replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '');
+
+        // Ostatnia kontrola tuż przed wysłaniem do AI – jeśli anonimizacja coś przepuściła, nic nie wychodzi.
+        function assertNoLeak(text, child) {
+            const found = P.leaks(text, child);
+            if (found.length) throw new Error('Wysyłka wstrzymana: w tekście dla AI zostało „' + found.join('”, „') + '”. Popraw opis i spróbuj jeszcze raz.');
+        }
+
+        // Imię i nazwisko wstawiamy dopiero na kartce, w przeglądarce.
+        const fillChild = (html, child) => DT.fillName(html, P.fullName(child)).split('[imię]').join(escapeHtml(child.imie || '[imię]'));
+
+        function downloadJson(obj, name) {
+            const blob = new Blob([JSON.stringify(obj)], { type: 'application/json' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = name;
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+        }
+
+        function readFileJson(file) {
+            return new Promise((resolve, reject) => {
+                const r = new FileReader();
+                r.onload = () => { try { resolve(JSON.parse(r.result)); } catch (e) { reject(new Error('Plik jest uszkodzony albo to nie jest kopia Teczki.')); } };
+                r.onerror = () => reject(new Error('Nie udało się odczytać pliku.'));
+                r.readAsText(file);
+            });
+        }
+
+        const Tag = ({ ai }) => ai
+            ? <span className="tag-ai text-[11px] font-bold normal-case tracking-normal ml-1">· do AI bez imion</span>
+            : <span className="tag-local text-[11px] font-bold normal-case tracking-normal ml-1">· tylko na tym komputerze</span>;
+
+        function Field({ label, ai, local, children }) {
+            return <label className="block"><span className="lbl">{label}{ai ? <Tag ai /> : local ? <Tag /> : null}</span>{children}</label>;
+        }
+
+        // ---------- ekrany startowe ----------
+        function ImportButton({ onImported, label }) {
+            const ref = useRef(null);
+            const [err, setErr] = useState('');
+            const pick = async (e) => {
+                const f = e.target.files && e.target.files[0];
+                e.target.value = '';
+                if (!f) return;
+                try {
+                    const sealed = await readFileJson(f);
+                    if (!sealed || sealed.app !== 'edubox-podopieczni' || !sealed.ct) throw new Error('To nie jest kopia Teczki podopiecznych.');
+                    if (readStored() && !window.confirm('Wczytanie kopii zastąpi dane zapisane teraz w tej przeglądarce. Kontynuować?')) return;
+                    localStorage.setItem(P.VAULT_KEY, JSON.stringify(sealed));
+                    setErr('');
+                    onImported();
+                } catch (x) { setErr(x.message); }
+            };
+            return (
+                <div>
+                    <button type="button" className="btn btn-soft w-full" onClick={() => ref.current && ref.current.click()}><i className="ph-bold ph-upload-simple"></i>{label || 'Wczytaj kopię zapasową'}</button>
+                    <input ref={ref} type="file" accept=".json,application/json" className="hidden" onChange={pick} />
+                    {err && <p className="text-sm text-red-300 mt-2">{err}</p>}
+                </div>
+            );
+        }
+
+        function Setup({ onCreated, onImported }) {
+            const [pw, setPw] = useState('');
+            const [pw2, setPw2] = useState('');
+            const [ack, setAck] = useState(false);
+            const [busy, setBusy] = useState(false);
+            const [err, setErr] = useState('');
+            const create = async (e) => {
+                e.preventDefault();
+                setErr('');
+                if (pw.length < 8) return setErr('Hasło musi mieć co najmniej 8 znaków.');
+                if (pw !== pw2) return setErr('Hasła się różnią.');
+                setBusy(true);
+                try { onCreated(await P.createSession(pw)); } catch (x) { setErr(x.message); setBusy(false); }
+            };
+            return (
+                <div className="max-w-lg mx-auto px-4 py-12">
+                    <div className="text-5xl mb-4">🗂️</div>
+                    <h1 className="text-3xl font-black mb-3">Teczka podopiecznych</h1>
+                    <p className="text-slate-300 leading-relaxed mb-6">Dane dzieci, dokumenty, terminy i notatki z obserwacji – w jednym miejscu, <strong>tylko na tym komputerze</strong>, zaszyfrowane Twoim hasłem. Dokumenty (IPET, WOPFU, opinia, WWRD) pisze AI, ale dostaje wyłącznie opis bez imion i dat.</p>
+                    <form onSubmit={create} className="card p-6 space-y-4">
+                        <Field label="Ustaw hasło do Teczki"><input type="password" autoComplete="new-password" className="field" value={pw} onChange={e => setPw(e.target.value)} placeholder="min. 8 znaków" /></Field>
+                        <Field label="Powtórz hasło"><input type="password" autoComplete="new-password" className="field" value={pw2} onChange={e => setPw2(e.target.value)} /></Field>
+                        <label className="flex gap-3 items-start text-sm text-amber-100 bg-amber-500/10 border border-amber-400/30 rounded-xl p-3">
+                            <input type="checkbox" className="mt-1" checked={ack} onChange={e => setAck(e.target.checked)} />
+                            <span><strong>Hasła nie da się odzyskać.</strong> Bez niego nikt – także EduBox – nie odczyta danych. Zapisz je w bezpiecznym miejscu i regularnie pobieraj kopię zapasową.</span>
+                        </label>
+                        {err && <p className="text-sm text-red-300">{err}</p>}
+                        <button className="btn btn-main w-full" disabled={!ack || busy}>{busy ? 'Tworzę sejf…' : 'Utwórz Teczkę'}</button>
+                    </form>
+                    <div className="mt-4"><ImportButton onImported={onImported} label="Mam już kopię – wczytaj ją" /></div>
+                </div>
+            );
+        }
+
+        function Locked({ onOpened, onImported }) {
+            const [pw, setPw] = useState('');
+            const [busy, setBusy] = useState(false);
+            const [err, setErr] = useState('');
+            const unlock = async (e) => {
+                e.preventDefault();
+                setBusy(true); setErr('');
+                try {
+                    const res = await P.open(readStored(), pw);
+                    onOpened(res.data, res.session);
+                } catch (x) { setErr(x.message); setBusy(false); }
+            };
+            return (
+                <div className="max-w-md mx-auto px-4 py-16">
+                    <div className="text-5xl mb-4">🔒</div>
+                    <h1 className="text-3xl font-black mb-2">Teczka podopiecznych</h1>
+                    <p className="text-slate-400 mb-6">Teczka jest zablokowana. Wpisz hasło, żeby ją otworzyć.</p>
+                    <form onSubmit={unlock} className="card p-6 space-y-4">
+                        <input type="password" autoFocus autoComplete="current-password" className="field" value={pw} onChange={e => setPw(e.target.value)} placeholder="Hasło do Teczki" />
+                        {err && <p className="text-sm text-red-300">{err}</p>}
+                        <button className="btn btn-main w-full" disabled={busy || !pw}>{busy ? 'Otwieram…' : 'Otwórz'}</button>
+                    </form>
+                    <div className="mt-4"><ImportButton onImported={onImported} /></div>
+                </div>
+            );
+        }
+
+        // ---------- kartka dokumentu ----------
+        function Paper({ html, editable, streaming, paperRef }) {
+            return <div ref={paperRef} contentEditable={!!editable && !streaming} suppressContentEditableWarning={true}
+                className={'doc-paper outline-none focus:ring-2 focus:ring-emerald-400 ' + (streaming ? 'doc-caret' : '')}
+                dangerouslySetInnerHTML={{ __html: sanitize(html) }} />;
+        }
+
+        function ExportBar({ getHtml, filename, title, extra }) {
+            const [msg, setMsg] = useState('');
+            const flash = (t) => { setMsg(t); setTimeout(() => setMsg(''), 2500); };
+            return (
+                <div className="flex flex-wrap gap-2 items-center">
+                    <button className="btn btn-soft" onClick={async () => flash((await DT.copyRich(getHtml())) ? 'Skopiowano' : 'Nie udało się skopiować')}><i className="ph-bold ph-copy"></i>Kopiuj</button>
+                    <button className="btn btn-soft" onClick={async () => { try { await DT.downloadDocx(getHtml(), { filename, title }); } catch (e) { flash('Błąd Worda: ' + e.message); } }}><i className="ph-bold ph-file-doc"></i>Word</button>
+                    <button className="btn btn-soft" onClick={() => DT.printDoc(getHtml(), filename)}><i className="ph-bold ph-printer"></i>Drukuj / PDF</button>
+                    {extra}
+                    {msg && <span className="text-sm text-emerald-300 font-bold">{msg}</span>}
+                </div>
+            );
+        }
+
+        function PromptPreview({ text }) {
+            return (
+                <details className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-3 text-sm">
+                    <summary className="cursor-pointer font-bold text-emerald-300"><i className="ph-bold ph-eye"></i> Co dokładnie trafi do AI (sprawdź przed wysłaniem)</summary>
+                    <pre className="whitespace-pre-wrap text-slate-300 text-xs leading-relaxed mt-3 max-h-80 overflow-auto">{text}</pre>
+                    <p className="text-xs text-slate-400 mt-2">Imiona, nazwisko, data urodzenia i PESEL są zamieniane na [imię] / [data urodzenia] / [PESEL]. Numery orzeczeń, poradnie i grupa w ogóle nie są wysyłane. Do tego idzie stała instrukcja z przepisami (ta sama co w Asystencie Pedagoga).</p>
+                </details>
+            );
+        }
+
+        // ---------- zakładki dziecka ----------
+        function TabDane({ child, set, settings }) {
+            const age = P.ageYears(child.dataUr);
+            const toggleProg = (id) => set({ programy: child.programy.includes(id) ? child.programy.filter(p => p !== id) : [...child.programy, id] });
+            return (
+                <div className="space-y-6">
+                    <div className="grid sm:grid-cols-2 gap-4">
+                        <Field label="Imię" local><input className="field" value={child.imie} onChange={e => set({ imie: e.target.value })} /></Field>
+                        <Field label="Nazwisko" local><input className="field" value={child.nazwisko} onChange={e => set({ nazwisko: e.target.value })} /></Field>
+                        <Field label="Zdrobnienia (po przecinku)" local><input className="field" value={child.zdrobnienie} onChange={e => set({ zdrobnienie: e.target.value })} placeholder="np. Kasia, Kasieńka" /></Field>
+                        <Field label={'Data urodzenia' + (age !== '' ? ` (${age} l.)` : '')} local><input type="date" className="field" value={child.dataUr} onChange={e => set({ dataUr: e.target.value })} /></Field>
+                        <Field label="Płeć (do odmiany w dokumentach)" ai>
+                            <select className="field" value={child.plec} onChange={e => set({ plec: e.target.value })}>
+                                <option value="">nie podano</option><option value="k">dziewczynka</option><option value="m">chłopiec</option>
+                            </select>
+                        </Field>
+                        <Field label="Grupa" local><input className="field" value={child.grupa} onChange={e => set({ grupa: e.target.value })} placeholder="np. Motylki" /></Field>
+                    </div>
+                    <div>
+                        <span className="lbl">Formy wsparcia<Tag ai /></span>
+                        <div className="flex flex-wrap gap-2">
+                            {P.PROGRAMY.map(p => (
+                                <button key={p.id} type="button" className="tab border border-slate-700" aria-pressed={child.programy.includes(p.id)} onClick={() => toggleProg(p.id)}>{p.label}</button>
+                            ))}
+                        </div>
+                    </div>
+                    <Field label="Orzeczenie wydane ze względu na" ai>
+                        <select className="field" value={child.orzeczenie} onChange={e => set({ orzeczenie: e.target.value })}>
+                            <option value="">— wybierz —</option>
+                            {AD.ORZECZENIA.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
+                        </select>
+                    </Field>
+                    <Field label="Funkcjonowanie / rozpoznanie (Twoimi słowami)" ai><textarea className="field" value={child.rozpoznanie} onChange={e => set({ rozpoznanie: e.target.value })} placeholder="np. autyzm, nie mówi, komunikuje się gestem i obrazkami, chodzi samodzielnie" /></Field>
+                    <Field label="Mocne strony i zainteresowania" ai><textarea className="field" value={child.mocneStrony} onChange={e => set({ mocneStrony: e.target.value })} /></Field>
+                    <Field label="Trudności" ai><textarea className="field" value={child.trudnosci} onChange={e => set({ trudnosci: e.target.value })} /></Field>
+                    <Field label="Zalecenia z orzeczenia / opinii (przepisz najważniejsze)" ai><textarea className="field" rows="5" value={child.zalecenia} onChange={e => set({ zalecenia: e.target.value })} placeholder="np. AAC, terapia integracji sensorycznej, zajęcia rewalidacyjne, stały plan dnia" /></Field>
+                    <p className="text-xs text-slate-500">Możesz pisać imieniem dziecka – przed wysłaniem do AI imię, nazwisko i zdrobnienia są zamieniane na [imię]. Nie wpisuj tu danych innych dzieci ani rodziców. Oddział w dokumentach: {(AD.ODDZIALY.find(o => o.id === settings.oddzial) || {}).label} (zmienisz w Ustawieniach).</p>
+                </div>
+            );
+        }
+
+        function TabDokumenty({ child, set }) {
+            const setDoc = (id, patch) => set({ dokumenty: child.dokumenty.map(d => d.id === id ? Object.assign({}, d, patch) : d) });
+            const setTerm = (id, patch) => set({ terminy: child.terminy.map(t => t.id === id ? Object.assign({}, t, patch) : t) });
+            const dl = P.deadlines(child);
+            const statusOf = (date) => { const x = dl.find(d => d.date === date); return x ? x.status : ''; };
+            const badge = (s) => s === 'po terminie' ? 'bg-red-500/20 text-red-300' : s === 'wkrótce' ? 'bg-amber-500/20 text-amber-200' : 'bg-slate-800 text-slate-400';
+            return (
+                <div className="space-y-8">
+                    <section>
+                        <div className="flex items-center justify-between gap-3 mb-3">
+                            <h3 className="text-lg font-black">Dokumenty z poradni i placówki <Tag /></h3>
+                            <button className="btn btn-soft" onClick={() => set({ dokumenty: [{ id: P.uid(), rodzaj: 'orzeczenie', numer: '', wydany: '', wazneDo: '', poradnia: '', skan: '', uwagi: '' }, ...child.dokumenty] })}><i className="ph-bold ph-plus"></i>Dodaj</button>
+                        </div>
+                        {child.dokumenty.length === 0 && <p className="text-sm text-slate-500">Brak dokumentów. Dodaj orzeczenie lub opinię – Teczka przypomni, kiedy kończy się ważność.</p>}
+                        <div className="space-y-3">
+                            {child.dokumenty.map(d => (
+                                <div key={d.id} className="card p-4">
+                                    <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                                        <Field label="Rodzaj"><select className="field" value={d.rodzaj} onChange={e => setDoc(d.id, { rodzaj: e.target.value })}>{P.RODZAJE_DOKUMENTOW.map(r => <option key={r.id} value={r.id}>{r.label}</option>)}</select></Field>
+                                        <Field label="Numer"><input className="field" value={d.numer} onChange={e => setDoc(d.id, { numer: e.target.value })} /></Field>
+                                        <Field label="Poradnia / wystawca"><input className="field" value={d.poradnia} onChange={e => setDoc(d.id, { poradnia: e.target.value })} /></Field>
+                                        <Field label="Data wydania"><input type="date" className="field" value={d.wydany} onChange={e => setDoc(d.id, { wydany: e.target.value })} /></Field>
+                                        <Field label="Ważne do"><input type="date" className="field" value={d.wazneDo} onChange={e => setDoc(d.id, { wazneDo: e.target.value })} /></Field>
+                                        <Field label="Gdzie leży skan"><input className="field" value={d.skan || ''} onChange={e => setDoc(d.id, { skan: e.target.value })} placeholder="np. Dokumenty/Przedszkole/2026" /></Field>
+                                    </div>
+                                    <div className="flex flex-wrap items-end gap-3 mt-3">
+                                        <div className="flex-1 min-w-[200px]"><Field label="Uwagi"><input className="field" value={d.uwagi || ''} onChange={e => setDoc(d.id, { uwagi: e.target.value })} /></Field></div>
+                                        {d.wazneDo && <span className={'text-xs font-black px-3 py-2 rounded-full ' + badge(statusOf(d.wazneDo))}>{statusOf(d.wazneDo) || 'ok'}</span>}
+                                        <button className="btn btn-danger" onClick={() => window.confirm('Usunąć ten dokument z Teczki?') && set({ dokumenty: child.dokumenty.filter(x => x.id !== d.id) })}><i className="ph-bold ph-trash"></i></button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </section>
+                    <section>
+                        <div className="flex items-center justify-between gap-3 mb-3">
+                            <h3 className="text-lg font-black">Terminy</h3>
+                            <button className="btn btn-soft" onClick={() => set({ terminy: [...child.terminy, { id: P.uid(), co: '', data: '', zrobione: false }] })}><i className="ph-bold ph-plus"></i>Dodaj termin</button>
+                        </div>
+                        <p className="text-sm text-slate-500 mb-3">Np. ocena efektywności IPET, spotkanie zespołu, aktualizacja WOPFU, termin złożenia wniosku. Terminy z przepisów i statutu wpisujesz sama – Teczka ich nie zgaduje.</p>
+                        <div className="space-y-2">
+                            {child.terminy.map(t => (
+                                <div key={t.id} className="flex flex-wrap items-center gap-2">
+                                    <input type="checkbox" checked={!!t.zrobione} onChange={e => setTerm(t.id, { zrobione: e.target.checked })} title="Zrobione" />
+                                    <input className={'field flex-1 min-w-[180px] ' + (t.zrobione ? 'line-through opacity-50' : '')} value={t.co} onChange={e => setTerm(t.id, { co: e.target.value })} placeholder="Co?" />
+                                    <input type="date" className="field w-auto" value={t.data} onChange={e => setTerm(t.id, { data: e.target.value })} />
+                                    {!t.zrobione && t.data && <span className={'text-xs font-black px-3 py-2 rounded-full ' + badge(statusOf(t.data))}>{statusOf(t.data) || 'ok'}</span>}
+                                    <button className="btn btn-danger" onClick={() => set({ terminy: child.terminy.filter(x => x.id !== t.id) })}><i className="ph-bold ph-x"></i></button>
+                                </div>
+                            ))}
+                        </div>
+                    </section>
+                </div>
+            );
+        }
+
+        function TabObserwacje({ child, set }) {
+            const [data, setData] = useState(today());
+            const [tekst, setTekst] = useState('');
+            const add = (e) => {
+                e.preventDefault();
+                if (!tekst.trim()) return;
+                set({ notatki: [{ id: P.uid(), data, tekst: tekst.trim() }, ...child.notatki] });
+                setTekst('');
+            };
+            const sorted = child.notatki.slice().sort((a, b) => String(b.data).localeCompare(String(a.data)));
+            return (
+                <div className="space-y-5">
+                    <form onSubmit={add} className="card p-4 space-y-3">
+                        <div className="flex flex-wrap gap-3 items-end">
+                            <Field label="Data"><input type="date" className="field w-auto" value={data} onChange={e => setData(e.target.value)} /></Field>
+                            <p className="text-xs text-slate-500 flex-1 min-w-[200px]">Krótko i konkretnie: co dziecko zrobiło, w jakiej sytuacji, z jaką pomocą. Notatki są materiałem do arkusza obserwacji, IPET i oceny efektywności.</p>
+                        </div>
+                        <Field label="Obserwacja" ai><textarea className="field" value={tekst} onChange={e => setTekst(e.target.value)} placeholder="np. Przy śniadaniu sama pokazała obrazek „pić”, bez podpowiedzi." /></Field>
+                        <button className="btn btn-main" disabled={!tekst.trim()}><i className="ph-bold ph-plus"></i>Zapisz obserwację</button>
+                    </form>
+                    {sorted.length === 0 && <p className="text-sm text-slate-500">Brak obserwacji.</p>}
+                    <ul className="space-y-2">
+                        {sorted.map(n => (
+                            <li key={n.id} className="card p-4 flex gap-3 items-start">
+                                <span className="text-xs font-black text-emerald-300 whitespace-nowrap mt-0.5">{P.formatDatePl(n.data)}</span>
+                                <p className="flex-1 text-sm text-slate-200 whitespace-pre-wrap">{n.tekst}</p>
+                                <button className="text-slate-500 hover:text-red-300" title="Usuń" onClick={() => window.confirm('Usunąć tę obserwację?') && set({ notatki: child.notatki.filter(x => x.id !== n.id) })}><i className="ph-bold ph-trash"></i></button>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            );
+        }
+
+        function TabGeneruj({ child, set, settings }) {
+            const defaultModule = child.programy.includes('wwrd') && !child.programy.includes('ks') ? 'wwrd' : 'dokumenty';
+            const [module, setModule] = useState(defaultModule);
+            const [docType, setDocType] = useState(defaultModule === 'wwrd' ? 'ipww' : 'ipet');
+            const [length, setLength] = useState('epic');
+            const [withNotes, setWithNotes] = useState(true);
+            const [extra, setExtra] = useState('');
+            const [cel, setCel] = useState('');
+            const [headers, setHeaders] = useState('');
+            const [text, setText] = useState('');
+            const [streaming, setStreaming] = useState(false);
+            const [doneMeta, setDoneMeta] = useState(null);
+            const [err, setErr] = useState('');
+            const [saved, setSaved] = useState(false);
+            const paperRef = useRef(null);
+            const types = module === 'wwrd' ? AD.WWRD_DOC_TYPES : AD.DOC_TYPES;
+
+            const input = Object.assign(P.aiInput(child, { module, docType, withNotes, extra, cel, oddzial: settings.oddzial }), { customHeaders: headers });
+            const userPrompt = AD.buildUserPrompt(input);
+
+            const run = async () => {
+                setErr(''); setSaved(false); setDoneMeta(null); setText('');
+                if (IS_LOCAL) return setErr('Plik otwarty lokalnie – AI działa tylko na eduboxpro.pl.');
+                const system = AD.buildSystemPrompt({ module, docType, length, customHeaders: headers });
+                try {
+                    assertNoLeak(userPrompt, child); // instrukcja systemowa jest stała – bez danych dziecka
+                    setStreaming(true);
+                    const res = await DT.streamChat({ system, prompt: userPrompt, temperature: 0.4, model: STRONG_DOCS.includes(docType) ? 'strong' : 'balanced', verbosity: length === 'zwiezle' ? 'low' : undefined }, (t) => setText(t));
+                    if (!res.text.trim()) throw new Error('AI nie zwróciło treści. Spróbuj ponownie za chwilę.');
+                    setText(res.text);
+                    setDoneMeta({ module, docType, interrupted: res.interrupted });
+                } catch (e) { setErr(e.message); }
+                finally { setStreaming(false); }
+            };
+
+            const normalized = DT.normalize(text);
+            const html = DT.markPlaceholders(fillChild(normalized, child));
+            const check = doneMeta && module === 'dokumenty' ? AD.checkCompleteness(docType, DT.headingsOf(normalized)) : null;
+            const exportHtml = () => sanitize(paperRef.current ? paperRef.current.innerHTML : html);
+            const filename = fileSafe(docLabel(module, docType) + '-' + P.fullName(child));
+            const save = () => {
+                set({ wygenerowane: [{ id: P.uid(), data: today(), module, docType, label: docLabel(module, docType), html: exportHtml() }, ...child.wygenerowane] });
+                setSaved(true);
+            };
+
+            return (
+                <div className="space-y-5">
+                    <div className="flex flex-wrap gap-2">
+                        <button className="tab border border-slate-700" aria-pressed={module === 'dokumenty'} onClick={() => { setModule('dokumenty'); setDocType('ipet'); }}>Dokumenty przedszkola (KS)</button>
+                        <button className="tab border border-slate-700" aria-pressed={module === 'wwrd'} onClick={() => { setModule('wwrd'); setDocType('ipww'); }}>WWRD / „Za życiem”</button>
+                    </div>
+                    <div className="grid sm:grid-cols-2 gap-4">
+                        <Field label="Dokument"><select className="field" value={docType} onChange={e => setDocType(e.target.value)}>{types.map(t => <option key={t.id} value={t.id}>{t.full || t.label}</option>)}</select></Field>
+                        <Field label="Długość"><select className="field" value={length} onChange={e => setLength(e.target.value)}><option value="epic">pełny dokument dla zespołu</option><option value="zwiezle">wersja zwięzła</option></select></Field>
+                    </div>
+                    {module === 'wwrd' && <Field label="Cel zajęć / temat (opcjonalnie)" ai><input className="field" value={cel} onChange={e => setCel(e.target.value)} placeholder="np. wskazywanie obrazków, naśladowanie ruchów" /></Field>}
+                    <Field label="Dodatkowe informacje do tego dokumentu (opcjonalnie)" ai><textarea className="field" value={extra} onChange={e => setExtra(e.target.value)} placeholder="np. postępy od ostatniej oceny, ustalenia z rodzicami" /></Field>
+                    <details className="text-sm"><summary className="cursor-pointer text-slate-400 font-bold">Własny wzór placówki (nagłówki z druku przedszkola)</summary>
+                        <textarea className="field mt-2" value={headers} onChange={e => setHeaders(e.target.value)} placeholder={'Każdy nagłówek w osobnej linii, np.\nInformacje o dziecku\nCele\nFormy pomocy'} />
+                    </details>
+                    <label className="flex items-center gap-2 text-sm text-slate-300"><input type="checkbox" checked={withNotes} onChange={e => setWithNotes(e.target.checked)} />Dołącz obserwacje ({child.notatki.length}) jako materiał źródłowy</label>
+                    <PromptPreview text={userPrompt} />
+                    <button className="btn btn-main" onClick={run} disabled={streaming}>{streaming ? <><i className="ph-bold ph-circle-notch animate-spin"></i>Piszę…</> : <><i className="ph-bold ph-magic-wand"></i>Napisz dokument</>}</button>
+                    {err && <p className="text-sm text-red-300 font-bold">{err}</p>}
+                    {(text || streaming) && (
+                        <div className="space-y-4">
+                            {doneMeta && <ExportBar getHtml={exportHtml} filename={filename} title={docLabel(module, docType)} extra={
+                                <button className="btn btn-main" onClick={save} disabled={saved}><i className="ph-bold ph-floppy-disk"></i>{saved ? 'Zapisano w historii' : 'Zapisz w Teczce'}</button>
+                            } />}
+                            {doneMeta && doneMeta.interrupted && <p className="text-sm text-amber-200">Połączenie przerwało się przed końcem – dokument może być niepełny.</p>}
+                            {check && <div className="text-xs text-slate-400">{check.label}: {check.okCount}/{check.items.length} {check.items.filter(i => !i.ok).length > 0 && <span className="text-amber-200">– brakuje: {check.items.filter(i => !i.ok).map(i => i.name).join(', ')}</span>}</div>}
+                            {doneMeta && <p className="text-xs text-slate-500">Możesz poprawiać tekst bezpośrednio na kartce. Żółte pola [uzupełnij…] wymagają Twoich danych.</p>}
+                            <Paper html={html} editable={!!doneMeta} streaming={streaming} paperRef={paperRef} />
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        function TabPorada({ child, set }) {
+            const [mode, setMode] = useState('zachowanie');
+            const [q, setQ] = useState('');
+            const [answer, setAnswer] = useState('');
+            const [busy, setBusy] = useState(false);
+            const [err, setErr] = useState('');
+            const [saved, setSaved] = useState(false);
+            const prompts = SOS.buildSosPrompts(mode, P.adviceText(child, q), { place: 'przedszkole', age: SOS.AGES[0] });
+            const run = async () => {
+                setErr(''); setAnswer(''); setSaved(false);
+                if (!q.trim()) return setErr('Opisz sytuację albo zadaj pytanie.');
+                if (IS_LOCAL) return setErr('Plik otwarty lokalnie – AI działa tylko na eduboxpro.pl.');
+                try {
+                    assertNoLeak(prompts.prompt, child);
+                    setBusy(true);
+                    const res = await DT.streamChat({ system: prompts.system, prompt: prompts.prompt, model: 'strong' }, (t) => setAnswer(t));
+                    setAnswer(res.text);
+                } catch (e) { setErr(e.message); }
+                finally { setBusy(false); }
+            };
+            const advice = SOS.splitSosAnswer(answer).advice.split('[imię]').join(child.imie || '[imię]');
+            const save = () => {
+                const body = advice.split(/\n+/).map(l => '<p>' + escapeHtml(l) + '</p>').join('');
+                set({ wygenerowane: [{ id: P.uid(), data: today(), module: 'porada', docType: mode, label: 'Porada: ' + q.trim().slice(0, 60), html: '<h1>Porada</h1><p><strong>Pytanie:</strong> ' + escapeHtml(q.trim()) + '</p>' + body }, ...child.wygenerowane] });
+                setSaved(true);
+            };
+            return (
+                <div className="space-y-4">
+                    <div className="flex flex-wrap gap-2">
+                        <button className="tab border border-slate-700" aria-pressed={mode === 'zachowanie'} onClick={() => setMode('zachowanie')}>Trudna sytuacja z dzieckiem</button>
+                        <button className="tab border border-slate-700" aria-pressed={mode === 'rodzic'} onClick={() => setMode('rodzic')}>Rozmowa z rodzicem</button>
+                    </div>
+                    <Field label="Opisz sytuację albo zadaj pytanie" ai><textarea className="field" rows="5" value={q} onChange={e => setQ(e.target.value)} placeholder="np. Przy myciu rąk krzyczy i ucieka od umywalki. Jak to rozłożyć na małe kroki?" /></Field>
+                    <p className="text-xs text-slate-500">AI dostaje też wiek, funkcjonowanie, trudności i mocne strony z karty dziecka – bez imienia. Porada to podpowiedź, nie diagnoza. W sytuacji zagrożenia działaj według procedur przedszkola.</p>
+                    <PromptPreview text={prompts.prompt} />
+                    <button className="btn btn-main" onClick={run} disabled={busy}>{busy ? <><i className="ph-bold ph-circle-notch animate-spin"></i>Myślę…</> : <><i className="ph-bold ph-lightbulb"></i>Poradź</>}</button>
+                    {err && <p className="text-sm text-red-300 font-bold">{err}</p>}
+                    {answer && (
+                        <div className="card p-5 space-y-3">
+                            <div className="text-sm text-slate-200 whitespace-pre-wrap leading-relaxed">{advice}</div>
+                            {!busy && <div className="flex flex-wrap gap-2">
+                                <button className="btn btn-soft" onClick={() => navigator.clipboard && navigator.clipboard.writeText(advice)}><i className="ph-bold ph-copy"></i>Kopiuj</button>
+                                <button className="btn btn-main" onClick={save} disabled={saved}><i className="ph-bold ph-floppy-disk"></i>{saved ? 'Zapisano w historii' : 'Zapisz w Teczce'}</button>
+                            </div>}
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        function TabHistoria({ child, set }) {
+            const [openId, setOpenId] = useState(null);
+            const paperRef = useRef(null);
+            const item = child.wygenerowane.find(w => w.id === openId);
+            if (item) {
+                return (
+                    <div className="space-y-4">
+                        <button className="btn btn-soft" onClick={() => setOpenId(null)}><i className="ph-bold ph-arrow-left"></i>Wróć do listy</button>
+                        <ExportBar getHtml={() => sanitize(paperRef.current ? paperRef.current.innerHTML : item.html)} filename={fileSafe(item.label + '-' + P.fullName(child) + '-' + item.data)} title={item.label} />
+                        <Paper html={item.html} editable={false} paperRef={paperRef} />
+                    </div>
+                );
+            }
+            return (
+                <div>
+                    {child.wygenerowane.length === 0 && <p className="text-sm text-slate-500">Tu będą dokumenty i porady zapisane z zakładek „Napisz dokument” i „Zapytaj AI”.</p>}
+                    <ul className="space-y-2">
+                        {child.wygenerowane.map(w => (
+                            <li key={w.id} className="card p-4 flex items-center gap-3">
+                                <span className="text-xs font-black text-emerald-300 whitespace-nowrap">{P.formatDatePl(w.data)}</span>
+                                <button className="flex-1 text-left text-sm font-bold hover:text-emerald-300" onClick={() => setOpenId(w.id)}>{w.label}</button>
+                                <button className="text-slate-500 hover:text-red-300" title="Usuń" onClick={() => window.confirm('Usunąć ten dokument z historii?') && set({ wygenerowane: child.wygenerowane.filter(x => x.id !== w.id) })}><i className="ph-bold ph-trash"></i></button>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            );
+        }
+
+        const TABS = [
+            { id: 'dane', label: 'Dane i opis', icon: 'ph-identification-card' },
+            { id: 'dokumenty', label: 'Dokumenty i terminy', icon: 'ph-folder-open' },
+            { id: 'obserwacje', label: 'Obserwacje', icon: 'ph-note-pencil' },
+            { id: 'generuj', label: 'Napisz dokument', icon: 'ph-magic-wand' },
+            { id: 'porada', label: 'Zapytaj AI', icon: 'ph-lightbulb' },
+            { id: 'historia', label: 'Historia', icon: 'ph-clock-counter-clockwise' }
+        ];
+
+        function ChildView({ child, set, remove, tab, setTab, settings }) {
+            const dl = P.deadlines(child).filter(d => d.status !== 'ok');
+            return (
+                <div className="space-y-5 min-w-0">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                            <h2 className="text-2xl font-black">{P.fullName(child) || 'Nowe dziecko'}</h2>
+                            <p className="text-sm text-slate-400">{[child.grupa, P.ageYears(child.dataUr) !== '' ? P.ageYears(child.dataUr) + ' l.' : '', child.programy.map(p => (P.PROGRAMY.find(x => x.id === p) || {}).label).join(' · ')].filter(Boolean).join(' · ') || 'Uzupełnij dane w zakładce „Dane i opis”.'}</p>
+                        </div>
+                        <button className="btn btn-danger" onClick={remove}><i className="ph-bold ph-trash"></i>Usuń dziecko</button>
+                    </div>
+                    {dl.length > 0 && <div className="flex flex-wrap gap-2">{dl.map((d, i) => <span key={i} className={'text-xs font-bold px-3 py-1.5 rounded-full ' + (d.status === 'po terminie' ? 'bg-red-500/20 text-red-300' : 'bg-amber-500/20 text-amber-200')}>{d.label}: {P.formatDatePl(d.date)} ({d.days < 0 ? Math.abs(d.days) + ' dni po terminie' : 'za ' + d.days + ' dni'})</span>)}</div>}
+                    <div className="flex gap-1 overflow-x-auto pb-1">
+                        {TABS.map(t => <button key={t.id} className="tab" aria-pressed={tab === t.id} onClick={() => setTab(t.id)}><i className={'ph-bold ' + t.icon}></i> {t.label}</button>)}
+                    </div>
+                    <div className="card p-5 sm:p-6">
+                        {tab === 'dane' && <TabDane child={child} set={set} settings={settings} />}
+                        {tab === 'dokumenty' && <TabDokumenty child={child} set={set} />}
+                        {tab === 'obserwacje' && <TabObserwacje child={child} set={set} />}
+                        {tab === 'generuj' && <TabGeneruj key={child.id} child={child} set={set} settings={settings} />}
+                        {tab === 'porada' && <TabPorada key={child.id} child={child} set={set} />}
+                        {tab === 'historia' && <TabHistoria key={child.id} child={child} set={set} />}
+                    </div>
+                </div>
+            );
+        }
+
+        function Dashboard({ vault, openChild }) {
+            const al = P.alerts(vault.children);
+            return (
+                <div className="space-y-5 min-w-0">
+                    <div className="card p-6">
+                        <h2 className="text-xl font-black mb-3"><i className="ph-bold ph-bell-ringing text-amber-300"></i> Do zrobienia</h2>
+                        {al.length === 0 ? <p className="text-sm text-slate-400">Nic pilnego. Tu pojawią się dokumenty, którym kończy się ważność, i terminy z najbliższych {P.SOON_DAYS} dni.</p> : (
+                            <ul className="space-y-2">
+                                {al.map((a, i) => (
+                                    <li key={i}><button className="w-full text-left flex flex-wrap gap-x-3 items-center rounded-xl px-3 py-2 hover:bg-slate-800" onClick={() => openChild(a.childId, 'dokumenty')}>
+                                        <span className={'text-xs font-black px-2 py-1 rounded-full ' + (a.status === 'po terminie' ? 'bg-red-500/20 text-red-300' : 'bg-amber-500/20 text-amber-200')}>{a.days < 0 ? Math.abs(a.days) + ' dni po terminie' : 'za ' + a.days + ' dni'}</span>
+                                        <strong className="text-sm">{a.name}</strong><span className="text-sm text-slate-400">{a.label} {P.formatDatePl(a.date)}</span>
+                                    </button></li>
+                                ))}
+                            </ul>
+                        )}
+                    </div>
+                    <div className="card p-6 text-sm text-slate-300 leading-relaxed space-y-2">
+                        <h2 className="text-xl font-black text-slate-100 mb-1"><i className="ph-bold ph-shield-check text-emerald-300"></i> Jak to działa</h2>
+                        <p>Wszystko, co tu wpiszesz, jest zaszyfrowane Twoim hasłem i zostaje <strong>w tej przeglądarce na tym komputerze</strong>. Nic nie trafia do chmury.</p>
+                        <p>Gdy prosisz AI o dokument lub poradę, wysyłany jest tylko opis bez imienia, nazwiska, daty urodzenia i numerów dokumentów – możesz to sprawdzić w „Co dokładnie trafi do AI”. Imię wstawia przeglądarka dopiero na gotowej kartce.</p>
+                        <p>Po {LOCK_MINUTES} minutach bezczynności Teczka sama się blokuje. Raz w tygodniu pobierz <strong>kopię zapasową</strong> (też zaszyfrowaną) – wyczyszczenie danych przeglądarki usunęłoby Teczkę.</p>
+                    </div>
+                    <div className="card p-6">
+                        <h2 className="text-lg font-black mb-3">Przydatne narzędzia EduBox</h2>
+                        <div className="flex flex-wrap gap-2 text-sm">
+                            <a className="btn btn-soft" href="/eduwpisy.html" target="_blank" rel="noopener">Wpisy do dziennika</a>
+                            <a className="btn btn-soft" href="/edukalendarz.html" target="_blank" rel="noopener">EduKalendarz</a>
+                            <a className="btn btn-soft" href="/materialy.html" target="_blank" rel="noopener">Baza Materiałów</a>
+                            <a className="btn btn-soft" href="/asystent-pedagoga.html" target="_blank" rel="noopener">Asystent Pedagoga</a>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        function Settings({ vault, update, changePassword, wipe, close }) {
+            const [pw, setPw] = useState('');
+            const [pw2, setPw2] = useState('');
+            const [msg, setMsg] = useState('');
+            const change = async (e) => {
+                e.preventDefault();
+                if (pw.length < 8) return setMsg('Hasło musi mieć co najmniej 8 znaków.');
+                if (pw !== pw2) return setMsg('Hasła się różnią.');
+                try { await changePassword(pw); setPw(''); setPw2(''); setMsg('Hasło zmienione. Stare kopie zapasowe otwiera nadal STARE hasło – pobierz nową kopię.'); } catch (x) { setMsg(x.message); }
+            };
+            return (
+                <div className="card p-6 space-y-6 min-w-0">
+                    <div className="flex justify-between items-center"><h2 className="text-xl font-black">Ustawienia</h2><button className="btn btn-soft" onClick={close}><i className="ph-bold ph-x"></i>Zamknij</button></div>
+                    <Field label="Rodzaj oddziału (do dokumentów)">
+                        <select className="field" value={vault.settings.oddzial} onChange={e => update(v => Object.assign({}, v, { settings: Object.assign({}, v.settings, { oddzial: e.target.value }) }))}>
+                            {AD.ODDZIALY.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
+                        </select>
+                    </Field>
+                    <form onSubmit={change} className="space-y-3">
+                        <span className="lbl">Zmień hasło</span>
+                        <div className="grid sm:grid-cols-2 gap-3">
+                            <input type="password" autoComplete="new-password" className="field" value={pw} onChange={e => setPw(e.target.value)} placeholder="Nowe hasło" />
+                            <input type="password" autoComplete="new-password" className="field" value={pw2} onChange={e => setPw2(e.target.value)} placeholder="Powtórz" />
+                        </div>
+                        <button className="btn btn-soft">Zmień hasło</button>
+                        {msg && <p className="text-sm text-amber-200">{msg}</p>}
+                    </form>
+                    <div className="border-t border-slate-800 pt-5">
+                        <span className="lbl">Usuń Teczkę z tej przeglądarki</span>
+                        <p className="text-sm text-slate-400 mb-3">Kasuje wszystkie dane z tego komputera. Kopie zapasowe zostają na dysku.</p>
+                        <button className="btn btn-danger" onClick={wipe}><i className="ph-bold ph-trash"></i>Usuń wszystkie dane</button>
+                    </div>
+                </div>
+            );
+        }
+
+        // ---------- aplikacja ----------
+        function App() {
+            const [stage, setStage] = useState(() => readStored() ? 'locked' : 'setup');
+            const [vault, setVault] = useState(null);
+            const [selId, setSelId] = useState(null);
+            const [tab, setTab] = useState('dane');
+            const [showSettings, setShowSettings] = useState(false);
+            const [query, setQuery] = useState('');
+            const [saveState, setSaveState] = useState('');
+            const sessionRef = useRef(null);
+            const vaultRef = useRef(null);
+            const timerRef = useRef(null);
+            const pendingRef = useRef(false);
+            const lastActive = useRef(Date.now());
+
+            const writeNow = useCallback(async (v) => {
+                if (!sessionRef.current || !v) return;
+                try {
+                    const sealed = await P.seal(v, sessionRef.current);
+                    localStorage.setItem(P.VAULT_KEY, JSON.stringify(sealed));
+                    pendingRef.current = false;
+                    setSaveState('Zapisano ' + new Date().toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' }));
+                } catch (e) {
+                    setSaveState('BŁĄD ZAPISU: ' + (e && e.name === 'QuotaExceededError' ? 'brak miejsca' : e.message));
+                }
+            }, []);
+
+            const update = useCallback((fn) => {
+                const next = fn(vaultRef.current);
+                vaultRef.current = next;
+                setVault(next);
+                pendingRef.current = true;
+                setSaveState('Zapisuję…');
+                clearTimeout(timerRef.current);
+                timerRef.current = setTimeout(() => writeNow(vaultRef.current), 500);
+            }, [writeNow]);
+
+            const opened = (data, session) => {
+                sessionRef.current = session;
+                vaultRef.current = data;
+                setVault(data);
+                setStage('open');
+                lastActive.current = Date.now();
+            };
+
+            const lock = useCallback(async () => {
+                clearTimeout(timerRef.current);
+                if (pendingRef.current) await writeNow(vaultRef.current);
+                sessionRef.current = null;
+                vaultRef.current = null;
+                setVault(null);
+                setSelId(null);
+                setShowSettings(false);
+                setSaveState('');
+                setStage(readStored() ? 'locked' : 'setup');
+            }, [writeNow]);
+
+            // Automatyczna blokada po bezczynności + ostrzeżenie przy zamykaniu karty w trakcie zapisu.
+            useEffect(() => {
+                if (stage !== 'open') return;
+                const touch = () => { lastActive.current = Date.now(); };
+                const evs = ['mousemove', 'keydown', 'click', 'touchstart', 'scroll'];
+                evs.forEach(e => window.addEventListener(e, touch, { passive: true }));
+                const iv = setInterval(() => { if (Date.now() - lastActive.current > LOCK_MINUTES * 60000) lock(); }, 20000);
+                const before = (e) => { if (pendingRef.current) { e.preventDefault(); e.returnValue = ''; } };
+                window.addEventListener('beforeunload', before);
+                return () => { evs.forEach(e => window.removeEventListener(e, touch)); clearInterval(iv); window.removeEventListener('beforeunload', before); };
+            }, [stage, lock]);
+
+            if (stage === 'setup') return <Setup onImported={() => setStage('locked')} onCreated={(s) => { const v = P.emptyVault(); opened(v, s); writeNow(v); }} />;
+            if (stage === 'locked' || !vault) return <Locked onOpened={opened} onImported={() => setStage('locked')} />;
+
+            const child = vault.children.find(c => c.id === selId);
+            const setChild = (id) => (patch) => update(v => Object.assign({}, v, { children: v.children.map(c => c.id === id ? Object.assign({}, c, patch, { zmieniono: new Date().toISOString() }) : c) }));
+            const addChild = () => { const c = P.newChild(); update(v => Object.assign({}, v, { children: [...v.children, c] })); setSelId(c.id); setTab('dane'); setShowSettings(false); };
+            const removeChild = (c) => () => {
+                if (!window.confirm(`Usunąć ${P.fullName(c) || 'to dziecko'} z Teczki razem z dokumentami, obserwacjami i historią?`)) return;
+                update(v => Object.assign({}, v, { children: v.children.filter(x => x.id !== c.id) }));
+                setSelId(null);
+            };
+            const openChild = (id, t) => { setSelId(id); setTab(t || 'dane'); setShowSettings(false); };
+            const backup = async () => {
+                const sealed = await P.seal(vaultRef.current, sessionRef.current);
+                downloadJson(sealed, `teczka-podopiecznych-${today()}.json`);
+            };
+            const changePassword = async (pw) => {
+                sessionRef.current = await P.createSession(pw);
+                await writeNow(vaultRef.current);
+            };
+            const wipe = () => {
+                if (window.prompt('Aby usunąć WSZYSTKIE dane Teczki z tej przeglądarki, wpisz: USUŃ') !== 'USUŃ') return;
+                try { localStorage.removeItem(P.VAULT_KEY); } catch (e) {}
+                pendingRef.current = false;
+                sessionRef.current = null; vaultRef.current = null;
+                setVault(null); setSelId(null); setShowSettings(false); setStage('setup');
+            };
+
+            const q = query.trim().toLocaleLowerCase('pl');
+            const alertIds = new Set(P.alerts(vault.children).map(a => a.childId));
+            const list = vault.children
+                .filter(c => !q || [c.imie, c.nazwisko, c.zdrobnienie, c.grupa].join(' ').toLocaleLowerCase('pl').includes(q))
+                .sort((a, b) => (a.nazwisko + a.imie).localeCompare(b.nazwisko + b.imie, 'pl'));
+
+            return (
+                <div>
+                    <header className="border-b border-slate-800 bg-slate-950/95 sticky top-0 z-20 backdrop-blur">
+                        <div className="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+                            <button className="font-black text-lg tracking-tight text-left" onClick={() => { setSelId(null); setShowSettings(false); }}>🗂️ Teczka <span className="text-emerald-300">podopiecznych</span></button>
+                            <div className="flex flex-wrap items-center gap-2">
+                                <span className={'text-xs mr-1 ' + (saveState.startsWith('BŁĄD') ? 'text-red-300 font-bold' : 'text-slate-500')}>{saveState}</span>
+                                <button className="btn btn-soft" onClick={backup} title="Pobierz zaszyfrowaną kopię"><i className="ph-bold ph-download-simple"></i><span className="hidden sm:inline">Kopia zapasowa</span></button>
+                                <button className="btn btn-soft" onClick={() => { setShowSettings(true); setSelId(null); }} title="Ustawienia"><i className="ph-bold ph-gear"></i></button>
+                                <button className="btn btn-main" onClick={lock}><i className="ph-bold ph-lock"></i><span className="hidden sm:inline">Zablokuj</span></button>
+                            </div>
+                        </div>
+                    </header>
+                    <main className="max-w-7xl mx-auto px-4 py-6 grid lg:grid-cols-[300px_minmax(0,1fr)] gap-6 items-start">
+                        <aside className="card p-4 lg:sticky lg:top-20 space-y-3 min-w-0">
+                            <button className="btn btn-main w-full" onClick={addChild}><i className="ph-bold ph-user-plus"></i>Dodaj dziecko</button>
+                            {vault.children.length > 4 && <input className="field" value={query} onChange={e => setQuery(e.target.value)} placeholder="Szukaj…" />}
+                            {vault.children.length === 0 && <p className="text-sm text-slate-500 px-1">Nie ma jeszcze dzieci. Zacznij od „Dodaj dziecko”.</p>}
+                            <ul className="space-y-1 max-h-[60vh] overflow-y-auto">
+                                {list.map(c => (
+                                    <li key={c.id}><button onClick={() => openChild(c.id, selId === c.id ? tab : 'dane')} className={'w-full text-left rounded-xl px-3 py-2 flex items-center gap-2 ' + (c.id === selId ? 'bg-emerald-500/15 text-emerald-200' : 'hover:bg-slate-800')}>
+                                        <span className="flex-1 min-w-0"><span className="block font-bold text-sm truncate">{P.fullName(c) || 'Bez imienia'}</span><span className="block text-xs text-slate-500 truncate">{[c.grupa, c.programy.map(p => p.toUpperCase().replace('ZAZYCIEM', 'Za życiem')).join(' · ')].filter(Boolean).join(' · ')}</span></span>
+                                        {alertIds.has(c.id) && <span className="w-2.5 h-2.5 rounded-full bg-amber-400 shrink-0" title="Pilny termin"></span>}
+                                    </button></li>
+                                ))}
+                            </ul>
+                        </aside>
+                        {showSettings ? <Settings vault={vault} update={update} changePassword={changePassword} wipe={wipe} close={() => setShowSettings(false)} />
+                            : child ? <ChildView key={child.id} child={child} set={setChild(child.id)} remove={removeChild(child)} tab={tab} setTab={setTab} settings={vault.settings} />
+                            : <Dashboard vault={vault} openChild={openChild} />}
+                    </main>
+                </div>
+            );
+        }
+
+        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    </script>
+</body>
+</html>

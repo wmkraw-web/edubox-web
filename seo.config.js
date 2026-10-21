@@ -117,6 +117,7 @@ module.exports = {
     { path: 'panel-materialy.html', reason: 'Prywatny panel zarządzania pakietami materiałów (Basic Auth)' },
     { path: 'menu.html', reason: 'Fragment nawigacji, nie samodzielna strona' },
     { path: 'teczka.html', reason: 'Prywatna lokalna Teczka użytkownika, bez treści publicznej' },
+    { path: 'podopieczni.html', reason: 'Prywatna zaszyfrowana Teczka podopiecznych (dane dzieci tylko w przeglądarce)' },
   ],
   robotsDisallow: [
     '/api/',
@@ -130,6 +131,7 @@ module.exports = {
     '/panel-analytics.html',
     '/panel-materialy.html',
     '/teczka.html',
+    '/podopieczni.html',
   ],
   blog: {
     page: 'blog.html',

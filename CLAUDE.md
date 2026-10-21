@@ -190,6 +190,22 @@ startową. Dozwolone wartości są jawnie sprawdzane w `scripts/check-catalog.js
 Strona jest celowo prywatna (`noindex`) i wykluczona z sitemap. Przy zmianach
 nie dodawaj synchronizacji chmurowej bez osobnej, świadomej decyzji właściciela.
 
+**Teczka podopiecznych (`podopieczni.html` + `podopieczni-core.js`, od 21.10.2026):** prywatne narzędzie dla
+wychowawczyni przedszkola specjalnego (żona właściciela) – karty dzieci (KS, WWRD, „Za życiem”), dokumenty z poradni
+z datą ważności, terminy, obserwacje, generowanie dokumentów i porady. **Dane dzieci tylko w przeglądarce**, w jednym
+zaszyfrowanym wpisie `localStorage.eduboxPodopieczniV1` (PBKDF2-SHA256 310 000 iteracji + AES-GCM 256, klucz tylko
+w pamięci karty, blokada po 15 min bezczynności, kopia zapasowa = ten sam zaszyfrowany plik; hasła nie da się odzyskać).
+Strona celowo NIE ładuje Firebase, GA, `global-core.js`, menu ani cookie-consent (test to pilnuje) i ma przypięte wersje
+bibliotek z CDN. Brak kafelka w `apps.js`, `noindex`, w `excludedPages` i `robots.txt`; bez Basic Auth – ochroną jest
+szyfrowanie (strona sama nie zawiera danych). **Do AI idzie tylko anonimowy opis:** `aiInput`/`adviceText` budują
+wejście dla `EduAsystentDocs.buildUserPrompt` i `EduSosPrompts` (te same sprawdzone instrukcje co Asystent Pedagoga),
+`scrub` zamienia imię/nazwisko/zdrobnienia w odmianie na `[imię]`, PESEL, datę urodzenia, numery dokumentów i poradnie
+z karty oraz każdy zapis „nr …” na tokeny; grupy, numerów i poradni w ogóle nie wysyłamy. Przed KAŻDYM `streamChat`
+jest `assertNoLeak` (`leaks()` – wstrzymuje wysyłkę), a strona pokazuje „Co dokładnie trafi do AI”. Imię wraca dopiero
+na kartce (`fillName` + `[imię]` → imię). Testy: `npm run podopieczni:check` (w `npm test`) – także pełne zapytania
+dla wszystkich typów dokumentów KS i WWRD bez żadnej danej identyfikującej. Nowe pole z danymi dziecka = albo tylko
+lokalne, albo przez `scrub`; nigdy prosto do promptu.
+
 **Panel jakości Make:** `panel-jakosci.html` korzysta z odczytowego trybu
 `GET /api/weekly-report?view=make-health`, dzięki czemu nie powstaje trzynasta
 funkcja Vercel. Publiczny jest wyłącznie pusty ekran logowania; dane endpointu
