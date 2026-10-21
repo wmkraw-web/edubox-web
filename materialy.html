@@ -154,7 +154,10 @@
         // przeglądarce) - kod zapamiętany przy aktywacji PRO w menu.html jest wysyłany
         // do /api/verify-code przy KAŻDYM pobraniu, więc bez ważnego kodu plik po
         // prostu nie przyjdzie, nawet gdyby ktoś ręcznie ustawił flagę eduboxProStatus.
-        async function pobierzPlik(sciezka, nazwaPliku, onBlad) {
+        // Do 21.10.2026 kod zapamiętywało tylko górne menu, więc kto odblokował PRO w narzędziu,
+        // nie miał tu czego wysłać i dostawał „Nieprawidłowy kod”. Przy odmowie (403) prosimy raz o kod,
+        // zapamiętujemy go i próbujemy jeszcze raz. Serwer tylko sprawdza kod - niczego nie zużywa.
+        async function pobierzPlik(sciezka, nazwaPliku, onBlad, ponownie = false) {
             const kod = localStorage.getItem('eduboxProCode') || '';
             try {
                 const res = await fetch('/api/verify-code', {
@@ -163,6 +166,13 @@
                     body: JSON.stringify({ action: 'materialy-download', path: sciezka, code: kod, mode: 'link', name: nazwaPliku }),
                 });
                 const data = await res.json().catch(() => ({}));
+                if (res.status === 403 && !ponownie) {
+                    const wpisany = (window.prompt('Wpisz kod PRO, którym odblokowano dostęp (np. z maila z podziękowaniem):', kod) || '').trim().toUpperCase();
+                    if (wpisany) {
+                        try { localStorage.setItem('eduboxProCode', wpisany); } catch (e) {}
+                        return pobierzPlik(sciezka, nazwaPliku, onBlad, true);
+                    }
+                }
                 if (!res.ok || !data.url) {
                     onBlad(data.error || 'Nie udało się pobrać pliku.');
                     return;

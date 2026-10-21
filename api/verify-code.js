@@ -1,14 +1,14 @@
 import { getServiceAccountAccessToken } from './_lib/googleServiceAccountAuth.js';
 import { isRateLimited } from './_lib/rateLimit.js';
-import { YEAR_CODE_PATTERN, yearCodeUntil } from './_lib/coffeePlan.js';
+import { YEAR_CODE_PATTERN, yearCodeUntil, BONUS_CODE_PATTERN, BONUS_SHEETS, bonusUntilFromRows } from './_lib/coffeePlan.js';
 import { signedGetUrl, allowedOrigin, isPreviewPath, isUploadPath, sanitizePakiet, toFields, FIRESTORE_DOCS, KATALOG_PATH, DOC_ID } from './_lib/materialy.js';
 
 // UWAGA: ten plik obsługuje TERAZ dwie sprawy pod jednym endpointem, celowo -
 // dokładnie ten sam kompromis co api/ewa-generate.js (obrazy fal.ai + wideo D-ID
 // pod wspólnym endpointem przez pole "type"/"action" w body), bo limit 12 funkcji
 // na planie Vercel Hobby jest już prawie wyczerpany (11/12 przed tą zmianą).
-// Domyślne zachowanie (brak pola "action" w body) jest BEZ ŻADNEJ ZMIANY - to
-// wciąż ten sam prosty "czy ten kod jest ważny" używany przez menu.html.
+// Domyślne zachowanie (brak pola "action" w body) to prosty "czy ten kod jest ważny"
+// używany przez menu.html i narzędzia (od 21.10.2026 kod idzie do Make tylko z prefiksem EDU-/KAWA-).
 // Nowe akcje "materialy-download" / "materialy-upload" / "materialy-delete" obsługują
 // Bazę Materiałów (materialy.html + panel-materialy.html) - jedyne miejsce w EduBox,
 // gdzie plik do pobrania jest naprawdę zablokowany po stronie serwera, a nie tylko
@@ -68,8 +68,32 @@ async function checkYearCode(normalizedCode) {
   }
 }
 
-// Ten sam trzystopniowy sposób weryfikacji kodu co poniżej w handlerze - wydzielony,
-// żeby akcja "materialy-download" mogła go użyć bez duplikowania trzech gałęzi if.
+// Kod 7-dniowy (KAWA-/EDU-) już AKTYWOWANY - tylko odczyt arkusza, bez Make i bez żadnego zapisu.
+// Używane wyłącznie przy pobieraniu z Bazy Materiałów: Make przy każdym sprawdzeniu oznacza kod jako
+// „used”, więc drugi raz odpowiada „nieważny” - do 21.10.2026 przez to osoby z kodem z kawy albo
+// polecenia nie mogły pobrać żadnego pakietu. Nieaktywowany kod pobierania nie daje (najpierw aktywacja).
+async function checkActivatedBonusCode(normalizedCode) {
+  try {
+    if (!BONUS_CODE_PATTERN.test(normalizedCode)) return null;
+    if (!process.env.GOOGLE_SERVICE_ACCOUNT_KEY || !process.env.SHEETS_SPREADSHEET_ID) return null;
+    const sheet = BONUS_SHEETS[normalizedCode.split('-')[0]];
+    const token = await getServiceAccountAccessToken(
+      JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_KEY),
+      'https://www.googleapis.com/auth/spreadsheets.readonly'
+    );
+    const sheetRes = await fetch(
+      `https://sheets.googleapis.com/v4/spreadsheets/${process.env.SHEETS_SPREADSHEET_ID}/values/${encodeURIComponent(sheet.range)}`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    if (!sheetRes.ok) return null;
+    return bonusUntilFromRows((await sheetRes.json()).values || [], normalizedCode);
+  } catch (e) {
+    return null;
+  }
+}
+
+// Sprawdzenie kodu przy pobieraniu pliku z Bazy Materiałów - TYLKO odczyt, nigdy Make: pobieranie
+// nie może zużywać kodu ani wysyłać maili z nagrodą za polecenie przy każdym kliknięciu.
 async function isCodeCurrentlyValid(code) {
   if (!code || typeof code !== 'string') return false;
   const normalized = code.trim().toUpperCase();
@@ -78,15 +102,7 @@ async function isCodeCurrentlyValid(code) {
 
   if (YEAR_CODE_PATTERN.test(normalized)) return Boolean(await checkYearCode(normalized));
 
-  if (process.env.REFERRAL_WEBHOOK_URL) {
-    const referralResult = await checkWebhook(process.env.REFERRAL_WEBHOOK_URL, normalized);
-    if (referralResult) return true;
-  }
-
-  if (process.env.COFFEE_WEBHOOK_URL) {
-    const coffeeResult = await checkWebhook(process.env.COFFEE_WEBHOOK_URL, normalized);
-    if (coffeeResult) return true;
-  }
+  if (BONUS_CODE_PATTERN.test(normalized)) return Boolean(await checkActivatedBonusCode(normalized));
 
   return false;
 }
@@ -432,8 +448,11 @@ export default async function handler(req, res) {
     return res.status(200).json(until ? { valid: true, bonus: true, until } : { valid: false });
   }
 
+  // Do Make trafia tylko kod z pasującym prefiksem (EDU- → polecenia, KAWA- → kawa). Wcześniej każdy
+  // błędny kod (np. literówka w kodzie uniwersalnym) szedł do OBU scenariuszy: podwójne operacje Make
+  // i ostrzeżenia w skrzynce przy zwykłej pomyłce.
   // 2. Kod bonusowy z programu poleceń — sprawdzany w Make (rejestr w Google Sheets).
-  if (process.env.REFERRAL_WEBHOOK_URL) {
+  if (process.env.REFERRAL_WEBHOOK_URL && normalized.startsWith('EDU-')) {
     const referralResult = await checkWebhook(process.env.REFERRAL_WEBHOOK_URL, normalized);
     if (referralResult) {
       return res.status(200).json({ valid: true, bonus: true, until: referralResult.until });
@@ -441,7 +460,7 @@ export default async function handler(req, res) {
   }
 
   // 3. Kod z podziękowania za kawę (Buycoffee.to) — czasowy dostęp PRO, sprawdzany w Make.
-  if (process.env.COFFEE_WEBHOOK_URL) {
+  if (process.env.COFFEE_WEBHOOK_URL && normalized.startsWith('KAWA-')) {
     const coffeeResult = await checkWebhook(process.env.COFFEE_WEBHOOK_URL, normalized);
     if (coffeeResult) {
       return res.status(200).json({ valid: true, bonus: true, until: coffeeResult.until });

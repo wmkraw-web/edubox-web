@@ -640,6 +640,15 @@ w Make, scenariusz Coffee-Verify) albo – od 49 zł – `ROK-…` (365 dni od w
 `api/verify-code.js` sprawdza bezpośrednio w arkuszu `Coffee_Codes` (A kod, F data). Logika planu:
 `api/_lib/coffeePlan.js` (testy `node api/_lib/coffeePlan.test.js`). Przeglądarka obsługuje oba typy
 przez `bonus/until` (eduboxBonusUntil).
+**Aktywacja vs pobieranie (od 21.10.2026):** Make (Coffee-Verify / Referral-Verify) przy sprawdzeniu ZUŻYWA kod
+(„used” + data w kolumnie UsedAt), więc wolno go wołać tylko przy aktywacji – i tylko z pasującym prefiksem
+(`EDU-` → polecenia, `KAWA-` → kawa). Pobieranie z Bazy Materiałów (`isCodeCurrentlyValid`) czyta arkusz bez zapisu
+(`bonusUntilFromRows`: aktywowany kod ważny do dnia użycia + 7, północ UTC – jak w przeglądarce). Wcześniej
+pobieranie pytało Make drugi raz i osoby z kodem z kawy/polecenia nie pobierały nic. Kod do pobierania leży
+w `localStorage.eduboxProCode` – zapisują go menu, `EduBoxCore.verifyPremiumCode` i każda własna aktywacja w narzędziu
+(nowa aktywacja = dopisz zapis kodu); bez niego `materialy.html` prosi o kod przy odmowie 403.
+Scenariusze Make zwracają `{"valid": false}` przy nieznanym kodzie (router po wyszukiwaniu – wyszukiwanie
+w arkuszu potrafi oddać pustą paczkę, a „Update a Row” bez numeru wiersza sypał błędem `Aundefined:Zundefined`).
 
 **Generowanie treści przez AI — wypracowane wzorce:**
 - *Sekcje zamiast JSON przy strumieniu* (EduWycieczka): JSON nie płynie strumieniem, więc dostaje słabszy

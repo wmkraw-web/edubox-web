@@ -435,6 +435,9 @@ export const EduBoxCore = {
                     // licznik bonusu, żeby nie wygasił w przyszłości permanentnego dostępu.
                     localStorage.removeItem('eduboxBonusUntil');
                 }
+                // Baza Materiałów wysyła ten kod przy każdym pobraniu (sprawdzanie po stronie serwera).
+                // Wcześniej zapamiętywało go tylko menu, więc PRO odblokowane w narzędziu nie pobierało nic.
+                localStorage.setItem('eduboxProCode', String(code || '').trim().toUpperCase());
             }
             return data.valid === true;
         } catch (e) {
