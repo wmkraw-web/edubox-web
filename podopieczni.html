@@ -130,8 +130,12 @@
         }
 
         function Setup({ onCreated, onImported }) {
+            const [name1, setName1] = useState('');
             const [pw, setPw] = useState('');
             const [pw2, setPw2] = useState('');
+            const [name2, setName2] = useState('');
+            const [bpw, setBpw] = useState('');
+            const [bpw2, setBpw2] = useState('');
             const [ack, setAck] = useState(false);
             const [busy, setBusy] = useState(false);
             const [err, setErr] = useState('');
@@ -140,20 +144,44 @@
                 setErr('');
                 if (pw.length < 8) return setErr('Hasło musi mieć co najmniej 8 znaków.');
                 if (pw !== pw2) return setErr('Hasła się różnią.');
+                if (bpw || bpw2) {
+                    if (bpw.length < 8) return setErr('Hasło zapasowe musi mieć co najmniej 8 znaków.');
+                    if (bpw !== bpw2) return setErr('Hasła zapasowe się różnią.');
+                    if (bpw === pw) return setErr('Hasło zapasowe musi być inne niż główne.');
+                }
                 setBusy(true);
-                try { onCreated(await P.createSession(pw)); } catch (x) { setErr(x.message); setBusy(false); }
+                try {
+                    let s = await P.createSession(pw, name1.trim() || 'Hasło główne');
+                    if (bpw) s = await P.addPassword(s, bpw, name2.trim() || 'Hasło zapasowe');
+                    onCreated(s);
+                } catch (x) { setErr(x.message); setBusy(false); }
             };
             return (
                 <div className="max-w-lg mx-auto px-4 py-12">
                     <div className="text-5xl mb-4">🗂️</div>
                     <h1 className="text-3xl font-black mb-3">Teczka podopiecznych</h1>
                     <p className="text-slate-300 leading-relaxed mb-6">Dane dzieci, dokumenty, terminy i notatki z obserwacji – w jednym miejscu, <strong>tylko na tym komputerze</strong>, zaszyfrowane Twoim hasłem. Dokumenty (IPET, WOPFU, opinia, WWRD) pisze AI, ale dostaje wyłącznie opis bez imion i dat.</p>
-                    <form onSubmit={create} className="card p-6 space-y-4">
-                        <Field label="Ustaw hasło do Teczki"><input type="password" autoComplete="new-password" className="field" value={pw} onChange={e => setPw(e.target.value)} placeholder="min. 8 znaków" /></Field>
-                        <Field label="Powtórz hasło"><input type="password" autoComplete="new-password" className="field" value={pw2} onChange={e => setPw2(e.target.value)} /></Field>
+                    <form onSubmit={create} className="card p-6 space-y-5">
+                        <div className="space-y-3">
+                            <h2 className="font-black">1. Hasło codzienne</h2>
+                            <Field label="Czyje to hasło"><input className="field" value={name1} onChange={e => setName1(e.target.value)} placeholder="np. Ania" maxLength={40} /></Field>
+                            <div className="grid sm:grid-cols-2 gap-3">
+                                <Field label="Hasło"><input type="password" autoComplete="new-password" className="field" value={pw} onChange={e => setPw(e.target.value)} placeholder="min. 8 znaków" /></Field>
+                                <Field label="Powtórz hasło"><input type="password" autoComplete="new-password" className="field" value={pw2} onChange={e => setPw2(e.target.value)} /></Field>
+                            </div>
+                        </div>
+                        <div className="space-y-3 border-t border-slate-800 pt-4">
+                            <h2 className="font-black">2. Hasło zapasowe <span className="text-xs text-emerald-300 font-bold">(zalecane)</span></h2>
+                            <p className="text-sm text-slate-400">Drugie hasło do tej samej Teczki – dla osoby, która pomoże, gdy pierwsze się zapomni. Otwiera te same dane.</p>
+                            <Field label="Czyje to hasło"><input className="field" value={name2} onChange={e => setName2(e.target.value)} placeholder="np. Witold" maxLength={40} /></Field>
+                            <div className="grid sm:grid-cols-2 gap-3">
+                                <Field label="Hasło zapasowe"><input type="password" autoComplete="new-password" className="field" value={bpw} onChange={e => setBpw(e.target.value)} placeholder="min. 8 znaków" /></Field>
+                                <Field label="Powtórz"><input type="password" autoComplete="new-password" className="field" value={bpw2} onChange={e => setBpw2(e.target.value)} /></Field>
+                            </div>
+                        </div>
                         <label className="flex gap-3 items-start text-sm text-amber-100 bg-amber-500/10 border border-amber-400/30 rounded-xl p-3">
                             <input type="checkbox" className="mt-1" checked={ack} onChange={e => setAck(e.target.checked)} />
-                            <span><strong>Hasła nie da się odzyskać.</strong> Bez niego nikt – także EduBox – nie odczyta danych. Zapisz je w bezpiecznym miejscu i regularnie pobieraj kopię zapasową.</span>
+                            <span><strong>Haseł nie da się zresetować.</strong> Nikt – także EduBox – nie odczyta danych bez jednego z nich. Zapiszcie je w bezpiecznym miejscu i regularnie pobierajcie kopię zapasową.</span>
                         </label>
                         {err && <p className="text-sm text-red-300">{err}</p>}
                         <button className="btn btn-main w-full" disabled={!ack || busy}>{busy ? 'Tworzę sejf…' : 'Utwórz Teczkę'}</button>
@@ -172,14 +200,14 @@
                 setBusy(true); setErr('');
                 try {
                     const res = await P.open(readStored(), pw);
-                    onOpened(res.data, res.session);
+                    onOpened(res.data, res.session, res.migrated);
                 } catch (x) { setErr(x.message); setBusy(false); }
             };
             return (
                 <div className="max-w-md mx-auto px-4 py-16">
                     <div className="text-5xl mb-4">🔒</div>
                     <h1 className="text-3xl font-black mb-2">Teczka podopiecznych</h1>
-                    <p className="text-slate-400 mb-6">Teczka jest zablokowana. Wpisz hasło, żeby ją otworzyć.</p>
+                    <p className="text-slate-400 mb-6">Teczka jest zablokowana. Wpisz swoje hasło (codzienne albo zapasowe).</p>
                     <form onSubmit={unlock} className="card p-6 space-y-4">
                         <input type="password" autoFocus autoComplete="current-password" className="field" value={pw} onChange={e => setPw(e.target.value)} placeholder="Hasło do Teczki" />
                         {err && <p className="text-sm text-red-300">{err}</p>}
@@ -262,7 +290,7 @@
             );
         }
 
-        function TabDokumenty({ child, set }) {
+        function TabDokumenty({ child, set, onImport }) {
             const setDoc = (id, patch) => set({ dokumenty: child.dokumenty.map(d => d.id === id ? Object.assign({}, d, patch) : d) });
             const setTerm = (id, patch) => set({ terminy: child.terminy.map(t => t.id === id ? Object.assign({}, t, patch) : t) });
             const dl = P.deadlines(child);
@@ -273,9 +301,11 @@
                     <section>
                         <div className="flex items-center justify-between gap-3 mb-3">
                             <h3 className="text-lg font-black">Dokumenty z poradni i placówki <Tag /></h3>
+                            <span className="flex-1"></span>
+                            <button className="btn btn-main" onClick={onImport}><i className="ph-bold ph-file-arrow-up"></i>Wczytaj plik</button>
                             <button className="btn btn-soft" onClick={() => set({ dokumenty: [{ id: P.uid(), rodzaj: 'orzeczenie', numer: '', wydany: '', wazneDo: '', poradnia: '', skan: '', uwagi: '' }, ...child.dokumenty] })}><i className="ph-bold ph-plus"></i>Dodaj</button>
                         </div>
-                        {child.dokumenty.length === 0 && <p className="text-sm text-slate-500">Brak dokumentów. Dodaj orzeczenie lub opinię – Teczka przypomni, kiedy kończy się ważność.</p>}
+                        {child.dokumenty.length === 0 && <p className="text-sm text-slate-500">Brak dokumentów. Wczytaj orzeczenie lub opinię (PDF, Word, skan) albo dodaj ręcznie – Teczka przypomni, kiedy kończy się ważność.</p>}
                         <div className="space-y-3">
                             {child.dokumenty.map(d => (
                                 <div key={d.id} className="card p-4">
@@ -290,6 +320,7 @@
                                     <div className="flex flex-wrap items-end gap-3 mt-3">
                                         <div className="flex-1 min-w-[200px]"><Field label="Uwagi"><input className="field" value={d.uwagi || ''} onChange={e => setDoc(d.id, { uwagi: e.target.value })} /></Field></div>
                                         {d.wazneDo && <span className={'text-xs font-black px-3 py-2 rounded-full ' + badge(statusOf(d.wazneDo))}>{statusOf(d.wazneDo) || 'ok'}</span>}
+                                        {d.tekst && <details className="w-full order-last text-xs"><summary className="cursor-pointer text-emerald-300 font-bold"><i className="ph-bold ph-file-text"></i> Treść wczytana z pliku{d.plik ? ` „${d.plik}”` : ''} ({d.tekst.length.toLocaleString('pl-PL')} znaków) – AI korzysta z niej bez danych osobowych</summary><textarea className="field font-mono text-xs mt-2" rows="8" value={d.tekst} onChange={e => setDoc(d.id, { tekst: e.target.value })} /></details>}
                                         <button className="btn btn-danger" onClick={() => window.confirm('Usunąć ten dokument z Teczki?') && set({ dokumenty: child.dokumenty.filter(x => x.id !== d.id) })}><i className="ph-bold ph-trash"></i></button>
                                     </div>
                                 </div>
@@ -358,6 +389,8 @@
             const [docType, setDocType] = useState(defaultModule === 'wwrd' ? 'ipww' : 'ipet');
             const [length, setLength] = useState('epic');
             const [withNotes, setWithNotes] = useState(true);
+            const docsWithText = child.dokumenty.filter(d => d && d.tekst).length;
+            const [withDocs, setWithDocs] = useState(true);
             const [extra, setExtra] = useState('');
             const [cel, setCel] = useState('');
             const [headers, setHeaders] = useState('');
@@ -369,7 +402,7 @@
             const paperRef = useRef(null);
             const types = module === 'wwrd' ? AD.WWRD_DOC_TYPES : AD.DOC_TYPES;
 
-            const input = Object.assign(P.aiInput(child, { module, docType, withNotes, extra, cel, oddzial: settings.oddzial }), { customHeaders: headers });
+            const input = Object.assign(P.aiInput(child, { module, docType, withNotes, withDocs, extra, cel, oddzial: settings.oddzial }), { customHeaders: headers });
             const userPrompt = AD.buildUserPrompt(input);
 
             const run = async () => {
@@ -413,6 +446,7 @@
                         <textarea className="field mt-2" value={headers} onChange={e => setHeaders(e.target.value)} placeholder={'Każdy nagłówek w osobnej linii, np.\nInformacje o dziecku\nCele\nFormy pomocy'} />
                     </details>
                     <label className="flex items-center gap-2 text-sm text-slate-300"><input type="checkbox" checked={withNotes} onChange={e => setWithNotes(e.target.checked)} />Dołącz obserwacje ({child.notatki.length}) jako materiał źródłowy</label>
+                    <label className="flex items-center gap-2 text-sm text-slate-300"><input type="checkbox" checked={withDocs} disabled={!docsWithText} onChange={e => setWithDocs(e.target.checked)} />Dołącz treść wczytanych dokumentów ({docsWithText}) – bez danych osobowych</label>
                     <PromptPreview text={userPrompt} />
                     <button className="btn btn-main" onClick={run} disabled={streaming}>{streaming ? <><i className="ph-bold ph-circle-notch animate-spin"></i>Piszę…</> : <><i className="ph-bold ph-magic-wand"></i>Napisz dokument</>}</button>
                     {err && <p className="text-sm text-red-300 font-bold">{err}</p>}
@@ -519,7 +553,7 @@
             { id: 'historia', label: 'Historia', icon: 'ph-clock-counter-clockwise' }
         ];
 
-        function ChildView({ child, set, remove, tab, setTab, settings }) {
+        function ChildView({ child, set, remove, tab, setTab, settings, onImport }) {
             const dl = P.deadlines(child).filter(d => d.status !== 'ok');
             return (
                 <div className="space-y-5 min-w-0">
@@ -536,7 +570,7 @@
                     </div>
                     <div className="card p-5 sm:p-6">
                         {tab === 'dane' && <TabDane child={child} set={set} settings={settings} />}
-                        {tab === 'dokumenty' && <TabDokumenty child={child} set={set} />}
+                        {tab === 'dokumenty' && <TabDokumenty child={child} set={set} onImport={onImport} />}
                         {tab === 'obserwacje' && <TabObserwacje child={child} set={set} />}
                         {tab === 'generuj' && <TabGeneruj key={child.id} child={child} set={set} settings={settings} />}
                         {tab === 'porada' && <TabPorada key={child.id} child={child} set={set} />}
@@ -546,10 +580,291 @@
             );
         }
 
-        function Dashboard({ vault, openChild }) {
+        // ---------- wczytywanie dokumentów: wszystko w przeglądarce ----------
+        // PDF z tekstem → pdf.js; skan (PDF bez tekstu) i zdjęcie → OCR tesseract.js na tym komputerze (skan z imieniem,
+        // PESEL i adresem NIE może iść do chmury); Word .docx → mammoth. Biblioteki ładowane dopiero przy pierwszym pliku.
+        const LIBS = {
+            pdf: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js',
+            pdfWorker: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js',
+            mammoth: 'https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.8.0/mammoth.browser.min.js',
+            tesseract: 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js',
+            tessWorker: 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/worker.min.js',
+            tessCore: 'https://cdn.jsdelivr.net/npm/tesseract.js-core@5.1.1',
+            tessLang: 'https://cdn.jsdelivr.net/npm/@tesseract.js-data/pol/4.0.0_best_int'
+        };
+        const scriptCache = {};
+        const loadScript = (src) => scriptCache[src] || (scriptCache[src] = new Promise((resolve, reject) => {
+            const sc = document.createElement('script');
+            sc.src = src;
+            sc.onload = resolve;
+            sc.onerror = () => { delete scriptCache[src]; reject(new Error('Nie udało się wczytać biblioteki do odczytu plików. Sprawdź internet i spróbuj ponownie.')); };
+            document.head.appendChild(sc);
+        }));
+        const MAX_OCR_PAGES = 15;
+
+        async function ocrImages(sources, onProgress) {
+            await loadScript(LIBS.tesseract);
+            const worker = await window.Tesseract.createWorker('pol', 1, {
+                workerPath: LIBS.tessWorker, corePath: LIBS.tessCore, langPath: LIBS.tessLang,
+                logger: (m) => { if (m.status === 'recognizing text') onProgress(`Rozpoznaję tekst… ${Math.round((m.progress || 0) * 100)}%`); else if (/load/.test(m.status || '')) onProgress('Pobieram słownik polski do rozpoznawania (jednorazowo, ok. 3 MB)…'); }
+            });
+            try {
+                const out = [];
+                for (let i = 0; i < sources.length; i++) {
+                    onProgress(`Rozpoznaję stronę ${i + 1} z ${sources.length}…`);
+                    const { data } = await worker.recognize(sources[i]);
+                    out.push(data.text || '');
+                }
+                return out.join('\n\n');
+            } finally { await worker.terminate(); }
+        }
+
+        async function readDocument(file, onProgress) {
+            const name = file.name || 'plik';
+            const ext = (name.split('.').pop() || '').toLowerCase();
+            if (ext === 'doc') throw new Error('Stary format .doc – otwórz plik w Wordzie i zapisz jako .docx albo PDF.');
+            if (ext === 'txt') return { text: await file.text(), ocr: false, pages: 1 };
+            if (ext === 'docx') {
+                onProgress('Czytam dokument Word…');
+                await loadScript(LIBS.mammoth);
+                const r = await window.mammoth.extractRawText({ arrayBuffer: await file.arrayBuffer() });
+                return { text: r.value || '', ocr: false, pages: 1 };
+            }
+            if (['jpg', 'jpeg', 'png', 'webp', 'bmp'].includes(ext) || /^image\//.test(file.type)) {
+                if (/heic|heif/.test(ext + file.type)) throw new Error('Zdjęcie w formacie HEIC (iPhone) – zapisz je jako JPG albo zrób skan do PDF.');
+                return { text: await ocrImages([file], onProgress), ocr: true, pages: 1 };
+            }
+            if (ext !== 'pdf') throw new Error('Obsługiwane pliki: PDF, Word (.docx), zdjęcia (JPG, PNG) i .txt.');
+            onProgress('Czytam PDF…');
+            await loadScript(LIBS.pdf);
+            window.pdfjsLib.GlobalWorkerOptions.workerSrc = LIBS.pdfWorker;
+            const pdf = await window.pdfjsLib.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
+            const parts = [];
+            for (let i = 1; i <= pdf.numPages; i++) {
+                const tc = await (await pdf.getPage(i)).getTextContent();
+                parts.push(tc.items.map(it => it.str + (it.hasEOL ? '\n' : ' ')).join('').replace(/[ \t]+\n/g, '\n'));
+            }
+            const text = parts.join('\n\n');
+            if (text.replace(/\s/g, '').length >= 40 * pdf.numPages) return { text, ocr: false, pages: pdf.numPages };
+            // Skan: renderujemy strony do obrazka i rozpoznajemy tekst lokalnie.
+            const n = Math.min(pdf.numPages, MAX_OCR_PAGES);
+            const canvases = [];
+            for (let i = 1; i <= n; i++) {
+                onProgress(`To skan – przygotowuję stronę ${i} z ${n} do rozpoznania…`);
+                const page = await pdf.getPage(i);
+                const vp = page.getViewport({ scale: 2 });
+                const c = document.createElement('canvas');
+                c.width = vp.width; c.height = vp.height;
+                await page.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise;
+                canvases.push(c);
+            }
+            return { text: await ocrImages(canvases, onProgress), ocr: true, pages: pdf.numPages, cut: pdf.numPages > n };
+        }
+
+        const FIELD_LABELS = [
+            ['rozpoznanie', 'Funkcjonowanie / rozpoznanie'],
+            ['mocneStrony', 'Mocne strony i zainteresowania'],
+            ['trudnosci', 'Trudności'],
+            ['zalecenia', 'Zalecenia z dokumentu']
+        ];
+        const PROGRAM_FOR = { orzeczenie: 'ks', ipet: 'ks', wopfu: 'ks', opinia_wwrd: 'wwrd', ipww: 'wwrd' };
+        const normName = (s) => String(s || '').trim().toLocaleLowerCase('pl');
+
+        function ImportDoc({ vault, update, presetChildId, onDone, onCancel }) {
+            const fileRef = useRef(null);
+            const [step, setStep] = useState('pick');
+            const [progress, setProgress] = useState('');
+            const [err, setErr] = useState('');
+            const [fileInfo, setFileInfo] = useState(null);
+            const [text, setText] = useState('');
+            const [idf, setIdf] = useState(null);
+            const [target, setTarget] = useState(presetChildId || 'new');
+            const [ai, setAi] = useState(null);
+            const [aiBusy, setAiBusy] = useState(false);
+            const [aiErr, setAiErr] = useState('');
+            const [modes, setModes] = useState({});
+
+            const existing = vault.children.find(c => c.id === target) || null;
+            const setI = (patch) => setIdf(prev => Object.assign({}, prev, patch));
+
+            const pick = async (e) => {
+                const f = e.target.files && e.target.files[0];
+                e.target.value = '';
+                if (!f) return;
+                setErr(''); setStep('reading'); setProgress('Otwieram plik…');
+                try {
+                    const r = await readDocument(f, setProgress);
+                    const clean = String(r.text || '').replace(/\u0000/g, '').trim();
+                    if (clean.replace(/\s/g, '').length < 20) throw new Error('Nie udało się odczytać tekstu z tego pliku. Jeśli to zdjęcie, zrób je prosto, w dobrym świetle, i spróbuj ponownie.');
+                    const found = P.extractIdentity(clean);
+                    setText(clean);
+                    setIdf(found);
+                    setFileInfo({ name: f.name, ocr: r.ocr, pages: r.pages, cut: r.cut });
+                    if (!presetChildId) {
+                        const match = vault.children.find(c => normName(P.fullName(c)) && normName(P.fullName(c)) === normName([found.imie, found.nazwisko].join(' ')))
+                            || vault.children.find(c => found.nazwisko && normName(c.nazwisko) === normName(found.nazwisko) && c.dataUr && c.dataUr === found.dataUr);
+                        setTarget(match ? match.id : 'new');
+                    }
+                    setStep('review');
+                } catch (x) { setErr(x.message); setStep('pick'); }
+            };
+
+            // Dziecko „robocze” do anonimizacji: imię i dane z formularza + to, co już jest w karcie (zdrobnienia, grupa, dokumenty).
+            const scrubChild = idf ? Object.assign({}, existing || P.newChild(), {
+                imie: idf.imie || (existing && existing.imie) || '',
+                nazwisko: idf.nazwisko || (existing && existing.nazwisko) || '',
+                zdrobnienie: [existing && existing.zdrobnienie, idf.zdrobnienie].filter(Boolean).join(', '),
+                dataUr: idf.dataUr || (existing && existing.dataUr) || '',
+                dokumenty: [...((existing && existing.dokumenty) || []), { numer: idf.numer, poradnia: idf.poradnia }]
+            }) : null;
+            const anon = idf ? P.anonymizeDocText(text, scrubChild) : '';
+            const prompts = idf ? P.cardExtractionPrompts(anon, idf.rodzaj, AD.ORZECZENIA) : null;
+            const canAi = idf && idf.imie.trim() && idf.nazwisko.trim();
+
+            const runAi = async () => {
+                setAiErr('');
+                if (IS_LOCAL) return setAiErr('Plik otwarty lokalnie – AI działa tylko na eduboxpro.pl.');
+                try {
+                    assertNoLeak(prompts.prompt, scrubChild);
+                    setAiBusy(true);
+                    const res = await DT.streamChat({ system: prompts.system, prompt: prompts.prompt, model: 'balanced', temperature: 0.2 });
+                    const card = P.parseCardJson(res.text, AD.ORZECZENIA);
+                    const fill = (s) => String(s || '').split('[imię]').join(idf.imie.split(' ')[0] || '[imię]');
+                    setAi({ rozpoznanie: fill(card.rozpoznanie), mocneStrony: fill(card.mocneStrony), trudnosci: fill(card.trudnosci), zalecenia: fill(card.zalecenia) });
+                    const patch = {};
+                    if (card.orzeczenie && !idf.orzeczenie) patch.orzeczenie = card.orzeczenie;
+                    if (card.rodzaj && idf.rodzaj === 'inne') patch.rodzaj = card.rodzaj;
+                    if (card.okres && !idf.okres) patch.okres = card.okres;
+                    setI(patch);
+                    const m = {};
+                    FIELD_LABELS.forEach(([k]) => { m[k] = existing && String(existing[k] || '').trim() ? 'dopisz' : 'zastap'; });
+                    setModes(m);
+                } catch (x) { setAiErr(x.message); }
+                finally { setAiBusy(false); }
+            };
+
+            const save = () => {
+                if (!idf.imie.trim() && !existing) return setErr('Wpisz imię dziecka.');
+                const now = new Date().toISOString();
+                const doc = { id: P.uid(), rodzaj: idf.rodzaj, numer: idf.numer, wydany: idf.wydany, wazneDo: idf.wazneDo, poradnia: idf.poradnia, skan: fileInfo.name, plik: fileInfo.name, tekst: text, uwagi: idf.okres ? 'Okres: ' + idf.okres : '', wczytano: now };
+                const base = existing || P.newChild();
+                const next = Object.assign({}, base, {
+                    imie: base.imie || idf.imie.trim(),
+                    nazwisko: base.nazwisko || idf.nazwisko.trim(),
+                    dataUr: base.dataUr || idf.dataUr,
+                    zdrobnienie: [base.zdrobnienie, idf.zdrobnienie].map(x => String(x || '').trim()).filter(Boolean).filter((x, i, arr) => arr.indexOf(x) === i).join(', '),
+                    orzeczenie: (idf.rodzaj === 'orzeczenie' && idf.orzeczenie) ? idf.orzeczenie : (base.orzeczenie || idf.orzeczenie),
+                    programy: PROGRAM_FOR[idf.rodzaj] && !base.programy.includes(PROGRAM_FOR[idf.rodzaj]) ? [...base.programy, PROGRAM_FOR[idf.rodzaj]] : base.programy,
+                    dokumenty: [doc, ...base.dokumenty],
+                    zmieniono: now
+                });
+                if (ai) FIELD_LABELS.forEach(([k]) => { next[k] = P.mergeField(base[k], ai[k], modes[k] || 'dopisz'); });
+                update(v => Object.assign({}, v, { children: existing ? v.children.map(c => c.id === existing.id ? next : c) : [...v.children, next] }));
+                onDone(next.id);
+            };
+
+            if (step === 'pick' || step === 'reading') {
+                return (
+                    <div className="card p-6 space-y-4 min-w-0">
+                        <div className="flex justify-between items-center gap-3"><h2 className="text-xl font-black">Dodaj z dokumentu</h2><button className="btn btn-soft" onClick={onCancel}><i className="ph-bold ph-x"></i>Anuluj</button></div>
+                        <p className="text-sm text-slate-300 leading-relaxed">Wybierz orzeczenie, opinię, IPET, WOPFU albo inny dokument: <strong>PDF, Word (.docx) lub zdjęcie/skan</strong>. Plik jest czytany <strong>na tym komputerze</strong> – nie jest nigdzie wysyłany. Teczka podpowie dane do karty, a Ty je sprawdzisz przed zapisaniem.</p>
+                        {step === 'reading'
+                            ? <p className="text-emerald-300 font-bold flex items-center gap-2"><i className="ph-bold ph-circle-notch animate-spin"></i>{progress}</p>
+                            : <button className="btn btn-main" onClick={() => fileRef.current && fileRef.current.click()}><i className="ph-bold ph-file-arrow-up"></i>Wybierz plik</button>}
+                        <input ref={fileRef} type="file" accept=".pdf,.docx,.txt,.jpg,.jpeg,.png,.webp,application/pdf,image/*" className="hidden" onChange={pick} />
+                        <p className="text-xs text-slate-500">Skany i zdjęcia są rozpoznawane w przeglądarce (pierwszy raz pobiera się słownik polski, ok. 3 MB) – sprawdź potem tekst, bo przy słabym skanie zdarzają się literówki. Najwyżej {MAX_OCR_PAGES} stron skanu naraz.</p>
+                        {err && <p className="text-sm text-red-300 font-bold">{err}</p>}
+                    </div>
+                );
+            }
+
+            const docOpts = P.RODZAJE_DOKUMENTOW;
+            return (
+                <div className="space-y-5 min-w-0">
+                    <div className="card p-6 space-y-2">
+                        <div className="flex flex-wrap justify-between items-center gap-3">
+                            <h2 className="text-xl font-black">Sprawdź dane z dokumentu</h2>
+                            <button className="btn btn-soft" onClick={onCancel}><i className="ph-bold ph-x"></i>Anuluj</button>
+                        </div>
+                        <p className="text-sm text-slate-400"><i className="ph-bold ph-file-text"></i> {fileInfo.name} · {fileInfo.pages} {fileInfo.pages === 1 ? 'strona' : 'str.'}{fileInfo.ocr ? ' · tekst rozpoznany ze skanu – sprawdź literówki' : ''}{fileInfo.cut ? ` · rozpoznano pierwsze ${MAX_OCR_PAGES} stron` : ''}</p>
+                    </div>
+
+                    <div className="card p-6 space-y-4">
+                        <h3 className="font-black">1. Komu przypisać dokument</h3>
+                        <select className="field" value={target} onChange={e => setTarget(e.target.value)} disabled={!!presetChildId}>
+                            <option value="new">➕ Nowe dziecko</option>
+                            {vault.children.map(c => <option key={c.id} value={c.id}>{P.fullName(c) || 'Bez imienia'}</option>)}
+                        </select>
+                        {existing && <p className="text-xs text-slate-500">Puste pola karty zostaną uzupełnione, a wypełnione – zostają, chyba że niżej wybierzesz inaczej.</p>}
+                    </div>
+
+                    <div className="card p-6 space-y-4">
+                        <h3 className="font-black">2. Dane z nagłówka <Tag /></h3>
+                        <p className="text-xs text-slate-500">Rozpoznane automatycznie, bez AI. Popraw, jeśli coś się nie zgadza – imię i nazwisko są potrzebne, żeby usunąć je z tekstu przed wysłaniem do AI.</p>
+                        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                            <Field label="Imię (imiona)"><input className="field" value={idf.imie} onChange={e => setI({ imie: e.target.value })} /></Field>
+                            <Field label="Nazwisko"><input className="field" value={idf.nazwisko} onChange={e => setI({ nazwisko: e.target.value })} /></Field>
+                            <Field label="Zdrobnienie użyte w dokumencie"><input className="field" value={idf.zdrobnienie || ''} onChange={e => setI({ zdrobnienie: e.target.value })} placeholder="np. Kasia" /></Field>
+                            <Field label="Data urodzenia"><input type="date" className="field" value={idf.dataUr} onChange={e => setI({ dataUr: e.target.value })} /></Field>
+                            <Field label="Rodzaj dokumentu"><select className="field" value={idf.rodzaj} onChange={e => setI({ rodzaj: e.target.value })}>{docOpts.map(r => <option key={r.id} value={r.id}>{r.label}</option>)}</select></Field>
+                            <Field label="Numer"><input className="field" value={idf.numer} onChange={e => setI({ numer: e.target.value })} /></Field>
+                            <Field label="Data wydania"><input type="date" className="field" value={idf.wydany} onChange={e => setI({ wydany: e.target.value })} /></Field>
+                            <Field label="Ważne do"><input type="date" className="field" value={idf.wazneDo} onChange={e => setI({ wazneDo: e.target.value })} /></Field>
+                            <Field label="Poradnia / wystawca"><input className="field" value={idf.poradnia} onChange={e => setI({ poradnia: e.target.value })} /></Field>
+                        </div>
+                        {idf.okres && <p className="text-sm text-slate-300">Okres z dokumentu: <em>„{idf.okres}”</em>{!idf.wazneDo && <span className="text-amber-200"> – wpisz datę „Ważne do”, żeby Teczka przypomniała o terminie.</span>}</p>}
+                        <Field label="Orzeczenie wydane ze względu na" ai><select className="field" value={idf.orzeczenie} onChange={e => setI({ orzeczenie: e.target.value })}><option value="">— nie dotyczy / nie wiem —</option>{AD.ORZECZENIA.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}</select></Field>
+                    </div>
+
+                    <div className="card p-6 space-y-4">
+                        <h3 className="font-black">3. Opis do karty dziecka <Tag ai /></h3>
+                        <p className="text-sm text-slate-400">AI przeczyta treść dokumentu <strong>po usunięciu danych osobowych</strong> i wypisze funkcjonowanie, mocne strony, trudności i zalecenia. Możesz to pominąć i uzupełnić kartę sama.</p>
+                        <PromptPreview text={prompts.prompt} />
+                        <button className="btn btn-main" onClick={runAi} disabled={!canAi || aiBusy}>{aiBusy ? <><i className="ph-bold ph-circle-notch animate-spin"></i>Czytam dokument…</> : <><i className="ph-bold ph-magic-wand"></i>{ai ? 'Wyciągnij jeszcze raz' : 'Wyciągnij opis przez AI'}</>}</button>
+                        {!canAi && <p className="text-xs text-amber-200">Najpierw wpisz imię i nazwisko dziecka w punkcie 2.</p>}
+                        {aiErr && <p className="text-sm text-red-300 font-bold">{aiErr}</p>}
+                        {ai && FIELD_LABELS.map(([k, label]) => (
+                            <div key={k} className="space-y-2">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <span className="lbl mb-0">{label}</span>
+                                    {existing && String(existing[k] || '').trim() && (
+                                        <select className="field w-auto py-1 text-xs" value={modes[k] || 'dopisz'} onChange={e => setModes(m => Object.assign({}, m, { [k]: e.target.value }))}>
+                                            <option value="dopisz">dopisz do karty</option><option value="zastap">zastąp to, co w karcie</option><option value="pomin">pomiń</option>
+                                        </select>
+                                    )}
+                                </div>
+                                <textarea className="field" rows="4" value={ai[k]} onChange={e => setAi(a => Object.assign({}, a, { [k]: e.target.value }))} />
+                                {existing && String(existing[k] || '').trim() && <p className="text-xs text-slate-500">Teraz w karcie: {String(existing[k]).slice(0, 160)}{String(existing[k]).length > 160 ? '…' : ''}</p>}
+                            </div>
+                        ))}
+                    </div>
+
+                    <details className="card p-6">
+                        <summary className="cursor-pointer font-black">4. Tekst dokumentu ({text.length.toLocaleString('pl-PL')} znaków) – sprawdź albo popraw</summary>
+                        <p className="text-xs text-slate-500 mt-2 mb-3">Ten tekst zostaje zaszyfrowany w karcie dziecka i (bez danych osobowych) pomaga AI pisać kolejne dokumenty. Popraw literówki ze skanu, jeśli są.</p>
+                        <textarea className="field font-mono text-xs" rows="14" value={text} onChange={e => setText(e.target.value)} />
+                    </details>
+
+                    {err && <p className="text-sm text-red-300 font-bold">{err}</p>}
+                    <div className="flex flex-wrap gap-2">
+                        <button className="btn btn-main" onClick={save}><i className="ph-bold ph-floppy-disk"></i>{existing ? 'Zapisz w karcie: ' + P.fullName(existing) : 'Utwórz kartę dziecka'}</button>
+                        <button className="btn btn-soft" onClick={onCancel}>Anuluj</button>
+                    </div>
+                </div>
+            );
+        }
+
+        function Dashboard({ vault, openChild, onImport }) {
             const al = P.alerts(vault.children);
             return (
                 <div className="space-y-5 min-w-0">
+                    {vault.children.length === 0 && (
+                        <div className="card p-6 border-emerald-500/40">
+                            <h2 className="text-xl font-black mb-2">Zacznij od dokumentu</h2>
+                            <p className="text-sm text-slate-300 mb-4">Wczytaj orzeczenie albo opinię (PDF, Word, zdjęcie lub skan) – Teczka sama założy kartę dziecka, a Ty tylko sprawdzisz dane.</p>
+                            <button className="btn btn-main" onClick={onImport}><i className="ph-bold ph-file-arrow-up"></i>Dodaj z dokumentu</button>
+                        </div>
+                    )}
                     <div className="card p-6">
                         <h2 className="text-xl font-black mb-3"><i className="ph-bold ph-bell-ringing text-amber-300"></i> Do zrobienia</h2>
                         {al.length === 0 ? <p className="text-sm text-slate-400">Nic pilnego. Tu pojawią się dokumenty, którym kończy się ważność, i terminy z najbliższych {P.SOON_DAYS} dni.</p> : (
@@ -582,16 +897,38 @@
             );
         }
 
-        function Settings({ vault, update, changePassword, wipe, close }) {
+        function PasswordForm({ onSubmit, withLabel, button }) {
+            const [label, setLabel] = useState('');
             const [pw, setPw] = useState('');
             const [pw2, setPw2] = useState('');
             const [msg, setMsg] = useState('');
-            const change = async (e) => {
+            const [busy, setBusy] = useState(false);
+            const go = async (e) => {
                 e.preventDefault();
                 if (pw.length < 8) return setMsg('Hasło musi mieć co najmniej 8 znaków.');
                 if (pw !== pw2) return setMsg('Hasła się różnią.');
-                try { await changePassword(pw); setPw(''); setPw2(''); setMsg('Hasło zmienione. Stare kopie zapasowe otwiera nadal STARE hasło – pobierz nową kopię.'); } catch (x) { setMsg(x.message); }
+                setBusy(true);
+                try { await onSubmit(pw, label.trim()); setPw(''); setPw2(''); setLabel(''); setMsg(''); } catch (x) { setMsg(x.message); }
+                setBusy(false);
             };
+            return (
+                <form onSubmit={go} className="space-y-3">
+                    {withLabel && <input className="field" value={label} onChange={e => setLabel(e.target.value)} placeholder="Czyje to hasło, np. Witold" maxLength={40} />}
+                    <div className="grid sm:grid-cols-2 gap-3">
+                        <input type="password" autoComplete="new-password" className="field" value={pw} onChange={e => setPw(e.target.value)} placeholder="Nowe hasło (min. 8 znaków)" />
+                        <input type="password" autoComplete="new-password" className="field" value={pw2} onChange={e => setPw2(e.target.value)} placeholder="Powtórz" />
+                    </div>
+                    <button className="btn btn-soft" disabled={busy}>{busy ? 'Zapisuję…' : button}</button>
+                    {msg && <p className="text-sm text-red-300">{msg}</p>}
+                </form>
+            );
+        }
+
+        function Settings({ vault, update, session, setSession, wipe, close }) {
+            const [editId, setEditId] = useState(null);
+            const [adding, setAdding] = useState(false);
+            const [note, setNote] = useState('');
+            const after = (txt) => { setNote(txt + ' Kopie zapasowe zrobione WCZEŚNIEJ otwierają się starymi hasłami – pobierz nową kopię.'); };
             return (
                 <div className="card p-6 space-y-6 min-w-0">
                     <div className="flex justify-between items-center"><h2 className="text-xl font-black">Ustawienia</h2><button className="btn btn-soft" onClick={close}><i className="ph-bold ph-x"></i>Zamknij</button></div>
@@ -600,15 +937,34 @@
                             {AD.ODDZIALY.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
                         </select>
                     </Field>
-                    <form onSubmit={change} className="space-y-3">
-                        <span className="lbl">Zmień hasło</span>
-                        <div className="grid sm:grid-cols-2 gap-3">
-                            <input type="password" autoComplete="new-password" className="field" value={pw} onChange={e => setPw(e.target.value)} placeholder="Nowe hasło" />
-                            <input type="password" autoComplete="new-password" className="field" value={pw2} onChange={e => setPw2(e.target.value)} placeholder="Powtórz" />
-                        </div>
-                        <button className="btn btn-soft">Zmień hasło</button>
-                        {msg && <p className="text-sm text-amber-200">{msg}</p>}
-                    </form>
+                    <div className="space-y-3">
+                        <span className="lbl">Hasła do tej Teczki</span>
+                        <p className="text-sm text-slate-400">Każde hasło otwiera te same dane. Dobrze mieć dwa: codzienne i zapasowe u drugiej osoby.</p>
+                        {session.slots.length < 2 && <p className="text-sm text-amber-200 bg-amber-500/10 border border-amber-400/30 rounded-xl p-3">Jest tylko jedno hasło. Jeśli się zapomni, danych nie da się odzyskać – dodaj hasło zapasowe.</p>}
+                        <ul className="space-y-2">
+                            {session.slots.map(sl => (
+                                <li key={sl.id} className="rounded-xl border border-slate-800 p-3 space-y-3">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <i className="ph-bold ph-key text-emerald-300"></i>
+                                        <strong className="text-sm">{sl.label}</strong>
+                                        <span className="text-xs text-slate-500">ustawione {P.formatDatePl(String(sl.created || '').slice(0, 10))}</span>
+                                        {sl.id === session.openedWith && <span className="text-xs font-bold text-emerald-300">· tym hasłem otwarto Teczkę</span>}
+                                        <span className="flex-1"></span>
+                                        <button className="btn btn-soft" onClick={() => setEditId(editId === sl.id ? null : sl.id)}>Zmień</button>
+                                        {session.slots.length > 1 && sl.id !== session.openedWith && <button className="btn btn-danger" onClick={() => {
+                                            if (!window.confirm(`Usunąć hasło „${sl.label}”? Tym hasłem nie otworzy się już Teczki w tej przeglądarce.`)) return;
+                                            try { setSession(P.removePassword(session, sl.id)); after('Hasło usunięte.'); } catch (x) { setNote(x.message); }
+                                        }}><i className="ph-bold ph-trash"></i></button>}
+                                    </div>
+                                    {editId === sl.id && <PasswordForm button="Zapisz nowe hasło" onSubmit={async (pw) => { setSession(await P.changePassword(session, sl.id, pw)); setEditId(null); after(`Hasło „${sl.label}” zmienione.`); }} />}
+                                </li>
+                            ))}
+                        </ul>
+                        {adding
+                            ? <div className="rounded-xl border border-emerald-500/30 p-3"><PasswordForm withLabel button="Dodaj hasło" onSubmit={async (pw, label) => { setSession(await P.addPassword(session, pw, label || 'Hasło zapasowe')); setAdding(false); after('Hasło dodane.'); }} /></div>
+                            : session.slots.length < 5 && <button className="btn btn-soft" onClick={() => setAdding(true)}><i className="ph-bold ph-plus"></i>Dodaj hasło</button>}
+                        {note && <p className="text-sm text-amber-200">{note}</p>}
+                    </div>
                     <div className="border-t border-slate-800 pt-5">
                         <span className="lbl">Usuń Teczkę z tej przeglądarki</span>
                         <p className="text-sm text-slate-400 mb-3">Kasuje wszystkie dane z tego komputera. Kopie zapasowe zostają na dysku.</p>
@@ -627,6 +983,8 @@
             const [showSettings, setShowSettings] = useState(false);
             const [query, setQuery] = useState('');
             const [saveState, setSaveState] = useState('');
+            const [sessionView, setSessionView] = useState(null);
+            const [importFor, setImportFor] = useState(null); // null | 'new' | id dziecka – kreator „Dodaj z dokumentu”
             const sessionRef = useRef(null);
             const vaultRef = useRef(null);
             const timerRef = useRef(null);
@@ -655,8 +1013,10 @@
                 timerRef.current = setTimeout(() => writeNow(vaultRef.current), 500);
             }, [writeNow]);
 
-            const opened = (data, session) => {
+            const opened = (data, session, migrated) => {
                 sessionRef.current = session;
+                setSessionView(session);
+                if (migrated) setTimeout(() => writeNow(data), 0);
                 vaultRef.current = data;
                 setVault(data);
                 setStage('open');
@@ -667,6 +1027,8 @@
                 clearTimeout(timerRef.current);
                 if (pendingRef.current) await writeNow(vaultRef.current);
                 sessionRef.current = null;
+                setSessionView(null);
+                setImportFor(null);
                 vaultRef.current = null;
                 setVault(null);
                 setSelId(null);
@@ -692,26 +1054,27 @@
 
             const child = vault.children.find(c => c.id === selId);
             const setChild = (id) => (patch) => update(v => Object.assign({}, v, { children: v.children.map(c => c.id === id ? Object.assign({}, c, patch, { zmieniono: new Date().toISOString() }) : c) }));
-            const addChild = () => { const c = P.newChild(); update(v => Object.assign({}, v, { children: [...v.children, c] })); setSelId(c.id); setTab('dane'); setShowSettings(false); };
+            const addChild = () => { setImportFor(null); const c = P.newChild(); update(v => Object.assign({}, v, { children: [...v.children, c] })); setSelId(c.id); setTab('dane'); setShowSettings(false); };
             const removeChild = (c) => () => {
                 if (!window.confirm(`Usunąć ${P.fullName(c) || 'to dziecko'} z Teczki razem z dokumentami, obserwacjami i historią?`)) return;
                 update(v => Object.assign({}, v, { children: v.children.filter(x => x.id !== c.id) }));
                 setSelId(null);
             };
-            const openChild = (id, t) => { setSelId(id); setTab(t || 'dane'); setShowSettings(false); };
+            const openChild = (id, t) => { setImportFor(null); setSelId(id); setTab(t || 'dane'); setShowSettings(false); };
             const backup = async () => {
                 const sealed = await P.seal(vaultRef.current, sessionRef.current);
                 downloadJson(sealed, `teczka-podopiecznych-${today()}.json`);
             };
-            const changePassword = async (pw) => {
-                sessionRef.current = await P.createSession(pw);
-                await writeNow(vaultRef.current);
+            const setSession = (sNew) => {
+                sessionRef.current = sNew;
+                setSessionView(sNew);
+                writeNow(vaultRef.current);
             };
             const wipe = () => {
                 if (window.prompt('Aby usunąć WSZYSTKIE dane Teczki z tej przeglądarki, wpisz: USUŃ') !== 'USUŃ') return;
                 try { localStorage.removeItem(P.VAULT_KEY); } catch (e) {}
                 pendingRef.current = false;
-                sessionRef.current = null; vaultRef.current = null;
+                sessionRef.current = null; vaultRef.current = null; setSessionView(null); setImportFor(null);
                 setVault(null); setSelId(null); setShowSettings(false); setStage('setup');
             };
 
@@ -725,11 +1088,11 @@
                 <div>
                     <header className="border-b border-slate-800 bg-slate-950/95 sticky top-0 z-20 backdrop-blur">
                         <div className="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
-                            <button className="font-black text-lg tracking-tight text-left" onClick={() => { setSelId(null); setShowSettings(false); }}>🗂️ Teczka <span className="text-emerald-300">podopiecznych</span></button>
+                            <button className="font-black text-lg tracking-tight text-left" onClick={() => { setSelId(null); setShowSettings(false); setImportFor(null); }}>🗂️ Teczka <span className="text-emerald-300">podopiecznych</span></button>
                             <div className="flex flex-wrap items-center gap-2">
-                                <span className={'text-xs mr-1 ' + (saveState.startsWith('BŁĄD') ? 'text-red-300 font-bold' : 'text-slate-500')}>{saveState}</span>
+                                <span className={'text-xs mr-1 ' + (saveState.startsWith('BŁĄD') ? 'text-red-300 font-bold' : 'text-slate-500')}>{sessionView ? <span className="hidden md:inline">🔑 {P.slotLabel(sessionView)} · </span> : null}{saveState}</span>
                                 <button className="btn btn-soft" onClick={backup} title="Pobierz zaszyfrowaną kopię"><i className="ph-bold ph-download-simple"></i><span className="hidden sm:inline">Kopia zapasowa</span></button>
-                                <button className="btn btn-soft" onClick={() => { setShowSettings(true); setSelId(null); }} title="Ustawienia"><i className="ph-bold ph-gear"></i></button>
+                                <button className="btn btn-soft" onClick={() => { setShowSettings(true); setSelId(null); setImportFor(null); }} title="Ustawienia"><i className="ph-bold ph-gear"></i></button>
                                 <button className="btn btn-main" onClick={lock}><i className="ph-bold ph-lock"></i><span className="hidden sm:inline">Zablokuj</span></button>
                             </div>
                         </div>
@@ -737,6 +1100,7 @@
                     <main className="max-w-7xl mx-auto px-4 py-6 grid lg:grid-cols-[300px_minmax(0,1fr)] gap-6 items-start">
                         <aside className="card p-4 lg:sticky lg:top-20 space-y-3 min-w-0">
                             <button className="btn btn-main w-full" onClick={addChild}><i className="ph-bold ph-user-plus"></i>Dodaj dziecko</button>
+                            <button className="btn btn-soft w-full" onClick={() => { setImportFor('new'); setShowSettings(false); }}><i className="ph-bold ph-file-arrow-up"></i>Dodaj z dokumentu</button>
                             {vault.children.length > 4 && <input className="field" value={query} onChange={e => setQuery(e.target.value)} placeholder="Szukaj…" />}
                             {vault.children.length === 0 && <p className="text-sm text-slate-500 px-1">Nie ma jeszcze dzieci. Zacznij od „Dodaj dziecko”.</p>}
                             <ul className="space-y-1 max-h-[60vh] overflow-y-auto">
@@ -748,9 +1112,10 @@
                                 ))}
                             </ul>
                         </aside>
-                        {showSettings ? <Settings vault={vault} update={update} changePassword={changePassword} wipe={wipe} close={() => setShowSettings(false)} />
-                            : child ? <ChildView key={child.id} child={child} set={setChild(child.id)} remove={removeChild(child)} tab={tab} setTab={setTab} settings={vault.settings} />
-                            : <Dashboard vault={vault} openChild={openChild} />}
+                        {importFor ? <ImportDoc key={importFor} vault={vault} update={update} presetChildId={importFor === 'new' ? null : importFor} onCancel={() => setImportFor(null)} onDone={(id) => { setImportFor(null); setSelId(id); setTab('dane'); }} />
+                            : showSettings ? <Settings vault={vault} update={update} session={sessionView} setSession={setSession} wipe={wipe} close={() => setShowSettings(false)} />
+                            : child ? <ChildView key={child.id} child={child} set={setChild(child.id)} remove={removeChild(child)} tab={tab} setTab={setTab} settings={vault.settings} onImport={() => setImportFor(child.id)} />
+                            : <Dashboard vault={vault} openChild={openChild} onImport={() => setImportFor('new')} />}
                     </main>
                 </div>
             );

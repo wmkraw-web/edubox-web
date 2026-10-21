@@ -205,6 +205,20 @@ jest `assertNoLeak` (`leaks()` – wstrzymuje wysyłkę), a strona pokazuje „C
 na kartce (`fillName` + `[imię]` → imię). Testy: `npm run podopieczni:check` (w `npm test`) – także pełne zapytania
 dla wszystkich typów dokumentów KS i WWRD bez żadnej danej identyfikującej. Nowe pole z danymi dziecka = albo tylko
 lokalne, albo przez `scrub`; nigdy prosto do promptu.
+**Teczka – dwa hasła i dokumenty (21.10.2026, wersja sejfu 2):** dane szyfruje losowy klucz danych, „zawinięty”
+osobno każdym hasłem (`slots`, max 5: codzienne żony + zapasowe Witolda; `addPassword`/`changePassword`/`removePassword`,
+nie da się usunąć jedynego ani tego, którym otwarto). Sejf v1 otwiera się i zapisuje jako v2. **Wczytywanie PDF / Word /
+zdjęć / skanów** (`readDocument` w stronie): pdf.js 3.11.174 i mammoth 1.8.0 z cdnjs, skan (PDF bez tekstu, max 15 stron)
+i zdjęcie → OCR tesseract.js 5.1.1 (słownik `pol` z jsdelivr) **w przeglądarce** – skanu z PESEL-em i adresem nie wysyłamy
+do żadnego OCR w chmurze. Dlatego `vercel.json` ma osobne CSP dla `/podopieczni.html` (`'wasm-unsafe-eval'`,
+`worker-src blob:`, bez analityki i Firebase, `no-store`), a globalna reguła ma `source` z wykluczeniem tej strony –
+nie dopisuj `wasm-unsafe-eval` do CSP całego serwisu. Dane z nagłówka dokumentu (imię, PESEL → data urodzenia, numer,
+daty, poradnia, „ze względu na”) rozpoznaje `extractIdentity` lokalnie; do AI idzie `anonymizeDocText` (wycina linie
+z danymi osobowymi, adresy, telefony, e-maile, nazwę poradni w każdej odmianie, „miejscowość, dnia …” + `scrub`)
+i AI zwraca JSON opisu do karty (`cardExtractionPrompts`/`parseCardJson`), który nauczycielka zatwierdza (dopisz /
+zastąp / pomiń). Treść dokumentów (zaszyfrowana w karcie) idzie jako materiał do kolejnych dokumentów (`docsText`).
+`nameVariants` dokleja popularne zdrobnienia (`DIMINUTIVES`: Katarzyna → Kasia…) – realny wyciek z testu: zdrobnienie
+z dokumentu nie trafiło do karty; krótkie imiona mają jawne formy odmiany (`shortForms`, żeby „Ala” nie zjadała „ale”).
 
 **Panel jakości Make:** `panel-jakosci.html` korzysta z odczytowego trybu
 `GET /api/weekly-report?view=make-health`, dzięki czemu nie powstaje trzynasta
