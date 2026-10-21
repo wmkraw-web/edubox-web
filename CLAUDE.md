@@ -86,6 +86,13 @@ wzorów (np. EduDialog).
     narzędzie z katalogu dziennie (arkusz `Ada_Katalog`, 57 wierszy), stała
     postać "Ada" (kasztanowe włosy, ubranie w barwach indygo/ametyst), głos
     Agaty, link w opisie do konkretnego narzędzia (nie strony głównej).
+    YouTube w Make idzie przez WŁASNY klient OAuth (Google Cloud, projekt `edubox-make`, klient „Make YouTube”,
+    w produkcji, YouTube Data API v3 – tam wykresy błędów per metoda). „[403] Forbidden” z `uploadVideo`
+    (8–21.10.2026, 5 razy) to NIE odrzucony film: `videos.insert` się udaje, a pada drugie wywołanie
+    (`videos.update` z tytułem/opisem) – film wisi publicznie jako „unknown”. Trasa błędu modułu 11: 90 s
+    przerwy → najnowszy film z playlisty wgranych (`UUmHtkuzDeX8RmyK6ykHijzA`) → gdy tytuł „unknown”,
+    ponowne `PUT /v3/videos` i `Resume` z jego id (dalej playlista, mail, FB); gdy filmu nie ma – mail
+    z załącznikiem do ręcznego wrzucenia. Nie każ wrzucać ponownie, gdy film już jest (duplikat).
 - **GitHub Actions** (`.github/workflows/`):
   `health-check.yml` (co 6h — sprawdza WSZYSTKIE strony .html i endpointy
   /api, alert mailem przez Resend jeśli coś nie odpowiada),
