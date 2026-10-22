@@ -98,8 +98,14 @@ wzorów (np. EduDialog).
   /api, alert mailem przez Resend jeśli coś nie odpowiada),
   `costalert.yml` (codziennie — koszty OpenAI/Fal.ai),
   `coffee-check.yml` (co 5 min — wpłaty buycoffee.to → kod PRO),
-  `weekly-report.yml` (poniedziałki — raport tygodniowy),
-  `update-porada-dnia.yml` (Porada dnia).
+  `weekly-report.yml` (poniedziałki — raport tygodniowy).
+  **Porada dnia** (od 22.10.2026) NIE idzie już przez Make ani AI: `porada-dnia.js` ma stałą pulę
+  (`OGOLNE` + `SEZON` na miesiące) i sam wybiera poradę według daty (`pick`, co 3. dzień sezonowa);
+  testy `porada:check` (długość, duplikaty, zakaz przepisów i diagnoz, liczba ogólnych niepodzielna przez 7).
+  Dawny scenariusz Make 6969697 i workflow `update-porada-dnia.yml` usunięte – porada stała od 18.09.
+  **Polecenia:** `EduBox-Referral-Signup` (7007023) po zapisie e-maila od razu tworzy kod `EDU-…` w
+  `Referral_Codes` i wysyła go (Gmail edubox.ai); gdy kod czeka niewykorzystany – wysyła go ponownie.
+  Dawny osobny `Referral-GenerateCode` był wyłączony od 28.08 i nikt nie dostawał kodów – usunięty.
 
 ## Katalog narzędzi (`apps.js`, 66 wpisów, 4 kategorie)
 
