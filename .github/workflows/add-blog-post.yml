@@ -1,5 +1,10 @@
 name: Add Blog Post
 
+# Wpis bloga po kliknięciu „Publikuj” w mailu (Make → repository_dispatch „add-blog-post”).
+# Make wysyła TYLKO dane (tytuł, zajawka, kategoria, ikona, treść HTML). Wpis buduje i sprawdza
+# scripts/publikacje.js: czyści HTML, zostawia linki tylko do naszych stron, odrzuca numery przepisów.
+# Błąd = czerwony przebieg i mail z GitHuba, blog zostaje bez zmian.
+
 on:
   repository_dispatch:
     types: [add-blog-post]
@@ -7,62 +12,40 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: publikacje
+  cancel-in-progress: false
+
 jobs:
   add-post:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           ref: main
-          fetch-depth: 0
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
 
-      - name: Install dependencies
-        run: npm ci --no-audit --no-fund
+      - run: npm ci --no-audit --no-fund
 
-      - name: Add new post to blog-posts.js
+      - name: Dodaj wpis do blog-posts.js
         env:
-          NEW_POST_JSON: ${{ toJson(github.event.client_payload.post) }}
+          PAYLOAD: ${{ toJson(github.event.client_payload.post) }}
+        run: node scripts/publikacje.js blog
+
+      - name: Sprawdź pliki danych i SEO
         run: |
-          node <<'EOF'
-          const fs = require('fs');
-          const path = 'blog-posts.js';
+          npm run jsliteral:check
+          npm run seo:sitemap
+          npm run seo:check
 
-          let content = fs.readFileSync(path, 'utf8');
-
-          // NEW_POST_JSON is a JSON-encoded string - parse it back to raw text
-          const rawPost = JSON.parse(process.env.NEW_POST_JSON);
-
-          // Fill in today's date if the post text still has the placeholder
-          const today = new Date().toISOString().slice(0, 10);
-          const postText = rawPost.replace(/DATE_TODAY/g, today);
-
-          const marker = 'window.BLOG_POSTS = [';
-          if (!content.includes(marker)) {
-            throw new Error('Nie znaleziono "window.BLOG_POSTS = [" w blog-posts.js');
-          }
-
-          content = content.replace(marker, marker + '\n' + postText + ',');
-          fs.writeFileSync(path, content, 'utf8');
-          console.log('Wpis dodany poprawnie.');
-          EOF
-
-      - name: Rebuild public sitemap safely
-        run: npm run seo:sitemap
-
-      - name: Validate SEO before commit
-        run: npm run seo:check
-
-      - name: Commit and push
+      - name: Commit i push
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add blog-posts.js sitemap.xml
-          git commit -m "Nowy wpis na blogu (automat) + aktualizacja sitemap" || echo "Brak zmian do commitu"
-          git push
+          git commit -m "Nowy wpis na blogu (automat, zaakceptowany mailem) + sitemap" || exit 0
+          for i in 1 2 3; do git pull --rebase -q && git push -q && break; sleep 5; done

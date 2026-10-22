@@ -1,0 +1,43 @@
+name: Add Co nowego
+
+# Wpisy „Co nowego” po kliknięciu „Publikuj” w mailu (Make → repository_dispatch „add-co-nowego”,
+# payload { post: { entries: [{ tag, title, description, link? }] } }). Sprawdza scripts/publikacje.js.
+
+on:
+  repository_dispatch:
+    types: [add-co-nowego]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publikacje
+  cancel-in-progress: false
+
+jobs:
+  add-entries:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Dopisz wpisy do zmiany.js
+        env:
+          PAYLOAD: ${{ toJson(github.event.client_payload.post) }}
+        run: node scripts/publikacje.js co-nowego
+
+      - name: Sprawdź plik danych
+        run: node scripts/check-js-literal.js
+
+      - name: Commit i push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add zmiany.js
+          git commit -m "Co nowego: podsumowanie zmian (automat, zaakceptowane mailem)" || exit 0
+          for i in 1 2 3; do git pull --rebase -q && git push -q && break; sleep 5; done

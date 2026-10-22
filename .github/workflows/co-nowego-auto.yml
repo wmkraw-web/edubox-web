@@ -1,0 +1,50 @@
+name: Co nowego – automat
+
+# Bez AI i bez akceptacji (twarde dane): nowe pakiety w Bazie Materiałów (Firestore, odczyt publiczny)
+# i nowe kafelki w apps.js → wpis w zmiany.js. Co już ogłoszono, pamięta data/co-nowego-stan.json.
+# Pakiet musi mieć co najmniej 2 h (może być jeszcze poprawiany); kilka pakietów naraz = jeden wpis.
+
+on:
+  schedule:
+    - cron: '17 17 * * *'   # codziennie ok. 19:17 czasu polskiego (latem), 18:17 zimą
+  push:
+    branches: [main]
+    paths:
+      - apps.js
+      - scripts/publikacje.js
+      - .github/workflows/co-nowego-auto.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publikacje
+  cancel-in-progress: false
+
+jobs:
+  auto:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Nowe pakiety i narzędzia
+        run: node scripts/publikacje.js auto
+
+      - name: Sprawdź plik danych
+        run: node scripts/check-js-literal.js
+
+      - name: Commit i push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add zmiany.js data/co-nowego-stan.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Co nowego: nowe materiały / narzędzia (automat)"
+          for i in 1 2 3; do git pull --rebase -q && git push -q && break; sleep 5; done
