@@ -3,6 +3,14 @@
 // Najnowsze wpisy na początku tablicy.
 window.CO_NOWEGO = [
     {
+        "id": "2026-10-22-nowy-pakiet-do-pobrania",
+        "date": "2026-10-22",
+        "tag": "Nowość",
+        "title": "Nowy pakiet do pobrania",
+        "description": "W Bazie Materiałów jest nowy pakiet: „Moja ojczyzna – Polska” (przedszkole). Podgląd stron jest dla wszystkich, pobieranie z kodem PRO.",
+        "link": "materialy.html?sekcja=przedszkole&pakiet=Q8Cqne2KMzu13f5wHjW9"
+    },
+    {
         "id": "2026-10-16-nowe-materia-y-do-pobrania",
         "date": "2026-10-16",
         "tag": "Nowość",
