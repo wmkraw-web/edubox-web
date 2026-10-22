@@ -76,16 +76,22 @@ wzorów (np. EduDialog).
   ciasno przyciętej twarzy.
 
 **Automatyzacje poza repo:**
-- **Make.com** (2 scenariusze wideo na YouTube Shorts):
-  - *"Wrześniowe bóle YouTube Tube"* (id 6943601) — codziennie 18:55, temat
-    dnia z arkusza Google (`Wrzesien_Bole`, 57 wierszy, rotacja przez
-    `formatDate(now;"DDD") % N`), głos i wygląd naprzemiennie kobieta/mężczyzna
-    (`RWZoDXNWfWzwHbPcWFpP`=Agata / `Y7xc6da0VDgeNzscBD9d`=Rafał, ta sama
-    zmienna dnia steruje OBOMA, żeby się nie rozjeżdżały).
-  - *"Minuta z Adą"* (id 7048286) — pon/śr/pt 12:00, promuje jedno konkretne
-    narzędzie z katalogu dziennie (arkusz `Ada_Katalog`, 57 wierszy), stała
-    postać "Ada" (kasztanowe włosy, ubranie w barwach indygo/ametyst), głos
-    Agaty, link w opisie do konkretnego narzędzia (nie strony głównej).
+- **Make.com** – pełna, aktualna mapa wszystkich scenariuszy: dokument „EduBox – mapa automatyzacji Make”
+  (https://claude.ai/artifact/JnaAWonK7oQY3mPyJSkcXQ, stan 22.10.2026; dawny Word z 31.08 = archiwum).
+  YouTube Shorts – jeden film dziennie, dwie serie na zmianę według parzystości dnia roku
+  (`formatDate(now; "DDD"; "Europe/Warsaw") % 2`, filtr na module 2 – na pierwszym module filtr nie działa):
+  - *"Minuta z Adą"* (id 7048286) — dni NIEPARZYSTE 17:00, promuje jedno konkretne
+    narzędzie z katalogu (arkusz `Ada_Katalog`, wiersz `DDD % 57 + 1`), stała
+    postać "Ada" (kasztanowe włosy, ubranie w barwach indygo/ametyst), link w opisie do konkretnego
+    narzędzia (nie strony głównej), w sob/nd też rolka na FB. Od 22.10.2026 5 palet (etykieta narzędzia
+    + karta odpowiedzi) zmienianych co odcinek: zmienna `pal = floor(DDD/2) % 5` → `switch(1.pal; …)`.
+  - *"YOUTUBE-Przerwa z Adą"* (id 8124770, od 22.10.2026) — dni PARZYSTE 17:00, wesoły Short: formaty
+    `pov / slownik / plan / zgadnij` po kolei (`floor(DDD/2) % 4`), gpt-5 (`reasoning_effort` medium) pisze żart
+    + JEDNO narzędzie z `Ada_Katalog`, 2 obrazki GPT Image 2.5 `edit` z Adą jako wzorem (napis wpisany w obrazek),
+    głos Ady, kategoria Rozrywka, historia tematów w magazynie 229323 (rekord `przerwa-historia`).
+    Kadr 9:16 = rozmyte tło z DOLNEJ połowy obrazka (`c_crop,h_0.5,g_south`) + cały obrazek 2:3 na środku –
+    tło z całego obrazka pokazywało rozmytą kopię etykiety u góry. Zasady: żart z sytuacji, nie z dzieci,
+    rodziców ani dyrekcji; bez imion.
     YouTube w Make idzie przez WŁASNY klient OAuth (Google Cloud, projekt `edubox-make`, klient „Make YouTube”,
     w produkcji, YouTube Data API v3 – tam wykresy błędów per metoda). „[403] Forbidden” z `uploadVideo`
     (8–21.10.2026, 5 razy) to NIE odrzucony film: `videos.insert` się udaje, a pada drugie wywołanie
