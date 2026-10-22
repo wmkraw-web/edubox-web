@@ -107,6 +107,19 @@ wzorów (np. EduDialog).
     (tablica 807129633158572215) z UTM `wesoly-piatek`, temat dopisywany do rekordu `historia`. Bez kliknięcia nic nie
     wychodzi. Zasady w instrukcji: żart z sytuacji (nie z dzieci/rodziców), bez imion, bez wymyślonych świąt, w obrazie
     ŻADNYCH napisów poza zadanymi (model dorzucał błędne napisy na kubkach).
+  - *Piny Pinterest – 3 serie dzienne* (od 22.10.2026 na GPT Image 2.5 `quality: medium`, ~0,02 USD/pin; wcześniej flux/dev
+    + napis w Cloudinary – „kartka na korku / pusty notes” każdego dnia): **5327390** „Darmowe narzędzie AI” 8:30
+    (`Tematy_Ogolne_PIN`, wiersz usuwany), **6941310** „Pokój nauczycielski” 19:50 (`Wrzesien_Bole`, kol. G),
+    **5333588** „Pomysł na zajęcia” 15:00 (`Ada_Katalog`, rotacja wierszy). Każda seria ma 5 układów zmienianych
+    co dzień (`switch((DDD + przesunięcie 0/2/4) % 5)` w module 80): narzędzie – makieta / przed-po / 3 kroki / scena
+    z Adą / „15 sekund”; pokój – scena i komiks z Adą / dymek / zamiast-spróbuj / 3 porady; pomysł – kroki / flat-lay /
+    checklista / scena z Adą / planer. gpt-5 (`reasoning_effort: low`, JSON `narzedzie/tytul/opis/prompt_obrazu`)
+    wypełnia szablon układu dnia; etykietę serii, „eduboxpro.pl”, paletę i zakaz innych napisów dokleja Make (moduły
+    86/87). Układy z Adą idą przez `edit` z jej zdjęciem (strój na sztywno: indygo marynarka + ametystowa bluzka).
+    Ciało pina do `/v5/pins` przez `json:TransformToJSON` (cudzysłowy w opisie nie psują JSON-a). Nazwa narzędzia
+    na grafice = krótka (1–3 słowa) – w teście model wpisał cały tytuł strony z `Tematy_Ogolne_PIN`. Test bez
+    publikacji: kopia scenariusza z `builtin:BasicFeeder` (lista układów → zmienna 80) i zapisem do magazynu 228919
+    zamiast Pinteresta i arkusza.
 - **GitHub Actions** (`.github/workflows/`):
   `health-check.yml` (co 6h — sprawdza WSZYSTKIE strony .html i endpointy
   /api, alert mailem przez Resend jeśli coś nie odpowiada),
