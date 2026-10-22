@@ -93,6 +93,11 @@ wzorów (np. EduDialog).
     przerwy → najnowszy film z playlisty wgranych (`UUmHtkuzDeX8RmyK6ykHijzA`) → gdy tytuł „unknown”,
     ponowne `PUT /v3/videos` i `Resume` z jego id (dalej playlista, mail, FB); gdy filmu nie ma – mail
     z załącznikiem do ręcznego wrzucenia. Nie każ wrzucać ponownie, gdy film już jest (duplikat).
+  - *"YOUTUBE-ZanimKlikniesz Short"* (id 8115725, od 22.10.2026) — sobota 12:00, temat z zakładki
+    `ZanimKlikniesz` (kol. A forma alert/quiz/gdyby, B nagłówek, C fakty; status YouTube w kol. **F**, FB = D,
+    Pinterest = E), gpt-4.1 JSON (hook/tresc/ekran/tytul), tło fal flux/dev, 2 plansze Cloudinary, głos Agaty,
+    Zvid, ta sama trasa błędu 403 co Minuta. Zastąpił „YOUTUBE-shorty-problemy-nauczyciela” (dublował Adę,
+    miał klucz fal wpisany jawnie – usunięty).
 - **GitHub Actions** (`.github/workflows/`):
   `health-check.yml` (co 6h — sprawdza WSZYSTKIE strony .html i endpointy
   /api, alert mailem przez Resend jeśli coś nie odpowiada),
