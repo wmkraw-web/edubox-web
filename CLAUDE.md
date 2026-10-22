@@ -120,6 +120,22 @@ wzorów (np. EduDialog).
     na grafice = krótka (1–3 słowa) – w teście model wpisał cały tytuł strony z `Tematy_Ogolne_PIN`. Test bez
     publikacji: kopia scenariusza z `builtin:BasicFeeder` (lista układów → zmienna 80) i zapisem do magazynu 228919
     zamiast Pinteresta i arkusza.
+  - *Blog i „Co nowego” – automat wpisów* (od 22.10.2026, magazyn „Publikacje – propozycje” 229323, webhook 3958930):
+    **BLOG 1** (8123685, wt 9:00) – pierwszy wolny temat z `Blog_Tematy` (kol. C pusta; kategorie Prawo oświatowe / Awans
+    zawodowy / Podstawa programowa pomijane – te wpisy pisze właściciel po sprawdzeniu w ISAP), gpt-5 medium pisze JSON
+    `title/excerpt/category/icon/content`, kol. C = „propozycja – data”, mail z podglądem i Publikuj/Pomiń.
+    **CO NOWEGO 1** (8123701, pn 9:00) – commity z 7 dni (GitHub API, bez commitów bota) → gpt-5 wybiera 0–3 zmiany
+    widoczne dla nauczycieli → mail. **PUBLIKACJE 2** (webhook) – klik → `repository_dispatch` `add-blog-post` /
+    `add-co-nowego` przez zapisany w Make klucz HTTP (keychain 220360, nagłówek Authorization; token NIE w blueprincie). Webhook (8123722)
+    sprawdza sekret `t` w linku i status „czeka” – drugi klik daje „link nieaktualny”. Bez kliknięcia nic nie wychodzi.
+    **Strona GitHuba:** `scripts/publikacje.js` buduje wpis z danych (AI nie pisze kodu JS): czyści HTML do p/h2/h3/
+    ul/ol/li/strong/em/a, linki tylko do istniejących stron z `publicPages`, odrzuca numery przepisów (`art. 5`, `§ 6`,
+    `Dz.U.`, `ust.`, `poz.`), 350–1600 słów, unikalny slug; błąd = czerwony przebieg i mail, blog bez zmian. Dawny
+    `add-blog-post` wklejał surowy obiekt JS od gpt-4o-mini, a scenariusz „Blog_Tematy_DOBRY” chodził co 15 min bez
+    oznaczania tematu (ten sam wpis w kółko) i miał token GitHuba jawnie – usunięty. **Bez AI i bez akceptacji:**
+    `co-nowego-auto.yml` (codziennie ~19:17 + push `apps.js`) – nowe pakiety z Firestore (odleżane 2 h, kilka naraz =
+    jeden wpis z linkiem `materialy.html?…`) i nowe kafelki z `apps.js`; ogłoszone są w `data/co-nowego-stan.json`.
+    Wpisy mają opcjonalne pole `link` („Zobacz →” w `co-nowego.html`). Testy: `publikacje:check` (w `npm test`).
 - **GitHub Actions** (`.github/workflows/`):
   `health-check.yml` (co 6h — sprawdza WSZYSTKIE strony .html i endpointy
   /api, alert mailem przez Resend jeśli coś nie odpowiada),
