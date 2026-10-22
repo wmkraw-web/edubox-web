@@ -98,6 +98,15 @@ wzorów (np. EduDialog).
     Pinterest = E), gpt-4.1 JSON (hook/tresc/ekran/tytul), tło fal flux/dev, 2 plansze Cloudinary, głos Agaty,
     Zvid, ta sama trasa błędu 403 co Minuta. Zastąpił „YOUTUBE-shorty-problemy-nauczyciela” (dublował Adę,
     miał klucz fal wpisany jawnie – usunięty).
+  - *"WESOŁY PIĄTEK"* (od 22.10.2026, 3 scenariusze + magazyn danych „Wesoły piątek – propozycje” 228919):
+    **1** (8116611, czw 18:00) – format z numeru tygodnia ISO (słownik / bingo / versus / pov / zgadnij), gpt-5 (`reasoning_effort`
+    medium) pisze 2 warianty z katalogu `Ada_Katalog`, GPT Image 2.5 `quality: high` 1024×1536 (versus/pov przez `edit`
+    z Adą jako wzorem postaci), zapis pod kluczem `GGGG-[W]WW`, mail do Witolda z przyciskami. Bezpiecznik: gdy rekord
+    tygodnia już jest, nic nie robi (ponowne generowanie = usuń rekord). **2** (8116575, webhook 3956409) – przyciski
+    Publikuj A/B/Pomiń (`t` = sekret w linku), zmiana zdania do publikacji. **3** (8116586, pt 15:00) – FB + Pinterest
+    (tablica 807129633158572215) z UTM `wesoly-piatek`, temat dopisywany do rekordu `historia`. Bez kliknięcia nic nie
+    wychodzi. Zasady w instrukcji: żart z sytuacji (nie z dzieci/rodziców), bez imion, bez wymyślonych świąt, w obrazie
+    ŻADNYCH napisów poza zadanymi (model dorzucał błędne napisy na kubkach).
 - **GitHub Actions** (`.github/workflows/`):
   `health-check.yml` (co 6h — sprawdza WSZYSTKIE strony .html i endpointy
   /api, alert mailem przez Resend jeśli coś nie odpowiada),
