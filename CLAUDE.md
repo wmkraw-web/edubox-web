@@ -584,6 +584,8 @@ przycisk w „Wyglądzie”, darmowa grafika liczona dopiero po udanym obrazku (
 Giełda: nowy zapis `{v: 2, design, studentName: '', diplomaSignature: '', customImage: tylko https}`, stare wzory
 czyta `designFromLegacy`, stare girlandy (`activeTab: 'garland'`) odsyłają do MagicLetters. **Girlandy są tylko
 w MagicLetters.**
+Bez znaku wodnego (decyzja właściciela 25.10.2026): dyplom jest zawsze darmowy, PRO = tylko kolejne grafiki AI.
+Miejscowość i datę też poprawia się na dyplomie (`editPlace`: przed pierwszym przecinkiem miejscowość, reszta data).
 
 **CSP a obrazki z fal.media:** `connect-src` NIE obejmuje fal.media, więc `fetch(urlObrazka)` w przeglądarce kończy
 się „Failed to fetch” (realny błąd w MagicLetters: obrazek opłacony, użytkownik dostawał błąd, licznik się nie

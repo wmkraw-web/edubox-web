@@ -391,7 +391,7 @@
         }
 
         // Jeden dyplom w rozmiarze kartki A4. Ten sam komponent rysuje podgląd, wydruk i plik PDF/PNG.
-        function Diploma({ d, name, place, signature, editable, onDesign, onName, onPlace, onSignature, isPremium }) {
+        function Diploma({ d, name, place, signature, editable, onDesign, onName, onPlace, onSignature }) {
             const { w, h } = PAGE[d.orientation] || PAGE.horizontal;
             const land = d.orientation !== 'vertical';
             const fullBg = d.image && d.imageLayout === 'full_background';
@@ -438,7 +438,7 @@
                         </>
                     )}
 
-                    {!isPremium && <div className="eg-watermark" style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', transform: 'rotate(-30deg)', fontSize: 84, fontWeight: 900, letterSpacing: 18, color: '#0f172a', opacity: 0.03, pointerEvents: 'none', userSelect: 'none' }}>EDUGENERATOR</div>}
+                    {/* Bez znaku wodnego: dyplom jest zawsze za darmo, PRO dotyczy tylko kolejnych grafik AI. */}
 
                     <div style={{ position: 'absolute', inset: 0, padding: `${pad + (land ? 18 : 40)}px ${pad + 70}px ${pad + 6}px`, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
                         <EditableText tag="h1" value={d.title} onChange={set('title')} editable={editable} placeholder="Tytuł dyplomu"
@@ -595,10 +595,18 @@
                     setAccessCode('');
                     setShowPro(false);
                     localStorage.setItem('eduboxProStatus', 'PRO');
-                    showToast('🎉 Kod PRO przyjęty – grafiki AI bez limitu i dyplomy bez znaku wodnego.');
+                    showToast('🎉 Kod PRO przyjęty – ozdobne tła i ilustracje AI bez limitu.');
                 } else {
                     showToast('❌ Ten kod nie działa. Sprawdź, czy nie ma literówki.');
                 }
+            };
+
+            // Miejscowość i data poprawiane wprost na dyplomie: przed pierwszym przecinkiem miejscowość, za nim data.
+            const editPlace = (text) => {
+                const v = String(text || '');
+                const i = v.indexOf(',');
+                if (i < 0) { setTown(v.trim()); setDateText(''); }
+                else { setTown(v.slice(0, i).trim()); setDateText(v.slice(i + 1).trim()); }
             };
 
             // ---------- Okazja ----------
@@ -881,7 +889,7 @@
 
                         {showPro && !isPremium && (
                             <div className="eb-card p-4 mb-5 flex flex-col sm:flex-row gap-3 sm:items-center">
-                                <p className="text-sm text-slate-300 flex-1">Kod PRO znosi limit grafik AI i znak wodny. Robienie, druk i PDF dyplomów są zawsze za darmo.</p>
+                                <p className="text-sm text-slate-300 flex-1">Pierwsza grafika AI jest za darmo, kolejne z kodem PRO. Robienie, druk i PDF dyplomów są zawsze za darmo.</p>
                                 <div className="flex gap-2">
                                     <input value={accessCode} onChange={e => setAccessCode(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleVerifyCode()} placeholder="Wpisz kod" className="eb-field uppercase w-44" />
                                     <button onClick={handleVerifyCode} className="eb-btn eb-btn--primary">OK</button>
@@ -915,10 +923,10 @@
                                         )}
                                     </div>
                                     <ScaledPreview orientation={design.orientation} maxHeight={land ? undefined : 720}>
-                                        <Diploma d={design} name={previewName} place={place} signature={signature} editable isPremium={isPremium}
+                                        <Diploma d={design} name={previewName} place={place} signature={signature} editable
                                             onDesign={patch}
                                             onName={series ? null : setStudentName}
-                                            onPlace={null}
+                                            onPlace={editPlace}
                                             onSignature={setSignature} />
                                     </ScaledPreview>
                                     {isGenerating && (
@@ -1231,7 +1239,7 @@
                     <div className="eg-print" style={{ display: 'none' }}>
                         {recipients.map((n, i) => (
                             <div key={i} className="eg-print-page">
-                                <Diploma d={design} name={n} place={place} signature={signature} editable={false} isPremium={isPremium} />
+                                <Diploma d={design} name={n} place={place} signature={signature} editable={false} />
                             </div>
                         ))}
                     </div>
@@ -1241,7 +1249,7 @@
                         <div ref={exportRef} aria-hidden="true" style={{ position: 'fixed', left: -20000, top: 0, pointerEvents: 'none' }}>
                             {(exporting === 'png' ? [previewName] : recipients).map((n, i) => (
                                 <div key={i} className="eg-export-page eg-exporting" style={{ width: PAGE[design.orientation].w, height: PAGE[design.orientation].h }}>
-                                    <Diploma d={design} name={n} place={place} signature={signature} editable={false} isPremium={isPremium} />
+                                    <Diploma d={design} name={n} place={place} signature={signature} editable={false} />
                                 </div>
                             ))}
                         </div>
