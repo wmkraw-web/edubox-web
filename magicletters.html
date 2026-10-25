@@ -278,6 +278,8 @@
             const [marketItems, setMarketItems] = useState([]);
             const [isFetchingMarket, setIsFetchingMarket] = useState(false);
             const [isPublishing, setIsPublishing] = useState(false);
+            // Wgrane z dysku zdjęcia (mogą pokazywać dzieci/salę) NIE trafiają na publiczną Giełdę – grafiki AI tak.
+            const [uploaded, setUploaded] = useState({ bg: false, text: false });
 
             // Init
             useEffect(() => {
@@ -325,9 +327,10 @@
                 }
             };
 
-            const handleFileUpload = (e, setter) => {
+            const handleFileUpload = (e, setter, slot) => {
                 const file = e.target.files[0];
                 if (file) {
+                    if (slot) setUploaded(u => ({ ...u, [slot]: true }));
                     const reader = new FileReader();
                     reader.onload = (event) => setter(event.target.result);
                     reader.readAsDataURL(file);
@@ -416,8 +419,8 @@
                     }
 
                     if (base64Img) {
-                        if (aiTarget === 'background') setBgCustomImage(base64Img);
-                        else setTextCustomImage(base64Img);
+                        if (aiTarget === 'background') { setBgCustomImage(base64Img); setUploaded(u => ({ ...u, bg: false })); }
+                        else { setTextCustomImage(base64Img); setUploaded(u => ({ ...u, text: false })); }
 
                         if (!imgIsPro) {
                             const today = new Date().toISOString().split('T')[0];
@@ -438,19 +441,32 @@
                 }
             };
 
-            // Market Logic
+            // Giełda Wzorów – wspólny silnik (EduBoxCore.saveToGielda / subscribeToGielda), jak w innych narzędziach.
+            // Do 13.08.2026 MagicLetters miało własne publishToMarket/fetchMarket; przy migracji na global-core
+            // zniknęły, a strona nadal je wołała – publikacja i lista Giełdy zawsze kończyły się błędem.
+            const GIELDA = 'magicletters_market';
+
             const publishToGielda = async () => {
-                if (!user) { showMessage('Musisz poczekać na połączenie z serwerem.', 'error'); return; }
+                if (!user || !window.EduBoxCore?.saveToGielda) { showMessage('Chwilka, łączę z Giełdą. Spróbuj za moment.', 'error'); return; }
                 if (!text.trim()) { showMessage('Napis nie może być pusty.', 'error'); return; }
+
+                const skipped = [uploaded.bg && 'tło', uploaded.text && 'wypełnienie liter'].filter(Boolean);
+                const ok = window.confirm(
+                    `Giełda jest publiczna – projekt z napisem „${text.trim()}” zobaczą wszyscy nauczyciele.\n\n` +
+                    'Upewnij się, że w napisie nie ma imienia ani nazwiska dziecka.' +
+                    (skipped.length ? `\n\nWgrane zdjęcie (${skipped.join(', ')}) zostaje tylko u Ciebie – na Giełdę pójdzie projekt bez niego.` : '') +
+                    '\n\nOpublikować?'
+                );
+                if (!ok) return;
 
                 setIsPublishing(true);
                 try {
-                    // Kompresja base64 przed wysłaniem do Firestore (limit 1MB/doc)
-                    const safeBgImg = await resizeImageToDataURL(bgCustomImage, 512);
-                    const safeTextImg = await resizeImageToDataURL(textCustomImage, 512);
+                    // Kompresja base64 przed zapisem (dokument Firestore max ~1 MB)
+                    const safeBgImg = uploaded.bg ? null : await resizeImageToDataURL(bgCustomImage, 512);
+                    const safeTextImg = uploaded.text ? null : await resizeImageToDataURL(textCustomImage, 512);
 
-                    const payload = {
-                        text,
+                    const config = {
+                        text: text.trim(),
                         shapeId: shape.id,
                         fontName: font.name,
                         bgColor,
@@ -464,28 +480,14 @@
                         letterOffsetY
                     };
 
-                    await window.EduBoxCore.publishToMarket(payload);
+                    await window.EduBoxCore.saveToGielda(GIELDA, 'magicletters', text.trim().slice(0, 60), config);
                     showMessage('Opublikowano na Giełdzie!', 'success');
                     setAppMode('gielda');
-                    loadMarket();
                 } catch (error) {
                     console.error("Publish error:", error);
-                    showMessage('Błąd publikacji na Giełdzie.', 'error');
+                    showMessage(error?.message?.includes('za duża') ? error.message : 'Nie udało się opublikować. Sprawdź internet i spróbuj ponownie.', 'error');
                 } finally {
                     setIsPublishing(false);
-                }
-            };
-
-            const loadMarket = async () => {
-                setIsFetchingMarket(true);
-                try {
-                    const items = await window.EduBoxCore.fetchMarket();
-                    setMarketItems(items);
-                } catch (error) {
-                    console.error("Fetch market error:", error);
-                    showMessage('Błąd ładowania Giełdy.', 'error');
-                } finally {
-                    setIsFetchingMarket(false);
                 }
             };
 
@@ -499,6 +501,7 @@
                 setTextColor(item.textColor || '#ffffff');
                 setTextTheme(THEMES.find(t => t.id === item.textThemeId) || THEMES[0]);
                 setTextCustomImage(item.textCustomImage || null);
+                setUploaded({ bg: false, text: false });
                 setLetterScale(item.letterScale || 1);
                 setLetterOffsetX(item.letterOffsetX || 0);
                 setLetterOffsetY(item.letterOffsetY || 0);
@@ -506,9 +509,22 @@
                 showMessage('Wczytano projekt!', 'success');
             };
 
+            // Lista Giełdy na żywo, tylko gdy zakładka jest otwarta
             useEffect(() => {
-                if (appMode === 'gielda') loadMarket();
-            }, [appMode]);
+                if (appMode !== 'gielda' || !user || !window.EduBoxCore?.subscribeToGielda) return;
+                setIsFetchingMarket(true);
+                const unsubscribe = window.EduBoxCore.subscribeToGielda(GIELDA, (items) => {
+                    setMarketItems(items
+                        .map(it => ({ ...(it.config || {}), id: it.id }))
+                        .filter(it => typeof it.text === 'string' && it.text.trim()));
+                    setIsFetchingMarket(false);
+                }, (error) => {
+                    console.error("Fetch market error:", error);
+                    showMessage('Nie udało się wczytać Giełdy.', 'error');
+                    setIsFetchingMarket(false);
+                });
+                return () => unsubscribe && unsubscribe();
+            }, [appMode, user]);
 
             const characters = text.split('');
 
@@ -664,10 +680,10 @@
                                         
                                         <label className="flex items-center justify-center gap-2 w-full p-3 border border-dashed border-slate-700 rounded-lg cursor-pointer hover:border-purple-500 hover:bg-slate-800/50 transition-all text-slate-400 hover:text-white">
                                             <i className="ph-bold ph-upload-simple"></i> <span className="text-[10px] font-bold uppercase">Wgraj z dysku</span>
-                                            <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, setBgCustomImage)} />
+                                            <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, setBgCustomImage, 'bg')} />
                                         </label>
                                         {bgCustomImage && (
-                                            <button onClick={() => setBgCustomImage(null)} className="text-[9px] text-red-400 font-bold uppercase w-full hover:underline flex justify-center items-center gap-1">
+                                            <button onClick={() => { setBgCustomImage(null); setUploaded(u => ({ ...u, bg: false })); }} className="text-[9px] text-red-400 font-bold uppercase w-full hover:underline flex justify-center items-center gap-1">
                                                 <i className="ph-bold ph-trash"></i> Usuń własne tło
                                             </button>
                                         )}
@@ -686,10 +702,10 @@
                                         
                                         <label className="flex items-center justify-center gap-2 w-full p-3 border border-dashed border-slate-700 rounded-lg cursor-pointer hover:border-purple-500 hover:bg-slate-800/50 transition-all text-slate-400 hover:text-white">
                                             <i className="ph-bold ph-upload-simple"></i> <span className="text-[10px] font-bold uppercase">Wgraj wzór na litery</span>
-                                            <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, setTextCustomImage)} />
+                                            <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, setTextCustomImage, 'text')} />
                                         </label>
                                         {textCustomImage && (
-                                            <button onClick={() => setTextCustomImage(null)} className="text-[9px] text-red-400 font-bold uppercase w-full hover:underline flex justify-center items-center gap-1">
+                                            <button onClick={() => { setTextCustomImage(null); setUploaded(u => ({ ...u, text: false })); }} className="text-[9px] text-red-400 font-bold uppercase w-full hover:underline flex justify-center items-center gap-1">
                                                 <i className="ph-bold ph-trash"></i> Usuń wzór liter
                                             </button>
                                         )}

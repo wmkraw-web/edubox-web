@@ -543,6 +543,11 @@ Realne przypadki: EduSOS publikował surowy opis z imieniem i diagnozą (teraz a
 – imię z tablicy żetonowej (`withoutChildName`), EduGenerator – imię ucznia z dyplomu, podpis i wgrane zdjęcie
 (zostaje tylko grafika AI z adresu https), EduPlakat – plakat ze zdjęcia (image-to-image) może zachować wizerunek,
 więc osobne pytanie (`fromPhoto`). Imię dziecka na dyplomie / tablicy wpisuje przeglądarka, nie AI (EduDyplomy).
+MagicLetters (25.10.2026): od migracji na global-core (13.08.2026) wołało nieistniejące `EduBoxCore.publishToMarket`/
+`fetchMarket` – publikacja i lista Giełdy zawsze padały. Teraz `saveToGielda('magicletters_market')` + `subscribeToGielda`
+(wpis `{name, config}`), wgrane z dysku zdjęcia tła/liter zostają lokalnie (flaga `uploaded`), grafiki AI idą, `confirm`
+przypomina o imionach w napisie. Stare wzory z `artifacts/edubox-magicletters-v3/…/market` nie są czytane.
+Po migracji narzędzia na wspólny silnik sprawdź `grep 'EduBoxCore\.'` – każda wołana funkcja musi istnieć w global-core.js.
 
 **`\b` w JS nie zna polskich liter:** `/\bświatła\b/` nigdy nie trafi (ś, ę, ą to dla `\b` „nie-litery”) – w EduChunku
 pogrubianie słów kluczowych z ogonkami po prostu nie działało. Granice słowa: `(^|[^\p{L}\p{N}])(słowo)(?![\p{L}\p{N}])`
