@@ -572,6 +572,19 @@ więc gpt-6.1 (~30 s) z zasadą „tylko prawdziwe tytuły z autorem albo rokiem
 (`[data powrotu]`, sekretariat). Narzędzia prywatne: posty Ewy i scenariusze Ani na balanced; Ania nie czyta adresu
 „…html?mode=…” – link do opisu filmu jest w panelu z przyciskiem Kopiuj.
 
+**EduGenerator 2 (25.10.2026, decyzja właściciela):** kreator 4 kroków (Okazja → Treść → Wygląd → Drukuj) zamiast
+zakładek „Teksty/Grafika/AI/Szlify”. Dyplom (`Diploma`) ma STAŁY rozmiar A4 w px (`PAGE`: 1122 × 793 / 793 × 1122)
+i tylko skalujemy go na ekranie (`ScaledPreview`) – podgląd, wydruk (`.eg-print`, każda osoba na osobnej kartce),
+PDF (html2canvas 1.4.1 + jsPDF 2.5.1 z cdnjs, ładowane po kliknięciu) i PNG to ten sam układ. Tekst edytowalny na
+dyplomie (`EditableText`, DOM ustawiany ręcznie, żeby kursor nie skakał); podpowiedzi „Imię i nazwisko” tylko w
+`.eg-sheet` (podgląd), nie w druku – puste imię = linia do wpisania długopisem. **Seria z listy imion** tylko w pamięci
+karty (bez localStorage, bez Giełdy, nigdy do AI); miejscowość i podpis pamiętane w `localStorage.eduGeneratorPamiec`
+(można wyłączyć). Okazja ustawia wygląd BEZ AI (tint koloru tytułu + emoji w rogach); malowanie tła AI to świadomy
+przycisk w „Wyglądzie”, darmowa grafika liczona dopiero po udanym obrazku (`countImage` → `executeImageLimitCheck`).
+Giełda: nowy zapis `{v: 2, design, studentName: '', diplomaSignature: '', customImage: tylko https}`, stare wzory
+czyta `designFromLegacy`, stare girlandy (`activeTab: 'garland'`) odsyłają do MagicLetters. **Girlandy są tylko
+w MagicLetters.**
+
 **CSP a obrazki z fal.media:** `connect-src` NIE obejmuje fal.media, więc `fetch(urlObrazka)` w przeglądarce kończy
 się „Failed to fetch” (realny błąd w MagicLetters: obrazek opłacony, użytkownik dostawał błąd, licznik się nie
 zwiększał). Obrazek z fal.media zamieniamy na dane przez `<img crossOrigin="anonymous">` + `<canvas>` (img-src

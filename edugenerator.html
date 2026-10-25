@@ -4,14 +4,14 @@
     <meta name="google" content="notranslate">
     <title>EduGenerator – dyplomy z ilustracjami AI | EduBox AI</title>
     <meta property="og:title" content="EduGenerator – dyplomy z ilustracjami AI | EduBox AI">
-    <meta property="og:description" content="Dyplomy i ozdobne girlandy ze zintegrowanym wycinaniem tła. Za darmo, prosto z przeglądarki – EduBox AI.">
+    <meta property="og:description" content="Dyplomy w 4 krokach: gotowe okazje, cała lista dzieci naraz, ozdobne tło od AI, druk i PDF. Za darmo, prosto z przeglądarki – EduBox AI.">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://eduboxpro.pl/edugenerator.html">
     <meta property="og:image" content="https://eduboxpro.pl/okladka.jpg">
     <meta property="og:locale" content="pl_PL">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="EduGenerator – dyplomy z ilustracjami AI | EduBox AI">
-    <meta name="twitter:description" content="Dyplomy i ozdobne girlandy ze zintegrowanym wycinaniem tła. Za darmo, prosto z przeglądarki – EduBox AI.">
+    <meta name="twitter:description" content="Dyplomy w 4 krokach: gotowe okazje, cała lista dzieci naraz, ozdobne tło od AI, druk i PDF. Za darmo, prosto z przeglądarki – EduBox AI.">
     <meta name="twitter:image" content="https://eduboxpro.pl/okladka.jpg">
 
     <!-- Google tag (gtag.js) -->
@@ -83,6 +83,14 @@
 
         input:focus, select:focus, textarea:focus { box-shadow: 0 0 15px rgba(99, 102, 241, 0.3); border-color: #6366f1 !important; }
 
+        /* EduGenerator 2: tekst edytowany na dyplomie, podpowiedzi tylko w podglądzie (nie w druku ani PDF) */
+        .eg-editable { outline: none; cursor: text; border-radius: 8px; transition: box-shadow .15s; }
+        .eg-editable:hover { box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.35); }
+        .eg-editable:focus { box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.85); }
+        .eg-sheet [data-placeholder]:empty::before { content: attr(data-placeholder); opacity: 0.35; }
+        .eg-sheet { box-shadow: 0 20px 50px -22px rgba(0, 0, 0, 0.8); border-radius: 4px; overflow: hidden; }
+        .eg-diploma h1, .eg-diploma div { margin: 0; }
+
         .dark-grid-bg {
             background-image: radial-gradient(rgba(255, 255, 255, 0.05) 2px, transparent 2px);
             background-size: 30px 30px;
@@ -90,13 +98,13 @@
     </style>
 
   <link rel="canonical" href="https://eduboxpro.pl/edugenerator.html">
-  <meta name="description" content="Dyplomy i ozdobne girlandy ze zintegrowanym wycinaniem tła. Za darmo, prosto z przeglądarki – EduBox AI.">
+  <meta name="description" content="Dyplomy w 4 krokach: gotowe okazje, cała lista dzieci naraz, ozdobne tło od AI, druk i PDF. Za darmo, prosto z przeglądarki – EduBox AI.">
   <link rel="icon" href="/favicon.ico" type="image/x-icon">  <script type="application/ld+json">
 {
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
   "name": "EduGenerator – dyplomy z ilustracjami AI | EduBox AI",
-  "description": "Dyplomy i ozdobne girlandy ze zintegrowanym wycinaniem tła. Za darmo, prosto z przeglądarki – EduBox AI.",
+  "description": "Dyplomy w 4 krokach: gotowe okazje, cała lista dzieci naraz, ozdobne tło od AI, druk i PDF. Za darmo, prosto z przeglądarki – EduBox AI.",
   "url": "https://eduboxpro.pl/edugenerator.html",
   "applicationCategory": "EducationalApplication",
   "operatingSystem": "Web",
@@ -138,74 +146,76 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        // Wykorzystujemy wyciągnięty Core poprzez obiekt globalny (window)
-        const { useState, useEffect, useRef } = window.React;
+        // EduGenerator 2 (25.10.2026) – dyplomy w 4 krokach: Okazja → Treść → Wygląd → Drukuj.
+        // Dyplom rysujemy w stałym rozmiarze kartki A4 (1122 × 793 px poziomo, 793 × 1122 pionowo) i tylko
+        // skalujemy go na ekranie – podgląd, wydruk, PDF i PNG to ten sam układ. Girlandy przeniesione do MagicLetters.
+        const { useState, useEffect, useRef, useLayoutEffect } = window.React;
 
+        // Palety bez AI (nazwy zostały ze starej wersji – wzory z Giełdy zapisane z selectedThemeId dalej się wczytują).
         const THEMES = [
-          { id: 'watercolor', name: 'Akwarela', bgHex: '#ffffff', borderHex: '#818cf8', elements: ['☁️', '✨'] },
+          { id: 'pasowanie', name: 'Szkolna', bgHex: '#eef2ff', borderHex: '#6366f1', elements: ['🎒', '🖍️'] },
+          { id: 'watercolor', name: 'Chmurki', bgHex: '#ffffff', borderHex: '#818cf8', elements: ['☁️', '✨'] },
           { id: 'boho', name: 'Boho', bgHex: '#FAF9F6', borderHex: '#D4B895', elements: ['🌿', '☀️'] },
           { id: 'rodzina', name: 'Rodzina', bgHex: '#fff1f2', borderHex: '#f43f5e', elements: ['❤️', '🏡'] },
-          { id: 'autyzm', name: 'Autyzm', bgHex: '#eff6ff', borderHex: '#3b82f6', elements: ['💙', '🧩'] },
-          { id: 'skarpetka', name: 'Skarpetka', bgHex: '#fdf4ff', borderHex: '#fb923c', elements: ['🧦', '🌈'] },
-          { id: 'pasowanie', name: 'Pasowanie', bgHex: '#eef2ff', borderHex: '#6366f1', elements: ['🎒', '🖍️'] },
-          { id: 'zakonczenie', name: 'Zakończenie', bgHex: '#fefce8', borderHex: '#eab308', elements: ['🎓', '🌻'] },
-          { id: 'przedszkolak', name: 'Przedszkolak', bgHex: '#fef9c3', borderHex: '#f87171', elements: ['🎈', '🧸'] },
-          { id: 'dziecko', name: 'Dziecko', bgHex: '#f0fdf4', borderHex: '#4ade80', elements: ['🍭', '🎠'] },
-          { id: 'nauczyciel', name: 'Nauczyciel', bgHex: '#eef2ff', borderHex: '#6366f1', elements: ['🦉', '✏️'] },
-          { id: 'space', name: 'Kosmos', bgHex: '#312e81', borderHex: '#818cf8', elements: ['🚀', '⭐'] },
+          { id: 'autyzm', name: 'Niebieska', bgHex: '#eff6ff', borderHex: '#3b82f6', elements: ['💙', '🧩'] },
+          { id: 'skarpetka', name: 'Tęczowa', bgHex: '#fdf4ff', borderHex: '#fb923c', elements: ['🧦', '🌈'] },
+          { id: 'zakonczenie', name: 'Słoneczna', bgHex: '#fefce8', borderHex: '#eab308', elements: ['🎓', '🌻'] },
+          { id: 'przedszkolak', name: 'Przedszkole', bgHex: '#fef9c3', borderHex: '#f87171', elements: ['🎈', '🧸'] },
+          { id: 'dziecko', name: 'Miętowa', bgHex: '#f0fdf4', borderHex: '#4ade80', elements: ['🍭', '🎠'] },
+          { id: 'nauczyciel', name: 'Mądra sowa', bgHex: '#eef2ff', borderHex: '#6366f1', elements: ['🦉', '✏️'] },
           { id: 'wiosna', name: 'Wiosna', bgHex: '#fdf2f8', borderHex: '#f472b6', elements: ['🌸', '🦋'] },
-          { id: 'zima', name: 'Zima', bgHex: '#f0f9ff', borderHex: '#7dd3fc', elements: ['❄️', '⛄'] },
+          { id: 'lato', name: 'Lato', bgHex: '#fefce8', borderHex: '#facc15', elements: ['☀️', '🏖️'] },
           { id: 'jesien', name: 'Jesień', bgHex: '#fff7ed', borderHex: '#ea580c', elements: ['🍁', '🍄'] },
-          { id: 'lato', name: 'Lato', bgHex: '#fefce8', borderHex: '#facc15', elements: ['☀️', '🏖️'] }
+          { id: 'zima', name: 'Zima', bgHex: '#f0f9ff', borderHex: '#7dd3fc', elements: ['❄️', '⛄'] },
+          { id: 'space', name: 'Kosmos', bgHex: '#e0e7ff', borderHex: '#4338ca', elements: ['🚀', '⭐'] }
         ];
 
-        // Gotowe motywy okazji - jedno kliknięcie: AI maluje całe ozdobne tło dyplomu,
-        // aplikacja ustawia teksty, czcionkę i kolory. Prompt opisuje SKOŃCZONY projekt graficzny
-        // (ramka, postacie, paleta, pusty panel na tekst), nie pojedynczy obiekt.
+        // Gotowe okazje – jedno kliknięcie ustawia teksty, czcionkę, kolory i ozdoby (bez AI, za darmo).
+        // Ozdobne tło malowane przez AI to osobny, świadomy krok w „Wyglądzie” (zużywa darmową grafikę).
+        // Prompt opisuje SKOŃCZONĄ ramkę (postacie w rogach, pusty środek), nie scenę.
         const OCCASION_PRESETS = [
-          { id: 'chlopaka', label: 'Dzień Chłopaka', emoji: '⚽', font: 'font-balsamiq', titleColor: '#1d4ed8', textColor: '#0f172a',
+          { id: 'chlopaka', label: 'Dzień Chłopaka', emoji: '⚽', deco: ['⚽', '⭐'], font: 'font-balsamiq', titleColor: '#1d4ed8', textColor: '#0f172a',
             title: 'DYPLOM SUPER CHŁOPAKA', subtitle: 'OTRZYMUJE', reason: 'za bycie wspaniałym kolegą, uśmiech każdego dnia i mnóstwo dobrej energii.',
             prompt: 'Border decorated with cartoon footballs, gold stars, small crowns, confetti and blue rays. Two small cartoon boys giving a thumbs up in the bottom corners. Blue, red and yellow colors.' },
-          { id: 'dziewczynek', label: 'Dzień Dziewczynek', emoji: '🌷', font: 'font-caveat', titleColor: '#db2777', textColor: '#0f172a',
+          { id: 'dziewczynek', label: 'Dzień Dziewczynek', emoji: '🌷', deco: ['🌷', '🦋'], font: 'font-caveat', titleColor: '#db2777', textColor: '#0f172a',
             title: 'DYPLOM SUPER DZIEWCZYNKI', subtitle: 'OTRZYMUJE', reason: 'za dobre serce, pomysłowość i uśmiech, który rozświetla całą salę.',
             prompt: 'Border decorated with tulips, hearts, butterflies, sparkles and looping ribbons. Two small cartoon girls in the bottom corners. Rose, magenta and mint colors.' },
-          { id: 'dziecka', label: 'Dzień Dziecka', emoji: '🎈', font: 'font-balsamiq', titleColor: '#7c3aed', textColor: '#0f172a',
+          { id: 'dziecka', label: 'Dzień Dziecka', emoji: '🎈', deco: ['🎈', '🌈'], font: 'font-balsamiq', titleColor: '#7c3aed', textColor: '#0f172a',
             title: 'DYPLOM Z OKAZJI DNIA DZIECKA', subtitle: 'DLA', reason: 'za radość, ciekawość świata i wspaniałą wspólną zabawę.',
             prompt: 'Border decorated with balloons, rainbows, kites, ice cream cones, paper planes and stars. A few small cartoon children in the bottom corners. Bright rainbow colors.' },
-          { id: 'mamy', label: 'Dzień Mamy', emoji: '💐', font: 'font-dancing', titleColor: '#be123c', textColor: '#7f1d1d',
+          { id: 'mamy', label: 'Dzień Mamy', emoji: '💐', deco: ['💐', '❤️'], font: 'font-dancing', titleColor: '#be123c', textColor: '#7f1d1d',
             title: 'DYPLOM DLA NAJLEPSZEJ MAMY', subtitle: 'Z MIŁOŚCIĄ OD', reason: 'za każdy przytulas, każdą bajkę na dobranoc i bycie zawsze obok.',
             prompt: 'Border decorated with roses, hearts, lace, tea cups and floral vines. A small bouquet in a bottom corner. Blush pink, coral and cream colors.' },
-          { id: 'taty', label: 'Dzień Taty', emoji: '👔', font: 'font-oswald', titleColor: '#1e3a8a', textColor: '#0f172a',
+          { id: 'taty', label: 'Dzień Taty', emoji: '👔', deco: ['👔', '⭐'], font: 'font-oswald', titleColor: '#1e3a8a', textColor: '#0f172a',
             title: 'DYPLOM DLA NAJLEPSZEGO TATY', subtitle: 'OD', reason: 'za wspólne wygłupy, naprawianie wszystkiego i najmocniejsze uściski na świecie.',
             prompt: 'Border decorated with neckties, moustaches, hand tools, small medals and stars. A small cartoon dad and child in a bottom corner. Navy, teal and mustard colors.' },
-          { id: 'dziadkowie', label: 'Babcia i Dziadek', emoji: '👵', font: 'font-lora', titleColor: '#b45309', textColor: '#422006',
+          { id: 'dziadkowie', label: 'Babcia i Dziadek', emoji: '👵', deco: ['👵', '👴'], font: 'font-lora', titleColor: '#b45309', textColor: '#422006',
             title: 'DYPLOM DLA KOCHANEJ BABCI I DZIADKA', subtitle: 'OD WNUKÓW', reason: 'za bajki, pyszne obiady i najcieplejsze serca pod słońcem.',
             prompt: 'Border decorated with balls of knitting yarn, round spectacles, apple pie, garden flowers and hearts. A small cartoon grandmother and grandfather in the bottom corners. Amber, sage green and dusty rose colors.' },
-          { id: 'pasowanie', label: 'Pasowanie na ucznia', emoji: '🎒', font: 'font-playfair', titleColor: '#1e40af', textColor: '#0f172a',
+          { id: 'pasowanie', label: 'Pasowanie na ucznia', emoji: '🎒', deco: ['🎒', '✏️'], font: 'font-playfair', titleColor: '#1e40af', textColor: '#0f172a',
             title: 'PASOWANIE NA UCZNIA', subtitle: 'ZOSTAJE UROCZYŚCIE PASOWANY/A', reason: 'na pełnoprawnego ucznia naszej szkoły.',
             prompt: 'Border decorated with pencils, backpacks, open books, laurel leaves, stars and a school bell. Two small cartoon first-graders in the bottom corners. Royal blue, gold and white colors.' },
-          { id: 'zakonczenie', label: 'Zakończenie roku', emoji: '🎓', font: 'font-cinzel', titleColor: '#a16207', textColor: '#0f172a',
+          { id: 'zakonczenie', label: 'Zakończenie roku', emoji: '🎓', deco: ['🎓', '🌻'], font: 'font-cinzel', titleColor: '#a16207', textColor: '#0f172a',
             title: 'DYPLOM NA ZAKOŃCZENIE ROKU SZKOLNEGO', subtitle: 'OTRZYMUJE', reason: 'za całoroczną pracę, postępy w nauce i wspaniałą klasową przyjaźń.',
             prompt: 'Border decorated with graduation caps, sunflowers, suns, swallows, confetti and laurel wreaths. Two small cartoon kids tossing caps in the bottom corners. Sunny yellow, sky blue and green colors.' },
-          { id: 'mikolajki', label: 'Mikołajki / Święta', emoji: '🎅', font: 'font-lobster', titleColor: '#b91c1c', textColor: '#14532d',
+          { id: 'mikolajki', label: 'Mikołajki / Święta', emoji: '🎅', deco: ['🎅', '❄️'], font: 'font-lobster', titleColor: '#b91c1c', textColor: '#14532d',
             title: 'DYPLOM OD ŚWIĘTEGO MIKOŁAJA', subtitle: 'DLA GRZECZNEGO DZIECKA', reason: 'za dobre serce, pomoc innym i wiarę w świąteczne cuda.',
             prompt: 'Border decorated with Santa hats, gingerbread, candy canes, snowflakes, baubles and holly. A small cartoon Santa and elf in the bottom corners. Red, pine green, gold and white colors.' },
-          { id: 'konkurs', label: 'Konkurs / I miejsce', emoji: '🏆', font: 'font-playfair', titleColor: '#1e3a8a', textColor: '#0f172a',
+          { id: 'konkurs', label: 'Konkurs / I miejsce', emoji: '🏆', deco: ['🏆', '⭐'], font: 'font-playfair', titleColor: '#1e3a8a', textColor: '#0f172a',
             title: 'DYPLOM ZA ZAJĘCIE I MIEJSCA', subtitle: 'W KONKURSIE', reason: 'za wybitne osiągnięcia, zaangażowanie i reprezentowanie szkoły na najwyższym poziomie.',
             prompt: 'Border decorated with laurel wreaths, gold medals, ribbons, stars, trophies and light rays with elegant corner flourishes. No characters. Deep blue, gold and cream colors.' },
-          { id: 'czytelnik', label: 'Mistrz czytania', emoji: '📚', font: 'font-patrick', titleColor: '#0f766e', textColor: '#0f172a',
+          { id: 'czytelnik', label: 'Mistrz czytania', emoji: '📚', deco: ['📚', '🦉'], font: 'font-patrick', titleColor: '#0f766e', textColor: '#0f172a',
             title: 'DYPLOM MISTRZA CZYTANIA', subtitle: 'OTRZYMUJE', reason: 'za pochłanianie książek, piękne czytanie na głos i miłość do bibliotecznych przygód.',
             prompt: 'Border decorated with open books, owls with glasses, bookmarks, page sparkles and stars. A small cartoon child reading in a bottom corner. Teal, warm orange and cream colors.' },
-          { id: 'sport', label: 'Sportowiec roku', emoji: '🥇', font: 'font-oswald', titleColor: '#c2410c', textColor: '#0f172a',
+          { id: 'sport', label: 'Sportowiec roku', emoji: '🥇', deco: ['🥇', '⚽'], font: 'font-oswald', titleColor: '#c2410c', textColor: '#0f172a',
             title: 'DYPLOM SPORTOWCA ROKU', subtitle: 'OTRZYMUJE', reason: 'za wolę walki, sportową postawę i świetną formę przez cały rok.',
             prompt: 'Border decorated with medals, stopwatches, running shoes, footballs, checkered flags and motion streaks. Two small cartoon running kids in the bottom corners. Orange, blue and lime colors.' },
-          { id: 'ekolog', label: 'Mały Ekolog', emoji: '🌍', font: 'font-quicksand', titleColor: '#15803d', textColor: '#0f172a',
+          { id: 'ekolog', label: 'Mały Ekolog', emoji: '🌍', deco: ['🌍', '🌱'], font: 'font-quicksand', titleColor: '#15803d', textColor: '#0f172a',
             title: 'DYPLOM MAŁEGO EKOLOGA', subtitle: 'OTRZYMUJE', reason: 'za dbanie o przyrodę, segregowanie odpadów i troskę o naszą planetę.',
             prompt: 'Border decorated with leaves, ladybugs, bees, flowers, recycling arrows, planet Earth and a sun. Two small cartoon kids planting a tree in a bottom corner. Green, sky blue and yellow colors.' }
         ];
 
-        // Ozdobne ramki AI dla dyplomów robionych od zera - nie ruszaja tekstow uzytkownika,
-        // maluja tylko ramke z pustym srodkiem (ten sam silnik co motywy okazji).
+        // Ozdobne ramki AI dla dyplomu „od zera” – malują tylko ramkę z pustym środkiem.
         const FRAME_STYLES = [
           { id: 'kids',    emoji: '🎨', label: 'Dziecięca',  hint: 'balloons, stars, crayons, confetti and playful clouds, cheerful bright primary colors' },
           { id: 'elegant', emoji: '👑', label: 'Elegancka',  hint: 'thin gold filigree lines, small laurel branches and delicate corner flourishes, navy and gold, minimal' },
@@ -215,121 +225,332 @@
           { id: 'forest',  emoji: '🍃', label: 'Leśna',      hint: 'oak leaves, acorns, mushrooms, ferns and tiny woodland flowers, warm green and amber' }
         ];
 
-        const EXTENDED_COLORS = [
-            '#0f172a', '#ffffff', '#ef4444', '#f97316', '#f59e0b', 
-            '#84cc16', '#22c55e', '#06b6d4', '#3b82f6', '#6366f1', 
-            '#8b5cf6', '#d946ef', '#ec4899'
+        const ART_STYLES = [
+            { id: 'flat', label: '🖍️ Bajkowa' },
+            { id: 'watercolor', label: '🎨 Akwarela' },
+            { id: 'doodle', label: '✏️ Szkic' },
+            { id: '3d', label: '🧸 Plastelina 3D' }
         ];
 
-        const makeWhiteTransparent = (imageSrc) => {
-            return new Promise((resolve) => {
-                const img = new Image();
-                if (!imageSrc.startsWith('blob:') && !imageSrc.startsWith('data:')) {
-                    img.crossOrigin = 'Anonymous';
-                }
-                img.onload = () => {
-                    try {
-                        const canvas = document.createElement('canvas');
-                        canvas.width = img.width;
-                        canvas.height = img.height;
-                        const ctx = canvas.getContext('2d', { willReadFrequently: true });
-                        ctx.drawImage(img, 0, 0);
-                        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                        const data = imageData.data;
-                        for (let i = 0; i < data.length; i += 4) {
-                            const r = data[i]; const g = data[i+1]; const b = data[i+2];
-                            if (r > 230 && g > 230 && b > 230) {
-                                data[i+3] = 0; 
-                            } else if (r > 200 && g > 200 && b > 200) {
-                                data[i+3] = (255 - Math.max(r, g, b)) * 2; 
-                            }
-                        }
-                        ctx.putImageData(imageData, 0, 0);
-                        resolve(canvas.toDataURL('image/png'));
-                    } catch(e) { resolve(imageSrc); }
-                };
-                img.onerror = () => resolve(imageSrc);
-                img.src = imageSrc;
-            });
+        const FONTS = [
+            { id: 'font-sans', name: 'Montserrat', hint: 'klasyczna' },
+            { id: 'font-balsamiq', name: 'Balsamiq', hint: 'dziecięca' },
+            { id: 'font-caveat', name: 'Caveat', hint: 'odręczna' },
+            { id: 'font-patrick', name: 'Patrick Hand', hint: 'zeszytowa' },
+            { id: 'font-quicksand', name: 'Quicksand', hint: 'okrągła' },
+            { id: 'font-pacifico', name: 'Pacifico', hint: 'ozdobna' },
+            { id: 'font-dancing', name: 'Dancing Script', hint: 'elegancka' },
+            { id: 'font-lobster', name: 'Lobster', hint: 'gruba' },
+            { id: 'font-playfair', name: 'Playfair', hint: 'uroczysta' },
+            { id: 'font-cinzel', name: 'Cinzel', hint: 'szlachetna' },
+            { id: 'font-lora', name: 'Lora', hint: 'książkowa' },
+            { id: 'font-oswald', name: 'Oswald', hint: 'sportowa' }
+        ];
+
+        const INK_COLORS = ['#0f172a', '#1e3a8a', '#1d4ed8', '#0f766e', '#15803d', '#a16207', '#c2410c', '#b91c1c', '#be123c', '#db2777', '#7c3aed', '#ffffff'];
+
+        const STEPS = [
+            { id: 'okazja', label: 'Okazja', icon: 'ph-confetti' },
+            { id: 'tresc', label: 'Treść', icon: 'ph-pencil-simple-line' },
+            { id: 'wyglad', label: 'Wygląd', icon: 'ph-palette' },
+            { id: 'gotowe', label: 'Drukuj', icon: 'ph-printer' }
+        ];
+
+        // Kartka A4 w pikselach CSS (96 dpi): 297 × 210 mm.
+        const PAGE = { horizontal: { w: 1122, h: 793 }, vertical: { w: 793, h: 1122 } };
+        const MAX_NAMES = 60;
+        const MEMORY_KEY = 'eduGeneratorPamiec';
+
+        const tint = (hex, amount) => {
+            const m = /^#?([0-9a-f]{6})$/i.exec(hex || '');
+            if (!m) return '#ffffff';
+            const n = parseInt(m[1], 16);
+            const mix = (c) => Math.round(c + (255 - c) * amount);
+            const r = mix((n >> 16) & 255), g = mix((n >> 8) & 255), b = mix(n & 255);
+            return '#' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
         };
 
+        const todayPl = () => new Date().toLocaleDateString('pl-PL', { day: 'numeric', month: 'long', year: 'numeric' });
+
+        const plural = (n, one, few, many) => n === 1 ? one : (n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? few : many);
+
+        const parseNames = (text) => String(text || '').split(/\r?\n/).map(s => s.trim()).filter(Boolean).slice(0, MAX_NAMES);
+
+        const DEFAULT_DESIGN = {
+            orientation: 'horizontal',
+            font: 'font-playfair',
+            title: 'DYPLOM',
+            subtitle: 'OTRZYMUJE',
+            reason: 'za wspaniałą pracę, zaangażowanie i uśmiech, który zarażał całą grupę.',
+            bg: '#eef2ff', border: '#6366f1', deco: ['🎒', '🖍️'], themeId: 'pasowanie',
+            titleColor: '#1e3a8a', textColor: '#0f172a',
+            frame: 'double',
+            image: null, imageLayout: 'full_background', imageOpacity: 100,
+            panel: 0,
+            sizes: { title: 60, subtitle: 22, name: 54, reason: 24 },
+            occasionId: null
+        };
+
+        // Stary wzór z Giełdy (płaskie pola z wersji 1) → nowy projekt.
+        const designFromLegacy = (c) => {
+            const theme = THEMES.find(t => t.id === c.selectedThemeId);
+            const tf = c.textFormats || {};
+            return {
+                ...DEFAULT_DESIGN,
+                orientation: c.diplomaOrientation === 'vertical' ? 'vertical' : 'horizontal',
+                font: c.selectedFont || DEFAULT_DESIGN.font,
+                title: c.diplomaTitle ?? DEFAULT_DESIGN.title,
+                subtitle: c.diplomaSubtitle ?? '',
+                reason: c.diplomaReason ?? '',
+                bg: c.diplomaBgColor || theme?.bgHex || DEFAULT_DESIGN.bg,
+                border: c.diplomaBorderColor || theme?.borderHex || DEFAULT_DESIGN.border,
+                deco: theme?.elements || DEFAULT_DESIGN.deco,
+                themeId: c.selectedThemeId || null,
+                titleColor: tf.title?.color || '#0f172a',
+                textColor: tf.name?.color || c.diplomaTextColor || '#0f172a',
+                frame: c.borderWidth === 0 ? 'none' : (c.borderStyle === 'dashed' ? 'dashed' : 'double'),
+                image: c.customImage || null,
+                imageLayout: c.graphicLayout || 'full_background',
+                imageOpacity: c.bgImageOpacity ?? 100,
+                panel: c.boxOpacity ?? 0,
+                sizes: {
+                    title: tf.title?.size || 60, subtitle: tf.subtitle?.size || 22,
+                    name: tf.name?.size || 54, reason: tf.reason?.size || 24
+                },
+                occasionId: c.lastOccasionId || null
+            };
+        };
+
+        const makeWhiteTransparent = (imageSrc) => new Promise((resolve) => {
+            const img = new Image();
+            if (!imageSrc.startsWith('blob:') && !imageSrc.startsWith('data:')) img.crossOrigin = 'Anonymous';
+            img.onload = () => {
+                try {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = img.width; canvas.height = img.height;
+                    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+                    ctx.drawImage(img, 0, 0);
+                    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    const data = imageData.data;
+                    for (let i = 0; i < data.length; i += 4) {
+                        const r = data[i], g = data[i + 1], b = data[i + 2];
+                        if (r > 230 && g > 230 && b > 230) data[i + 3] = 0;
+                        else if (r > 200 && g > 200 && b > 200) data[i + 3] = (255 - Math.max(r, g, b)) * 2;
+                    }
+                    ctx.putImageData(imageData, 0, 0);
+                    resolve(canvas.toDataURL('image/png'));
+                } catch (e) { resolve(imageSrc); }
+            };
+            img.onerror = () => resolve(imageSrc);
+            img.src = imageSrc;
+        });
+
+        // Zdjęcia z dysku zmniejszamy w przeglądarce (A4 nie potrzebuje 4000 px, a duży base64 zamula podgląd i PDF).
+        const shrinkImage = (dataUrl, max = 1600) => new Promise((resolve) => {
+            const img = new Image();
+            img.onload = () => {
+                const scale = Math.min(1, max / Math.max(img.width, img.height));
+                if (scale === 1) return resolve(dataUrl);
+                const c = document.createElement('canvas');
+                c.width = Math.round(img.width * scale); c.height = Math.round(img.height * scale);
+                c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+                resolve(c.toDataURL(dataUrl.startsWith('data:image/png') ? 'image/png' : 'image/jpeg', 0.9));
+            };
+            img.onerror = () => resolve(dataUrl);
+            img.src = dataUrl;
+        });
+
+        const loadScript = (src) => new Promise((resolve, reject) => {
+            if (document.querySelector(`script[src="${src}"]`)) return resolve();
+            const s = document.createElement('script');
+            s.src = src; s.onload = resolve; s.onerror = () => reject(new Error('Nie udało się wczytać biblioteki do PDF.'));
+            document.head.appendChild(s);
+        });
+
+        // Tekst edytowany wprost na dyplomie. DOM ustawiamy sami (nie przez React), żeby kursor nie skakał na koniec.
+        function EditableText({ tag = 'div', value, onChange, editable, placeholder, className, style }) {
+            const ref = useRef(null);
+            useLayoutEffect(() => {
+                const el = ref.current;
+                if (el && document.activeElement !== el && el.innerText !== value) el.innerText = value || '';
+            });
+            const Tag = tag;
+            return (
+                <Tag
+                    ref={ref}
+                    className={`${className || ''} ${editable ? 'eg-editable' : ''}`}
+                    style={style}
+                    data-placeholder={placeholder || ''}
+                    contentEditable={editable ? 'true' : 'false'}
+                    suppressContentEditableWarning
+                    spellCheck={false}
+                    onInput={(e) => onChange && onChange(e.currentTarget.innerText.replace(/\n{3,}/g, '\n\n'))}
+                    onBlur={(e) => onChange && onChange(e.currentTarget.innerText.trim())}
+                />
+            );
+        }
+
+        // Jeden dyplom w rozmiarze kartki A4. Ten sam komponent rysuje podgląd, wydruk i plik PDF/PNG.
+        function Diploma({ d, name, place, signature, editable, onDesign, onName, onPlace, onSignature, isPremium }) {
+            const { w, h } = PAGE[d.orientation] || PAGE.horizontal;
+            const land = d.orientation !== 'vertical';
+            const fullBg = d.image && d.imageLayout === 'full_background';
+            const pad = land ? 64 : 58;
+            const textShadow = fullBg ? '0 0 12px rgba(255,255,255,0.95), 0 0 2px rgba(255,255,255,0.9)' : 'none';
+            const set = (key) => (v) => onDesign && onDesign({ [key]: v });
+            const imgProps = d.image && /^https:/.test(d.image) ? { crossOrigin: 'anonymous' } : {};
+            const decoSize = land ? 64 : 58;
+
+            return (
+                <div className={`eg-diploma ${d.font}`} style={{ width: w, height: h, position: 'relative', overflow: 'hidden', background: d.bg, color: d.textColor }}>
+                    {!fullBg && (
+                        <div style={{ position: 'absolute', inset: 0, background: `radial-gradient(ellipse at 50% 30%, rgba(255,255,255,0.92) 0%, rgba(255,255,255,0) 65%)` }} />
+                    )}
+
+                    {d.image && (
+                        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
+                            {fullBg ? (
+                                <img src={d.image} {...imgProps} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: d.imageOpacity / 100 }} />
+                            ) : d.imageLayout === 'bottom_corners' ? (
+                                <>
+                                    <img src={d.image} {...imgProps} alt="" style={{ position: 'absolute', bottom: 18, left: 18, width: land ? 230 : 210, height: land ? 230 : 210, objectFit: 'contain', transform: 'rotate(-6deg)', opacity: d.imageOpacity / 100 }} />
+                                    <img src={d.image} {...imgProps} alt="" style={{ position: 'absolute', bottom: 18, right: 18, width: land ? 230 : 210, height: land ? 230 : 210, objectFit: 'contain', transform: 'scaleX(-1) rotate(-6deg)', opacity: d.imageOpacity / 100 }} />
+                                </>
+                            ) : (
+                                <img src={d.image} {...imgProps} alt="" style={{ position: 'absolute', bottom: 70, left: '50%', transform: 'translateX(-50%)', width: land ? 300 : 340, height: land ? 300 : 340, objectFit: 'contain', opacity: d.imageOpacity / 100 * 0.35 }} />
+                            )}
+                        </div>
+                    )}
+
+                    {!d.image && d.frame !== 'none' && (
+                        <>
+                            <div style={{ position: 'absolute', inset: 22, border: `${d.frame === 'dashed' ? 5 : 7}px ${d.frame === 'dashed' ? 'dashed' : 'solid'} ${d.border}`, borderRadius: 22 }} />
+                            {d.frame === 'double' && <div style={{ position: 'absolute', inset: 38, border: `2px solid ${d.border}`, borderRadius: 14, opacity: 0.55 }} />}
+                        </>
+                    )}
+
+                    {!d.image && d.deco && d.deco.length > 0 && (
+                        <>
+                            <div style={{ position: 'absolute', top: 44, left: 52, fontSize: decoSize, lineHeight: 1, transform: 'rotate(-12deg)' }}>{d.deco[0]}</div>
+                            <div style={{ position: 'absolute', top: 44, right: 52, fontSize: decoSize, lineHeight: 1, transform: 'rotate(12deg)' }}>{d.deco[1] || d.deco[0]}</div>
+                            <div style={{ position: 'absolute', bottom: 44, left: 52, fontSize: decoSize * 0.8, lineHeight: 1, transform: 'rotate(8deg)' }}>{d.deco[1] || d.deco[0]}</div>
+                            <div style={{ position: 'absolute', bottom: 44, right: 52, fontSize: decoSize * 0.8, lineHeight: 1, transform: 'rotate(-8deg)' }}>{d.deco[0]}</div>
+                        </>
+                    )}
+
+                    {!isPremium && <div className="eg-watermark" style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', transform: 'rotate(-30deg)', fontSize: 84, fontWeight: 900, letterSpacing: 18, color: '#0f172a', opacity: 0.03, pointerEvents: 'none', userSelect: 'none' }}>EDUGENERATOR</div>}
+
+                    <div style={{ position: 'absolute', inset: 0, padding: `${pad + (land ? 18 : 40)}px ${pad + 70}px ${pad + 6}px`, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+                        <EditableText tag="h1" value={d.title} onChange={set('title')} editable={editable} placeholder="Tytuł dyplomu"
+                            style={{ fontSize: d.sizes.title, color: d.titleColor, fontWeight: 700, lineHeight: 1.08, letterSpacing: '0.06em', textTransform: 'uppercase', textShadow, maxWidth: '100%', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }} />
+                        <EditableText tag="div" value={d.subtitle} onChange={set('subtitle')} editable={editable} placeholder="np. OTRZYMUJE"
+                            style={{ fontSize: d.sizes.subtitle, color: d.titleColor, fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', marginTop: 14, opacity: 0.85, textShadow, whiteSpace: 'pre-wrap' }} />
+
+                        <div style={{ flex: 1, minHeight: 0, width: '88%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', margin: '18px 0', padding: '22px 36px', borderRadius: 26, background: `rgba(255,255,255,${d.panel / 100})` }}>
+                            <EditableText tag="div" value={name} onChange={onName} editable={editable && !!onName} placeholder="Imię i nazwisko"
+                                className="eg-name"
+                                style={{ fontSize: d.sizes.name, color: d.textColor, fontWeight: 700, lineHeight: 1.15, minHeight: d.sizes.name * 1.15, minWidth: '60%', textShadow, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }} />
+                            <div style={{ width: '70%', height: 2, background: d.textColor, opacity: 0.25, margin: '10px 0 18px' }} />
+                            <EditableText tag="div" value={d.reason} onChange={set('reason')} editable={editable} placeholder="za co? (np. za piękną pracę konkursową)"
+                                style={{ fontSize: d.sizes.reason, color: d.textColor, lineHeight: 1.45, fontWeight: 600, maxWidth: land ? 760 : 560, textShadow, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }} />
+                        </div>
+
+                        <div style={{ width: '100%', display: 'flex', justifyContent: 'space-between', gap: 60, padding: '0 30px' }}>
+                            {[['place', place, onPlace, 'Miejscowość i data'], ['signature', signature, onSignature, 'Podpis']].map(([key, val, fn, label]) => (
+                                <div key={key} style={{ flex: 1, maxWidth: land ? 380 : 300, textAlign: 'center' }}>
+                                    <EditableText tag="div" value={val} onChange={fn} editable={editable && !!fn} placeholder=" "
+                                        style={{ fontSize: 18, fontWeight: 700, minHeight: 26, lineHeight: 1.3, color: d.textColor, textShadow, whiteSpace: 'pre-wrap' }} />
+                                    <div style={{ borderTop: `2px solid ${d.textColor}`, opacity: 0.35, marginTop: 6 }} />
+                                    <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', opacity: 0.6, marginTop: 5, color: d.textColor }}>{label}</div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // Podgląd: dyplom w stałym rozmiarze A4, przeskalowany do szerokości kolumny.
+        function ScaledPreview({ orientation, maxHeight, children }) {
+            const boxRef = useRef(null);
+            const [scale, setScale] = useState(0.5);
+            const { w, h } = PAGE[orientation] || PAGE.horizontal;
+            useLayoutEffect(() => {
+                const el = boxRef.current;
+                if (!el) return;
+                const fit = () => {
+                    const byWidth = el.clientWidth / w;
+                    const byHeight = maxHeight ? maxHeight / h : Infinity;
+                    setScale(Math.max(0.1, Math.min(1, byWidth, byHeight)));
+                };
+                fit();
+                const ro = new ResizeObserver(fit);
+                ro.observe(el);
+                return () => ro.disconnect();
+            }, [w, h, maxHeight]);
+            return (
+                <div ref={boxRef} className="w-full">
+                    <div className="mx-auto eg-sheet" style={{ width: w * scale, height: h * scale, position: 'relative' }}>
+                        <div style={{ width: w, height: h, transform: `scale(${scale})`, transformOrigin: 'top left', position: 'absolute', top: 0, left: 0 }}>
+                            {children}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
         function App() {
-            // STATE - Oczekiwanie na inicjalizację modułu Core
             const [coreReady, setCoreReady] = useState(!!window.EduBoxCore);
-            
-            // MAIN MODES: 'editor' | 'gielda'
-            const [appMode, setAppMode] = useState('editor');
-            const [activeTab, setActiveTab] = useState('diploma');
-            
+            const [user, setUser] = useState(null);
             const [isPremium, setIsPremium] = useState(false);
             const [accessCode, setAccessCode] = useState('');
+            const [showPro, setShowPro] = useState(false);
             const [toastMessage, setToastMessage] = useState('');
-            const fileInputRef = useRef(null);
-
-            // ZMIENNE DOT. BAZY I LIMITÓW
-            const [user, setUser] = useState(null);
+            const [step, setStep] = useState(0);
+            const [showGielda, setShowGielda] = useState(false);
             const [patterns, setPatterns] = useState([]);
-            const [usageCount, setUsageCount] = useState(0); 
 
-            const [diplomaTitle, setDiplomaTitle] = useState('DYPLOM');
-            const [diplomaSubtitle, setDiplomaSubtitle] = useState('ZA WYBITNE OSIĄGNIĘCIA');
-            const [studentName, setStudentName] = useState('Jan Kowalski');
-            const [diplomaReason, setDiplomaReason] = useState('za udział w konkursie plastycznym "Wiosna w przedszkolu" i przygotowanie najpiękniejszej pracy.');
-            const [diplomaDate, setDiplomaDate] = useState('Leżajsk, 31 Marca 2026');
-            const [diplomaSignature, setDiplomaSignature] = useState('Wychowawca');
-            
-            const [textFormats, setTextFormats] = useState({
-                title: { size: 64, bold: true, italic: false, color: '#0f172a' },
-                subtitle: { size: 24, bold: true, italic: false, color: '#0f172a' },
-                name: { size: 60, bold: true, italic: false, color: '#0f172a' },
-                reason: { size: 22, bold: true, italic: false, color: '#0f172a' }
-            });
+            const [design, setDesign] = useState(DEFAULT_DESIGN);
+            const patch = (p) => setDesign(prev => ({ ...prev, ...p }));
+            const setSize = (key, val) => setDesign(prev => ({ ...prev, sizes: { ...prev.sizes, [key]: val } }));
 
-            const [titleBoxWidth, setTitleBoxWidth] = useState(85); 
-            const [titleBoxOpacity, setTitleBoxOpacity] = useState(0); 
-            const [titleBoxOffset, setTitleBoxOffset] = useState(0);
-            const [boxWidth, setBoxWidth] = useState(85); 
-            const [boxOpacity, setBoxOpacity] = useState(90); 
-            const [boxOffset, setBoxOffset] = useState(0);
-            const [footerBoxWidth, setFooterBoxWidth] = useState(90);
-            const [footerBoxOpacity, setFooterBoxOpacity] = useState(0);
-            const [footerBoxOffset, setFooterBoxOffset] = useState(0);
-            
-            const [bgImageOpacity, setBgImageOpacity] = useState(100);
-            const [diplomaTextColor, setDiplomaTextColor] = useState('#0f172a');
-            const [diplomaBgColor, setDiplomaBgColor] = useState(THEMES[5].bgHex);
-            const [diplomaBorderColor, setDiplomaBorderColor] = useState(THEMES[5].borderHex);
-            const [borderStyle, setBorderStyle] = useState('solid'); 
-            const [borderWidth, setBorderWidth] = useState(12);
-            
-            const [selectedThemeId, setSelectedThemeId] = useState('pasowanie');
-            const [selectedFont, setSelectedFont] = useState('font-sans');
-            const [artStyle, setArtStyle] = useState('3d'); 
-            const [graphicLayout, setGraphicLayout] = useState('bottom_corners'); 
-            const [diplomaOrientation, setDiplomaOrientation] = useState('horizontal');
+            // Kto dostaje dyplom: jedno imię albo lista (tylko w tej karcie przeglądarki – nigdzie nie wysyłamy).
+            const [nameMode, setNameMode] = useState('one');
+            const [studentName, setStudentName] = useState('');
+            const [namesText, setNamesText] = useState('');
+            const [previewIndex, setPreviewIndex] = useState(0);
 
-            const [garlandText, setGarlandText] = useState('WITAJCIE');
-            const [garlandTextColor, setGarlandTextColor] = useState('#ffffff');
-            const [garlandLetterSize, setGarlandLetterSize] = useState(180); 
-            const [garlandLetterOffset, setGarlandLetterOffset] = useState(50); 
-            const [garlandShape, setGarlandShape] = useState('pennant'); 
+            // Miejscowość i podpis pamiętamy w tej przeglądarce (o ile nauczycielka nie wyłączy).
+            const saved = (() => { try { return JSON.parse(localStorage.getItem(MEMORY_KEY) || '{}'); } catch (e) { return {}; } })();
+            const [town, setTown] = useState(saved.town || '');
+            const [dateText, setDateText] = useState(todayPl());
+            const [signature, setSignature] = useState(saved.signature || '');
+            const [remember, setRemember] = useState(saved.remember !== false);
 
             const [aiPrompt, setAiPrompt] = useState('');
-            const [occasionSeed, setOccasionSeed] = useState(() => Math.floor(Math.random() * 1e9));
-            const [lastOccasionId, setLastOccasionId] = useState(null);
-            const [lastFrameStyle, setLastFrameStyle] = useState(null);
-            const [customImage, setCustomImage] = useState(null);
+            const [artStyle, setArtStyle] = useState('flat');
             const [isGenerating, setIsGenerating] = useState(false);
+            const [lastAiAction, setLastAiAction] = useState(null);
+            const [exporting, setExporting] = useState(null); // null | 'pdf' | 'png'
+            const fileInputRef = useRef(null);
+            const exportRef = useRef(null);
 
-            const activeTheme = THEMES.find(t => t.id === selectedThemeId) || THEMES[0];
-            const isLandscape = activeTab === 'diploma' && diplomaOrientation === 'horizontal';
+            const names = parseNames(namesText);
+            const series = nameMode === 'list' && names.length > 0;
+            const recipients = series ? names : [studentName];
+            const safeIndex = Math.min(previewIndex, Math.max(0, recipients.length - 1));
+            const previewName = series ? names[safeIndex] : studentName;
+            const place = [town.trim(), dateText.trim()].filter(Boolean).join(', ');
+            const preset = OCCASION_PRESETS.find(p => p.id === design.occasionId);
+            const land = design.orientation !== 'vertical';
 
+            const toastTimer = useRef(null);
             const showToast = (msg) => {
                 setToastMessage(msg);
-                setTimeout(() => setToastMessage(''), 4000);
+                clearTimeout(toastTimer.current);
+                toastTimer.current = setTimeout(() => setToastMessage(''), 4500);
             };
 
-            // Nasłuchiwanie na załadowanie modułu EDUBOX CORE (asynchroniczne)
             useEffect(() => {
                 if (!coreReady) {
                     const handleReady = () => setCoreReady(true);
@@ -338,118 +559,155 @@
                 }
             }, [coreReady]);
 
-            // Inicjalizacja EduBoxCore kiedy jest już gotowy
             useEffect(() => {
                 if (coreReady && window.EduBoxCore) {
                     window.EduBoxCore.init((loadedUser) => setUser(loadedUser));
-                    setUsageCount(window.EduBoxCore.getUsageCount());
-                    
-                    const status = localStorage.getItem('eduboxProStatus');
-                    if(status === 'PRO' || status === 'active') setIsPremium(true);
+                    if (['PRO', 'active'].includes(localStorage.getItem('eduboxProStatus'))) setIsPremium(true);
                 }
             }, [coreReady]);
 
-            // Nasłuchiwanie Giełdy
             useEffect(() => {
-                if (!user || !coreReady || !window.EduBoxCore) return;
-                const unsubscribe = window.EduBoxCore.subscribeToGielda('gielda_wzorow_edugenerator', 
+                if (!user || !coreReady || !window.EduBoxCore || !showGielda) return;
+                const unsubscribe = window.EduBoxCore.subscribeToGielda('gielda_wzorow_edugenerator',
                     (loadedData) => setPatterns(loadedData),
-                    (error) => console.error("Błąd odczytu Giełdy:", error)
+                    (error) => console.error('Błąd odczytu Giełdy:', error)
                 );
                 return () => unsubscribe();
-            }, [user, coreReady]);
+            }, [user, coreReady, showGielda]);
 
             useEffect(() => {
-                setDiplomaBgColor(activeTheme.bgHex);
-                setDiplomaBorderColor(activeTheme.borderHex);
-            }, [selectedThemeId]);
+                try {
+                    if (remember) localStorage.setItem(MEMORY_KEY, JSON.stringify({ town, signature, remember: true }));
+                    else localStorage.setItem(MEMORY_KEY, JSON.stringify({ remember: false }));
+                } catch (e) {}
+            }, [town, signature, remember]);
+
+            // Przejście do kroku przewija na górę panelu (na telefonie panel jest pod podglądem).
+            const goStep = (i) => {
+                setStep(Math.max(0, Math.min(STEPS.length - 1, i)));
+                const el = document.getElementById('eg-panel');
+                if (el && window.innerWidth < 1024) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            };
 
             const handleVerifyCode = async () => {
                 if (await window.EduBoxCore.verifyPremiumCode(accessCode)) {
-                    setIsPremium(true); 
-                    setAccessCode(''); 
+                    setIsPremium(true);
+                    setAccessCode('');
+                    setShowPro(false);
                     localStorage.setItem('eduboxProStatus', 'PRO');
-                    showToast("🎉 Moduł Premium odblokowany!"); 
-                } else { 
-                    showToast("❌ Nieprawidłowy kod!"); 
+                    showToast('🎉 Kod PRO przyjęty – grafiki AI bez limitu i dyplomy bez znaku wodnego.');
+                } else {
+                    showToast('❌ Ten kod nie działa. Sprawdź, czy nie ma literówki.');
                 }
             };
 
-            const executePrint = () => {
-                // Bez limitu: druk i Giełda nie używają AI (decyzja 8.10.2026 – limit tylko na generowanie przez AI).
-                        window.print();
+            // ---------- Okazja ----------
+            const applyOccasion = (p, stay) => {
+                setDesign(prev => ({
+                    ...prev,
+                    occasionId: p.id,
+                    font: p.font || 'font-sans',
+                    title: p.title, subtitle: p.subtitle, reason: p.reason,
+                    titleColor: p.titleColor || '#0f172a', textColor: p.textColor || '#0f172a',
+                    bg: tint(p.titleColor, 0.92), border: p.titleColor, deco: p.deco || [p.emoji], themeId: null,
+                    frame: 'double', image: null, panel: 0,
+                    sizes: { title: p.title.length > 26 ? 50 : 58, subtitle: 21, name: 54, reason: 24 }
+                }));
+                if (!stay) goStep(1);
             };
 
-            const sharePattern = async () => {
-                // Giełda jest publiczna: bez imienia ucznia, podpisu i wgranego zdjęcia (data:) – zostaje grafika AI (https).
-                if (!window.confirm('Do Giełdy (widocznej dla wszystkich) trafi wzór bez imienia ucznia, podpisu i wgranego zdjęcia. Sprawdź, czy tytuł i uzasadnienie nie zawierają imion. Udostępnić?')) return;
-                // Bez limitu: druk i Giełda nie używają AI (decyzja 8.10.2026 – limit tylko na generowanie przez AI).
-                        const currentConfig = {
-                            activeTab, diplomaTitle, diplomaSubtitle, studentName: '', diplomaReason, diplomaDate, diplomaSignature: '',
-                            textFormats, titleBoxWidth, titleBoxOpacity, titleBoxOffset, boxWidth, boxOpacity, boxOffset,
-                            footerBoxWidth, footerBoxOpacity, footerBoxOffset,
-                            bgImageOpacity, diplomaTextColor, diplomaBgColor, diplomaBorderColor, borderStyle, borderWidth,
-                            selectedThemeId, selectedFont, artStyle, graphicLayout, diplomaOrientation,
-                            garlandText, garlandTextColor, garlandLetterSize, garlandLetterOffset, garlandShape,
-                            occasionSeed, lastOccasionId,
-                            customImage: (typeof customImage === 'string' && /^https:\/\//.test(customImage)) ? customImage : null
-                        };
-                        
-                        try {
-                            const name = `${activeTab === 'garland' ? 'Girlanda' : 'Dyplom'} - ${activeTheme.name || 'Własny'}`;
-                            const type = activeTab === 'garland' ? 'Girlanda' : 'Dyplom';
-                            
-                            await window.EduBoxCore.saveToGielda('gielda_wzorow_edugenerator', type, name, currentConfig);
-                            showToast("✨ Zapisano w Giełdzie Wzorów!");
-                        } catch (e) {
-                            showToast(e.message || "🚨 Błąd podczas zapisu w chmurze.");
-                        }
+            const startBlank = () => {
+                setDesign(prev => ({ ...DEFAULT_DESIGN, orientation: prev.orientation, title: 'DYPLOM', subtitle: 'OTRZYMUJE', reason: '' }));
+                goStep(1);
             };
 
-            const loadPattern = (pattern) => {
-                const c = pattern.config;
-                if(!c) return;
-                
-                setAppMode('editor');
-                if (c.activeTab) setActiveTab(c.activeTab);
-                if (c.diplomaTitle) setDiplomaTitle(c.diplomaTitle);
-                if (c.diplomaSubtitle !== undefined) setDiplomaSubtitle(c.diplomaSubtitle);
-                if (c.studentName) setStudentName(c.studentName);
-                if (c.diplomaReason) setDiplomaReason(c.diplomaReason);
-                if (c.diplomaDate) setDiplomaDate(c.diplomaDate);
-                if (c.diplomaSignature) setDiplomaSignature(c.diplomaSignature);
-                if (c.textFormats) setTextFormats(c.textFormats);
-                if (c.titleBoxWidth) setTitleBoxWidth(c.titleBoxWidth);
-                if (c.titleBoxOpacity !== undefined) setTitleBoxOpacity(c.titleBoxOpacity);
-                if (c.titleBoxOffset !== undefined) setTitleBoxOffset(c.titleBoxOffset);
-                if (c.boxWidth) setBoxWidth(c.boxWidth);
-                if (c.boxOpacity !== undefined) setBoxOpacity(c.boxOpacity);
-                if (c.boxOffset !== undefined) setBoxOffset(c.boxOffset);
-                if (c.footerBoxWidth) setFooterBoxWidth(c.footerBoxWidth);
-                if (c.footerBoxOpacity !== undefined) setFooterBoxOpacity(c.footerBoxOpacity);
-                if (c.footerBoxOffset !== undefined) setFooterBoxOffset(c.footerBoxOffset);
-                if (c.bgImageOpacity) setBgImageOpacity(c.bgImageOpacity);
-                if (c.diplomaTextColor) setDiplomaTextColor(c.diplomaTextColor);
-                if (c.diplomaBgColor) setDiplomaBgColor(c.diplomaBgColor);
-                if (c.diplomaBorderColor) setDiplomaBorderColor(c.diplomaBorderColor);
-                if (c.borderStyle) setBorderStyle(c.borderStyle);
-                if (c.borderWidth !== undefined) setBorderWidth(c.borderWidth);
-                if (c.selectedThemeId) setSelectedThemeId(c.selectedThemeId);
-                if (c.selectedFont) setSelectedFont(c.selectedFont);
-                if (c.artStyle) setArtStyle(c.artStyle);
-                if (c.graphicLayout) setGraphicLayout(c.graphicLayout);
-                if (c.diplomaOrientation) setDiplomaOrientation(c.diplomaOrientation);
-                if (c.garlandText) setGarlandText(c.garlandText);
-                if (c.garlandTextColor) setGarlandTextColor(c.garlandTextColor);
-                if (c.garlandLetterSize) setGarlandLetterSize(c.garlandLetterSize);
-                if (c.garlandLetterOffset !== undefined) setGarlandLetterOffset(c.garlandLetterOffset);
-                if (c.garlandShape) setGarlandShape(c.garlandShape);
-                if (c.customImage !== undefined) setCustomImage(c.customImage);
-                else setCustomImage(null);
-                if (c.occasionSeed) setOccasionSeed(c.occasionSeed);
-                if (c.lastOccasionId) setLastOccasionId(c.lastOccasionId);
-                
-                showToast("✨ Wzór z Giełdy wczytany!");
+            // ---------- Grafika AI ----------
+            const proNow = () => isPremium || ['PRO', 'active'].includes(localStorage.getItem('eduboxProStatus'));
+            const imageAvailable = () => proNow() || window.EduBoxCore.getImageUsageCount() < 1;
+            // Darmową grafikę liczymy dopiero po udanym obrazku – błąd serwera nie zabiera jedynej próby.
+            const countImage = () => {
+                if (!proNow()) window.EduBoxCore.executeImageLimitCheck(false, () => {}, () => {}, () => {});
+            };
+            const limitMessage = () => showToast('⚠️ Darmowa grafika AI na start została już wykorzystana. Z kodem PRO malujesz bez limitu – a dyplom bez grafiki AI dalej zrobisz i wydrukujesz za darmo.');
+
+            const runFrameGeneration = async (decorationPrompt, action) => {
+                if (!imageAvailable()) { limitMessage(); return; }
+                setIsGenerating(true);
+                try {
+                    const fullPrompt = `A DECORATIVE ORNAMENTAL BORDER FRAME for a children's award diploma page, ${land ? 'landscape' : 'portrait'} orientation. A thick decorated border runs along all four edges of the image. ${decorationPrompt} The characters are SMALL and sit ONLY in the bottom-left and bottom-right corners. Keep the border lighter and simpler along the bottom edge. The entire middle of the image is one large FLAT EMPTY blank area of plain cream-colored paper: absolutely no scenery, no landscape, no houses, no sky, no background picture, nothing at all in the center, just empty blank paper. It must look like a printable ornamental page frame / border clipart, NOT an illustrated scene. Bright cheerful flat vector style, bold clean shapes, thick outlines, detail only on the border. Completely WORDLESS: no text, no letters, no words, no numbers, no watermark anywhere.`;
+                    const res = await fetch('/api/generate', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ prompt: fullPrompt, size: land ? '1536x1120' : '1120x1536', model: 'recraft' })
+                    });
+                    if (!res.ok) throw new Error('api');
+                    const data = await res.json();
+                    if (!data.imageUrl) throw new Error('brak obrazka');
+                    patch({ image: data.imageUrl, imageLayout: 'full_background', imageOpacity: 100, panel: 30, frame: 'none' });
+                    setLastAiAction(action);
+                    countImage();
+                    showToast('✨ Ozdobne tło gotowe! Nie pasuje? Kliknij „Inny wariant”.');
+                } catch (e) {
+                    showToast('🚨 Nie udało się namalować tła. Spróbuj ponownie za chwilę – darmowa grafika nie została zużyta.');
+                } finally {
+                    setIsGenerating(false);
+                }
+            };
+
+            const paintOccasion = () => {
+                if (!preset) return;
+                runFrameGeneration(preset.prompt, { kind: 'occasion' });
+            };
+
+            const paintFrameStyle = (styleId) => {
+                const st = FRAME_STYLES.find(s => s.id === styleId) || FRAME_STYLES[0];
+                runFrameGeneration(`Border decorated with ${st.hint}. No large characters anywhere.`, { kind: 'frame', styleId });
+            };
+
+            const repeatLastAi = () => {
+                if (!lastAiAction) return;
+                if (lastAiAction.kind === 'occasion') paintOccasion();
+                else if (lastAiAction.kind === 'frame') paintFrameStyle(lastAiAction.styleId);
+                else if (lastAiAction.kind === 'illustration') paintIllustration();
+            };
+
+            const paintIllustration = async () => {
+                if (!aiPrompt.trim()) { showToast('Napisz, co ma być na obrazku, np. „sowa w okularach czytająca książkę”.'); return; }
+                if (!imageAvailable()) { limitMessage(); return; }
+                const layout = design.imageLayout;
+                setIsGenerating(true);
+                let translated = aiPrompt;
+                try {
+                    const res = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=pl&tl=en&dt=t&q=${encodeURIComponent(aiPrompt)}`);
+                    if (res.ok) { const data = await res.json(); translated = (data[0] || []).map(x => x[0]).join(''); }
+                } catch (e) {}
+                const styles = {
+                    flat: 'cheerful flat vector cartoon illustration, bold friendly shapes',
+                    watercolor: 'soft watercolor illustration, pastel colors',
+                    doodle: 'hand-drawn simple doodle, thin ink line art, minimal',
+                    '3d': 'cute 3D clay figure illustration, soft studio light'
+                };
+                const layoutText = layout === 'full_background' ? 'full frame background scene, edge-to-edge illustration with a calm empty area in the middle for text' : 'single subject isolated on pure solid white background';
+                const fullPrompt = `Finished decorative illustration for a school diploma. MAIN SUBJECT: ${translated}. STYLE: ${styles[artStyle] || styles.flat}. ${layoutText}. Clean composition, professional print quality, correct anatomy. Completely wordless and textless: no text, no letters, no words, no numbers.`;
+                try {
+                    const response = await fetch('/api/generate', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ prompt: fullPrompt, size: layout === 'full_background' ? (land ? '1536x1024' : '1024x1536') : '1024x1024' })
+                    });
+                    if (!response.ok) throw new Error('api');
+                    const data = await response.json();
+                    if (!data.imageUrl) throw new Error('brak obrazka');
+                    const image = layout === 'full_background' ? data.imageUrl : await makeWhiteTransparent(data.imageUrl);
+                    patch({ image, imageOpacity: 100, panel: layout === 'full_background' ? 55 : design.panel });
+                    setLastAiAction({ kind: 'illustration' });
+                    countImage();
+                    showToast('✨ Ilustracja gotowa!');
+                } catch (e) {
+                    showToast('🚨 Nie udało się narysować ilustracji. Spróbuj ponownie – darmowa grafika nie została zużyta.');
+                } finally {
+                    setIsGenerating(false);
+                }
             };
 
             const handleFileUpload = (e) => {
@@ -457,855 +715,537 @@
                 if (!file) return;
                 const reader = new FileReader();
                 reader.onload = async (event) => {
-                    const imgData = event.target.result;
-                    if (graphicLayout === 'full_background') setCustomImage(imgData);
-                    else {
-                        const transparentImg = await makeWhiteTransparent(imgData);
-                        setCustomImage(transparentImg);
-                    }
+                    const small = await shrinkImage(event.target.result);
+                    const layout = design.imageLayout;
+                    const image = layout === 'full_background' ? small : await makeWhiteTransparent(small);
+                    patch({ image, imageOpacity: 100, panel: layout === 'full_background' ? 55 : design.panel });
+                    showToast('🖼️ Obrazek wstawiony. Zostaje tylko u Ciebie – nie trafia do Giełdy.');
                 };
                 reader.readAsDataURL(file);
-                e.target.value = null; 
+                e.target.value = null;
             };
 
-            const runOccasionGeneration = async (preset, seed) => {
-                const s = localStorage.getItem('eduboxProStatus');
-                const proImg = s === 'PRO' || s === 'active' || isPremium;
-                if (!proImg && window.EduBoxCore.getImageUsageCount() >= 2) {
-                    showToast('⚠️ Darmowa grafika na start (1/1) została wykorzystana. Wpisz kod PRO, aby tworzyć kolejne.');
-                    return;
+            const changeImageLayout = async (layout) => {
+                patch({ imageLayout: layout });
+            };
+
+            // ---------- Druk, PDF, obrazek ----------
+            const executePrint = () => {
+                // Bez limitu: druk i Giełda nie używają AI (decyzja 8.10.2026 – limit tylko na generowanie przez AI).
+                if (series && names.length > 1) showToast(`🖨️ Drukuję ${names.length} dyplomów – każdy na osobnej kartce.`);
+                setTimeout(() => window.print(), 50);
+            };
+
+            const fileSafe = (s) => String(s || 'dyplom').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/ł/g, 'l').replace(/Ł/g, 'L').replace(/[^\w-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'dyplom';
+
+            const renderPages = async () => {
+                await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
+                if (document.fonts && document.fonts.ready) await document.fonts.ready;
+                await new Promise(r => setTimeout(r, 120));
+                const pages = Array.from(exportRef.current?.querySelectorAll('.eg-export-page') || []);
+                const canvases = [];
+                for (const page of pages) {
+                    canvases.push(await window.html2canvas(page, { scale: 2, useCORS: true, backgroundColor: '#ffffff', logging: false }));
                 }
-                setIsGenerating(true);
+                return canvases;
+            };
+
+            const downloadBlob = (blob, filename) => {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url; a.download = filename;
+                document.body.appendChild(a); a.click(); a.remove();
+                setTimeout(() => URL.revokeObjectURL(url), 2000);
+            };
+
+            const exportPdf = async () => {
+                setExporting('pdf');
                 try {
-                    const land = diplomaOrientation === 'horizontal';
-                    const fullPrompt = `A DECORATIVE ORNAMENTAL BORDER FRAME for a children's award diploma page, ${land ? 'landscape' : 'portrait'} orientation. A thick decorated border runs along all four edges of the image. ${preset.prompt} The characters are SMALL and sit ONLY in the bottom-left and bottom-right corners. Keep the border lighter and simpler along the bottom edge. The entire middle of the image is one large FLAT EMPTY blank area of plain cream-colored paper: absolutely no scenery, no landscape, no houses, no sky, no background picture, nothing at all in the center, just empty blank paper. It must look like a printable ornamental page frame / border clipart, NOT an illustrated scene. Bright cheerful flat vector style, bold clean shapes, thick outlines, detail only on the border. Completely WORDLESS: no text, no letters, no words, no numbers, no watermark anywhere.`;
-                    const res = await fetch('/api/generate', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ prompt: fullPrompt, size: land ? '1536x1120' : '1120x1536', model: 'recraft' })
+                    await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+                    const canvases = await renderPages();
+                    const { jsPDF } = window.jspdf;
+                    const pdf = new jsPDF({ orientation: land ? 'landscape' : 'portrait', unit: 'mm', format: 'a4' });
+                    const pw = land ? 297 : 210, ph = land ? 210 : 297;
+                    canvases.forEach((c, i) => {
+                        if (i > 0) pdf.addPage('a4', land ? 'landscape' : 'portrait');
+                        pdf.addImage(c.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, pw, ph);
                     });
-                    if (!res.ok) throw new Error('Błąd łączenia z API.');
-                    const data = await res.json();
-                    setCustomImage(data.imageUrl);
-                    if (!proImg) {
-                        const today = new Date().toISOString().split('T')[0];
-                        localStorage.setItem('eduboxImageUsage', JSON.stringify({ date: today, count: window.EduBoxCore.getImageUsageCount() + 1 }));
-                    }
-                    showToast('✨ Motyw okazji gotowy! Wpisz imię w zakładce Teksty i drukuj.');
+                    const base = series ? `dyplomy-${fileSafe(design.title)}` : `dyplom-${fileSafe(studentName || design.title)}`;
+                    pdf.save(`${base}.pdf`);
+                    showToast(series ? `📄 Gotowe: PDF z ${canvases.length} dyplomami.` : '📄 PDF pobrany.');
                 } catch (e) {
-                    showToast('🚨 Błąd serwera. Spróbuj ponownie.');
+                    console.error(e);
+                    showToast('🚨 Nie udało się przygotować PDF. Użyj „Drukuj” i wybierz „Zapisz jako PDF”.');
                 } finally {
-                    setIsGenerating(false);
+                    setExporting(null);
                 }
             };
 
-            const applyOccasionPreset = (preset) => {
-                setSelectedFont(preset.font || 'font-sans');
-                setDiplomaTitle(preset.title);
-                setDiplomaSubtitle(preset.subtitle);
-                setDiplomaReason(preset.reason);
-                setTextFormats(prev => ({
-                    ...prev,
-                    title: { ...prev.title, size: 52, color: preset.titleColor || '#0f172a' },
-                    subtitle: { ...prev.subtitle, size: 20, color: preset.titleColor || '#0f172a' },
-                    name: { ...prev.name, size: 52, color: preset.textColor || '#0f172a' },
-                    reason: { ...prev.reason, size: 20, color: preset.textColor || '#0f172a' }
-                }));
-                setGraphicLayout('full_background');
-                setBgImageOpacity(100);
-                setTitleBoxWidth(92);
-                setBoxWidth(90);
-                setTitleBoxOpacity(0);
-                setBoxOpacity(32);
-                setFooterBoxOpacity(0);
-                setFooterBoxWidth(90);
-                setBorderWidth(0);
-                setDiplomaTextColor(preset.textColor || '#0f172a');
+            const exportPng = async () => {
+                setExporting('png');
+                try {
+                    const [canvas] = await renderPages();
+                    const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
+                    downloadBlob(blob, `dyplom-${fileSafe(previewName || design.title)}.png`);
+                    showToast('🖼️ Obrazek pobrany – możesz go wysłać albo wydrukować w punkcie ksero.');
+                } catch (e) {
+                    console.error(e);
+                    showToast('🚨 Nie udało się zapisać obrazka. Spróbuj „Drukuj” → „Zapisz jako PDF”.');
+                } finally {
+                    setExporting(null);
+                }
             };
 
-            const handleOccasionPreset = async (preset) => {
-                applyOccasionPreset(preset);
-                const seed = Math.floor(Math.random() * 1e9);
-                setOccasionSeed(seed);
-                setLastOccasionId(preset.id);
-                await runOccasionGeneration(preset, seed);
+            // ---------- Giełda ----------
+            const sharePattern = async () => {
+                // Giełda jest publiczna: bez imienia ucznia, podpisu i wgranego zdjęcia (data:) – zostaje grafika AI (https).
+                if (!window.confirm('Do Giełdy (widocznej dla wszystkich) trafi wzór bez imienia ucznia, listy imion, podpisu, miejscowości i wgranego zdjęcia. Sprawdź, czy tytuł i uzasadnienie nie zawierają imion. Udostępnić?')) return;
+                // Bez limitu: druk i Giełda nie używają AI (decyzja 8.10.2026 – limit tylko na generowanie przez AI).
+                const customImage = design.image;
+                const { image, ...rest } = design;
+                const currentConfig = {
+                    v: 2,
+                    design: rest,
+                    studentName: '', diplomaSignature: '',
+                    customImage: (typeof customImage === 'string' && /^https:\/\//.test(customImage)) ? customImage : null
+                };
+                try {
+                    const name = `Dyplom - ${preset ? preset.label : (design.title || 'Własny').slice(0, 40)}`;
+                    await window.EduBoxCore.saveToGielda('gielda_wzorow_edugenerator', 'Dyplom', name, currentConfig);
+                    showToast('✨ Wzór zapisany w Giełdzie. Dzięki, że się dzielisz!');
+                } catch (e) {
+                    showToast(e.message || '🚨 Nie udało się zapisać w Giełdzie.');
+                }
             };
 
-            const generateCustomFrame = async (styleId) => {
-                const st = FRAME_STYLES.find(s => s.id === styleId) || FRAME_STYLES[0];
-                setLastFrameStyle(styleId);
-                setLastOccasionId(null);
-                setGraphicLayout('full_background');
-                setBgImageOpacity(100);
-                setTitleBoxOpacity(0);
-                setBoxOpacity(30);
-                setFooterBoxOpacity(0);
-                setFooterBoxWidth(90);
-                setBorderWidth(0);
-                const seed = Math.floor(Math.random() * 1e9);
-                setOccasionSeed(seed);
-                await runOccasionGeneration({ prompt: `Border decorated with ${st.hint}. No large characters anywhere.` }, seed);
-            };
-
-            const regenerateOccasionVariant = async () => {
-                const preset = OCCASION_PRESETS.find(p => p.id === lastOccasionId);
-                if (!preset) { showToast('Najpierw wybierz motyw okazji.'); return; }
-                const seed = Math.floor(Math.random() * 1e9);
-                setOccasionSeed(seed);
-                await runOccasionGeneration(preset, seed);
-            };
-
-            const handleGenerateAiImage = async () => {
-                if (!aiPrompt.trim()) return;
-                const imgProStatus = localStorage.getItem('eduboxProStatus');
-                const imgIsPro = imgProStatus === 'PRO' || imgProStatus === 'active' || isPremium;
-                if (!imgIsPro && window.EduBoxCore.getImageUsageCount() >= 2) {
-                    showToast('⚠️ Darmowa grafika na start (1/1) została wykorzystana. Wpisz kod PRO, aby tworzyć kolejne.');
+            const loadPattern = (pattern) => {
+                const c = pattern.config;
+                if (!c) return;
+                if (c.activeTab === 'garland') {
+                    showToast('Girlandy robisz teraz w MagicLetters – otwieram w nowej karcie.');
+                    window.open('/magicletters.html', '_blank', 'noopener');
                     return;
                 }
-                setIsGenerating(true);
-                let translatedPrompt = aiPrompt;
-                try {
-                    const res = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=pl&tl=en&dt=t&q=${encodeURIComponent(aiPrompt)}`);
-                    if (res.ok) { const data = await res.json(); translatedPrompt = data[0][0][0]; }
-                } catch(e) {}
-
-                let layoutModifier = graphicLayout === 'full_background' ? "full frame background scene, edge-to-edge illustration" : "isolated on pure solid white background, no text, no letters";
-                let styleModifier = "";
-                switch(artStyle) {
-                  case 'watercolor': styleModifier = `beautiful watercolor art, pastel colors`; break;
-                  case 'doodle': styleModifier = `hand-drawn simple doodle, thin ink line art, sketchy, minimal`; break;
-                  case 'boho': styleModifier = `trendy boho style art, earthy colors`; break;
-                  case 'vibrant': styleModifier = `vibrant bold colors, colorful cartoon`; break;
-                  case 'papercraft': styleModifier = `3d papercraft illustration, cutouts`; break;
-                  case 'realistic': styleModifier = `highly realistic photography style, 8k`; break;
-                  case '3d': styleModifier = `highly detailed cute 3D animated movie style`; break;
-                  default: styleModifier = `flat vector illustration`;
-                }
-                let fullPrompt = artStyle === 'realistic'
-                    ? `A realistic photograph. SUBJECT: ${translatedPrompt}. ${styleModifier}, natural lighting, sharp focus, DSLR photo, photorealistic, real people, real textures, NOT a cartoon, NOT an illustration, NOT a drawing. ${layoutModifier}. PERFECT human anatomy. No text, no letters, no words, no watermark.`
-                    : `Finished decorative illustration for a school page decoration. MAIN SUBJECT: ${translatedPrompt}. STYLE: ${styleModifier}. ${layoutModifier}. Clean composition, bold friendly shapes, high detail, professional print quality, PERFECT human anatomy. Completely wordless and textless: no text, no letters, no words, no numbers.`;
-                
-                try {
-                    const response = await fetch('/api/generate', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ prompt: fullPrompt, size: graphicLayout === 'full_background' ? (diplomaOrientation === 'horizontal' ? '1408x1000' : '1000x1408') : '1024x1024' })
-                    });
-                    if (!response.ok) throw new Error("Błąd łączenia z API.");
-                    const data = await response.json();
-                    
-                    if (graphicLayout === 'full_background') {
-                        setCustomImage(data.imageUrl);
-                    } else {
-                        const transparentImg = await makeWhiteTransparent(data.imageUrl);
-                        setCustomImage(transparentImg);
-                    }
-                    if (!imgIsPro) {
-                        const today = new Date().toISOString().split('T')[0];
-                        const newImgCount = window.EduBoxCore.getImageUsageCount() + 1;
-                        localStorage.setItem('eduboxImageUsage', JSON.stringify({ date: today, count: newImgCount }));
-                    }
-                    showToast("✨ Grafika gotowa i wycięta!");
-                } catch (e) { 
-                    showToast("🚨 Błąd serwera. Spróbuj ponownie.");
-                } finally {
-                    setIsGenerating(false);
-                }
-            };
-
-            const updateFormat = (field, key, value) => {
-                setTextFormats(prev => ({ ...prev, [field]: { ...prev[field], [key]: value } }));
-            };
-
-            const TextFormatToolbar = ({ format, onChange, maxSize = 120 }) => (
-                <div className="flex flex-col gap-3 mt-2 bg-slate-900/80 p-3 rounded-xl border border-slate-700 shadow-sm transition-colors">
-                    <div className="flex items-center gap-3">
-                        <button onClick={() => onChange('bold', !format.bold)} className={`w-8 h-8 shrink-0 flex items-center justify-center rounded-lg text-sm font-serif transition-colors ${format.bold ? 'bg-indigo-600 text-white shadow-inner' : 'hover:bg-slate-700 text-slate-300'}`}><b>B</b></button>
-                        <button onClick={() => onChange('italic', !format.italic)} className={`w-8 h-8 shrink-0 flex items-center justify-center rounded-lg text-sm font-serif transition-colors ${format.italic ? 'bg-indigo-600 text-white shadow-inner' : 'hover:bg-slate-700 text-slate-300'}`}><i>I</i></button>
-                        
-                        <div className="w-px h-6 bg-slate-700 shrink-0"></div>
-                        
-                        <i className="ph-bold ph-text-t text-slate-400 shrink-0"></i>
-                        <input type="range" min="10" max={maxSize} value={format.size} onChange={e => onChange('size', Number(e.target.value))} className="w-full sm:w-32 shrink-0 accent-indigo-500 h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer" />
-                        <span className="text-[10px] font-bold text-slate-400 w-8 text-right shrink-0">{format.size}px</span>
-                    </div>
-                    
-                    <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-slate-700/50">
-                        {EXTENDED_COLORS.map(c => (
-                            <button 
-                                key={c} onClick={() => onChange('color', c)} 
-                                className={`w-6 h-6 rounded-full border-2 transition-transform hover:scale-110 shadow-sm ${format.color.toLowerCase() === c ? 'border-indigo-400 scale-110' : 'border-slate-500 hover:border-slate-300'}`} 
-                                style={{ backgroundColor: c }} title={c}
-                            ></button>
-                        ))}
-                        
-                        <div className="w-px h-5 bg-slate-700 shrink-0 mx-1"></div>
-                        
-                        <div className="relative w-8 h-8 rounded-full border-2 border-slate-400 overflow-hidden hover:border-indigo-400 transition-colors shadow-inner cursor-pointer flex items-center justify-center bg-slate-800" title="Własny kolor (Paleta systemu)">
-                            <div className="absolute inset-0 bg-[conic-gradient(red,yellow,lime,aqua,blue,magenta,red)] pointer-events-none opacity-80"></div>
-                            <input type="color" value={format.color} onChange={e => onChange('color', e.target.value)} className="absolute inset-0 w-[200%] h-[200%] -top-1/2 -left-1/2 cursor-pointer opacity-0" />
-                        </div>
-                    </div>
-                </div>
-            );
-
-            const ColorWidget = ({ label, value, setValue }) => (
-                <div className="flex flex-col items-center bg-slate-800 rounded-xl p-3 border border-slate-700">
-                    <span className="text-[9px] mb-2 font-bold text-slate-400 uppercase text-center tracking-widest">{label}</span>
-                    <div className="flex gap-1.5 mb-3 flex-wrap justify-center max-w-[150px]">
-                        {['#ffffff', '#020617', '#ef4444', '#f59e0b', '#10b981', '#3b82f6', '#8b5cf6', '#ec4899'].map(c => (
-                            <button key={c} onClick={() => setValue(c)} className={`w-5 h-5 rounded-full border-2 transition-transform hover:scale-110 shadow-sm ${value.toLowerCase() === c ? 'border-indigo-400 scale-110' : 'border-slate-500'}`} style={{backgroundColor: c}}></button>
-                        ))}
-                    </div>
-                    
-                    <div className="relative w-full h-8 rounded border border-slate-600 overflow-hidden group cursor-pointer bg-slate-900" title="Wybierz dowolny z palety">
-                        <input type="color" value={value} onChange={e => setValue(e.target.value)} className="absolute inset-0 w-[200%] h-[200%] -top-1/2 -left-1/2 cursor-pointer bg-transparent border-none p-0 z-10 opacity-0"/>
-                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none text-[10px] font-mono font-bold text-white uppercase group-hover:bg-white/10 transition-colors">
-                            <span className="bg-slate-700 px-1.5 py-0.5 rounded text-[8px] mr-2">HEX</span> {value}
-                        </div>
-                    </div>
-                </div>
-            );
-
-            const renderGarlandShape = (letter) => {
-                let svgPath = "";
-                if (garlandShape === 'pennant') svgPath = "M5,5 L95,5 L50,115 Z";
-                else if (garlandShape === 'triangle') svgPath = "M5,5 L95,5 L50,95 Z";
-                else if (garlandShape === 'circle') svgPath = "M 50, 50 m -45, 0 a 45,45 0 1,0 90,0 a 45,45 0 1,0 -90,0";
-
-                return (
-                    <div className="relative w-full h-full flex items-center justify-center p-4 drop-shadow-2xl">
-                        <svg viewBox="0 0 100 120" className="w-full h-full" preserveAspectRatio="none">
-                            <path d={svgPath} fill={diplomaBgColor} stroke={diplomaBorderColor} strokeWidth={borderWidth/3} strokeDasharray={borderStyle === 'dashed' ? '3,3' : 'none'} strokeLinejoin="round" />
-                            <circle cx="20" cy="15" r="2.5" fill="#ffffff" stroke="#cbd5e1" strokeWidth="0.5"/>
-                            <circle cx="80" cy="15" r="2.5" fill="#ffffff" stroke="#cbd5e1" strokeWidth="0.5"/>
-                        </svg>
-                        <div className="absolute inset-0 flex flex-col items-center justify-center pt-8">
-                            {customImage && <img src={customImage} className="absolute inset-x-0 top-[45%] -translate-y-1/2 m-auto w-48 h-48 object-contain opacity-25 pointer-events-none" />}
-                            <span className="font-black leading-none select-none z-10 whitespace-pre-wrap" style={{ color: garlandTextColor, fontSize: `${garlandLetterSize}px`, transform: `translateY(${garlandLetterOffset}px)` }}>
-                                {letter}
-                            </span>
-                        </div>
-                    </div>
-                );
+                const next = c.v === 2 && c.design ? { ...DEFAULT_DESIGN, ...c.design, sizes: { ...DEFAULT_DESIGN.sizes, ...(c.design.sizes || {}) }, image: c.customImage || null } : designFromLegacy(c);
+                setDesign(next);
+                setLastAiAction(null);
+                setShowGielda(false);
+                goStep(1);
+                showToast('✨ Wzór wczytany – wpisz imię i drukuj.');
             };
 
             if (!coreReady) {
-                return <div className="min-h-screen flex items-center justify-center text-white">Trwa ładowanie silnika EduBoxCore...</div>;
+                return <div className="min-h-screen flex items-center justify-center text-slate-300">Wczytuję EduGenerator…</div>;
             }
 
+            const pageCss = `
+                @media print {
+                    @page { size: A4 ${land ? 'landscape' : 'portrait'}; margin: 0; }
+                    html, body { background: #fff !important; margin: 0 !important; padding: 0 !important; height: auto !important; overflow: visible !important; }
+                    #wspolne-menu-kontener, nav, .eg-screen, .eg-toast, .eb-cookie, #cookie-consent { display: none !important; }
+                    #root, .eg-app { display: block !important; margin: 0 !important; padding: 0 !important; min-height: 0 !important; height: auto !important; background: #fff !important; }
+                    .eg-print { display: block !important; }
+                    .eg-print-page { width: ${PAGE[design.orientation].w}px; height: ${PAGE[design.orientation].h}px; overflow: hidden; break-inside: avoid; page-break-inside: avoid; }
+                    .eg-print-page:not(:last-child) { break-after: page; page-break-after: always; }
+                }
+            `;
+
+            const stepButton = (label, onClick, primary = true, icon = 'ph-arrow-right') => (
+                <button onClick={onClick} className={`eb-btn ${primary ? 'eb-btn--primary' : 'eb-btn--ghost'} flex-1`}>
+                    {!primary && <i className="ph-bold ph-arrow-left"></i>}{label}{primary && <i className={`ph-bold ${icon}`}></i>}
+                </button>
+            );
+
             return (
-                <div className={`min-h-screen flex flex-col ${selectedFont}`}>
-                    
-                    <style>{`
-                        @media print {
-                            @page { 
-                                size: ${isLandscape && activeTab === 'diploma' ? 'A4 landscape' : 'A4 portrait'}; 
-                                margin: 0; 
-                            }
-                            
-                            body, html { 
-                                background: white !important; 
-                                margin: 0 !important; 
-                                padding: 0 !important; 
-                                width: auto !important;
-                                height: auto !important;
-                                -webkit-print-color-adjust: exact !important; 
-                                print-color-adjust: exact !important; 
-                            }
+                <div className="eg-app min-h-screen">
+                    <style>{pageCss}</style>
 
-                            /* Prawidłowe ukrywanie elementów */
-                            .print-hidden, nav, #wspolne-menu-kontener, .dark-grid-bg, .xl\\:col-span-4 { 
-                                display: none !important; 
-                            }
-                            
-                            /* Resetowanie kontenerów, by nie tworzyły pustych stron */
-                            #root, #root > div, .max-w-\\[90rem\\], .xl\\:col-span-8, .grid, .flex-grow, .min-h-screen {
-                                display: block !important;
-                                margin: 0 !important;
-                                padding: 0 !important;
-                                width: 100% !important;
-                                max-width: none !important;
-                                height: auto !important;
-                                min-height: 0 !important;
-                                position: static !important;
-                                transform: none !important;
-                            }
-
-                            ${activeTab === 'diploma' ? `
-                            #print-area { 
-                                width: ${isLandscape ? '1122px' : '794px'} !important; 
-                                height: ${isLandscape ? '794px' : '1122px'} !important; 
-                                margin: 0 auto !important; 
-                                padding: 60px !important; 
-                                box-shadow: none !important; 
-                                border-radius: 0 !important; 
-                                box-sizing: border-box !important;
-                                aspect-ratio: auto !important;
-                                position: relative !important;
-                                page-break-inside: avoid !important;
-                                break-inside: avoid !important;
-                            }
-                            ` : `
-                            #print-area { 
-                                width: 100% !important; 
-                                margin: 0 !important; 
-                                padding: 0 !important; 
-                                box-shadow: none !important; 
-                                display: block !important;
-                            }
-                            .page-break { 
-                                page-break-after: always;
-                                break-after: page;
-                                width: 794px !important; 
-                                height: 1122px !important; 
-                                display: flex !important; 
-                                align-items: center !important; 
-                                justify-content: center !important; 
-                                margin: 0 auto !important; 
-                                padding: 0 !important;
-                                box-sizing: border-box !important;
-                            }
-                            `}
-                        }
-                    `}</style>
-
-                    {isGenerating && (
-                        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-[200] flex flex-col items-center justify-center text-white">
-                            <div className="glass-panel p-10 rounded-3xl flex flex-col items-center space-y-6 max-w-sm border border-purple-500/20 shadow-[0_0_50px_rgba(168,85,247,0.2)]">
-                                <div className="w-16 h-16 border-4 border-slate-700 border-t-purple-500 rounded-full animate-spin"></div>
-                                <div className="text-center">
-                                    <h3 className="text-xl font-bold mb-2">Szkicuję grafikę...</h3>
-                                    <p className="text-xs text-slate-400 font-medium">Magiczna gumka za chwilę usunie tło.</p>
-                                </div>
-                            </div>
-                        </div>
+                    {toastMessage && (
+                        <div className="eg-toast fixed top-5 left-1/2 -translate-x-1/2 z-[100] max-w-[92vw] w-[460px] bg-slate-900 border border-slate-600 text-white text-sm font-semibold px-5 py-3 rounded-2xl shadow-2xl" role="status">{toastMessage}</div>
                     )}
 
-                    <div className={`fixed top-12 left-1/2 -translate-x-1/2 z-[300] bg-emerald-600 text-white px-6 py-3 rounded-full font-bold shadow-[0_10px_40px_rgba(16,185,129,0.5)] transition-all duration-300 flex items-center gap-2 print-hidden ${toastMessage ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-10 pointer-events-none'}`}>
-                        {toastMessage}
-                    </div>
-
-                    <div className="max-w-[90rem] mx-auto px-4 mt-6 pb-24 grid grid-cols-1 xl:grid-cols-12 gap-8 w-full print:block print:p-0 relative z-10 flex-grow">
-                        
-                        {/* PANEL LEWY */}
-                        {appMode === 'editor' ? (
-                            <div className="xl:col-span-4 flex flex-col gap-6 print-hidden">
-                                
-                                {!isPremium && (
-                                    <div className="glass-panel p-4 rounded-2xl flex flex-col gap-2 border border-indigo-500/30 bg-indigo-950/20">
-                                        <div className="flex justify-between items-center">
-                                            <span className="text-[10px] font-bold text-indigo-300 uppercase tracking-widest">Projekt, druk i Giełda bez limitu · grafika AI: 1 na start</span>
-                                            <span className="text-[10px] text-slate-400">Wersja Free</span>
-                                        </div>
-                                        <div className="flex items-center gap-2 mt-1">
-                                            <input value={accessCode} onChange={e => setAccessCode(e.target.value)} placeholder="Kod odblokowujący..." className="flex-1 px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs outline-none text-white focus:border-indigo-500 transition-colors"/>
-                                            <button onClick={handleVerifyCode} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold transition-all shadow-md">OK</button>
-                                        </div>
-                                    </div>
-                                )}
-
-                                <button onClick={() => setAppMode('gielda')} className="w-full bg-slate-800 border border-slate-700 text-white p-3 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-fuchsia-900/30 hover:border-fuchsia-500/50 transition-all shadow-md btn-bounce flex items-center justify-center gap-2">
-                                    <i className="ph-bold ph-cloud text-lg text-fuchsia-400"></i> Giełda Wzorów (Współdzielone)
-                                </button>
-
-                                <div className="glass-panel p-4 rounded-2xl border border-slate-700/50 flex gap-3 items-start">
-                                    <span className="text-xl flex-shrink-0">ℹ️</span>
-                                    <p className="text-xs sm:text-sm text-slate-300 leading-relaxed"><strong className="text-white">Jak to działa:</strong> wybierz „Dyplom" albo „Girlandę", potem w edytorze wypełnij zakładki po kolei: „Teksty" (treść), „Grafika" (gotowe motywy okazji z AI + kolory) albo „AI" (własny opis, np. „Sowa w okularach czytająca książkę"), na końcu dopracuj w „Szlifach". Gotowe do pobrania i wydruku.</p>
-                                </div>
-
-                                <div className="glass-panel p-2 rounded-2xl flex gap-1 bg-slate-900/60">
-                                    <button onClick={() => setActiveTab('diploma')} className={`flex-1 py-3 px-2 rounded-xl flex items-center justify-center gap-2 text-[10px] font-bold uppercase tracking-widest transition-all ${activeTab === 'diploma' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}><i className="ph-bold ph-certificate text-lg"></i> Dyplom</button>
-                                    <button onClick={() => setActiveTab('garland')} className={`flex-1 py-3 px-2 rounded-xl flex items-center justify-center gap-2 text-[10px] font-bold uppercase tracking-widest transition-all ${activeTab === 'garland' ? 'bg-amber-600 text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}><i className="ph-bold ph-flag-banner text-lg"></i> Girlanda</button>
-                                </div>
-
-                                <div className="glass-panel p-6 rounded-[2rem] border-t-4 border-indigo-500 shadow-lg">
-                                    <div className="flex justify-between items-center mb-4">
-                                        <h2 className="font-black text-white uppercase tracking-widest text-sm flex items-center gap-2"><i className="ph-bold ph-faders text-indigo-400"></i> Parametry Kartki</h2>
-                                    </div>
-                                    <div className="space-y-4">
-                                        <div>
-                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Czcionka Dokumentu</label>
-                                            <select value={selectedFont} onChange={e => setSelectedFont(e.target.value)} className="w-full p-3 bg-slate-900 border border-slate-700 rounded-xl text-sm outline-none text-white focus:border-indigo-500 font-bold transition-colors">
-                                                <option value="font-sans">Montserrat (Klasyczna)</option>
-                                                <option value="font-balsamiq">Balsamiq (Dziecięca)</option>
-                                                <option value="font-caveat">Caveat (Odręczna)</option>
-                                                <option value="font-pacifico">Pacifico (Ozdobna)</option>
-                                                <option value="font-dancing">Dancing Script (Elegancka)</option>
-                                                <option value="font-lobster">Lobster (Pogrubiona)</option>
-                                                <option value="font-playfair">Playfair (Urzędowa)</option>
-                                            </select>
-                                        </div>
-                                        <div className="flex gap-3">
-                                            <div className="flex-1">
-                                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Układ Kartki</label>
-                                                <div className="flex bg-slate-900 p-1 rounded-xl border border-slate-700">
-                                                    <button onClick={() => setDiplomaOrientation('horizontal')} className={`flex-1 py-2 text-[10px] font-bold rounded-lg transition-colors ${diplomaOrientation === 'horizontal' ? 'bg-slate-700 text-white' : 'text-slate-400'}`}>Poziom</button>
-                                                    <button onClick={() => setDiplomaOrientation('vertical')} className={`flex-1 py-2 text-[10px] font-bold rounded-lg transition-colors ${diplomaOrientation === 'vertical' ? 'bg-slate-700 text-white' : 'text-slate-400'}`}>Pion</button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="glass-panel rounded-[2rem] overflow-hidden flex flex-col max-h-[650px]">
-                                    <div className="flex border-b border-slate-700/50 bg-slate-900/40">
-                                        <button onClick={() => setActiveTab('diploma')} className={`flex-1 p-4 text-xs font-bold uppercase tracking-wider border-b-2 transition-colors ${activeTab === 'diploma' ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-slate-400 hover:text-slate-300'}`}>Teksty</button>
-                                        <button onClick={() => setActiveTab('motywy')} className={`flex-1 p-4 text-xs font-bold uppercase tracking-wider border-b-2 transition-colors ${activeTab === 'motywy' ? 'border-emerald-500 text-emerald-400' : 'border-transparent text-slate-400 hover:text-slate-300'}`}>Grafika</button>
-                                        <button onClick={() => setActiveTab('ai')} className={`flex-1 p-4 text-xs font-bold uppercase tracking-wider border-b-2 transition-colors ${activeTab === 'ai' ? 'border-purple-500 text-purple-400' : 'border-transparent text-slate-400 hover:text-slate-300'}`}>AI</button>
-                                        <button onClick={() => setActiveTab('sliders')} className={`flex-1 p-4 text-xs font-bold uppercase tracking-wider border-b-2 transition-colors ${activeTab === 'sliders' ? 'border-sky-500 text-sky-400' : 'border-transparent text-slate-400 hover:text-slate-300'}`}>Szlify</button>
-                                    </div>
-                                    
-                                    <div className="p-6 overflow-y-auto custom-scrollbar flex-1">
-                                        
-                                        {activeTab === 'diploma' && (
-                                            <div className="space-y-6 animate-[reveal_0.2s_ease-out]">
-                                                <div className="bg-blue-900/20 border border-blue-500/30 p-3 rounded-xl text-[10px] text-blue-200 text-center font-bold tracking-wider">
-                                                    Wskazówka: Wciśnij klawisz ENTER w polach poniżej, aby przenieść wyraz do nowej linijki.
-                                                </div>
-
-                                                <div>
-                                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Tytuł Dyplomu</label>
-                                                    <textarea value={diplomaTitle} onChange={e => setDiplomaTitle(e.target.value)} rows="1" className="w-full p-4 bg-slate-900 border border-slate-700 rounded-xl outline-none text-white focus:border-indigo-500 transition-colors font-bold text-center resize-y whitespace-pre-wrap" />
-                                                    <TextFormatToolbar format={textFormats.title} onChange={(k, v) => updateFormat('title', k, v)} maxSize={150} />
-                                                </div>
-                                                <div>
-                                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Podtytuł</label>
-                                                    <textarea value={diplomaSubtitle} onChange={e => setDiplomaSubtitle(e.target.value)} rows="1" className="w-full p-4 bg-slate-900 border border-slate-700 rounded-xl outline-none text-white focus:border-indigo-500 transition-colors text-center resize-y whitespace-pre-wrap" />
-                                                    <TextFormatToolbar format={textFormats.subtitle} onChange={(k, v) => updateFormat('subtitle', k, v)} maxSize={80} />
-                                                </div>
-                                                <div>
-                                                    <label className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider block mb-2">Imię i Nazwisko</label>
-                                                    <textarea value={studentName} onChange={e => setStudentName(e.target.value)} rows="1" className="w-full p-4 bg-indigo-900/30 border border-indigo-500/50 rounded-xl font-bold text-xl outline-none text-indigo-200 focus:border-indigo-400 transition-colors text-center shadow-inner resize-y whitespace-pre-wrap" />
-                                                    <TextFormatToolbar format={textFormats.name} onChange={(k, v) => updateFormat('name', k, v)} maxSize={120} />
-                                                </div>
-                                                <div>
-                                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Powód / Uzasadnienie</label>
-                                                    <textarea value={diplomaReason} onChange={e => setDiplomaReason(e.target.value)} rows="3" className="w-full p-4 bg-slate-900 border border-slate-700 rounded-xl outline-none text-white text-sm resize-y focus:border-indigo-500 transition-colors custom-scrollbar whitespace-pre-wrap" />
-                                                    <TextFormatToolbar format={textFormats.reason} onChange={(k, v) => updateFormat('reason', k, v)} maxSize={60} />
-                                                </div>
-                                                <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-700/50">
-                                                    <div>
-                                                        <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Miejscowość i Data</label>
-                                                        <input type="text" value={diplomaDate} onChange={e => setDiplomaDate(e.target.value)} className="w-full p-3 bg-slate-900 border border-slate-700 rounded-xl text-white text-xs outline-none focus:border-indigo-500" />
-                                                    </div>
-                                                    <div>
-                                                        <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Podpis Nauczyciela</label>
-                                                        <input type="text" value={diplomaSignature} onChange={e => setDiplomaSignature(e.target.value)} className="w-full p-3 bg-slate-900 border border-slate-700 rounded-xl text-white text-xs outline-none focus:border-indigo-500" />
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        {activeTab === 'garland' && (
-                                            <div className="space-y-6 animate-[reveal_0.2s_ease-out]">
-                                                <div className="bg-amber-900/10 p-5 rounded-2xl border border-amber-500/30">
-                                                    <label className="text-[10px] font-bold text-amber-400 uppercase tracking-widest block mb-3 text-center">Napisz słowo (1 litera = 1 strona A4)</label>
-                                                    <input type="text" value={garlandText} onChange={e => setGarlandText(e.target.value.toUpperCase())} className="w-full p-5 bg-amber-900/30 border border-amber-500/50 rounded-xl font-black text-2xl text-white text-center outline-none tracking-[0.5rem] focus:border-amber-400 transition-colors" />
-                                                    
-                                                    <div className="mt-4 flex flex-col items-center">
-                                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Kolor Liter</label>
-                                                        <div className="flex items-center gap-1.5 flex-wrap justify-center mb-2">
-                                                            {EXTENDED_COLORS.map(c => (
-                                                                <button key={c} onClick={() => setGarlandTextColor(c)} className={`w-6 h-6 rounded-full border-2 transition-transform hover:scale-110 shadow-sm ${garlandTextColor.toLowerCase() === c ? 'border-amber-400 scale-110' : 'border-slate-600 hover:border-slate-400'}`} style={{ backgroundColor: c }}></button>
-                                                            ))}
-                                                            <div className="w-px h-5 bg-slate-700 shrink-0 mx-1"></div>
-                                                            <div className="relative w-8 h-8 rounded-full border-2 border-slate-500 overflow-hidden hover:border-amber-400 transition-colors shadow-inner" title="Własny kolor">
-                                                                <div className="absolute inset-0 bg-[conic-gradient(red,yellow,lime,aqua,blue,magenta,red)] pointer-events-none opacity-80"></div>
-                                                                <input type="color" value={garlandTextColor} onChange={e => setGarlandTextColor(e.target.value)} className="absolute inset-0 w-[200%] h-[200%] -top-1/2 -left-1/2 cursor-pointer opacity-0" />
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                
-                                                <div>
-                                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-3">Kształt Proporczyka</label>
-                                                    <div className="grid grid-cols-3 gap-2">
-                                                        <button onClick={() => setGarlandShape('pennant')} className={`p-3 rounded-xl border flex flex-col items-center gap-2 transition-colors ${garlandShape === 'pennant' ? 'bg-amber-600 border-amber-500 text-white' : 'bg-slate-900 border-slate-700 text-slate-400 hover:bg-slate-800'}`}>
-                                                            <svg width="20" height="24" viewBox="0 0 100 120"><path d="M5,5 L95,5 L50,115 Z" fill="currentColor"/></svg> Trójkąt Długi
-                                                        </button>
-                                                        <button onClick={() => setGarlandShape('triangle')} className={`p-3 rounded-xl border flex flex-col items-center gap-2 transition-colors ${garlandShape === 'triangle' ? 'bg-amber-600 border-amber-500 text-white' : 'bg-slate-900 border-slate-700 text-slate-400 hover:bg-slate-800'}`}>
-                                                            <svg width="24" height="20" viewBox="0 0 100 80"><path d="M5,5 L95,5 L50,75 Z" fill="currentColor"/></svg> Flaga Krótka
-                                                        </button>
-                                                        <button onClick={() => setGarlandShape('circle')} className={`p-3 rounded-xl border flex flex-col items-center gap-2 transition-colors ${garlandShape === 'circle' ? 'bg-amber-600 border-amber-500 text-white' : 'bg-slate-900 border-slate-700 text-slate-400 hover:bg-slate-800'}`}>
-                                                            <svg width="24" height="24" viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="currentColor"/></svg> Okrągły
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                                
-                                                <div className="space-y-4 pt-4 border-t border-slate-700/50">
-                                                    <div>
-                                                        <div className="flex justify-between text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-wider"><span>Wielkość czcionki</span><span className="text-amber-400">{garlandLetterSize}px</span></div>
-                                                        <input type="range" min="50" max="300" value={garlandLetterSize} onChange={e => setGarlandLetterSize(Number(e.target.value))} className="w-full accent-amber-500 h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer" />
-                                                    </div>
-                                                    <div>
-                                                        <div className="flex justify-between text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-wider"><span>Przesunięcie Góra/Dół</span><span className="text-amber-400">{garlandLetterOffset}px</span></div>
-                                                        <input type="range" min="-100" max="200" value={garlandLetterOffset} onChange={e => setGarlandLetterOffset(Number(e.target.value))} className="w-full accent-amber-500 h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer" />
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        {activeTab === 'motywy' && (
-                                            <div className="space-y-6 animate-[reveal_0.2s_ease-out]">
-                                                <div className="bg-emerald-900/10 p-5 rounded-2xl border border-emerald-500/30">
-                                                    <label className="text-[11px] font-bold text-emerald-400 uppercase tracking-widest mb-3 flex items-center justify-center gap-2"><i className="ph-bold ph-image"></i> Własna Grafika</label>
-                                                    <input type="file" accept="image/*" onChange={handleFileUpload} ref={fileInputRef} className="hidden" />
-                                                    <button onClick={() => fileInputRef.current.click()} className="w-full bg-slate-800 border border-slate-600 hover:border-emerald-500 text-white py-4 rounded-xl font-bold transition-colors flex items-center justify-center gap-2 shadow-sm btn-bounce">
-                                                        <i className="ph-bold ph-upload-simple text-xl text-emerald-400"></i> Wybierz z komputera
-                                                    </button>
-                                                    <p className="text-[10px] text-slate-400 text-center mt-3">Magiczna gumka automatycznie usunie białe tło z Twojego zdjęcia.</p>
-                                                    {customImage && (
-                                                        <button onClick={() => setCustomImage(null)} className="w-full mt-3 text-xs font-bold text-red-400 hover:bg-slate-800 py-2 border border-red-900/50 rounded-xl transition-colors">
-                                                            Usuń wgraną grafikę
-                                                        </button>
-                                                    )}
-                                                </div>
-
-                                                <div className="border-t border-slate-700/50 pt-4">
-                                                    <div className="bg-slate-900/60 p-4 rounded-2xl border border-emerald-500/30 mb-6">
-                                                        <label className="text-[11px] font-bold text-emerald-300 uppercase tracking-widest mb-1 flex items-center justify-center gap-2"><i className="ph-bold ph-frame-corners"></i> Ozdobna ramka AI (Twoje teksty bez zmian)</label>
-                                                        <p className="text-[10px] text-slate-400 text-center mb-3 leading-relaxed">Do dyplomu robionego od zera: AI namaluje samą ozdobną ramkę z pustym środkiem. Twój tytuł, imię i uzasadnienie zostają.</p>
-                                                        <div className="grid grid-cols-3 gap-2">
-                                                            {FRAME_STYLES.map(fs => (
-                                                                <button key={fs.id} onClick={() => generateCustomFrame(fs.id)} disabled={isGenerating} className={`p-2 rounded-lg border text-[10px] font-bold transition-all disabled:opacity-40 ${lastFrameStyle === fs.id ? 'bg-emerald-600 border-emerald-400 text-white' : 'bg-slate-900 border-slate-700 text-slate-300 hover:border-emerald-500 hover:bg-slate-800'}`}>{fs.emoji} {fs.label}</button>
-                                                            ))}
-                                                        </div>
-                                                        {customImage && graphicLayout === 'full_background' && (
-                                                            <button onClick={() => generateCustomFrame(lastFrameStyle || 'kids')} disabled={isGenerating} className="w-full mt-2 bg-slate-800 hover:bg-slate-700 border border-emerald-500/40 text-emerald-300 py-2 rounded-lg font-bold text-[10px] uppercase tracking-widest transition-colors disabled:opacity-40 flex items-center justify-center gap-2 btn-bounce">
-                                                                <i className="ph-bold ph-shuffle"></i> Inny wariant ramki
-                                                            </button>
-                                                        )}
-                                                    </div>
-
-                                                    <div className="bg-gradient-to-br from-indigo-900/30 to-purple-900/20 p-5 rounded-2xl border border-indigo-500/40 mb-6">
-                                                        <label className="text-[11px] font-bold text-indigo-300 uppercase tracking-widest mb-1 flex items-center justify-center gap-2"><i className="ph-bold ph-sparkle"></i> Gotowy motyw okazji (AI)</label>
-                                                        <p className="text-[10px] text-slate-400 text-center mb-4 leading-relaxed">Jedno kliknięcie: AI maluje całe ozdobne tło dyplomu (ramka, postacie, motywy) i ustawia teksty. Potem tylko wpisz imię dziecka w zakładce „Teksty".</p>
-                                                        <div className="grid grid-cols-2 gap-2">
-                                                            {OCCASION_PRESETS.map(p => (
-                                                                <button key={p.id} onClick={() => handleOccasionPreset(p)} disabled={isGenerating} className={`p-2.5 rounded-xl border text-left transition-all disabled:opacity-40 flex items-center gap-1.5 ${lastOccasionId === p.id ? 'bg-indigo-600 border-indigo-400 text-white shadow-md' : 'bg-slate-900 border-slate-700 text-slate-300 hover:border-indigo-500 hover:bg-slate-800'}`}>
-                                                                    <span className="text-lg shrink-0">{p.emoji}</span>
-                                                                    <span className="text-[10px] font-bold leading-tight">{p.label}</span>
-                                                                </button>
-                                                            ))}
-                                                        </div>
-                                                        {lastOccasionId && (
-                                                            <button onClick={regenerateOccasionVariant} disabled={isGenerating} className="w-full mt-3 bg-slate-800 hover:bg-slate-700 border border-indigo-500/40 text-indigo-300 py-2.5 rounded-xl font-bold text-[10px] uppercase tracking-widest transition-colors disabled:opacity-40 flex items-center justify-center gap-2 btn-bounce">
-                                                                <i className="ph-bold ph-shuffle"></i> Wygeneruj inny wariant tego motywu
-                                                            </button>
-                                                        )}
-                                                    </div>
-
-                                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-4">Motywy kolorystyczne (tło i ramka)</label>
-                                                    <div className="grid grid-cols-3 gap-2">
-                                                        {THEMES.map(t => (
-                                                            <button key={t.id} onClick={() => {setSelectedThemeId(t.id); setCustomImage(null);}} className={`p-3 rounded-xl border flex flex-col items-center transition-all ${selectedThemeId === t.id ? 'border-emerald-500 bg-emerald-900/20 shadow-md' : 'border-slate-700 bg-slate-900 hover:bg-slate-800'}`}>
-                                                                <span className="text-2xl mb-1">{t.elements[0]}</span>
-                                                                <span className="text-[8px] sm:text-[9px] font-bold text-slate-300 uppercase truncate w-full text-center">{t.name}</span>
-                                                            </button>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        {activeTab === 'ai' && (
-                                            <div className="space-y-6 animate-[reveal_0.2s_ease-out]">
-                                                {!isPremium ? (
-                                                    <div className="bg-slate-900 p-8 rounded-2xl border border-slate-700 text-center space-y-4">
-                                                        <div className="mx-auto w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center text-slate-500">
-                                                            <i className="ph-bold ph-lock-key text-2xl"></i>
-                                                        </div>
-                                                        <h3 className="font-bold text-white text-sm uppercase tracking-widest">Funkcja Premium</h3>
-                                                        <p className="text-xs text-slate-400">Rysowanie zaawansowanych grafik AI wymaga odblokowania. Wpisz kod Premium w okienku na górze panelu.</p>
-                                                    </div>
-                                                ) : (
-                                                    <div className="space-y-5">
-                                                        <div className="bg-purple-900/20 p-5 rounded-2xl border border-purple-500/30">
-                                                            <label className="text-[11px] font-bold text-purple-400 uppercase tracking-widest mb-3 flex items-center justify-center gap-2"><i className="ph-bold ph-magic-wand"></i> Generator Grafiki</label>
-                                                            <textarea 
-                                                                value={aiPrompt} onChange={e => setAiPrompt(e.target.value)} 
-                                                                placeholder="Opisz po polsku co wygenerować (np. Sowa w okularach czytająca książkę)..." 
-                                                                className="w-full p-4 bg-slate-900 border border-slate-700 rounded-xl text-sm outline-none text-white focus:border-purple-500 transition-colors resize-none custom-scrollbar mb-3" rows="3"
-                                                            />
-                                                            <button onClick={handleGenerateAiImage} disabled={isGenerating || !aiPrompt.trim()} className="w-full bg-purple-600 text-white px-5 py-3 rounded-xl font-bold shadow-[0_0_20px_rgba(147,51,234,0.3)] hover:bg-purple-500 disabled:opacity-50 transition-all uppercase tracking-widest flex items-center justify-center gap-2 btn-bounce">
-                                                                <i className="ph-bold ph-sparkle"></i> Wygeneruj i wytnij tło
-                                                            </button>
-                                                            {customImage && (
-                                                                <button onClick={() => setCustomImage(null)} className="w-full mt-3 text-xs font-bold text-red-400 hover:bg-slate-800 py-2 border border-red-900/50 rounded-xl transition-colors">
-                                                                    Usuń grafikę AI
-                                                                </button>
-                                                            )}
-                                                        </div>
-
-                                                        <div>
-                                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-3">Styl Rysowania</label>
-                                                            <div className="grid grid-cols-2 gap-2">
-                                                                {[
-                                                                    { id: '3d', label: '🎬 Animacja 3D' },
-                                                                    { id: 'watercolor', label: '🎨 Akwarela' },
-                                                                    { id: 'doodle', label: '✏️ Szkic / Doodle' },
-                                                                    { id: 'realistic', label: '📸 Realizm' }
-                                                                ].map(style => (
-                                                                    <button key={style.id} onClick={() => setArtStyle(style.id)} className={`py-2 text-[10px] font-bold rounded-lg transition-all border ${artStyle === style.id ? 'bg-purple-600 border-purple-500 text-white' : 'bg-slate-900 border-slate-700 text-slate-400 hover:bg-slate-800'}`}>{style.label}</button>
-                                                                ))}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        )}
-
-                                        {activeTab === 'sliders' && (
-                                            <div className="space-y-6 animate-[reveal_0.2s_ease-out]">
-                                                <div className="bg-slate-900 p-5 rounded-2xl border border-slate-700">
-                                                    <label className="text-[10px] font-bold text-sky-400 uppercase tracking-widest mb-4 flex items-center justify-center gap-2"><i className="ph-bold ph-palette"></i> Paleta Kolorów Kartki</label>
-                                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                                                        <ColorWidget label="Tło Kartki" value={diplomaBgColor} setValue={setDiplomaBgColor} />
-                                                        <ColorWidget label="Ramka" value={diplomaBorderColor} setValue={setDiplomaBorderColor} />
-                                                        <ColorWidget label="Stopka" value={diplomaTextColor} setValue={setDiplomaTextColor} />
-                                                    </div>
-                                                </div>
-
-                                                <div>
-                                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-3">Styl Ramki</label>
-                                                    <div className="grid grid-cols-4 gap-2">
-                                                        <button onClick={() => setBorderWidth(0)} className={`py-2 rounded-lg text-[9px] font-bold border transition-colors ${borderWidth === 0 ? 'bg-sky-600 text-white border-sky-500' : 'bg-slate-900 text-slate-400 border-slate-700'}`}>Brak</button>
-                                                        <button onClick={() => {setBorderStyle('solid'); setBorderWidth(4);}} className={`py-2 rounded-lg text-[9px] font-bold border transition-colors ${borderWidth === 4 ? 'bg-sky-600 text-white border-sky-500' : 'bg-slate-900 text-slate-400 border-slate-700'}`}>Cienka</button>
-                                                        <button onClick={() => {setBorderStyle('solid'); setBorderWidth(16);}} className={`py-2 rounded-lg text-[9px] font-bold border transition-colors ${borderWidth === 16 && borderStyle === 'solid' ? 'bg-sky-600 text-white border-sky-500' : 'bg-slate-900 text-slate-400 border-slate-700'}`}>Gruba</button>
-                                                        <button onClick={() => {setBorderStyle('dashed'); setBorderWidth(10);}} className={`py-2 rounded-lg text-[9px] font-bold border transition-colors ${borderStyle === 'dashed' ? 'bg-sky-600 text-white border-sky-500' : 'bg-slate-900 text-slate-400 border-slate-700'}`}>Kreski</button>
-                                                    </div>
-                                                </div>
-
-                                                <div className="space-y-4 pt-4 border-t border-slate-700/50">
-                                                    <div>
-                                                        <div className="flex justify-between text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-wider"><span>Pozycja Grafiki</span></div>
-                                                        <div className="flex gap-2">
-                                                            <button onClick={() => setGraphicLayout('bottom_corners')} className={`flex-1 py-1.5 rounded bg-slate-800 text-[9px] font-bold ${graphicLayout === 'bottom_corners' ? 'text-white border border-sky-500' : 'text-slate-400'}`}>W rogach</button>
-                                                            <button onClick={() => setGraphicLayout('bottom_center')} className={`flex-1 py-1.5 rounded bg-slate-800 text-[9px] font-bold ${graphicLayout === 'bottom_center' ? 'text-white border border-sky-500' : 'text-slate-400'}`}>Środek</button>
-                                                            <button onClick={() => setGraphicLayout('full_background')} className={`flex-1 py-1.5 rounded bg-slate-800 text-[9px] font-bold ${graphicLayout === 'full_background' ? 'text-white border border-sky-500' : 'text-slate-400'}`}>Jako tło</button>
-                                                        </div>
-                                                    </div>
-                                                    <div>
-                                                        <div className="flex justify-between text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-wider"><span>Krycie Grafiki</span><span className="text-sky-400">{bgImageOpacity}%</span></div>
-                                                        <input type="range" min="5" max="100" value={bgImageOpacity} onChange={e => setBgImageOpacity(Number(e.target.value))} className="w-full accent-sky-500 h-2 bg-slate-700 rounded-lg appearance-none" />
-                                                    </div>
-                                                </div>
-
-                                                <div className="space-y-4 pt-4 border-t border-slate-700/50">
-                                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Szkło nad Tytułem</label>
-                                                    <div>
-                                                        <div className="flex justify-between text-[10px] font-bold text-slate-500 mb-1"><span>Krycie kafla (0 = brak)</span></div>
-                                                        <input type="range" min="0" max="100" value={titleBoxOpacity} onChange={e => setTitleBoxOpacity(Number(e.target.value))} className="w-full accent-sky-500 h-1.5 bg-slate-800 rounded-lg appearance-none" />
-                                                    </div>
-                                                    <div>
-                                                        <div className="flex justify-between text-[10px] font-bold text-slate-500 mb-1"><span>Szerokość</span></div>
-                                                        <input type="range" min="50" max="100" value={titleBoxWidth} onChange={e => setTitleBoxWidth(Number(e.target.value))} className="w-full accent-sky-500 h-1.5 bg-slate-800 rounded-lg appearance-none" />
-                                                    </div>
-                                                    <div>
-                                                        <div className="flex justify-between text-[10px] font-bold text-slate-500 mb-1"><span>Góra/Dół</span></div>
-                                                        <input type="range" min="-100" max="100" value={titleBoxOffset} onChange={e => setTitleBoxOffset(Number(e.target.value))} className="w-full accent-sky-500 h-1.5 bg-slate-800 rounded-lg appearance-none" />
-                                                    </div>
-                                                </div>
-
-                                                <div className="space-y-4 pt-4 border-t border-slate-700/50">
-                                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Szkło w Środku</label>
-                                                    <div>
-                                                        <div className="flex justify-between text-[10px] font-bold text-slate-500 mb-1"><span>Krycie kafla (0 = brak)</span></div>
-                                                        <input type="range" min="0" max="100" value={boxOpacity} onChange={e => setBoxOpacity(Number(e.target.value))} className="w-full accent-sky-500 h-1.5 bg-slate-800 rounded-lg appearance-none" />
-                                                    </div>
-                                                    <div>
-                                                        <div className="flex justify-between text-[10px] font-bold text-slate-500 mb-1"><span>Szerokość</span></div>
-                                                        <input type="range" min="50" max="100" value={boxWidth} onChange={e => setBoxWidth(Number(e.target.value))} className="w-full accent-sky-500 h-1.5 bg-slate-800 rounded-lg appearance-none" />
-                                                    </div>
-                                                    <div>
-                                                        <div className="flex justify-between text-[10px] font-bold text-slate-500 mb-1"><span>Góra/Dół</span></div>
-                                                        <input type="range" min="-150" max="150" value={boxOffset} onChange={e => setBoxOffset(Number(e.target.value))} className="w-full accent-sky-500 h-1.5 bg-slate-800 rounded-lg appearance-none" />
-                                                    </div>
-                                                </div>
-
-                                                <div className="space-y-4 pt-4 border-t border-slate-700/50">
-                                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Szkło Stopki (miejscowość, data, podpis)</label>
-                                                    <div>
-                                                        <div className="flex justify-between text-[10px] font-bold text-slate-500 mb-1"><span>Krycie kafla (0 = brak)</span></div>
-                                                        <input type="range" min="0" max="100" value={footerBoxOpacity} onChange={e => setFooterBoxOpacity(Number(e.target.value))} className="w-full accent-sky-500 h-1.5 bg-slate-800 rounded-lg appearance-none" />
-                                                    </div>
-                                                    <div>
-                                                        <div className="flex justify-between text-[10px] font-bold text-slate-500 mb-1"><span>Szerokość</span></div>
-                                                        <input type="range" min="40" max="100" value={footerBoxWidth} onChange={e => setFooterBoxWidth(Number(e.target.value))} className="w-full accent-sky-500 h-1.5 bg-slate-800 rounded-lg appearance-none" />
-                                                    </div>
-                                                    <div>
-                                                        <div className="flex justify-between text-[10px] font-bold text-slate-500 mb-1"><span>Góra/Dół</span></div>
-                                                        <input type="range" min="-120" max="120" value={footerBoxOffset} onChange={e => setFooterBoxOffset(Number(e.target.value))} className="w-full accent-sky-500 h-1.5 bg-slate-800 rounded-lg appearance-none" />
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
+                    <div className="eg-screen max-w-[88rem] mx-auto px-4 sm:px-6 pt-6 pb-16">
+                        {/* Nagłówek */}
+                        <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
+                            <div className="min-w-0">
+                                <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight flex items-center gap-2"><i className="ph-duotone ph-certificate text-indigo-400"></i> EduGenerator</h1>
+                                <p className="text-sm text-slate-400 mt-0.5">Dyplom w 4 krokach – dla jednego dziecka albo dla całej grupy naraz.</p>
                             </div>
-                        ) : (
-                            /* PANEL LEWY - GIEŁDA WZORÓW */
-                            <div className="xl:col-span-4 flex flex-col gap-6 print-hidden">
-                                <div className="glass-panel p-6 rounded-[2rem] border-t-4 border-fuchsia-500 shadow-lg h-full flex flex-col max-h-[850px]">
-                                    <div className="flex justify-between items-center mb-6">
-                                        <h2 className="font-black text-white uppercase tracking-widest text-sm flex items-center gap-2"><i className="ph-bold ph-users text-fuchsia-400"></i> Giełda Wzorów</h2>
-                                        <button onClick={() => setAppMode('editor')} className="text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-lg text-xs font-bold uppercase transition-colors btn-bounce"><i className="ph-bold ph-arrow-left"></i> Wróć</button>
-                                    </div>
-                                    
-                                    <button onClick={sharePattern} className="w-full bg-fuchsia-600 hover:bg-fuchsia-500 text-white p-3 rounded-xl font-bold text-sm mb-6 shadow-lg transition-all btn-bounce flex justify-center items-center gap-2">
-                                        <i className="ph-bold ph-cloud-arrow-up text-lg"></i> Zapisz i udostępnij mój wzór
-                                    </button>
-                                    
-                                    <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Ostatnio dodane wzory</h3>
-                                    <div className="overflow-y-auto custom-scrollbar flex-1 space-y-3 pr-2">
-                                        {patterns.map(p => (
-                                            <div key={p.id} className="bg-slate-900 border border-slate-700 p-4 rounded-xl hover:border-fuchsia-500 transition-colors cursor-pointer group flex flex-col gap-2" onClick={() => loadPattern(p)}>
-                                                <div className="flex justify-between items-start gap-2">
-                                                    <span className="text-xs font-bold text-white group-hover:text-fuchsia-400 transition-colors line-clamp-2 leading-tight">{p.name}</span>
-                                                    <span className={`text-[9px] font-bold px-2 py-1 rounded shrink-0 ${p.type === 'Dyplom' ? 'bg-indigo-900/50 text-indigo-300' : 'bg-amber-900/50 text-amber-300'}`}>{p.type}</span>
-                                                </div>
-                                                <div className="flex justify-between items-center">
-                                                    <p className="text-[9px] text-slate-500">Autor: <span className="text-slate-400">{p.userId.substring(0,6)}</span></p>
-                                                    <p className="text-[9px] text-slate-500">{p.createdAt?.toDate().toLocaleDateString()}</p>
-                                                </div>
-                                            </div>
-                                        ))}
-                                        {patterns.length === 0 && (
-                                            <div className="text-center py-10 opacity-50">
-                                                <i className="ph-bold ph-cloud-arrow-down text-4xl mb-2 text-slate-500"></i>
-                                                <p className="text-xs text-slate-400">Pobieranie wzorów z chmury...</p>
-                                            </div>
-                                        )}
-                                    </div>
+                            <div className="flex flex-wrap gap-2">
+                                <button onClick={() => setShowGielda(true)} className="eb-btn eb-btn--ghost"><i className="ph-bold ph-users-three"></i> Giełda wzorów</button>
+                                {isPremium
+                                    ? <span className="eb-chip eb-chip--ok self-center"><i className="ph-fill ph-crown"></i> PRO</span>
+                                    : <button onClick={() => setShowPro(v => !v)} className="eb-btn eb-btn--quiet"><i className="ph-bold ph-key"></i> Mam kod PRO</button>}
+                            </div>
+                        </div>
+
+                        {showPro && !isPremium && (
+                            <div className="eb-card p-4 mb-5 flex flex-col sm:flex-row gap-3 sm:items-center">
+                                <p className="text-sm text-slate-300 flex-1">Kod PRO znosi limit grafik AI i znak wodny. Robienie, druk i PDF dyplomów są zawsze za darmo.</p>
+                                <div className="flex gap-2">
+                                    <input value={accessCode} onChange={e => setAccessCode(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleVerifyCode()} placeholder="Wpisz kod" className="eb-field uppercase w-44" />
+                                    <button onClick={handleVerifyCode} className="eb-btn eb-btn--primary">OK</button>
                                 </div>
                             </div>
                         )}
 
-                        {/* PANEL PRAWY - PODGLĄD (OBSZAR DRUKU) */}
-                        <div className="xl:col-span-8 flex justify-center items-start lg:sticky lg:top-28 self-start print:static w-full relative min-h-[600px] xl:h-auto">
-                            
-                            <div className="absolute inset-0 dark-grid-bg -z-10 rounded-[3rem] opacity-30 print-hidden"></div>
+                        {/* Kroki */}
+                        <nav aria-label="Kroki" className="eg-steps grid grid-cols-4 gap-1.5 sm:gap-2 mb-5">
+                            {STEPS.map((s, i) => (
+                                <button key={s.id} onClick={() => goStep(i)} aria-current={step === i ? 'step' : undefined}
+                                    className={`flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 py-2.5 px-1 rounded-xl border text-xs sm:text-sm font-bold transition-colors ${step === i ? 'bg-indigo-600 border-indigo-500 text-white' : i < step ? 'bg-slate-800/80 border-slate-700 text-indigo-200' : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:text-slate-200'}`}>
+                                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] ${step === i ? 'bg-white/20' : 'bg-slate-700/70'}`}>{i < step ? <i className="ph-bold ph-check"></i> : i + 1}</span>
+                                    <span>{s.label}</span>
+                                </button>
+                            ))}
+                        </nav>
 
-                            <div className="w-full h-full flex flex-col items-center justify-center relative sm:py-6 print:block print:p-0 print:h-auto">
-                                {activeTab !== 'garland' ? (
-                                    /* WIDOK: DYPLOM */
-                                    <div 
-                                        id="print-area"
-                                        className={`relative flex flex-col justify-between rounded-[1rem] sm:rounded-[2rem] p-8 md:p-12 text-center shadow-[0_0_40px_rgba(0,0,0,0.5)] transition-all overflow-hidden bg-cover bg-center bg-no-repeat mx-auto
-                                        ${diplomaOrientation === 'horizontal' ? 'w-full aspect-[1.414]' : 'h-[600px] md:h-[800px] aspect-[0.707]'}`}
-                                        style={{ backgroundColor: diplomaBgColor, backgroundImage: (!customImage || graphicLayout !== 'full_background') ? 'radial-gradient(ellipse at 50% 28%, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0) 62%)' : 'none', borderWidth: `${borderWidth}px`, borderStyle: borderStyle, borderColor: diplomaBorderColor, color: diplomaTextColor }}
-                                    >
-                                        {!customImage && (
-                                            <div className="absolute inset-0 z-0 pointer-events-none opacity-[0.12] flex items-center justify-center space-x-20 scale-[1.8] sm:scale-150">
-                                                <div className="text-[10rem] sm:text-[15rem] drop-shadow-lg">{activeTheme.elements[0]}</div>
-                                                <div className="text-[10rem] sm:text-[15rem] drop-shadow-lg">{activeTheme.elements[1]}</div>
+                        <div className="grid grid-cols-1 lg:grid-cols-[400px_minmax(0,1fr)] xl:grid-cols-[440px_minmax(0,1fr)] gap-5 lg:gap-7 items-start">
+                            {/* PODGLĄD */}
+                            <div className="order-1 lg:order-2 lg:sticky lg:top-4 min-w-0">
+                                <div className="eb-card p-3 sm:p-5">
+                                    <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                                        <span className="text-xs text-slate-400 flex items-center gap-1.5"><i className="ph-bold ph-cursor-text"></i> Kliknij tekst na dyplomie, żeby go poprawić</span>
+                                        {series && (
+                                            <div className="flex items-center gap-1">
+                                                <button className="eb-btn eb-btn--icon eb-btn--quiet" aria-label="Poprzedni" onClick={() => setPreviewIndex(Math.max(0, safeIndex - 1))}><i className="ph-bold ph-caret-left"></i></button>
+                                                <span className="text-xs font-bold text-slate-200 tabular-nums">{safeIndex + 1} / {names.length}</span>
+                                                <button className="eb-btn eb-btn--icon eb-btn--quiet" aria-label="Następny" onClick={() => setPreviewIndex(Math.min(names.length - 1, safeIndex + 1))}><i className="ph-bold ph-caret-right"></i></button>
                                             </div>
                                         )}
-
-                                        {customImage && (
-                                            <div className="absolute inset-0 z-10 pointer-events-none overflow-hidden">
-                                                {graphicLayout === 'full_background' ? (
-                                                    <img src={customImage} className="w-full h-full object-cover" style={{ opacity: bgImageOpacity / 100 }} />
-                                                ) : graphicLayout === 'bottom_corners' ? (
-                                                    <>
-                                                        <img src={customImage} className="absolute bottom-[-1rem] left-[-2rem] w-48 h-48 md:w-72 md:h-72 object-contain rotate-6 drop-shadow-xl" style={{ opacity: bgImageOpacity / 100 }} />
-                                                        <img src={customImage} className="absolute bottom-[-1rem] right-[-2rem] w-48 h-48 md:w-72 md:h-72 object-contain -rotate-12 drop-shadow-xl" style={{ opacity: bgImageOpacity / 100 }} />
-                                                    </>
-                                                ) : graphicLayout === 'bottom_center' ? (
-                                                    <img src={customImage} className="absolute bottom-[-2rem] left-1/2 -translate-x-1/2 w-64 h-64 md:w-[28rem] md:h-[28rem] object-contain drop-shadow-xl" style={{ opacity: bgImageOpacity / 100 }} />
-                                                ) : null}
-                                            </div>
-                                        )}
-
-                                        {!isPremium && <div className="absolute inset-0 z-50 flex items-center justify-center opacity-[0.03] rotate-[-35deg] text-4xl md:text-7xl font-black uppercase pointer-events-none select-none tracking-[1rem] text-slate-900">EDUGENERATOR</div>}
-
-                                        {(!customImage || graphicLayout !== 'full_background') && borderWidth > 0 && (
-                                            <>
-                                                <div className="absolute z-[15] pointer-events-none" style={{ inset: '12px', border: `2px solid ${diplomaBorderColor}`, borderRadius: '12px', opacity: 0.75 }}></div>
-                                                <div className="absolute z-[15] pointer-events-none" style={{ inset: '19px', border: `1px solid ${diplomaBorderColor}`, borderRadius: '9px', opacity: 0.4 }}></div>
-                                            </>
-                                        )}
-
-                                        {/* Szyba: Tytuł */}
-                                        <div 
-                                            className="z-20 relative mx-auto flex flex-col items-center justify-center transition-all py-3 px-6 md:py-6 md:px-10 rounded-[1.5rem] md:rounded-[2rem] flex-shrink-0"
-                                            style={{ 
-                                                width: `${titleBoxWidth}%`, transform: `translateY(${titleBoxOffset}px)`, 
-                                                backgroundColor: `rgba(255,255,255,${titleBoxOpacity/100})`, 
-                                                backdropFilter: titleBoxOpacity > 0 ? `blur(${(titleBoxOpacity/100)*16}px)` : 'none',
-                                                border: titleBoxOpacity > 0 ? '1px solid rgba(255,255,255,0.4)' : 'none',
-                                                boxShadow: titleBoxOpacity > 0 ? '0 10px 30px -10px rgba(0,0,0,0.1)' : 'none'
-                                            }}
-                                        >
-                                            <div className="w-full">
-                                                <h1 style={{ fontSize: `${textFormats.title.size}px`, color: textFormats.title.color, fontWeight: textFormats.title.bold ? 'bold' : 'normal', fontStyle: textFormats.title.italic ? 'italic' : 'normal', textShadow: '0 0 10px rgba(255,255,255,0.8)' }} className="tracking-[0.1em] md:tracking-[0.2em] uppercase leading-none drop-shadow-sm select-none break-words max-w-full whitespace-pre-wrap">{diplomaTitle}</h1>
-                                                <h3 style={{ fontSize: `${textFormats.subtitle.size}px`, color: textFormats.subtitle.color, fontWeight: textFormats.subtitle.bold ? 'bold' : 'normal', fontStyle: textFormats.subtitle.italic ? 'italic' : 'normal' }} className="opacity-80 uppercase tracking-widest min-h-[1.5em] select-none break-words mt-2 max-w-full whitespace-pre-wrap">{diplomaSubtitle}</h3>
-                                            </div>
-                                        </div>
-
-                                        {/* Szyba 2: Treść główna (imię, uzasadnienie) */}
-                                        <div 
-                                            className="z-20 relative mx-auto flex flex-col items-center justify-center transition-all pt-5 pb-5 px-6 md:pt-9 md:pb-7 md:px-14 rounded-[1.5rem] md:rounded-[2rem] flex-1 min-h-0 overflow-hidden"
-                                            style={{ 
-                                                width: `${boxWidth}%`, transform: `translateY(${boxOffset}px)`, 
-                                                backgroundColor: `rgba(255,255,255,${boxOpacity/100})`, 
-                                                backdropFilter: boxOpacity > 0 ? `blur(${(boxOpacity/100)*16}px)` : 'none',
-                                                boxShadow: boxOpacity >= 40 ? '0 22px 48px -14px rgba(0,0,0,0.25)' : 'none', border: boxOpacity >= 55 ? `2px solid ${diplomaBorderColor}33` : 'none'
-                                            }}
-                                        >
-                                            <h2 style={{ fontSize: `${textFormats.name.size}px`, color: textFormats.name.color, fontWeight: textFormats.name.bold ? 'bold' : 'normal', fontStyle: textFormats.name.italic ? 'italic' : 'normal' }} className="border-b-2 border-slate-300/50 inline-block px-4 md:px-16 pb-2 md:pb-4 mb-3 md:mb-5 leading-tight w-full select-none max-w-full whitespace-pre-wrap break-words">{studentName}</h2>
-                                            <p style={{ fontSize: `${textFormats.reason.size}px`, color: textFormats.reason.color, fontWeight: textFormats.reason.bold ? 'bold' : 'normal', fontStyle: textFormats.reason.italic ? 'italic' : 'normal' }} className="leading-snug md:leading-relaxed select-none opacity-90 max-w-full whitespace-pre-wrap break-words">{diplomaReason}</p>
-                                        </div>
-
-                                        {/* Szyba 3: Stopka (miejscowość/data + podpis) - własny kafel */}
-                                        <div 
-                                            className="z-20 relative mx-auto flex justify-between items-end gap-4 transition-all py-3 px-6 md:py-4 md:px-10 rounded-[1.25rem] md:rounded-[1.75rem] flex-shrink-0 select-none"
-                                            style={{ 
-                                                width: `${footerBoxWidth}%`, transform: `translateY(${footerBoxOffset}px)`, 
-                                                backgroundColor: `rgba(255,255,255,${footerBoxOpacity/100})`, 
-                                                backdropFilter: footerBoxOpacity > 0 ? `blur(${(footerBoxOpacity/100)*16}px)` : 'none',
-                                                boxShadow: footerBoxOpacity >= 40 ? '0 12px 30px -12px rgba(0,0,0,0.2)' : 'none', border: footerBoxOpacity >= 55 ? `2px solid ${diplomaBorderColor}33` : 'none'
-                                            }}
-                                        >
-                                            <div className="text-center flex-1 max-w-[45%] border-t-2 pt-1.5 md:pt-2" style={{ borderColor: `${diplomaTextColor}45` }}>
-                                                <div className="font-bold text-[10px] md:text-base mb-0.5 leading-tight" style={{ color: diplomaTextColor }}>{diplomaDate}</div>
-                                                <div className="text-[6px] md:text-[8px] font-black uppercase opacity-60 tracking-wider" style={{ color: diplomaTextColor }}>Miejscowość i data</div>
-                                            </div>
-                                            <div className="text-center flex-1 max-w-[45%] border-t-2 pt-1.5 md:pt-2" style={{ borderColor: `${diplomaTextColor}45` }}>
-                                                <div className="font-bold text-[10px] md:text-base mb-0.5 leading-tight opacity-90" style={{ color: diplomaTextColor }}>{diplomaSignature}</div>
-                                                <div className="text-[6px] md:text-[8px] font-black uppercase opacity-60 tracking-wider" style={{ color: diplomaTextColor }}>Podpis Nauczyciela</div>
-                                            </div>
-                                        </div>
                                     </div>
-                                ) : (
-                                    /* WIDOK: GIRLANDA */
-                                    <div id="print-area" className="grid grid-cols-1 gap-12 print:block w-full flex flex-col items-center mt-4">
-                                        <div className="absolute top-4 left-4 bg-slate-900/80 text-amber-400 px-4 py-2 rounded-xl text-xs font-bold border border-slate-700 shadow-md print-hidden z-50">
-                                            <i className="ph-bold ph-eye"></i> Widzisz podgląd 1 litery. Drukarka wypluje wszystkie strony.
-                                        </div>
-                                        
-                                        {garlandText.split('').map((letter, idx) => (
-                                            <div key={idx} className={`${idx === 0 ? 'block' : 'hidden'} print:block page-break relative aspect-[0.707] h-full sm:h-auto sm:w-[60%] mx-auto flex items-center justify-center bg-transparent print:w-[210mm] print:h-[297mm]`}>
-                                                {renderGarlandShape(letter)}
+                                    <ScaledPreview orientation={design.orientation} maxHeight={land ? undefined : 720}>
+                                        <Diploma d={design} name={previewName} place={place} signature={signature} editable isPremium={isPremium}
+                                            onDesign={patch}
+                                            onName={series ? null : setStudentName}
+                                            onPlace={null}
+                                            onSignature={setSignature} />
+                                    </ScaledPreview>
+                                    {isGenerating && (
+                                        <div className="mt-3 flex items-center gap-2 text-sm text-indigo-200"><i className="ph-bold ph-spinner animate-spin"></i> Maluję grafikę, to trwa ok. 20–40 sekund…</div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* PANEL KROKÓW */}
+                            <div id="eg-panel" className="order-2 lg:order-1 min-w-0 scroll-mt-4">
+                                <div className="eb-card p-4 sm:p-5">
+                                    {step === 0 && (
+                                        <div className="space-y-4">
+                                            <div className="eb-note">
+                                                <span>ℹ️</span>
+                                                <div><b>Jak to działa:</b> wybierz okazję – teksty, kolory i ozdoby ustawią się same. Potem wpisz imię (albo wklej listę całej grupy), dopasuj wygląd i drukuj. Ozdobne tło malowane przez AI dodasz w kroku „Wygląd”.</div>
                                             </div>
-                                        ))}
+                                            <h2 className="text-base font-bold text-white">Na jaką okazję?</h2>
+                                            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-2 xl:grid-cols-3 gap-2">
+                                                {OCCASION_PRESETS.map(p => (
+                                                    <button key={p.id} onClick={() => applyOccasion(p)}
+                                                        className={`text-left rounded-xl border p-3 transition-colors ${design.occasionId === p.id ? 'border-indigo-400 bg-indigo-500/15' : 'border-slate-700 bg-slate-900/60 hover:border-slate-500'}`}>
+                                                        <div className="text-2xl leading-none mb-1.5">{p.emoji}</div>
+                                                        <div className="text-[13px] font-bold text-slate-100 leading-tight">{p.label}</div>
+                                                    </button>
+                                                ))}
+                                                <button onClick={startBlank} className="text-left rounded-xl border border-dashed border-slate-600 p-3 hover:border-slate-400 bg-transparent">
+                                                    <div className="text-2xl leading-none mb-1.5">✍️</div>
+                                                    <div className="text-[13px] font-bold text-slate-100 leading-tight">Własny dyplom</div>
+                                                </button>
+                                            </div>
+                                            <p className="text-xs text-slate-500">Szukasz girlandy z literami? Jest teraz w <a href="/magicletters.html" className="text-indigo-300 underline">MagicLetters</a>.</p>
+                                        </div>
+                                    )}
+
+                                    {step === 1 && (
+                                        <div className="space-y-4">
+                                            <h2 className="text-base font-bold text-white">Co ma być na dyplomie?</h2>
+                                            <div>
+                                                <label className="eb-label" htmlFor="eg-title">Tytuł</label>
+                                                <input id="eg-title" className="eb-field" value={design.title} onChange={e => patch({ title: e.target.value })} />
+                                            </div>
+                                            <div>
+                                                <label className="eb-label" htmlFor="eg-sub">Linijka nad imieniem</label>
+                                                <input id="eg-sub" className="eb-field" value={design.subtitle} placeholder="np. OTRZYMUJE" onChange={e => patch({ subtitle: e.target.value })} />
+                                            </div>
+
+                                            <div>
+                                                <span className="eb-label">Dla kogo?</span>
+                                                <div className="eb-segment" role="group">
+                                                    <button className="eb-segment__item" aria-pressed={nameMode === 'one'} onClick={() => setNameMode('one')}>Jedno dziecko</button>
+                                                    <button className="eb-segment__item" aria-pressed={nameMode === 'list'} onClick={() => setNameMode('list')}>Cała lista</button>
+                                                </div>
+                                            </div>
+                                            {nameMode === 'one' ? (
+                                                <div>
+                                                    <label className="eb-label" htmlFor="eg-name">Imię i nazwisko</label>
+                                                    <input id="eg-name" className="eb-field" value={studentName} placeholder="Zostaw puste, jeśli wpiszesz ręcznie długopisem" onChange={e => setStudentName(e.target.value)} />
+                                                </div>
+                                            ) : (
+                                                <div>
+                                                    <label className="eb-label" htmlFor="eg-names">Lista – jedno imię w linijce</label>
+                                                    <textarea id="eg-names" className="eb-field" rows={6} value={namesText} placeholder={'Ola Nowak\nKuba Wiśniewski\nZosia Kamińska'} onChange={e => { setNamesText(e.target.value); setPreviewIndex(0); }} />
+                                                    <p className="eb-hint mt-1.5">{names.length > 0 ? `${names.length} ${plural(names.length, 'dyplom', 'dyplomy', 'dyplomów')} – każdy na osobnej kartce.` : 'Wklej listę z dziennika albo arkusza.'} 🔒 Imiona zostają w tej karcie przeglądarki – nigdzie ich nie wysyłamy ani nie zapisujemy.{parseNames(namesText).length >= MAX_NAMES ? ` (najwyżej ${MAX_NAMES} naraz)` : ''}</p>
+                                                </div>
+                                            )}
+
+                                            <div>
+                                                <label className="eb-label" htmlFor="eg-reason">Za co?</label>
+                                                <textarea id="eg-reason" className="eb-field" rows={3} value={design.reason} onChange={e => patch({ reason: e.target.value })} />
+                                            </div>
+
+                                            <div className="grid grid-cols-1 gap-3">
+                                                <div>
+                                                    <label className="eb-label" htmlFor="eg-town">Miejscowość</label>
+                                                    <input id="eg-town" className="eb-field" value={town} placeholder="np. Kraków" onChange={e => setTown(e.target.value)} />
+                                                </div>
+                                                <div>
+                                                    <label className="eb-label" htmlFor="eg-date">Data</label>
+                                                    <div className="flex gap-2">
+                                                        <input id="eg-date" className="eb-field" value={dateText} onChange={e => setDateText(e.target.value)} />
+                                                        <button className="eb-btn eb-btn--icon eb-btn--quiet" title="Dzisiejsza data" aria-label="Wstaw dzisiejszą datę" onClick={() => setDateText(todayPl())}><i className="ph-bold ph-calendar-check"></i></button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label className="eb-label" htmlFor="eg-sign">Podpis</label>
+                                                <input id="eg-sign" className="eb-field" value={signature} placeholder="np. Wychowawczyni grupy Motylki" onChange={e => setSignature(e.target.value)} />
+                                            </div>
+                                            <label className="flex items-start gap-2 text-sm text-slate-300 cursor-pointer">
+                                                <input type="checkbox" className="mt-1 accent-indigo-500" checked={remember} onChange={e => setRemember(e.target.checked)} />
+                                                <span>Zapamiętaj miejscowość i podpis na tym urządzeniu</span>
+                                            </label>
+
+                                            <div className="flex gap-2 pt-2">{stepButton('Wstecz', () => goStep(0), false)}{stepButton('Dalej: wygląd', () => goStep(2))}</div>
+                                        </div>
+                                    )}
+
+                                    {step === 2 && (
+                                        <div className="space-y-5">
+                                            <div>
+                                                <span className="eb-label">Kartka</span>
+                                                <div className="eb-segment" role="group">
+                                                    <button className="eb-segment__item" aria-pressed={land} onClick={() => patch({ orientation: 'horizontal' })}><i className="ph-bold ph-rectangle"></i> Poziomo</button>
+                                                    <button className="eb-segment__item" aria-pressed={!land} onClick={() => patch({ orientation: 'vertical' })}><i className="ph-bold ph-rectangle rotate-90"></i> Pionowo</button>
+                                                </div>
+                                            </div>
+
+                                            <div>
+                                                <span className="eb-label">Czcionka</span>
+                                                <div className="grid grid-cols-3 gap-1.5">
+                                                    {FONTS.map(f => (
+                                                        <button key={f.id} onClick={() => patch({ font: f.id })} title={f.hint}
+                                                            className={`${f.id} rounded-lg border py-2 px-1 text-[15px] leading-tight ${design.font === f.id ? 'border-indigo-400 bg-indigo-500/15 text-white' : 'border-slate-700 bg-slate-900/60 text-slate-200 hover:border-slate-500'}`}>
+                                                            Dyplom<span className="block text-[10px] font-sans text-slate-400 mt-0.5" style={{ fontFamily: 'Plus Jakarta Sans, sans-serif' }}>{f.hint}</span>
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            <div>
+                                                <span className="eb-label">Tło dyplomu</span>
+                                                {design.image ? (
+                                                    <div className="rounded-xl border border-slate-700 bg-slate-900/60 p-3 space-y-3">
+                                                        <div className="flex items-center gap-3">
+                                                            <img src={design.image} alt="" className="w-14 h-14 rounded-lg object-cover bg-white" />
+                                                            <div className="flex-1 text-sm text-slate-300">{/^data:/.test(design.image) ? 'Twój obrazek' : 'Grafika AI'}</div>
+                                                            <button onClick={() => patch({ image: null, frame: 'double', panel: 0 })} className="eb-btn eb-btn--quiet"><i className="ph-bold ph-trash"></i> Usuń</button>
+                                                        </div>
+                                                        {lastAiAction && !/^data:/.test(design.image) && (
+                                                            <button onClick={repeatLastAi} disabled={isGenerating} className="eb-btn eb-btn--ghost eb-btn--block"><i className="ph-bold ph-arrows-clockwise"></i> Inny wariant {proNow() ? '' : '(z kodem PRO)'}</button>
+                                                        )}
+                                                        <div className="eb-segment" role="group" aria-label="Gdzie obrazek">
+                                                            {[['full_background', 'Całe tło'], ['bottom_corners', 'W rogach'], ['bottom_center', 'Na środku']].map(([id, label]) => (
+                                                                <button key={id} className="eb-segment__item" aria-pressed={design.imageLayout === id} onClick={() => changeImageLayout(id)}>{label}</button>
+                                                            ))}
+                                                        </div>
+                                                        <label className="block text-xs text-slate-400">Widoczność obrazka: {design.imageOpacity}%
+                                                            <input type="range" min="15" max="100" value={design.imageOpacity} onChange={e => patch({ imageOpacity: Number(e.target.value) })} className="w-full accent-indigo-500" />
+                                                        </label>
+                                                        <label className="block text-xs text-slate-400">Jasne pole pod tekstem: {design.panel}%
+                                                            <input type="range" min="0" max="95" value={design.panel} onChange={e => patch({ panel: Number(e.target.value) })} className="w-full accent-indigo-500" />
+                                                        </label>
+                                                    </div>
+                                                ) : (
+                                                    <div className="space-y-2">
+                                                        <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-3 xl:grid-cols-5 gap-1.5">
+                                                            {preset && (
+                                                                <button onClick={() => applyOccasion(preset, true)} className={`rounded-lg border p-2 text-center ${!design.themeId ? 'border-indigo-400 bg-indigo-500/15' : 'border-slate-700 bg-slate-900/60'}`}>
+                                                                    <div className="text-lg">{preset.deco.join('')}</div><div className="text-[10px] text-slate-300 mt-0.5 leading-tight">{preset.label}</div>
+                                                                </button>
+                                                            )}
+                                                            {THEMES.map(t => (
+                                                                <button key={t.id} onClick={() => patch({ themeId: t.id, bg: t.bgHex, border: t.borderHex, deco: t.elements })}
+                                                                    className={`rounded-lg border p-2 text-center ${design.themeId === t.id ? 'border-indigo-400 bg-indigo-500/15' : 'border-slate-700 bg-slate-900/60 hover:border-slate-500'}`}>
+                                                                    <div className="h-4 rounded mb-1" style={{ background: t.bgHex, border: `3px solid ${t.borderHex}` }}></div>
+                                                                    <div className="text-sm leading-none">{t.elements.join('')}</div>
+                                                                    <div className="text-[10px] text-slate-300 mt-0.5 leading-tight">{t.name}</div>
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                        <div className="eb-segment" role="group" aria-label="Ramka">
+                                                            {[['double', 'Ramka'], ['dashed', 'Kreski'], ['none', 'Bez ramki']].map(([id, label]) => (
+                                                                <button key={id} className="eb-segment__item" aria-pressed={design.frame === id} onClick={() => patch({ frame: id })}>{label}</button>
+                                                            ))}
+                                                        </div>
+                                                        <button className="eb-btn eb-btn--quiet eb-btn--block" onClick={() => patch({ deco: [] })}><i className="ph-bold ph-eraser"></i> Bez ozdób w rogach</button>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            <div className="rounded-xl border border-indigo-500/30 bg-indigo-500/5 p-4 space-y-3">
+                                                <div className="flex items-start justify-between gap-2">
+                                                    <div>
+                                                        <h3 className="text-sm font-bold text-white flex items-center gap-1.5"><i className="ph-bold ph-magic-wand text-indigo-300"></i> Ozdobne tło od AI</h3>
+                                                        <p className="text-xs text-slate-400 mt-0.5">{proNow() ? 'Z kodem PRO bez limitu.' : (window.EduBoxCore.getImageUsageCount() < 1 ? 'Pierwsza grafika za darmo.' : 'Darmowa grafika wykorzystana – kolejne z kodem PRO.')} Malowanie trwa ok. 30 s.</p>
+                                                    </div>
+                                                </div>
+                                                {preset && (
+                                                    <button onClick={paintOccasion} disabled={isGenerating} className="eb-btn eb-btn--primary eb-btn--block">{preset.emoji} Namaluj tło: {preset.label}</button>
+                                                )}
+                                                <div>
+                                                    <span className="text-xs text-slate-400 block mb-1.5">{preset ? 'albo ramka w stylu:' : 'Ramka w stylu:'}</span>
+                                                    <div className="grid grid-cols-3 gap-1.5">
+                                                        {FRAME_STYLES.map(st => (
+                                                            <button key={st.id} disabled={isGenerating} onClick={() => paintFrameStyle(st.id)} className="rounded-lg border border-slate-700 bg-slate-900/60 hover:border-slate-500 py-2 text-xs font-bold text-slate-200 disabled:opacity-50">{st.emoji} {st.label}</button>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                                <details className="group">
+                                                    <summary className="text-xs font-bold text-indigo-200 cursor-pointer select-none">Ilustracja z Twojego opisu</summary>
+                                                    <div className="mt-2 space-y-2">
+                                                        <input className="eb-field" value={aiPrompt} onChange={e => setAiPrompt(e.target.value)} placeholder="np. sowa w okularach czytająca książkę" />
+                                                        <div className="grid grid-cols-2 gap-1.5">
+                                                            {ART_STYLES.map(s => (
+                                                                <button key={s.id} onClick={() => setArtStyle(s.id)} className={`rounded-lg border py-1.5 text-xs font-bold ${artStyle === s.id ? 'border-indigo-400 bg-indigo-500/15 text-white' : 'border-slate-700 text-slate-300'}`}>{s.label}</button>
+                                                            ))}
+                                                        </div>
+                                                        <div className="eb-segment" role="group" aria-label="Gdzie ilustracja">
+                                                            {[['full_background', 'Całe tło'], ['bottom_corners', 'W rogach'], ['bottom_center', 'Na środku']].map(([id, label]) => (
+                                                                <button key={id} className="eb-segment__item" aria-pressed={design.imageLayout === id} onClick={() => patch({ imageLayout: id })}>{label}</button>
+                                                            ))}
+                                                        </div>
+                                                        <button onClick={paintIllustration} disabled={isGenerating} className="eb-btn eb-btn--ghost eb-btn--block"><i className="ph-bold ph-paint-brush"></i> Narysuj ilustrację</button>
+                                                    </div>
+                                                </details>
+                                                <button onClick={() => fileInputRef.current?.click()} className="eb-btn eb-btn--quiet eb-btn--block"><i className="ph-bold ph-upload-simple"></i> Wstaw własny obrazek (bez AI)</button>
+                                                <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileUpload} />
+                                            </div>
+
+                                            <details className="rounded-xl border border-slate-700 p-3">
+                                                <summary className="text-sm font-bold text-slate-200 cursor-pointer select-none">Kolory i wielkość liter</summary>
+                                                <div className="mt-3 space-y-4">
+                                                    {[['titleColor', 'Kolor tytułu'], ['textColor', 'Kolor imienia i treści']].map(([key, label]) => (
+                                                        <div key={key}>
+                                                            <span className="text-xs text-slate-400 block mb-1.5">{label}</span>
+                                                            <div className="flex flex-wrap gap-1.5 items-center">
+                                                                {INK_COLORS.map(c => (
+                                                                    <button key={c} aria-label={c} onClick={() => patch({ [key]: c })} className={`w-7 h-7 rounded-full border-2 ${design[key].toLowerCase() === c ? 'border-indigo-300 scale-110' : 'border-slate-600'}`} style={{ background: c }}></button>
+                                                                ))}
+                                                                <input type="color" value={design[key]} onChange={e => patch({ [key]: e.target.value })} className="w-8 h-8 bg-transparent cursor-pointer" aria-label="Dowolny kolor" />
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                    {!design.image && (
+                                                        <div>
+                                                            <span className="text-xs text-slate-400 block mb-1.5">Kolor tła i ramki</span>
+                                                            <div className="flex gap-3">
+                                                                <label className="flex items-center gap-2 text-xs text-slate-300">Tło <input type="color" value={design.bg} onChange={e => patch({ bg: e.target.value, themeId: null })} className="w-8 h-8 bg-transparent" /></label>
+                                                                <label className="flex items-center gap-2 text-xs text-slate-300">Ramka <input type="color" value={design.border} onChange={e => patch({ border: e.target.value, themeId: null })} className="w-8 h-8 bg-transparent" /></label>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                    {[['title', 'Tytuł', 28, 96], ['subtitle', 'Linijka nad imieniem', 12, 40], ['name', 'Imię', 24, 90], ['reason', 'Za co', 14, 40]].map(([key, label, min, max]) => (
+                                                        <label key={key} className="block text-xs text-slate-400">{label}: {design.sizes[key]} px
+                                                            <input type="range" min={min} max={max} value={design.sizes[key]} onChange={e => setSize(key, Number(e.target.value))} className="w-full accent-indigo-500" />
+                                                        </label>
+                                                    ))}
+                                                    {!design.image && (
+                                                        <label className="block text-xs text-slate-400">Jasne pole pod tekstem: {design.panel}%
+                                                            <input type="range" min="0" max="95" value={design.panel} onChange={e => patch({ panel: Number(e.target.value) })} className="w-full accent-indigo-500" />
+                                                        </label>
+                                                    )}
+                                                </div>
+                                            </details>
+
+                                            <div className="flex gap-2 pt-1">{stepButton('Wstecz', () => goStep(1), false)}{stepButton('Dalej: drukuj', () => goStep(3))}</div>
+                                        </div>
+                                    )}
+
+                                    {step === 3 && (
+                                        <div className="space-y-4">
+                                            <h2 className="text-base font-bold text-white">Gotowe do druku</h2>
+                                            <div className="rounded-xl bg-slate-900/70 border border-slate-700 p-3 text-sm text-slate-300 space-y-1">
+                                                <div><b className="text-white">{recipients.length}</b> {plural(recipients.length, 'dyplom', 'dyplomy', 'dyplomów')} · A4 {land ? 'poziomo' : 'pionowo'}</div>
+                                                {!series && !studentName.trim() && <div className="text-amber-300 text-xs">Bez imienia – zostanie linia do wpisania długopisem.</div>}
+                                                {!place && <div className="text-amber-300 text-xs">Bez miejscowości i daty – możesz je dopisać w kroku „Treść”.</div>}
+                                            </div>
+                                            <button onClick={executePrint} className="eb-btn eb-btn--primary eb-btn--lg eb-btn--block"><i className="ph-bold ph-printer"></i> Drukuj {series ? `(${names.length})` : ''}</button>
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <button onClick={exportPdf} disabled={!!exporting} className="eb-btn eb-btn--ghost">{exporting === 'pdf' ? <i className="ph-bold ph-spinner animate-spin"></i> : <i className="ph-bold ph-file-pdf"></i>} Pobierz PDF</button>
+                                                <button onClick={exportPng} disabled={!!exporting} className="eb-btn eb-btn--ghost">{exporting === 'png' ? <i className="ph-bold ph-spinner animate-spin"></i> : <i className="ph-bold ph-image"></i>} Obrazek PNG</button>
+                                            </div>
+                                            <p className="eb-hint">{series ? 'PDF zawiera wszystkie dyplomy z listy, obrazek PNG – ten widoczny w podglądzie.' : 'PDF i PNG przydadzą się do wysłania rodzicom albo do druku w punkcie ksero.'} W drukarce ustaw „Dopasuj do strony” albo skalę 100% i zaznacz „Grafika tła”.</p>
+                                            <div className="eb-divider"></div>
+                                            <button onClick={sharePattern} className="eb-btn eb-btn--quiet eb-btn--block"><i className="ph-bold ph-share-network"></i> Podziel się wzorem w Giełdzie</button>
+                                            <div className="flex gap-2">{stepButton('Wstecz', () => goStep(2), false)}<button onClick={() => { setStudentName(''); setNamesText(''); goStep(1); }} className="eb-btn eb-btn--ghost flex-1"><i className="ph-bold ph-plus"></i> Kolejny dyplom</button></div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* GIEŁDA */}
+                    {showGielda && (
+                        <div className="eg-screen fixed inset-0 z-[90] bg-black/60 flex items-end sm:items-center justify-center p-0 sm:p-6" onClick={() => setShowGielda(false)}>
+                            <div className="eb-card w-full sm:max-w-3xl max-h-[85vh] overflow-y-auto p-5 rounded-b-none sm:rounded-b-[var(--eb-r-lg)]" onClick={e => e.stopPropagation()} role="dialog" aria-label="Giełda wzorów">
+                                <div className="flex items-center justify-between mb-4">
+                                    <h2 className="text-lg font-bold text-white flex items-center gap-2"><i className="ph-bold ph-users-three text-indigo-300"></i> Giełda wzorów</h2>
+                                    <button onClick={() => setShowGielda(false)} className="eb-btn eb-btn--icon eb-btn--quiet" aria-label="Zamknij"><i className="ph-bold ph-x"></i></button>
+                                </div>
+                                <p className="text-sm text-slate-400 mb-4">Wzory udostępnione przez innych nauczycieli. Wczytujesz układ i grafikę – imię wpisujesz swoje.</p>
+                                {!user ? (
+                                    <p className="text-sm text-slate-400"><i className="ph-bold ph-spinner animate-spin"></i> Łączę z Giełdą…</p>
+                                ) : patterns.length === 0 ? (
+                                    <p className="text-sm text-slate-400">Na razie pusto – bądź pierwsza i podziel się swoim wzorem w kroku „Drukuj”.</p>
+                                ) : (
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                        {patterns.map(p => {
+                                            const garland = p.config?.activeTab === 'garland';
+                                            const img = p.config?.customImage;
+                                            return (
+                                                <button key={p.id} onClick={() => loadPattern(p)} className="text-left flex items-center gap-3 rounded-xl border border-slate-700 bg-slate-900/60 hover:border-indigo-400 p-2.5">
+                                                    <div className="w-14 h-10 rounded-md bg-slate-200 overflow-hidden flex-shrink-0 flex items-center justify-center text-lg">{img ? <img src={img} alt="" className="w-full h-full object-cover" loading="lazy" /> : (garland ? '🚩' : '📜')}</div>
+                                                    <div className="min-w-0">
+                                                        <div className="text-sm font-bold text-slate-100 truncate">{p.name || 'Wzór'}</div>
+                                                        <div className="text-[11px] text-slate-500">{garland ? 'Girlanda → MagicLetters' : (p.createdAt?.toDate ? p.createdAt.toDate().toLocaleDateString('pl-PL') : '')}</div>
+                                                    </div>
+                                                </button>
+                                            );
+                                        })}
                                     </div>
                                 )}
                             </div>
-
-                            <div className="absolute -bottom-6 md:-bottom-12 left-1/2 -translate-x-1/2 flex items-center justify-center gap-2 sm:gap-4 print-hidden z-50 w-[95%] sm:w-auto">
-                                <button onClick={sharePattern} className="bg-fuchsia-600 hover:bg-fuchsia-500 text-white px-4 sm:px-8 py-4 sm:py-5 rounded-2xl font-black text-[10px] sm:text-sm md:text-base tracking-widest flex items-center justify-center gap-2 shadow-[0_10px_40px_rgba(192,38,211,0.4)] transition-all btn-bounce uppercase whitespace-nowrap flex-1 sm:flex-none">
-                                    <i className="ph-bold ph-cloud-arrow-up text-xl md:text-2xl"></i><span>Do Biblioteki</span>
-                                </button>
-                                <button onClick={executePrint} className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 sm:px-10 py-4 sm:py-5 rounded-2xl font-black text-[10px] sm:text-sm md:text-base tracking-widest flex items-center justify-center gap-2 md:gap-3 shadow-[0_10px_40px_rgba(99,102,241,0.5)] transition-all btn-bounce uppercase whitespace-nowrap flex-1 sm:flex-none">
-                                    <i className="ph-bold ph-printer text-xl md:text-2xl"></i><span>Drukuj</span>
-                                </button>
-                            </div>
                         </div>
+                    )}
 
+                    {/* WYDRUK – wszystkie dyplomy, każdy na osobnej kartce (na ekranie ukryte) */}
+                    <div className="eg-print" style={{ display: 'none' }}>
+                        {recipients.map((n, i) => (
+                            <div key={i} className="eg-print-page">
+                                <Diploma d={design} name={n} place={place} signature={signature} editable={false} isPremium={isPremium} />
+                            </div>
+                        ))}
                     </div>
+
+                    {/* PDF / PNG – strony rysowane poza ekranem tylko na czas zapisu */}
+                    {exporting && (
+                        <div ref={exportRef} aria-hidden="true" style={{ position: 'fixed', left: -20000, top: 0, pointerEvents: 'none' }}>
+                            {(exporting === 'png' ? [previewName] : recipients).map((n, i) => (
+                                <div key={i} className="eg-export-page eg-exporting" style={{ width: PAGE[design.orientation].w, height: PAGE[design.orientation].h }}>
+                                    <Diploma d={design} name={n} place={place} signature={signature} editable={false} isPremium={isPremium} />
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
             );
         }
