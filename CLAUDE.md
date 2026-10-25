@@ -589,6 +589,10 @@ baner cookies drukujący się na każdej stronie (naprawione w `cookie-consent.j
 czarne pasy (`* { box-shadow:none }` w druku), reguła `.flex { display:block }` psująca wnętrze
 stron, siatka EduKomiksu w jednej kolumnie (szerokość wydruku < 768 px = brak `md:`).
 EduBajka: ilustracje 170 × 113 mm, tekst do ~110 słów = jedna kartka A4 na stronę.
+MagicLetters (25.10.2026): drukowała się tylko 1 strona, bo cała aplikacja siedzi w `h-screen overflow-hidden`
+(i `<main>` z `overflow-hidden`), a strona litery miała `height: 100vh` we flexie. Narzędzie z układem „ekran
+aplikacji” = w `@media print` zdejmij wysokość/overflow/flex z KAŻDEGO przodka wersji do druku (klasy `ml-app`,
+`ml-main`) i łam strony `break-after: page` na `:not(:last-child)`, nie `100vh`.
 
 **Service Worker (`service-worker.js`, v4 od 7.10.2026):** strony, skrypty, style i dane ZAWSZE
 najpierw z sieci (cache tylko offline), obrazki/czcionki z cache z odświeżaniem w tle, inne domeny

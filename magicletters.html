@@ -54,14 +54,25 @@
             100% { transform: translate(30px, 50px) scale(1.1); }
         }
 
-        /* Print Styles - Kriticzne dla działania aplikacji! */
+        /* Print Styles - Krytyczne dla działania aplikacji!
+           Ekran aplikacji to kontener h-screen + overflow-hidden (i <main> z overflow-hidden).
+           Bez zdjęcia tych ograniczeń drukarka widziała tylko jedną „wysokość ekranu”,
+           czyli pierwszą literę. W druku wszystko staje się zwykłym blokiem, a strony
+           łamie break-after (flex nie łamie stron w Chrome). */
+        @page { size: A4 portrait; margin: 1cm; }
         @media print {
-            body { background: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; margin: 0; padding: 0; overflow: visible !important; }
+            html, body { background: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; margin: 0 !important; padding: 0 !important; height: auto !important; overflow: visible !important; }
             .no-print { display: none !important; }
-            .print-container { background: white !important; padding: 0 !important; display: flex; flex-wrap: wrap; justify-content: center; width: 100% !important; overflow: visible !important; }
-            .letter-page { page-break-inside: avoid; page-break-after: always; display: flex; align-items: center; justify-content: center; width: 100%; height: 100vh; }
-            .half-page { width: 100%; padding: 0.5cm 0; page-break-inside: avoid; display: flex; align-items: center; justify-content: center; }
-            #root { height: auto !important; overflow: visible !important; }
+            #root, .ml-app, .ml-main, .print-container {
+                display: block !important; height: auto !important; min-height: 0 !important; max-height: none !important;
+                overflow: visible !important; position: static !important; width: 100% !important;
+                background: white !important; padding: 0 !important; margin: 0 !important;
+            }
+            .ml-print { display: block !important; width: 100%; }
+            .letter-page { display: flex; align-items: center; justify-content: center; width: 100%; height: 27.6cm; break-inside: avoid; page-break-inside: avoid; }
+            .letter-page:not(:last-child) { break-after: page; page-break-after: always; }
+            .half-page { display: flex; align-items: center; justify-content: center; width: 100%; height: 13.7cm; break-inside: avoid; page-break-inside: avoid; }
+            .half-page:nth-child(2n):not(:last-child) { break-after: page; page-break-after: always; }
         }
     </style>
 
@@ -502,7 +513,7 @@
             const characters = text.split('');
 
             return (
-                <div className="flex h-screen w-full bg-slate-950 text-slate-200 overflow-hidden font-sans relative">
+                <div className="ml-app flex h-screen w-full bg-slate-950 text-slate-200 overflow-hidden font-sans relative">
                     
                     {/* Auras rendering in background */}
                     <div className="aura-container no-print">
@@ -780,7 +791,7 @@
                     </aside>
 
                     {/* Main Workspace (Preview Area) */}
-                    <main className="flex-1 flex flex-col relative z-10 overflow-hidden">
+                    <main className="ml-main flex-1 flex flex-col relative z-10 overflow-hidden">
                         
                         {/* Live Preview Wrapper */}
                         <div className="flex-1 overflow-y-auto custom-scrollbar p-6 lg:p-12 print-container relative">
@@ -840,7 +851,7 @@
                             </div>
 
                             {/* Wersja do DRUKU A4 (Ukryta na ekranie) */}
-                            <div className="hidden print:block w-full z-50 bg-white">
+                            <div className="ml-print hidden print:block w-full z-50 bg-white">
                                 {characters.map((char, index) => {
                                     if (char === ' ') return null;
                                     let backgroundStyle = { backgroundColor: bgColor };
@@ -861,7 +872,7 @@
 
                                     return (
                                         <div key={`print-${index}`} className={lettersPerSheet === 1 ? 'letter-page' : 'half-page'}>
-                                            <div className="relative flex items-center justify-center overflow-hidden" style={{ ...backgroundStyle, clipPath: shape.clipPath, width: lettersPerSheet === 1 ? '18cm' : '12cm', height: lettersPerSheet === 1 ? '25cm' : '13cm', margin: lettersPerSheet === 2 ? '0 auto' : '0' }}>
+                                            <div className="relative flex items-center justify-center overflow-hidden" style={{ ...backgroundStyle, clipPath: shape.clipPath, width: lettersPerSheet === 1 ? '18cm' : '12cm', height: lettersPerSheet === 1 ? '25cm' : '12.8cm', margin: lettersPerSheet === 2 ? '0 auto' : '0' }}>
                                                 {/* Dodatkowy Wrapper dla pewności w druku */}
                                                 <div className="flex items-center justify-center w-full h-full z-10">
                                                     <span className="font-bold select-none" style={{ ...textStyle, fontSize: lettersPerSheet === 1 ? '400px' : '200px' }}>
