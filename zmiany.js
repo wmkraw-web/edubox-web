@@ -3,6 +3,29 @@
 // Najnowsze wpisy na początku tablicy.
 window.CO_NOWEGO = [
     {
+        "id": "2026-10-26-edugenerator-nowy-4-krokowy-kreator-dyplomow",
+        "date": "2026-10-26",
+        "tag": "Ulepszenie",
+        "title": "EduGenerator: nowy 4‑krokowy kreator dyplomów",
+        "description": "Nowy kreator w 4 krokach z dużym podglądem. Edycja tekstów bezpośrednio na dyplomie (także „Miejscowość i data”), stały A4 = podgląd/wydruk/PDF/PNG, druk całej listy imion, zapamiętywanie miejscowości i podpisu. Dyplom bez znaku wodnego.",
+        "link": "edugenerator.html"
+    },
+    {
+        "id": "2026-10-26-magicletters-gielda-wrocila-i-drukuje-wszystkie-litery",
+        "date": "2026-10-26",
+        "tag": "Poprawka",
+        "title": "MagicLetters: Giełda wróciła i drukuje wszystkie litery",
+        "description": "Przywrócono publikowanie na Giełdzie i podgląd listy prac. Druk obejmuje teraz wszystkie litery (1 lub 2 na A4), nie tylko pierwszą stronę.",
+        "link": "magicletters.html"
+    },
+    {
+        "id": "2026-10-26-baza-materialow-kody-pro-dzialaja-przy-pobieraniu",
+        "date": "2026-10-26",
+        "tag": "Poprawka",
+        "title": "Baza Materiałów: kody PRO działają przy pobieraniu",
+        "description": "Po aktywacji kodu KAWA- lub EDU- pakiety pobierają się bez błędu „nieważny kod”. Kod nie jest ponownie zużywany przy samym pobieraniu."
+    },
+    {
         "id": "2026-10-22-baza-materialow-nowe-sekcje-i-wygodny-podglad-pakietow",
         "date": "2026-10-22",
         "tag": "Ulepszenie",
