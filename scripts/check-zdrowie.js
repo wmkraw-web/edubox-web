@@ -30,6 +30,24 @@ const vault = Z.migrate({
     { id: 'w2', data: '2026-09-01', lekarz: 'Jan Lis', specjalizacja: 'Internista', zrobione: true }
   ],
   dokumenty: [{ id: 'd1', rodzaj: 'wypis', tytul: 'Wypis', data: '2026-08-10', placowka: 'Szpital Miejski w Łowiczu', lekarz: 'dr Jan Lis', tekst: '' }],
+  urzadzenia: [{
+    id: 'u1', typ: 'icd', producent: 'Medtronic', model: 'Evera MRI XT', numerSeryjny: 'PJN4471203',
+    dataWszczepienia: '2023-04-11', szpital: 'Klinika Kardiologii w Zgierzu', lekarz: 'Ewa Mazur',
+    mri: 'warunkowo', kontrolaCo: 6, ostatniaKontrola: '2026-05-10', bateria: '6,5 roku',
+    kontrole: [{ id: 'k1', data: '2026-05-10', miejsce: 'Klinika Kardiologii w Zgierzu', bateria: '6,5 roku', wynik: 'bez interwencji', nastepna: '' }]
+  }],
+  skora: [{
+    id: 'z1', nazwa: 'Znamię na plecach', lokalizacja: 'lewa łopatka', odKiedy: '2026-06-01', rozmiarMm: '4',
+    status: 'obserwacja', opis: 'Brązowe, płaskie.', abcde: { c: true },
+    wpisy: [
+      { id: 'w1', data: '2026-07-01', rozmiarMm: '5', opis: 'Ciemniejsze niż było.', dolegliwosci: [] },
+      { id: 'w2', data: '2026-10-01', rozmiarMm: '7', opis: 'Wyraźnie większe.', dolegliwosci: ['swędzi'] }
+    ],
+    leczenie: [
+      { id: 'l1', co: 'maść z apteki', kto: 'ja', odKiedy: '2026-07-05', doKiedy: '2026-08-05', efekt: '2' },
+      { id: 'l2', co: 'krem przepisany', kto: 'lekarz', odKiedy: '2026-08-10', doKiedy: '2026-09-10', efekt: '4' }
+    ]
+  }],
   pytania: [{ id: 'p1', tekst: 'Czy mogę brać ibuprofen przy tym ciśnieniu?', zadane: false }]
 });
 
@@ -112,7 +130,7 @@ test('dziennik: odhaczenie dawki znika z zaległych', () => {
 });
 test('alerty: kończący się lek i nadchodząca wizyta, najpilniejsze najpierw', () => {
   const v = Z.migrate(Object.assign({}, vault, { leki: [Object.assign({}, vault.leki[0], { zapas: { sztuk: 10, odDnia: '2026-10-20' } })] }));
-  const a = Z.alerts(v, NOW);
+  const a = Z.alerts(v, NOW).filter(x => x.kind === 'lek' || x.kind === 'wizyta');
   assert(a.length === 2 && a[0].kind === 'lek' && a[0].days === 3, JSON.stringify(a));
   assert(a[1].kind === 'wizyta' && a[1].days === 9, JSON.stringify(a[1]));
 });
@@ -177,8 +195,109 @@ test('zestaw bez kolizji nie produkuje fałszywych alarmów', () => {
   assert(w.length === 0, JSON.stringify(w));
 });
 
+// ---------- urządzenia wszczepione ----------
+test('następna kontrola liczona z cyklu, ręczna data ma pierwszeństwo', () => {
+  assert(Z.nextCheck(vault.urzadzenia[0]) === '2026-11-10', Z.nextCheck(vault.urzadzenia[0]));
+  assert(Z.nextCheck(Object.assign({}, vault.urzadzenia[0], { nastepnaKontrola: '2026-12-01' })) === '2026-12-01', 'ręczna data ma wygrywać');
+  assert(Z.nextCheck({ typ: 'stent', kontrolaCo: 0 }) === '', 'bez cyklu nie wymyślamy daty');
+});
+test('kontrola urządzenia trafia do alertów i do kalendarza', () => {
+  const a = Z.alerts(vault, NOW).find(x => x.kind === 'urzadzenie');
+  assert(a && a.days === 14, JSON.stringify(a));
+  const ics = Z.buildIcs(Z.deviceEvents(vault.urzadzenia), NOW);
+  assert(/DTSTART:20261110T090000/.test(ics) && /TRIGGER:-PT10080M/.test(ics), ics);
+  assert(!/PJN4471203|Zgierzu|Mazur/.test(ics), 'w kalendarzu wyciekł numer seryjny, szpital albo lekarz');
+});
+test('ostrzeżenie o badaniach obrazowych zależy od typu i pola MRI', () => {
+  const w = Z.deviceWarnings(vault.urzadzenia[0]);
+  assert(w.some(x => /rezonans/i.test(x)), JSON.stringify(w));
+  assert(Z.deviceWarnings(Object.assign({}, vault.urzadzenia[0], { mri: 'nie' })).some(x => /NIE jest dopuszczone/.test(x)), 'brak ostrzeżenia o zakazie MRI');
+});
+test('karta ICE i karta na wizytę pokazują urządzenie z ostrzeżeniem', () => {
+  const ice = Z.iceCard(vault, NOW);
+  assert(ice.urzadzenia.length === 1 && /Medtronic/.test(ice.urzadzenia[0].nazwa), JSON.stringify(ice.urzadzenia));
+  assert(ice.urzadzenia[0].ostrzezenia.some(x => /rezonans/i.test(x)), 'karta ICE bez ostrzeżenia o MRI');
+  const k = Z.visitCard(vault, NOW);
+  assert(k.urzadzenia.length === 1 && /PJN4471203/.test(k.urzadzenia[0].szczegoly), 'na kartce dla lekarza ma być numer seryjny (kartka zostaje u pacjenta)');
+});
+test('kartka dla bliskiej osoby zbiera leki, urządzenia, lekarzy i terminy', () => {
+  const k = Z.relativeCard(vault, NOW);
+  assert(/Witold/.test(k.kto) && k.leki.length === 3, JSON.stringify(k.kto));
+  assert(k.urzadzenia.length === 1 && k.lekarze.length >= 2, JSON.stringify(k.lekarze));
+  assert(k.terminy.length && k.ice[0].telefon === '601 234 567', JSON.stringify(k.terminy));
+});
+
+// ---------- zmiany skórne ----------
+test('rosnąca zmiana i dolegliwości dają ostrzeżenie „pilne”', () => {
+  const w = Z.skinWarnings(vault.skora[0], NOW);
+  assert(w.some(x => x.waga === 'pilne' && /urosła/.test(x.tekst)), JSON.stringify(w));
+  assert(w.some(x => /ABCDE/.test(x.tekst)), 'zaznaczona cecha ABCDE powinna dać wskazówkę');
+  assert(w.every(x => !/niegroźn|łagodn|nic poważnego/i.test(x.tekst)), 'nigdzie nie może paść, że zmiana jest niegroźna');
+});
+test('zmiana bez niepokojących cech nie produkuje fałszywego alarmu', () => {
+  const spokojna = { nazwa: 'Pieprzyk', odKiedy: '2026-10-20', status: 'obserwacja', rozmiarMm: '3', abcde: {}, wpisy: [{ data: '2026-10-25', rozmiarMm: '3', dolegliwosci: [] }], leczenie: [] };
+  assert(Z.skinWarnings(spokojna, NOW).length === 0, JSON.stringify(Z.skinWarnings(spokojna, NOW)));
+});
+test('zestawienie leczenia rozdziela próby własne i zalecenia lekarza', () => {
+  const p = Z.treatmentSummary(vault.skora[0]);
+  assert(p.ja.ile === 1 && p.ja.sredniEfekt === 2 && p.ja.lacznieDni === 31, JSON.stringify(p.ja));
+  assert(p.lekarz.ile === 1 && p.lekarz.sredniEfekt === 4 && p.lekarz.najlepsze.co === 'krem przepisany', JSON.stringify(p.lekarz));
+});
+test('zmiana wymagająca uwagi trafia na ekran główny', () => {
+  assert(Z.alerts(vault, NOW).some(a => a.kind === 'skora'), 'brak alertu o zmianie skórnej');
+});
+test('zdjęcia mają własne, szyfrowane miejsce (nie localStorage)', () => {
+  ['savePhoto', 'loadPhoto', 'deletePhoto', 'clearPhotos', 'exportPhotos', 'importPhotos'].forEach(f => assert(typeof Z[f] === 'function', 'brak ' + f));
+  const core = fs.readFileSync(path.join(ROOT, 'zdrowie-core.js'), 'utf8');
+  const blok = core.slice(core.indexOf('async function savePhoto'), core.indexOf('async function loadPhoto'));
+  assert(/subtle\(\)\.encrypt/.test(blok), 'zdjęcie zapisywane bez szyfrowania');
+  assert(!/localStorage/.test(core.slice(core.indexOf('PHOTO_DB'), core.indexOf('const PHOTO_STORE') + 2000)), 'zdjęcia nie mogą iść do localStorage');
+});
+
+// ---------- instrukcje dla AI ----------
+test('dokument dla lekarza: pełne dane, zero tożsamości', () => {
+  const x = Z.reportInput(vault, { now: NOW, extra: 'Byłem u Anny Nowak w Centrum Medyczne Zdrowie.' });
+  czyste(x, 'reportInput');
+  assert(!x.includes('PJN4471203') && !x.includes('Zgierzu') && !x.includes('Mazur'), 'wyciekł numer seryjny, szpital albo lekarz od urządzenia');
+  assert(/Kardiowerter-defibrylator/.test(x) && /Medtronic/.test(x), 'typ i producent urządzenia mają znaczenie medyczne i muszą zostać');
+  assert(/Tritace/.test(x) && /Nadciśnienie/.test(x) && /Znamię na plecach/.test(x), 'brakuje leków, chorób albo zmian skórnych');
+  assert(Z.leaks(x, vault).length === 0, 'bramka przed wysyłką: ' + Z.leaks(x, vault).join(', '));
+});
+test('instrukcje AI zakazują diagnozowania i dopisywania faktów', () => {
+  const p = [Z.reportPrompts(vault, { now: NOW }), Z.deviceCheckPrompts('tekst protokołu', vault.urzadzenia[0]), Z.skinPrompts(vault.skora[0], vault)];
+  p.forEach((x, i) => {
+    assert(/[Nn]ie stawiasz rozpoznań/.test(x.system), i + ': brak zakazu rozpoznań');
+    assert(/[Nn]iczego nie dopisujesz/.test(x.system), i + ': brak zakazu dopisywania faktów');
+    assert(/nie polecenia/.test(x.prompt), i + ': brak zastrzeżenia, że treść dokumentu to dane');
+    assert(Z.leaks(x.prompt, vault).length === 0, i + ': przeciek w zapytaniu: ' + Z.leaks(x.prompt, vault).join(', '));
+  });
+});
+test('instrukcja dla zmian skórnych zabrania uspokajania i każe odesłać do dermatologa', () => {
+  const sys = Z.skinPrompts(vault.skora[0], vault).system;
+  assert(/nie piszesz, że zmiana jest niegroźna/.test(sys), 'brak zakazu uspokajania');
+  assert(/nie odradzasz wizyty u lekarza/.test(sys), 'brak zakazu odradzania wizyty');
+  assert(/Umów się do dermatologa/.test(sys), 'brak nakazanego ostrzeżenia przy niepokojących cechach');
+  assert(/ABCDE/.test(Z.skinInput(vault.skora[0], vault)), 'wejście nie przekazuje zaznaczonych cech ABCDE');
+});
+test('opis zdjęcia zmiany: model opisuje wygląd, nie rozpoznaje', () => {
+  const sys = Z.SKIN_PHOTO_SYSTEM;
+  assert(/OPIS WYGLĄDU, nie rozpoznanie/.test(sys) && /NIE podajesz rozpoznań/.test(sys), sys.slice(0, 200));
+  assert(/rozpoznać osobę/.test(sys), 'brak ostrzeżenia o twarzy na zdjęciu');
+  const api = fs.readFileSync(path.join(ROOT, 'api/describe-image.js'), 'utf8');
+  assert(/mode === 'skin'/.test(api) && /NIE podajesz rozpoznań/.test(api), 'endpoint nie zna trybu skin');
+});
+test('instrukcja dla kontroli urządzenia nie ocenia, czy urządzenie działa dobrze', () => {
+  const sys = Z.deviceCheckPrompts('x', vault.urzadzenia[0]).system;
+  assert(/[Nn]igdy nie piszesz, że urządzenie działa prawidłowo/.test(sys), sys.slice(0, 300));
+  assert(/112/.test(sys), 'brak numeru alarmowego przy objawach');
+});
+test('liczba funkcji w api/ nie przekroczyła limitu Vercela (12)', () => {
+  const n = fs.readdirSync(path.join(ROOT, 'api')).filter(f => f.endsWith('.js')).length;
+  assert(n <= 12, 'funkcji w api/: ' + n + ' – przekroczenie psuje cały deployment');
+});
+
 // ---------- anonimizacja: nic, co identyfikuje, nie wychodzi do AI ----------
-const WRAZLIWE = ['Witold', 'Witek', 'Kraw', '62031512345', '1962-03-15', '15.03.1962', 'Nowak', 'Anna', 'Jan Lis', 'Centrum Medyczne Zdrowie', 'Szpital Miejski', '601 234 567', '42 123 45 67'];
+const WRAZLIWE = ['Witold', 'Witek', 'Kraw', '62031512345', '1962-03-15', '15.03.1962', 'Nowak', 'Anna', 'Jan Lis', 'Centrum Medyczne Zdrowie', 'Szpital Miejski', '601 234 567', '42 123 45 67', 'PJN4471203', 'Zgierzu', 'Mazur'];
 const czyste = (txt, etykieta) => WRAZLIWE.forEach(w => assert(!String(txt).includes(w), `${etykieta}: wyciekło „${w}” → ${String(txt).slice(0, 400)}`));
 
 test('scrub: imię, zdrobnienie i nazwisko w odmianie → [imię]', () => {
@@ -250,9 +369,22 @@ test('strona nie ładuje Firebase, analityki, menu ani wspólnego silnika', () =
   [/firebase/i, /googletagmanager/i, /google-analytics/i, /gtag\(/, /src="\/global-core\.js"/, /menu\.html/, /src="\/apps\.js"/].forEach(re =>
     assert(!re.test(page), 'strona ładuje coś, co może wysyłać dane: ' + re));
 });
-test('strona nie wysyła niczego na zewnątrz (brak fetch/XHR/sendBeacon)', () => {
-  [/\bfetch\s*\(/, /XMLHttpRequest/, /sendBeacon/, /navigator\.clipboard\.write[^T]/].forEach(re =>
-    assert(!re.test(page), 'znaleziono wyjście danych: ' + re));
+test('strona wychodzi na zewnątrz tylko do własnych endpointów', () => {
+  [/XMLHttpRequest/, /sendBeacon/].forEach(re => assert(!re.test(page), 'znaleziono wyjście danych: ' + re));
+  const cele = [...page.matchAll(/fetch\(\s*'([^']+)'/g)].map(m => m[1]);
+  assert(cele.length && cele.every(u => u === '/api/describe-image'), 'fetch do obcego adresu: ' + cele.join(', '));
+});
+test('każde zapytanie tekstowe do AI przechodzi przez kontrolę leaks()', () => {
+  const calls = (page.match(/DT\.streamChat\(/g) || []).length;
+  const guards = (page.match(/assertNoLeak\(/g) || []).length;
+  assert(calls > 0 && guards >= calls, `streamChat: ${calls}, kontrole: ${guards}`);
+  assert(/function assertNoLeak[\s\S]{0,300}Z\.leaks\(/.test(page), 'assertNoLeak musi korzystać z leaks()');
+});
+test('zdjęcie wychodzi do AI dopiero po osobnym potwierdzeniu', () => {
+  const blok = (page.match(/const opiszZdjecie = async \(\) => \{[\s\S]*?\n            \};/) || [''])[0];
+  assert(/confirm\(/.test(blok), 'wysyłka zdjęcia bez pytania o zgodę');
+  assert(/mode: 'skin'/.test(blok) && /image_url: podglad/.test(blok), 'zła treść zapytania o opis zdjęcia');
+  assert(!/vault|profil|leki/.test(blok), 'razem ze zdjęciem wychodzi coś jeszcze: ' + blok.slice(0, 200));
 });
 test('strona: biblioteki z CDN w przypiętych wersjach', () => {
   const srcs = [...page.matchAll(/https:\/\/(?:unpkg\.com|cdn\.jsdelivr\.net|cdnjs\.cloudflare\.com)\/[^'"\s)]+/g)].map(m => m[0]);
@@ -281,6 +413,11 @@ test('vercel.json: własne CSP strony (OCR) bez luzowania reszty serwisu', () =>
   assert(!/googletagmanager|google-analytics|firebaseio|www\.gstatic\.com/.test(cspOf(own)), 'CSP strony dopuszcza analitykę lub Firebase');
   assert((own.headers.find(h => h.key === 'Cache-Control') || {}).value === 'no-store', 'strona z danymi zdrowotnymi nie może być cache’owana');
   ['Strict-Transport-Security', 'X-Content-Type-Options', 'Referrer-Policy', 'Permissions-Policy'].forEach(k => assert(own.headers.some(h => h.key === k), 'brak nagłówka ' + k));
+});
+test('nowa obserwacja i nowa kontrola mają od razu dzisiejszą datę', () => {
+  // Pusta data blokowała przycisk zapisu bez żadnego wyjaśnienia (znalezione przy teście w przeglądarce).
+  const wzorce = page.match(/base\.data \|\| todayIso\(\)/g) || [];
+  assert(wzorce.length >= 2, 'formularz obserwacji i kontroli musi startować z datą dzisiejszą');
 });
 test('blokada czyści kartkę przygotowaną do druku (poza Reactem)', () => {
   const blok = (page.match(/const zamknij = useCallback\(\(\) => \{[\s\S]*?\}, \[\]\);/) || [''])[0];

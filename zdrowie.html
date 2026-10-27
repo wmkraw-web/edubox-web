@@ -145,6 +145,8 @@
                 try {
                     const j = JSON.parse(await f.text());
                     if (j.app !== Z.APP_ID) throw new Error('To nie jest kopia zapasowa aplikacji Moje Zdrowie.');
+                    // Zdjęcia z kopii trafiają do bazy od razu – są już zaszyfrowane, więc otworzy je dopiero hasło.
+                    if (Array.isArray(j.zdjecia) && j.zdjecia.length) { try { await Z.importPhotos(j.zdjecia); } catch (e) { /* bez zdjęć kartoteka i tak się otworzy */ } }
                     setImportBlob(j); setErr('');
                 } catch (x) { setErr(x.message || 'Nie udało się odczytać pliku.'); }
             };
@@ -277,8 +279,8 @@
                                 {alerty.map((a, i) => (
                                     <li key={i}>
                                         <button className="w-full flex items-center gap-3 text-left hover:bg-slate-800/60 rounded-xl px-2 py-2"
-                                            onClick={() => goto(a.kind === 'wizyta' ? 'wizyty' : 'leki')}>
-                                            <Icon name={a.kind === 'wizyta' ? 'stethoscope' : 'pill'} className="text-lg text-slate-400" />
+                                            onClick={() => goto({ wizyta: 'wizyty', urzadzenie: 'urzadzenia', skora: 'skora' }[a.kind] || 'leki')}>
+                                            <Icon name={{ wizyta: 'stethoscope', urzadzenie: 'heartbeat', skora: 'eye' }[a.kind] || 'pill'} className="text-lg text-slate-400" />
                                             <span className="flex-1 text-sm">{a.label}</span>
                                             <span className={`pill ${STATUS_PILL[a.status] || 'pill-ok'}`}>{dayWord(a.days)}</span>
                                         </button>
@@ -892,6 +894,12 @@
             const pytania = k.pytania.length
                 ? `<h2>Moje pytania</h2><ol>${k.pytania.map(p => `<li>${esc(p)}</li>`).join('')}</ol>`
                 : '';
+            const urzadzenia = k.urzadzenia.length
+                ? `<h2>Wszczepione urządzenia i implanty</h2><table><thead><tr><th>Urządzenie</th><th>Szczegóły</th></tr></thead><tbody>${k.urzadzenia.map(u => `<tr><td><strong>${esc(u.nazwa)}</strong></td><td>${esc(u.szczegoly)}</td></tr>`).join('')}</tbody></table><p><strong>Uwaga przed badaniami:</strong> ${esc(k.urzadzenia.flatMap(u => u.ostrzezenia).join(' '))}</p>`
+                : '';
+            const skora = k.skora.length
+                ? `<h2>Obserwowane zmiany skórne</h2>${k.skora.map(z => `<p><strong>${esc(z.nazwa)}</strong>${z.lokalizacja ? ' — ' + esc(z.lokalizacja) : ''}${z.odKiedy ? ', od ' + esc(z.odKiedy) : ''}: ${esc(z.opis)}${z.ostrzezenia.length ? ' <em>(' + esc(z.ostrzezenia.join(' ')) + ')</em>' : ''}</p>`).join('')}`
+                : '';
             const badania = k.ostatnieBadania.length
                 ? `<h2>Ostatnie badania</h2>${k.ostatnieBadania.map(b => `<p><strong>${esc(b.data)}</strong> — ${esc(b.opis)}${b.odstajace.length ? ': ' + b.odstajace.map(x => esc(x.parametr) + ' ' + esc(x.wynik)).join(', ') : ''}</p>`).join('')}`
                 : '';
@@ -902,8 +910,10 @@
                 </tbody></table>
                 <h2>Rozpoznania i choroby przewlekłe</h2>${akapity(k.choroby)}
                 <h2>Uczulenia i nietolerancje</h2>${akapity(k.alergie)}
+                ${urzadzenia}
                 <h2>Leki przyjmowane na stałe</h2>${leki}
                 ${badania}
+                ${skora}
                 ${k.uwagi ? '<h2>Dodatkowe informacje</h2>' + akapity(k.uwagi) : ''}
                 ${pytania}
                 <h2>Notatki z wizyty</h2><p class="linia"></p><p class="linia"></p><p class="linia"></p><p class="linia"></p><p class="linia"></p><p class="linia"></p>`;
@@ -912,7 +922,11 @@
         function iceCardHtml(vault) {
             const k = Z.iceCard(vault);
             const row = (a, b) => `<tr><th style="width:34%">${esc(a)}</th><td>${esc(b) || '—'}</td></tr>`;
+            const urzadzenia = k.urzadzenia.length
+                ? `<p style="border:2px solid #000;padding:8px"><strong>UWAGA — wszczepione urządzenia:</strong> ${esc(k.urzadzenia.map(u => u.nazwa).join('; '))}.<br>${esc(k.urzadzenia.flatMap(u => u.ostrzezenia).join(' '))}</p>`
+                : '';
             return `<h1>W razie wypadku (ICE)</h1>
+                ${urzadzenia}
                 <table><tbody>
                   ${row('Imię i nazwisko', k.imie)}
                   ${row('Wiek', k.wiek ? k.wiek + ' lat' : '')}
@@ -924,6 +938,36 @@
                 <h2>Powiadomić</h2>
                 <table><tbody>${k.ice.length ? k.ice.map(x => `<tr><th style="width:34%">${esc(x.kto)}</th><td>${esc(x.telefon)}</td></tr>`).join('') : '<tr><td>Nie wpisano kontaktów.</td></tr>'}</tbody></table>
                 <p><em>Kartka wydrukowana z prywatnej kartoteki — dane nie są nigdzie przechowywane poza urządzeniem właściciela.</em></p>`;
+        }
+
+        function relativeCardHtml(vault) {
+            const k = Z.relativeCard(vault);
+            const row = (a, b) => `<tr><th style="width:32%">${esc(a)}</th><td>${esc(b) || '—'}</td></tr>`;
+            const leki = k.leki.length
+                ? `<table><thead><tr><th>Lek</th><th>Dawkowanie</th><th>Na co</th></tr></thead><tbody>${k.leki.map(l => `<tr><td><strong>${esc(l.nazwa)}</strong></td><td>${esc(l.dawkowanie)}</td><td>${esc(l.naCo)}</td></tr>`).join('')}</tbody></table>`
+                : '<p>Brak leków na stałe.</p>';
+            const urzadzenia = k.urzadzenia.length
+                ? `<h2>Wszczepione urządzenia</h2><p style="border:2px solid #000;padding:8px"><strong>${esc(k.urzadzenia.map(u => u.nazwa).join('; '))}</strong><br>${esc(k.urzadzenia.flatMap(u => u.ostrzezenia).join(' '))}</p>`
+                : '';
+            const lekarze = k.lekarze.length
+                ? `<h2>Lekarze i placówki</h2><table><tbody>${k.lekarze.map(l => `<tr><th style="width:40%">${esc(l.kto)}</th><td>${esc([l.telefon, l.miejsce].filter(Boolean).join(', '))}</td></tr>`).join('')}</tbody></table>`
+                : '';
+            const terminy = k.terminy.length
+                ? `<h2>Najbliższe terminy</h2><ul>${k.terminy.map(t => `<li>${esc(t.co)} — ${esc(t.kiedy)}</li>`).join('')}</ul>`
+                : '';
+            const ice = k.ice.length
+                ? `<h2>Kogo powiadomić</h2><table><tbody>${k.ice.map(x => `<tr><th style="width:40%">${esc(x.kto)}</th><td>${esc(x.telefon)}</td></tr>`).join('')}</tbody></table>`
+                : '';
+            return `<h1>Co trzeba o mnie wiedzieć</h1>
+                <table><tbody>${row('Osoba', k.kto)}${row('Grupa krwi', k.grupaKrwi)}${row('Uczulenia', k.alergie)}</tbody></table>
+                <h2>Choroby przewlekłe</h2>${akapity(k.choroby)}
+                ${urzadzenia}
+                <h2>Leki przyjmowane na stałe</h2>${leki}
+                ${lekarze}
+                ${terminy}
+                ${ice}
+                ${k.uwagi ? '<h2>Inne ważne informacje</h2>' + akapity(k.uwagi) : ''}
+                <p><em>Kartka dla bliskiej osoby — wydruk z prywatnej kartoteki, stan na ${esc(Z.formatDatePl(Z.today()))}.</em></p>`;
         }
 
         function Kartki({ vault, save }) {
@@ -958,6 +1002,15 @@
                         <h3 className="font-extrabold mb-1">Karta ICE do portfela</h3>
                         <p className="text-sm text-slate-400 mb-4">Grupa krwi, uczulenia, leki i kontakt do bliskich — to, czego ratownik szuka najpierw.</p>
                         <button className="btn btn-main" onClick={() => drukuj(iceCardHtml(vault), 'Karta ICE')}><Icon name="printer" /> Drukuj / zapisz PDF</button>
+                    </div>
+
+                    <div className="card p-5">
+                        <h3 className="font-extrabold mb-1">Kartka dla bliskiej osoby</h3>
+                        <p className="text-sm text-slate-400 mb-4">Wszystko, co żona albo syn muszą wiedzieć, gdyby trzeba było zadzwonić po pomoc albo pojechać z Tobą do szpitala: leki, urządzenia, lekarze, najbliższe terminy. Ta kartka zostaje w domu.</p>
+                        <div className="flex flex-wrap gap-2">
+                            <button className="btn btn-main" onClick={() => drukuj(relativeCardHtml(vault), 'Co trzeba o mnie wiedzieć')}><Icon name="printer" /> Drukuj / zapisz PDF</button>
+                            <button className="btn btn-soft" onClick={() => DT.copyRich(relativeCardHtml(vault))}><Icon name="copy" /> Kopiuj</button>
+                        </div>
                     </div>
 
                     <div className="card p-5">
@@ -1070,12 +1123,14 @@
             const [nowe, setNowe] = useState({ label: '', pass: '', pass2: '' });
             const [komunikat, setKomunikat] = useState('');
             const [podgladAi, setPodgladAi] = useState(false);
+            const [udostepnij, setUdostepnij] = useState(false);
             const s = vault.settings;
             const setS = (k, v) => save(Object.assign({}, vault, { settings: Object.assign({}, s, { [k]: v }) }));
 
             const kopia = async () => {
                 const blob = await Z.seal(vault, session);
-                download(JSON.stringify(blob), `moje-zdrowie-kopia-${todayIso()}.json`, 'application/json');
+                const zdjecia = await Z.exportPhotos().catch(() => []);
+                download(JSON.stringify(Object.assign({}, blob, { zdjecia })), `moje-zdrowie-kopia-${todayIso()}.json`, 'application/json');
             };
             const kalendarzLekow = () => {
                 const ev = Z.medEvents(vault.leki, { alarmMinutes: Number(s.alarmMinutes) || 0 });
@@ -1145,6 +1200,15 @@
                     </div>
 
                     <div className="card p-5">
+                        <h3 className="font-extrabold mb-1">Osoba bliska</h3>
+                        <p className="text-sm text-slate-400 mb-4">
+                            Możesz dać żonie albo dziecku własne hasło i zaszyfrowaną kopię kartoteki. To pełny dostęp do kopii,
+                            bez synchronizacji — prowadzę przez to krok po kroku.
+                        </p>
+                        <button className="btn btn-main" onClick={() => setUdostepnij(true)}><Icon name="users" /> Udostępnij bliskiej osobie</button>
+                    </div>
+
+                    <div className="card p-5">
                         <h3 className="font-extrabold mb-1">Hasła ({session.slots.length} z 5)</h3>
                         <p className="text-sm text-slate-400 mb-4">Każde hasło otwiera te same dane. Dobrze mieć drugie, zapisane poza komputerem — zapomnianego nie da się odzyskać.</p>
                         <ul className="space-y-2 mb-4">
@@ -1168,14 +1232,18 @@
                         {komunikat ? <p className="mt-3 text-sm text-teal-300">{komunikat}</p> : null}
                     </div>
 
+                    {udostepnij ? <Udostepnianie vault={vault} session={session} setSession={setSession} onClose={() => setUdostepnij(false)} /> : null}
+
                     <div className="card p-5">
                         <h3 className="font-extrabold mb-1">Co zobaczyłaby sztuczna inteligencja</h3>
                         <p className="text-sm text-slate-400 mb-4">
-                            Na razie aplikacja <strong>nie wysyła niczego na zewnątrz</strong>. Tak wyglądałby opis przygotowany do wysłania —
-                            bez imienia, PESEL-u, lekarzy i placówek. Każda wysyłka i tak będzie go pokazywać przed wyjściem z komputera.
+                            Aplikacja wysyła coś na zewnątrz tylko wtedy, gdy sam klikniesz „Przygotuj dokument”, „Wyjaśnij protokół”,
+                            „Uporządkuj przebieg” albo „Poproś AI o opis zdjęcia”. Tak wygląda opis, który wtedy wychodzi — bez imienia,
+                            PESEL-u, lekarzy, placówek i numerów urządzeń. Przed każdą wysyłką możesz go zobaczyć, a osobna kontrola
+                            wstrzyma ją, gdyby cokolwiek się prześlizgnęło.
                         </p>
                         <button className="btn btn-soft" onClick={() => setPodgladAi(!podgladAi)}>{podgladAi ? 'Ukryj' : 'Pokaż'} podgląd</button>
-                        {podgladAi ? <pre className="mt-3 whitespace-pre-wrap text-xs bg-slate-950 border border-slate-800 rounded-xl p-3 text-slate-300">{Z.aiInput(vault) || '(za mało danych w profilu)'}</pre> : null}
+                        {podgladAi ? <pre className="mt-3 whitespace-pre-wrap text-xs bg-slate-950 border border-slate-800 rounded-xl p-3 text-slate-300 max-h-96 overflow-y-auto">{Z.reportInput(vault) || '(za mało danych w kartotece)'}</pre> : null}
                     </div>
 
                     <div className="card p-5 border-red-900/60">
@@ -1190,12 +1258,838 @@
             );
         }
 
+        // ---------- wspólne: wysyłka do AI z bramką i kartka A4 ----------
+        // Nic nie wychodzi z komputera, zanim leaks() nie potwierdzi, że w tekście nie został ślad tożsamości.
+        function assertNoLeak(text, vault) {
+            const found = Z.leaks(text, vault);
+            if (found.length) throw new Error('Wysyłka wstrzymana: w tekście dla AI zostało „' + found.join('”, „') + '”. Popraw zapis i spróbuj jeszcze raz.');
+        }
+
+        function AiKartka({ tytul, prompts, vault, model, onZapisz, dodatkowe }) {
+            const [stan, setStan] = useState('gotowe');
+            const [html, setHtml] = useState('');
+            const [err, setErr] = useState('');
+            const [podglad, setPodglad] = useState(false);
+            const kartkaRef = useRef(null);
+            const baseRef = useRef('');
+
+            const start = async () => {
+                setErr(''); setStan('pisze'); setHtml('');
+                try {
+                    assertNoLeak(prompts.prompt, vault);
+                    const r = await DT.streamChat(
+                        { system: prompts.system, prompt: prompts.prompt, model: model || 'strong', stream: true },
+                        (t) => setHtml(DT.normalize(t))
+                    );
+                    const gotowy = DT.markPlaceholders(DT.normalize(r.text));
+                    baseRef.current = gotowy;
+                    setHtml(gotowy);
+                    setStan('gotowe-tekst');
+                } catch (x) { setErr(x.message); setStan('gotowe'); }
+            };
+
+            const biezacy = () => (kartkaRef.current && kartkaRef.current.innerHTML) || html;
+
+            return (
+                <div className="space-y-4">
+                    <div className="flex flex-wrap gap-2">
+                        <button className="btn btn-main" disabled={stan === 'pisze'} onClick={start}>
+                            <Icon name={stan === 'pisze' ? 'circle-notch' : 'sparkle'} />
+                            {stan === 'pisze' ? 'Piszę…' : html ? 'Napisz jeszcze raz' : tytul}
+                        </button>
+                        {html && stan !== 'pisze' ? (
+                            <>
+                                <button className="btn btn-soft" onClick={() => DT.copyRich(biezacy())}><Icon name="copy" /> Kopiuj</button>
+                                <button className="btn btn-soft" onClick={() => DT.downloadDocx(biezacy(), fileSafe(tytul) + '.docx')}><Icon name="file-doc" /> Word</button>
+                                <button className="btn btn-soft" onClick={() => DT.printDoc(biezacy(), tytul)}><Icon name="printer" /> Drukuj / PDF</button>
+                                {onZapisz ? <button className="btn btn-soft" onClick={() => onZapisz(biezacy())}><Icon name="floppy-disk" /> Zapisz w kartotece</button> : null}
+                            </>
+                        ) : null}
+                        <button className="btn btn-soft sm:ml-auto !text-xs" onClick={() => setPodglad(!podglad)}>
+                            <Icon name="eye" /> {podglad ? 'Ukryj' : 'Pokaż'}, co pójdzie do AI
+                        </button>
+                    </div>
+
+                    {dodatkowe}
+
+                    {podglad ? (
+                        <div>
+                            <Note tone="info">Dokładnie ten tekst zostanie wysłany. Nie ma w nim imienia, PESEL-u, nazwisk lekarzy, placówek ani numerów urządzeń — przed wysyłką sprawdza to jeszcze raz osobna kontrola.</Note>
+                            <pre className="mt-2 whitespace-pre-wrap text-xs bg-slate-950 border border-slate-800 rounded-xl p-3 text-slate-300 max-h-80 overflow-y-auto">{prompts.prompt}</pre>
+                        </div>
+                    ) : null}
+
+                    {err ? <Note tone="stop">{err}</Note> : null}
+
+                    {html ? (
+                        <div>
+                            {stan === 'gotowe-tekst' ? <p className="text-xs text-slate-500 mb-2">Możesz poprawiać tekst wprost na kartce — eksport bierze to, co widzisz.</p> : null}
+                            <div
+                                ref={kartkaRef}
+                                className="doc-paper"
+                                contentEditable={stan === 'gotowe-tekst'}
+                                suppressContentEditableWarning
+                                dangerouslySetInnerHTML={{ __html: html }}
+                            />
+                        </div>
+                    ) : null}
+                </div>
+            );
+        }
+
+        // ---------- zakładka: Urządzenia (kardiowerter, stymulator, implanty) ----------
+        function DeviceCheckForm({ dev, check, onSave, onClose, onDelete, vault }) {
+            const [k, setK] = useState(() => {
+                const base = Object.assign(Z.newDeviceCheck(), check || {});
+                return Object.assign(base, { data: base.data || todayIso() });
+            });
+            const [progress, setProgress] = useState('');
+            const [err, setErr] = useState('');
+            const [analiza, setAnaliza] = useState(false);
+            const fileRef = useRef(null);
+            const set = (f, v) => setK(prev => Object.assign({}, prev, { [f]: v }));
+
+            const wczytaj = async (e) => {
+                const f = e.target.files && e.target.files[0];
+                e.target.value = '';
+                if (!f) return;
+                setErr(''); setProgress('Otwieram plik…');
+                try {
+                    const r = await readDocument(f, setProgress);
+                    const clean = String(r.text || '').replace(/\u0000/g, '').trim();
+                    if (clean.replace(/\s/g, '').length < 20) throw new Error('Nie udało się odczytać tekstu z tego pliku.');
+                    const info = Z.extractDocInfo(clean);
+                    setK(prev => Object.assign({}, prev, { tekst: clean, ocr: r.ocr, data: prev.data || info.data, miejsce: prev.miejsce || info.placowka }));
+                    setProgress(`Odczytano ${r.pages} ${Z.plural(r.pages, 'stronę', 'strony', 'stron')}${r.ocr ? ' (rozpoznawanie tekstu)' : ''}.`);
+                } catch (x) { setErr(x.message); setProgress(''); }
+            };
+
+            const historia = (dev.kontrole || []).filter(x => x.id !== k.id).slice(-2)
+                .map(x => `${Z.formatDatePl(x.data)}: ${x.wynik || '—'}${x.bateria ? `, bateria ${x.bateria}` : ''}`).join(' | ') || 'brak zapisanych';
+            const anon = k.tekst ? Z.anonymizeDocText(k.tekst, vault) : '';
+            const prompts = Z.deviceCheckPrompts(anon, dev, { historia });
+
+            return (
+                <Modal title="Kontrola urządzenia" onClose={onClose} wide>
+                    <div className="flex flex-wrap items-center gap-3">
+                        <button className="btn btn-soft" onClick={() => fileRef.current.click()}><Icon name="upload-simple" /> Wczytaj protokół (PDF, zdjęcie)</button>
+                        <input ref={fileRef} type="file" accept=".pdf,.docx,.txt,image/*" className="hidden" onChange={wczytaj} />
+                        {progress ? <span className="text-xs text-slate-400">{progress}</span> : null}
+                    </div>
+                    {err ? <div className="mt-3"><Note tone="stop">{err}</Note></div> : null}
+
+                    <div className="grid sm:grid-cols-2 gap-4 mt-5">
+                        <Field label="Data kontroli"><input type="date" className="field" value={k.data} onChange={e => set('data', e.target.value)} /></Field>
+                        <Field label="Gdzie"><input className="field" value={k.miejsce} onChange={e => set('miejsce', e.target.value)} placeholder="poradnia kontroli urządzeń" /></Field>
+                        <Field label="Stan baterii" hint="np. 6,5 roku, 2,78 V, ERI/ERT"><input className="field" value={k.bateria} onChange={e => set('bateria', e.target.value)} /></Field>
+                        <Field label="Następna kontrola"><input type="date" className="field" value={k.nastepna} onChange={e => set('nastepna', e.target.value)} /></Field>
+                    </div>
+                    <div className="mt-4 space-y-4">
+                        <Field label="Wynik / co powiedział lekarz"><textarea className="field" value={k.wynik} onChange={e => set('wynik', e.target.value)} /></Field>
+                        <Field label="Epizody i interwencje urządzenia" hint="np. liczba epizodów, wyładowania, stymulacja ATP"><textarea className="field" value={k.interwencje} onChange={e => set('interwencje', e.target.value)} /></Field>
+                    </div>
+
+                    {k.tekst ? (
+                        <div className="mt-5 rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
+                            <div className="flex items-center justify-between gap-3">
+                                <h3 className="font-extrabold text-sm">Wyjaśnij protokół prostym językiem</h3>
+                                <button className="btn btn-soft !py-1.5 !text-xs" onClick={() => setAnaliza(!analiza)}>{analiza ? 'Ukryj' : 'Pokaż'}</button>
+                            </div>
+                            <p className="text-xs text-slate-400 mt-1">AI objaśni skróty i jednostki z protokołu i wypisze pytania na następną wizytę. Nie ocenia, czy urządzenie działa dobrze — to robi poradnia.</p>
+                            {analiza ? <div className="mt-4"><AiKartka tytul="Wyjaśnij protokół" prompts={prompts} vault={vault} /></div> : null}
+                        </div>
+                    ) : null}
+
+                    <div className="flex flex-wrap gap-2 mt-6">
+                        <button className="btn btn-main" disabled={!k.data} onClick={() => onSave(k)}><Icon name="check" /> Zapisz kontrolę</button>
+                        <button className="btn btn-soft" onClick={onClose}>Anuluj</button>
+                        {check && onDelete ? <button className="btn btn-danger sm:ml-auto" onClick={() => { if (confirm('Usunąć tę kontrolę?')) onDelete(check.id); }}>Usuń</button> : null}
+                    </div>
+                </Modal>
+            );
+        }
+
+        function DeviceForm({ dev, isNew, onSave, onClose, onDelete, vault }) {
+            const [u, setU] = useState(() => Object.assign(Z.newDevice(), dev || {}));
+            const [kontrola, setKontrola] = useState(null);
+            const set = (k, v) => setU(prev => Object.assign({}, prev, { [k]: v }));
+            const typ = Z.deviceType(u);
+            const nastepna = Z.nextCheck(u);
+
+            const zapiszKontrole = (k) => {
+                const sa = u.kontrole || [];
+                const next = sa.some(x => x.id === k.id) ? sa.map(x => x.id === k.id ? k : x) : [...sa, k];
+                const najnowsza = next.slice().sort((a, b) => String(a.data).localeCompare(String(b.data))).pop();
+                setU(prev => Object.assign({}, prev, {
+                    kontrole: next,
+                    ostatniaKontrola: (najnowsza && najnowsza.data) || prev.ostatniaKontrola,
+                    nastepnaKontrola: (najnowsza && najnowsza.nastepna) || prev.nastepnaKontrola,
+                    bateria: (najnowsza && najnowsza.bateria) || prev.bateria
+                }));
+                setKontrola(null);
+            };
+
+            return (
+                <Modal title={isNew ? 'Nowe urządzenie' : Z.deviceLabel(u)} onClose={onClose} wide>
+                    <div className="grid sm:grid-cols-2 gap-4">
+                        <Field label="Rodzaj">
+                            <select className="field" value={u.typ} onChange={e => {
+                                const t = Z.TYPY_URZADZEN.find(x => x.id === e.target.value);
+                                setU(prev => Object.assign({}, prev, { typ: e.target.value, kontrolaCo: prev.kontrolaCo || (t && t.kontrolaCo) || 0 }));
+                            }}>
+                                {Z.TYPY_URZADZEN.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
+                            </select>
+                        </Field>
+                        <Field label="Własna nazwa (opcjonalnie)"><input className="field" value={u.nazwa} onChange={e => set('nazwa', e.target.value)} placeholder={typ.label} /></Field>
+                        <Field label="Producent" hint="Trafia do AI — ma znaczenie przy badaniach obrazowych"><input className="field" value={u.producent} onChange={e => set('producent', e.target.value)} placeholder="np. Medtronic, Biotronik" /></Field>
+                        <Field label="Model"><input className="field" value={u.model} onChange={e => set('model', e.target.value)} /></Field>
+                        <Field label="Numer seryjny" hint="Zostaje w przeglądarce, do AI nie trafia"><input className="field" value={u.numerSeryjny} onChange={e => set('numerSeryjny', e.target.value)} /></Field>
+                        <Field label="Data wszczepienia"><input type="date" className="field" value={u.dataWszczepienia} onChange={e => set('dataWszczepienia', e.target.value)} /></Field>
+                        <Field label="Ośrodek wszczepiający"><input className="field" value={u.szpital} onChange={e => set('szpital', e.target.value)} /></Field>
+                        <Field label="Lekarz prowadzący"><input className="field" value={u.lekarz} onChange={e => set('lekarz', e.target.value)} /></Field>
+                        <Field label="Rezonans magnetyczny (MRI)" hint="Z karty urządzenia od producenta">
+                            <select className="field" value={u.mri} onChange={e => set('mri', e.target.value)}>
+                                {Z.MRI.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
+                            </select>
+                        </Field>
+                        <Field label="Kontrola co ile miesięcy"><input type="number" min="0" max="60" className="field" value={u.kontrolaCo} onChange={e => set('kontrolaCo', Number(e.target.value) || 0)} /></Field>
+                        <Field label="Ostatnia kontrola"><input type="date" className="field" value={u.ostatniaKontrola} onChange={e => set('ostatniaKontrola', e.target.value)} /></Field>
+                        <Field label="Następna kontrola" hint={!u.nastepnaKontrola && nastepna ? `Policzona z cyklu: ${Z.formatDatePl(nastepna)}` : ''}>
+                            <input type="date" className="field" value={u.nastepnaKontrola} onChange={e => set('nastepnaKontrola', e.target.value)} />
+                        </Field>
+                    </div>
+                    <div className="mt-4 space-y-4">
+                        <Field label="Wskazanie / dlaczego wszczepione"><input className="field" value={u.wskazanie} onChange={e => set('wskazanie', e.target.value)} /></Field>
+                        <Field label="Uwagi"><textarea className="field" value={u.uwagi} onChange={e => set('uwagi', e.target.value)} /></Field>
+                    </div>
+
+                    <div className="mt-5">
+                        <Note tone="warn">
+                            <strong>Na kartkach do druku i na karcie ICE:</strong>
+                            <ul className="mt-2 space-y-1 list-disc pl-5">{Z.deviceWarnings(u).map((w, i) => <li key={i}>{w}</li>)}</ul>
+                        </Note>
+                    </div>
+
+                    <div className="mt-5 rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
+                        <div className="flex items-center justify-between mb-3">
+                            <h3 className="font-extrabold text-sm">Kontrole ({(u.kontrole || []).length})</h3>
+                            <button className="btn btn-soft !py-1.5 !text-xs" onClick={() => setKontrola(Z.newDeviceCheck())}><Icon name="plus" /> Dodaj kontrolę</button>
+                        </div>
+                        {(u.kontrole || []).length ? (
+                            <div className="space-y-2">
+                                {(u.kontrole || []).slice().sort((a, b) => String(b.data).localeCompare(String(a.data))).map(k => (
+                                    <button key={k.id} className="w-full text-left rounded-xl border border-slate-800 bg-slate-950 p-3 hover:border-slate-700" onClick={() => setKontrola(k)}>
+                                        <div className="text-sm font-bold">{Z.formatDatePl(k.data) || 'bez daty'}{k.miejsce ? ' · ' + k.miejsce : ''}</div>
+                                        <div className="text-xs text-slate-400 mt-0.5">{[k.bateria ? 'bateria: ' + k.bateria : '', k.wynik].filter(Boolean).join(' · ') || 'bez opisu'}</div>
+                                    </button>
+                                ))}
+                            </div>
+                        ) : <p className="text-sm text-slate-500">Brak zapisanych kontroli. Po każdej wizycie wczytaj protokół — AI objaśni, co w nim jest.</p>}
+                    </div>
+
+                    <label className="flex items-center gap-2 mt-4 text-sm">
+                        <input type="checkbox" className="w-4 h-4 accent-teal-400" checked={u.aktywne !== false} onChange={e => set('aktywne', e.target.checked)} />
+                        Urządzenie jest nadal wszczepione
+                    </label>
+
+                    <div className="flex flex-wrap gap-2 mt-6">
+                        <button className="btn btn-main" onClick={() => onSave(u)}><Icon name="check" /> Zapisz</button>
+                        <button className="btn btn-soft" onClick={onClose}>Anuluj</button>
+                        {onDelete ? <button className="btn btn-danger sm:ml-auto" onClick={() => { if (confirm('Usunąć to urządzenie z kartoteki?')) onDelete(u.id); }}>Usuń</button> : null}
+                    </div>
+
+                    {kontrola ? <DeviceCheckForm dev={u} check={(u.kontrole || []).some(x => x.id === kontrola.id) ? kontrola : null} vault={vault}
+                        onSave={zapiszKontrole} onClose={() => setKontrola(null)}
+                        onDelete={(id) => { setU(prev => Object.assign({}, prev, { kontrole: (prev.kontrole || []).filter(x => x.id !== id) })); setKontrola(null); }} /> : null}
+                </Modal>
+            );
+        }
+
+        function Urzadzenia({ vault, save }) {
+            const [edit, setEdit] = useState(null);
+            const lista = vault.urzadzenia.filter(u => u.aktywne !== false);
+            const dawne = vault.urzadzenia.filter(u => u.aktywne === false);
+
+            const zapisz = (u) => {
+                const exists = vault.urzadzenia.some(x => x.id === u.id);
+                save(Object.assign({}, vault, { urzadzenia: exists ? vault.urzadzenia.map(x => x.id === u.id ? u : x) : [...vault.urzadzenia, u] }));
+                setEdit(null);
+            };
+            const usun = (id) => { save(Object.assign({}, vault, { urzadzenia: vault.urzadzenia.filter(x => x.id !== id) })); setEdit(null); };
+            const doKalendarza = () => {
+                const ev = Z.deviceEvents(vault.urzadzenia);
+                if (!ev.length) return alert('Żadne urządzenie nie ma wyliczonej daty kontroli.');
+                download(Z.buildIcs(ev), 'kontrole-urzadzen.ics', 'text/calendar;charset=utf-8');
+            };
+
+            return (
+                <div className="space-y-5">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                        <h2 className="text-2xl font-extrabold">Urządzenia i implanty</h2>
+                        <div className="flex gap-2">
+                            {lista.length ? <button className="btn btn-soft" onClick={doKalendarza}><Icon name="calendar-plus" /> Kontrole do kalendarza</button> : null}
+                            <button className="btn btn-main" onClick={() => setEdit(Z.newDevice())}><Icon name="plus" /> Dodaj urządzenie</button>
+                        </div>
+                    </div>
+
+                    {lista.length ? (
+                        <div className="space-y-3">
+                            {lista.map(u => {
+                                const data = Z.nextCheck(u);
+                                const d = data ? Z.daysUntil(data) : null;
+                                return (
+                                    <div key={u.id} className="card p-4">
+                                        <button className="w-full text-left" onClick={() => setEdit(u)}>
+                                            <div className="flex items-start justify-between gap-3">
+                                                <div className="min-w-0">
+                                                    <div className="font-extrabold">{Z.deviceLabel(u)}</div>
+                                                    <div className="text-xs text-slate-400 mt-0.5">
+                                                        {u.dataWszczepienia ? 'wszczepione ' + Z.formatDatePl(u.dataWszczepienia) : 'bez daty wszczepienia'}
+                                                        {u.bateria ? ' · bateria: ' + u.bateria : ''}
+                                                        {u.kontrolaCo ? ` · kontrola co ${u.kontrolaCo} mies.` : ''}
+                                                    </div>
+                                                </div>
+                                                {d != null ? <span className={`pill ${d < 0 ? 'pill-stop' : d <= 60 ? 'pill-sprawdz' : 'pill-ok'} shrink-0`}>kontrola {dayWord(d)}</span> : null}
+                                            </div>
+                                        </button>
+                                        <div className="mt-3 text-xs text-amber-200/90 border-t border-slate-800 pt-3">
+                                            {Z.deviceWarnings(u).map((w, i) => <p key={i}>⚠️ {w}</p>)}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    ) : (
+                        <div className="card p-6 text-center text-sm text-slate-400">
+                            <p className="mb-3">Nie masz wpisanych urządzeń ani implantów.</p>
+                            <p className="text-xs">Kardiowerter, stymulator, pompa, zastawka, endoproteza — wszystko, o czym musi wiedzieć ratownik i radiolog.</p>
+                        </div>
+                    )}
+
+                    {dawne.length ? (
+                        <details className="card p-4">
+                            <summary className="cursor-pointer text-sm font-bold text-slate-400">Usunięte / wymienione ({dawne.length})</summary>
+                            <div className="mt-3 space-y-2">
+                                {dawne.map(u => <button key={u.id} className="w-full text-left text-sm text-slate-400 hover:text-slate-200" onClick={() => setEdit(u)}>{Z.deviceLabel(u)}</button>)}
+                            </div>
+                        </details>
+                    ) : null}
+
+                    {edit ? <DeviceForm dev={edit} isNew={!vault.urzadzenia.some(x => x.id === edit.id)} vault={vault}
+                        onSave={zapisz} onClose={() => setEdit(null)} onDelete={vault.urzadzenia.some(x => x.id === edit.id) ? usun : null} /> : null}
+                </div>
+            );
+        }
+
+        // ---------- zakładka: Skóra ----------
+        // Zdjęcie przerysowujemy na canvas: to usuwa dane EXIF (w tym miejsce zrobienia zdjęcia),
+        // zmniejsza plik i prostuje orientację z telefonu.
+        const FOTO_MAX = 1280;
+        async function photoFromFile(file) {
+            if (!/^image\//.test(file.type)) throw new Error('To nie jest zdjęcie.');
+            let bitmap;
+            try { bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' }); }
+            catch (e) { throw new Error('Nie udało się otworzyć zdjęcia. Jeśli to HEIC z iPhone’a, zapisz je jako JPG.'); }
+            const skala = Math.min(1, FOTO_MAX / Math.max(bitmap.width, bitmap.height));
+            const c = document.createElement('canvas');
+            c.width = Math.round(bitmap.width * skala);
+            c.height = Math.round(bitmap.height * skala);
+            c.getContext('2d').drawImage(bitmap, 0, 0, c.width, c.height);
+            bitmap.close && bitmap.close();
+            return { dataUrl: c.toDataURL('image/jpeg', 0.82), szerokosc: c.width, wysokosc: c.height };
+        }
+
+        function Zdjecie({ id, session, alt, className }) {
+            const [src, setSrc] = useState('');
+            useEffect(() => {
+                let zywy = true;
+                if (!id) { setSrc(''); return; }
+                Z.loadPhoto(id, session).then(d => { if (zywy) setSrc(d); }).catch(() => { if (zywy) setSrc(''); });
+                return () => { zywy = false; };
+            }, [id, session]);
+            if (!id) return null;
+            return src
+                ? <img src={src} alt={alt || 'Zdjęcie zmiany'} className={className || 'rounded-xl border border-slate-800'} />
+                : <div className={`rounded-xl border border-slate-800 bg-slate-900 grid place-items-center text-xs text-slate-500 ${className || ''}`} style={{ minHeight: '120px' }}>wczytuję zdjęcie…</div>;
+        }
+
+        function SkinEntryForm({ spot, entry, isNew, session, vault, onSave, onClose, onDelete }) {
+            const [w, setW] = useState(() => {
+                const base = Object.assign(Z.newSkinEntry(), entry || {});
+                return Object.assign(base, { data: base.data || todayIso() });
+            });
+            const [podglad, setPodglad] = useState('');
+            const [busy, setBusy] = useState('');
+            const [err, setErr] = useState('');
+            const fileRef = useRef(null);
+            const set = (k, v) => setW(prev => Object.assign({}, prev, { [k]: v }));
+
+            useEffect(() => {
+                if (!w.zdjecieId) return;
+                Z.loadPhoto(w.zdjecieId, session).then(setPodglad).catch(() => setPodglad(''));
+            }, [w.zdjecieId, session]);
+
+            const wczytajZdjecie = async (e) => {
+                const f = e.target.files && e.target.files[0];
+                e.target.value = '';
+                if (!f) return;
+                setErr(''); setBusy('Przygotowuję zdjęcie…');
+                try {
+                    const foto = await photoFromFile(f);
+                    const id = w.zdjecieId || Z.uid();
+                    await Z.savePhoto(id, foto.dataUrl, session);
+                    setPodglad(foto.dataUrl);
+                    set('zdjecieId', id);
+                    setBusy('');
+                } catch (x) { setErr(x.message); setBusy(''); }
+            };
+
+            // Zdjęcie wychodzi z komputera TYLKO po osobnym kliknięciu — i tylko ono, bez żadnych innych danych.
+            const opiszZdjecie = async () => {
+                if (!podglad) return;
+                if (!confirm('Zdjęcie zostanie wysłane do modelu AI, żeby opisał, co na nim widać.\n\nWysyłane jest samo zdjęcie — bez imienia i bez reszty kartoteki. Dane o miejscu i czasie zrobienia zdjęcia zostały już z niego usunięte.\n\nWysłać?')) return;
+                setErr(''); setBusy('AI ogląda zdjęcie…');
+                try {
+                    const res = await fetch('/api/describe-image', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ mode: 'skin', image_url: podglad })
+                    });
+                    const j = await res.json();
+                    if (!res.ok) throw new Error(j.error || 'Nie udało się opisać zdjęcia.');
+                    set('aiOpis', j.description || '');
+                    setBusy('');
+                } catch (x) { setErr(x.message); setBusy(''); }
+            };
+
+            const przelaczDolegliwosc = (d) => set('dolegliwosci', (w.dolegliwosci || []).includes(d)
+                ? w.dolegliwosci.filter(x => x !== d)
+                : [...(w.dolegliwosci || []), d]);
+
+            return (
+                <Modal title={isNew ? 'Nowa obserwacja' : 'Obserwacja z ' + (Z.formatDatePl(w.data) || '—')} onClose={onClose} wide>
+                    <div className="grid sm:grid-cols-2 gap-4">
+                        <Field label="Data"><input type="date" className="field" value={w.data} onChange={e => set('data', e.target.value)} /></Field>
+                        <Field label="Rozmiar (mm)" hint="Zmierz linijką w najszerszym miejscu"><input className="field" value={w.rozmiarMm} onChange={e => set('rozmiarMm', e.target.value)} inputMode="decimal" /></Field>
+                    </div>
+
+                    <div className="mt-4">
+                        <span className="lbl">Dolegliwości</span>
+                        <div className="flex flex-wrap gap-2">
+                            {Z.DOLEGLIWOSCI.map(d => (
+                                <button key={d} className="tab" aria-pressed={(w.dolegliwosci || []).includes(d)} onClick={() => przelaczDolegliwosc(d)}>{d}</button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <Field label="Co widzisz / co się zmieniło">
+                        <textarea className="field mt-4" value={w.opis} onChange={e => set('opis', e.target.value)} placeholder="np. ciemniejsza niż miesiąc temu, brzeg po lewej rozmyty" />
+                    </Field>
+
+                    <div className="mt-5 rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
+                        <div className="flex flex-wrap items-center gap-2">
+                            <button className="btn btn-soft" onClick={() => fileRef.current.click()}><Icon name="camera" /> {w.zdjecieId ? 'Zmień zdjęcie' : 'Dodaj zdjęcie'}</button>
+                            <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={wczytajZdjecie} />
+                            {podglad ? <button className="btn btn-soft" disabled={!!busy} onClick={opiszZdjecie}><Icon name="sparkle" /> Poproś AI o opis zdjęcia</button> : null}
+                            {w.zdjecieId ? <button className="btn btn-danger !py-1.5 !text-xs" onClick={async () => { await Z.deletePhoto(w.zdjecieId); setPodglad(''); set('zdjecieId', ''); }}>Usuń zdjęcie</button> : null}
+                            {busy ? <span className="text-xs text-slate-400">{busy}</span> : null}
+                        </div>
+                        <p className="text-xs text-slate-500 mt-2">
+                            Zdjęcie jest zmniejszane i zapisywane zaszyfrowane na tym urządzeniu — razem z datą i miejscem wykonania,
+                            które usuwamy z pliku. Do AI trafia tylko wtedy, gdy klikniesz powyżej. Kadruj samą zmianę, bez twarzy.
+                        </p>
+                        {podglad ? <img src={podglad} alt="Zdjęcie zmiany" className="mt-3 rounded-xl border border-slate-800 max-h-72" /> : null}
+                        {w.aiOpis ? (
+                            <div className="mt-3">
+                                <span className="lbl">Opis zdjęcia od AI</span>
+                                <p className="text-sm text-slate-300 bg-slate-950 border border-slate-800 rounded-xl p-3">{w.aiOpis}</p>
+                                <button className="text-xs underline text-slate-500 hover:text-slate-300 mt-1" onClick={() => set('aiOpis', '')}>Usuń opis</button>
+                            </div>
+                        ) : null}
+                    </div>
+
+                    {err ? <div className="mt-3"><Note tone="stop">{err}</Note></div> : null}
+
+                    <div className="flex flex-wrap gap-2 mt-6">
+                        <button className="btn btn-main" disabled={!w.data} onClick={() => onSave(w)}><Icon name="check" /> Zapisz obserwację</button>
+                        <button className="btn btn-soft" onClick={onClose}>Anuluj</button>
+                        {onDelete ? <button className="btn btn-danger sm:ml-auto" onClick={() => { if (confirm('Usunąć tę obserwację?')) onDelete(w.id); }}>Usuń</button> : null}
+                    </div>
+                </Modal>
+            );
+        }
+
+        function TreatmentRow({ t, onChange, onDelete }) {
+            const set = (k, v) => onChange(Object.assign({}, t, { [k]: v }));
+            return (
+                <div className="rounded-xl border border-slate-800 bg-slate-950 p-3 space-y-3">
+                    <div className="flex gap-2">
+                        <input className="field" value={t.co} onChange={e => set('co', e.target.value)} placeholder="np. maść z apteki, krem sterydowy" />
+                        <button className="btn btn-danger !py-1.5 !px-3 shrink-0" onClick={onDelete} aria-label="Usuń">×</button>
+                    </div>
+                    <div className="grid sm:grid-cols-4 gap-2">
+                        <select className="field" value={t.kto} onChange={e => set('kto', e.target.value)}>
+                            <option value="ja">zastosowałem sam</option>
+                            <option value="lekarz">zalecił lekarz</option>
+                        </select>
+                        <input type="date" className="field" value={t.odKiedy} onChange={e => set('odKiedy', e.target.value)} title="od kiedy" />
+                        <input type="date" className="field" value={t.doKiedy} onChange={e => set('doKiedy', e.target.value)} title="do kiedy" />
+                        <select className="field" value={t.efekt} onChange={e => set('efekt', e.target.value)}>
+                            <option value="">efekt: nie oceniam</option>
+                            <option value="0">0 — bez zmian</option>
+                            <option value="1">1 — ledwie</option>
+                            <option value="2">2 — trochę</option>
+                            <option value="3">3 — zauważalnie</option>
+                            <option value="4">4 — wyraźnie</option>
+                            <option value="5">5 — ustąpiła</option>
+                        </select>
+                    </div>
+                    <input className="field" value={t.uwagi} onChange={e => set('uwagi', e.target.value)} placeholder="uwagi: jak stosowane, co się działo" />
+                </div>
+            );
+        }
+
+        function SkinSpotForm({ spot, isNew, session, vault, onSave, onClose, onDelete }) {
+            const [z, setZ] = useState(() => Object.assign(Z.newSkinSpot(), spot || {}));
+            const [wpis, setWpis] = useState(null);
+            const [analiza, setAnaliza] = useState(false);
+            const set = (k, v) => setZ(prev => Object.assign({}, prev, { [k]: v }));
+            const ostrzezenia = Z.skinWarnings(z);
+            const podsum = Z.treatmentSummary(z);
+            const wpisy = Z.sortedEntries(z);
+
+            const zapiszWpis = (w) => {
+                const sa = z.wpisy || [];
+                setZ(prev => Object.assign({}, prev, { wpisy: sa.some(x => x.id === w.id) ? sa.map(x => x.id === w.id ? w : x) : [...sa, w] }));
+                setWpis(null);
+            };
+            const usunWpis = async (id) => {
+                const w = (z.wpisy || []).find(x => x.id === id);
+                if (w && w.zdjecieId) { try { await Z.deletePhoto(w.zdjecieId); } catch (e) { /* brak zdjęcia nie blokuje usunięcia wpisu */ } }
+                setZ(prev => Object.assign({}, prev, { wpisy: (prev.wpisy || []).filter(x => x.id !== id) }));
+                setWpis(null);
+            };
+            const setLeczenie = (i, t) => set('leczenie', z.leczenie.map((x, j) => j === i ? t : x));
+
+            return (
+                <Modal title={isNew ? 'Nowa zmiana skórna' : (z.nazwa || 'Zmiana skórna')} onClose={onClose} wide>
+                    <div className="grid sm:grid-cols-2 gap-4">
+                        <Field label="Nazwa robocza"><input className="field" value={z.nazwa} onChange={e => set('nazwa', e.target.value)} placeholder="np. znamię na plecach" autoFocus /></Field>
+                        <Field label="Umiejscowienie"><input className="field" value={z.lokalizacja} onChange={e => set('lokalizacja', e.target.value)} placeholder="np. lewa łopatka" /></Field>
+                        <Field label="Od kiedy ją widzisz"><input type="date" className="field" value={z.odKiedy} onChange={e => set('odKiedy', e.target.value)} /></Field>
+                        <Field label="Rozmiar na początku (mm)"><input className="field" value={z.rozmiarMm} onChange={e => set('rozmiarMm', e.target.value)} inputMode="decimal" /></Field>
+                        <Field label="Status">
+                            <select className="field" value={z.status} onChange={e => set('status', e.target.value)}>
+                                {Z.STATUSY_SKORA.map(x => <option key={x.id} value={x.id}>{x.label}</option>)}
+                            </select>
+                        </Field>
+                    </div>
+                    <Field label="Opis początkowy"><textarea className="field mt-4" value={z.opis} onChange={e => set('opis', e.target.value)} placeholder="kształt, kolor, czy wystaje, czy swędzi" /></Field>
+
+                    <div className="mt-5 rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
+                        <h3 className="font-extrabold text-sm mb-1">Lista ABCDE</h3>
+                        <p className="text-xs text-slate-400 mb-3">
+                            Zaznacz, co pasuje do tej zmiany. To nie jest test ani rozpoznanie — tylko znana lista cech,
+                            które są powodem, żeby pokazać zmianę dermatologowi.
+                        </p>
+                        <div className="space-y-2">
+                            {Z.ABCDE.map(x => (
+                                <label key={x.id} className="flex items-start gap-3 text-sm cursor-pointer">
+                                    <input type="checkbox" className="w-4 h-4 mt-0.5 accent-teal-400" checked={!!z.abcde[x.id]}
+                                        onChange={e => set('abcde', Object.assign({}, z.abcde, { [x.id]: e.target.checked }))} />
+                                    <span><strong>{x.label}</strong><span className="block text-xs text-slate-400">{x.opis}</span></span>
+                                </label>
+                            ))}
+                        </div>
+                    </div>
+
+                    {ostrzezenia.length ? (
+                        <div className="mt-4 space-y-2">
+                            {ostrzezenia.map((o, i) => <Note key={i} tone={o.waga === 'pilne' ? 'stop' : 'warn'}>{o.tekst}</Note>)}
+                        </div>
+                    ) : null}
+
+                    <div className="mt-5 rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
+                        <div className="flex items-center justify-between mb-3">
+                            <h3 className="font-extrabold text-sm">Obserwacje ({wpisy.length})</h3>
+                            <button className="btn btn-soft !py-1.5 !text-xs" onClick={() => setWpis(Z.newSkinEntry())}><Icon name="plus" /> Dodaj obserwację</button>
+                        </div>
+                        {wpisy.length ? (
+                            <div className="grid sm:grid-cols-2 gap-3">
+                                {wpisy.map(w => (
+                                    <button key={w.id} className="text-left rounded-xl border border-slate-800 bg-slate-950 p-3 hover:border-slate-700" onClick={() => setWpis(w)}>
+                                        <div className="text-sm font-bold">{Z.formatDatePl(w.data) || 'bez daty'}{w.rozmiarMm ? ` · ${w.rozmiarMm} mm` : ''}</div>
+                                        {(w.dolegliwosci || []).length ? <div className="text-xs text-amber-200/80 mt-0.5">{w.dolegliwosci.join(', ')}</div> : null}
+                                        {w.opis ? <div className="text-xs text-slate-400 mt-1">{w.opis}</div> : null}
+                                        <Zdjecie id={w.zdjecieId} session={session} className="mt-2 rounded-lg border border-slate-800 max-h-40" />
+                                    </button>
+                                ))}
+                            </div>
+                        ) : <p className="text-sm text-slate-500">Brak obserwacji. Zdjęcie co kilka tygodni z tej samej odległości pokaże, czy zmiana rośnie.</p>}
+                    </div>
+
+                    <div className="mt-5 rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
+                        <div className="flex items-center justify-between mb-1">
+                            <h3 className="font-extrabold text-sm">Leczenie ({(z.leczenie || []).length})</h3>
+                            <button className="btn btn-soft !py-1.5 !text-xs" onClick={() => set('leczenie', [...(z.leczenie || []), Object.assign(Z.newTreatment(), { odKiedy: todayIso() })])}><Icon name="plus" /> Dodaj</button>
+                        </div>
+                        <p className="text-xs text-slate-400 mb-3">Osobno to, co zastosowałeś sam, i to, co zalecił lekarz — żeby dało się potem porównać.</p>
+                        <div className="space-y-3">
+                            {(z.leczenie || []).map((t, i) => (
+                                <TreatmentRow key={t.id} t={t} onChange={(nt) => setLeczenie(i, nt)} onDelete={() => set('leczenie', z.leczenie.filter((_, j) => j !== i))} />
+                            ))}
+                        </div>
+                        {podsum.ja.ile || podsum.lekarz.ile ? (
+                            <div className="mt-4 grid sm:grid-cols-2 gap-3 text-sm">
+                                {[['Moje próby', podsum.ja], ['Zalecone przez lekarza', podsum.lekarz]].map(([tytul, d]) => (
+                                    <div key={tytul} className="rounded-xl border border-slate-800 bg-slate-950 p-3">
+                                        <div className="font-bold">{tytul}</div>
+                                        <div className="text-xs text-slate-400 mt-1">
+                                            {d.ile} {Z.plural(d.ile, 'sposób', 'sposoby', 'sposobów')}
+                                            {d.lacznieDni != null ? ` · łącznie ${Z.dni(d.lacznieDni)}` : ''}
+                                            {d.sredniEfekt != null ? ` · średnia ocena ${d.sredniEfekt}/5` : ''}
+                                        </div>
+                                        {d.najlepsze ? <div className="text-xs text-teal-300 mt-1">najwyżej oceniasz: {d.najlepsze.co} ({d.najlepsze.efekt}/5)</div> : null}
+                                    </div>
+                                ))}
+                            </div>
+                        ) : null}
+                    </div>
+
+                    <div className="mt-5 rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
+                        <div className="flex items-center justify-between">
+                            <h3 className="font-extrabold text-sm">Uporządkuj przebieg przed wizytą</h3>
+                            <button className="btn btn-soft !py-1.5 !text-xs" onClick={() => setAnaliza(!analiza)}>{analiza ? 'Ukryj' : 'Pokaż'}</button>
+                        </div>
+                        <p className="text-xs text-slate-400 mt-1">AI ułoży przebieg z dat i Twoich zapisów, zestawi leczenie i wypisze pytania. Nie nazwie zmiany i nie powie, że jest niegroźna — tego nie da się ocenić ze zdjęcia.</p>
+                        {analiza ? <div className="mt-4"><AiKartka tytul="Uporządkuj przebieg" prompts={Z.skinPrompts(z, vault)} vault={vault} /></div> : null}
+                    </div>
+
+                    <div className="flex flex-wrap gap-2 mt-6">
+                        <button className="btn btn-main" disabled={!z.nazwa.trim() && !z.lokalizacja.trim()} onClick={() => onSave(z)}><Icon name="check" /> Zapisz</button>
+                        <button className="btn btn-soft" onClick={onClose}>Anuluj</button>
+                        {onDelete ? <button className="btn btn-danger sm:ml-auto" onClick={() => { if (confirm('Usunąć tę zmianę razem ze zdjęciami?')) onDelete(z.id); }}>Usuń</button> : null}
+                    </div>
+
+                    {wpis ? <SkinEntryForm spot={z} entry={wpis} isNew={!(z.wpisy || []).some(x => x.id === wpis.id)} session={session} vault={vault}
+                        onSave={zapiszWpis} onClose={() => setWpis(null)}
+                        onDelete={(z.wpisy || []).some(x => x.id === wpis.id) ? usunWpis : null} /> : null}
+                </Modal>
+            );
+        }
+
+        function Skora({ vault, save, session }) {
+            const [edit, setEdit] = useState(null);
+            const aktywne = vault.skora.filter(z => z.status !== 'zagojona' && z.status !== 'usunieta');
+            const zamkniete = vault.skora.filter(z => z.status === 'zagojona' || z.status === 'usunieta');
+
+            const zapisz = (z) => {
+                const exists = vault.skora.some(x => x.id === z.id);
+                save(Object.assign({}, vault, { skora: exists ? vault.skora.map(x => x.id === z.id ? z : x) : [...vault.skora, z] }));
+                setEdit(null);
+            };
+            const usun = async (id) => {
+                const z = vault.skora.find(x => x.id === id);
+                for (const w of ((z && z.wpisy) || [])) {
+                    if (w.zdjecieId) { try { await Z.deletePhoto(w.zdjecieId); } catch (e) { /* brak zdjęcia nie blokuje usunięcia */ } }
+                }
+                save(Object.assign({}, vault, { skora: vault.skora.filter(x => x.id !== id) }));
+                setEdit(null);
+            };
+
+            const Karta = ({ z }) => {
+                const ostrz = Z.skinWarnings(z);
+                const pilne = ostrz.filter(o => o.waga === 'pilne').length;
+                const ostatni = Z.sortedEntries(z).slice(-1)[0];
+                return (
+                    <button className="card w-full text-left p-4 hover:border-slate-700" onClick={() => setEdit(z)}>
+                        <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0 flex-1">
+                                <div className="font-extrabold">{z.nazwa || 'Zmiana skórna'}</div>
+                                <div className="text-xs text-slate-400 mt-0.5">
+                                    {z.lokalizacja ? z.lokalizacja : 'bez umiejscowienia'}
+                                    {z.odKiedy ? ' · od ' + Z.formatDatePl(z.odKiedy) : ''}
+                                    {` · ${(z.wpisy || []).length} ${Z.plural((z.wpisy || []).length, 'obserwacja', 'obserwacje', 'obserwacji')}`}
+                                </div>
+                                {ostatni && ostatni.rozmiarMm ? <div className="text-xs text-slate-500 mt-0.5">ostatni pomiar: {ostatni.rozmiarMm} mm</div> : null}
+                            </div>
+                            {ostatni && ostatni.zdjecieId ? <Zdjecie id={ostatni.zdjecieId} session={session} className="rounded-lg border border-slate-800 w-20 h-20 object-cover shrink-0" /> : null}
+                        </div>
+                        {pilne ? <div className="mt-2 text-xs text-red-300">⚠️ {ostrz.find(o => o.waga === 'pilne').tekst}</div> : null}
+                    </button>
+                );
+            };
+
+            return (
+                <div className="space-y-5">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                        <h2 className="text-2xl font-extrabold">Zmiany skórne</h2>
+                        <button className="btn btn-main" onClick={() => setEdit(Object.assign(Z.newSkinSpot(), { odKiedy: todayIso() }))}><Icon name="plus" /> Dodaj zmianę</button>
+                    </div>
+
+                    <Note tone="info">
+                        Dziennik obserwacji: zdjęcia, pomiary i to, co stosowałeś. Zdjęcia są zaszyfrowane na tym urządzeniu.
+                        <strong> Aplikacja nie ocenia, co to za zmiana</strong> — tego nie da się stwierdzić ze zdjęcia. Pomaga zauważyć, że coś się zmienia, i pokazać to lekarzowi z datami.
+                    </Note>
+
+                    {aktywne.length ? <div className="space-y-2">{aktywne.map(z => <Karta key={z.id} z={z} />)}</div>
+                        : <div className="card p-6 text-center text-sm text-slate-400">Brak obserwowanych zmian.</div>}
+
+                    {zamkniete.length ? (
+                        <details className="card p-4">
+                            <summary className="cursor-pointer text-sm font-bold text-slate-400">Zakończone ({zamkniete.length})</summary>
+                            <div className="mt-3 space-y-2">{zamkniete.map(z => <Karta key={z.id} z={z} />)}</div>
+                        </details>
+                    ) : null}
+
+                    {edit ? <SkinSpotForm spot={edit} isNew={!vault.skora.some(x => x.id === edit.id)} session={session} vault={vault}
+                        onSave={zapisz} onClose={() => setEdit(null)} onDelete={vault.skora.some(x => x.id === edit.id) ? usun : null} /> : null}
+                </div>
+            );
+        }
+
+        // ---------- zakładka: Analiza (dokument dla lekarza) ----------
+        function Analiza({ vault, save }) {
+            const [extra, setExtra] = useState('');
+            const prompts = useMemo(() => Z.reportPrompts(vault, { extra }), [vault, extra]);
+            const ile = {
+                leki: vault.leki.filter(m => m.aktywny !== false).length,
+                urzadzenia: vault.urzadzenia.filter(u => u.aktywne !== false).length,
+                dokumenty: vault.dokumenty.filter(d => d.tekst).length,
+                skora: vault.skora.filter(z => z.status !== 'zagojona' && z.status !== 'usunieta').length,
+                pytania: vault.pytania.filter(q => !q.zadane).length
+            };
+            const pusto = !Object.values(ile).some(Boolean) && !vault.profil.choroby;
+
+            const zapiszJakoDokument = (html) => {
+                const d = Object.assign(Z.newDoc(), {
+                    rodzaj: 'inne', tytul: 'Karta informacyjna pacjenta', data: todayIso(),
+                    tekst: DT.plainText(html), uwagi: 'Dokument przygotowany w aplikacji przed wizytą'
+                });
+                save(Object.assign({}, vault, { dokumenty: [...vault.dokumenty, d] }));
+                alert('Zapisano w zakładce Dokumenty.');
+            };
+
+            return (
+                <div className="space-y-5">
+                    <h2 className="text-2xl font-extrabold">Dokument dla lekarza</h2>
+                    <Note tone="info">
+                        AI zbiera wszystko, co masz w kartotece — choroby, uczulenia, leki, wszczepione urządzenia,
+                        ostatnie wyniki, obserwowane zmiany i Twoje pytania — i układa to w jedną kartkę do wydrukowania.
+                        <strong> Nie stawia rozpoznań i nie ocenia wyników</strong>, tylko porządkuje to, co wpisałeś.
+                    </Note>
+
+                    <div className="card p-4">
+                        <h3 className="text-sm font-extrabold uppercase tracking-wider text-slate-400 mb-3">Co wejdzie do dokumentu</h3>
+                        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-center">
+                            {[['Leki', ile.leki, 'pill'], ['Urządzenia', ile.urzadzenia, 'heartbeat'], ['Dokumenty', ile.dokumenty, 'folders'], ['Zmiany skórne', ile.skora, 'eye'], ['Pytania', ile.pytania, 'question']].map(([label, n, ikona]) => (
+                                <div key={label} className="rounded-xl border border-slate-800 bg-slate-950 p-3">
+                                    <Icon name={ikona} className="text-lg text-slate-500" />
+                                    <div className="text-xl font-extrabold text-teal-300">{n}</div>
+                                    <div className="text-[11px] text-slate-500">{label}</div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {pusto ? (
+                        <Note tone="warn">Kartoteka jest jeszcze pusta — uzupełnij profil i leki, inaczej dokument nie będzie miał z czego powstać.</Note>
+                    ) : null}
+
+                    <Field label="Co dopisać od siebie" hint="np. od dwóch tygodni duszność przy wchodzeniu na piętro">
+                        <textarea className="field" value={extra} onChange={e => setExtra(e.target.value)} />
+                    </Field>
+
+                    <AiKartka tytul="Przygotuj dokument" prompts={prompts} vault={vault} model="strong" onZapisz={zapiszJakoDokument} />
+                </div>
+            );
+        }
+
+        // ---------- udostępnianie bliskiej osobie ----------
+        function Udostepnianie({ vault, session, setSession, onClose }) {
+            const [krok, setKrok] = useState(1);
+            const [dane, setDane] = useState({ label: '', pass: '', pass2: '' });
+            const [err, setErr] = useState('');
+            const [busy, setBusy] = useState(false);
+            const [nowaSesja, setNowaSesja] = useState(null);
+
+            const dodajHaslo = async () => {
+                setErr(''); setBusy(true);
+                try {
+                    if (dane.pass !== dane.pass2) throw new Error('Hasła się różnią.');
+                    const next = await Z.addPassword(session, dane.pass, dane.label || 'Osoba bliska');
+                    setSession(next);
+                    setNowaSesja(next);
+                    setKrok(2);
+                } catch (x) { setErr(x.message); } finally { setBusy(false); }
+            };
+
+            const pobierzKopie = async () => {
+                setBusy(true);
+                try {
+                    const blob = await Z.seal(vault, nowaSesja || session);
+                    const zdjecia = await Z.exportPhotos().catch(() => []);
+                    download(JSON.stringify(Object.assign({}, blob, { zdjecia })), `moje-zdrowie-dla-bliskiej-osoby-${todayIso()}.json`, 'application/json');
+                    setKrok(3);
+                } catch (x) { setErr(x.message); } finally { setBusy(false); }
+            };
+
+            return (
+                <Modal title="Udostępnij bliskiej osobie" onClose={onClose} wide>
+                    <Note tone="warn">
+                        Nie ma tu „podglądu” ani ograniczonego dostępu: osoba, której dasz hasło, <strong>widzi całą kartotekę
+                        i może ją zmieniać</strong> u siebie. Nie ma też synchronizacji — od chwili przekazania pliku to dwie
+                        osobne kopie. Jeśli chcesz dać komuś tylko najważniejsze informacje, wydrukuj kartkę z zakładki „Kartki”.
+                    </Note>
+
+                    <ol className="mt-5 space-y-4">
+                        <li className={`rounded-2xl border p-4 ${krok === 1 ? 'border-teal-700 bg-teal-950/20' : 'border-slate-800'}`}>
+                            <h3 className="font-extrabold text-sm mb-1">1. Ustal hasło dla tej osoby</h3>
+                            <p className="text-xs text-slate-400 mb-3">Osobne hasło, nie Twoje. W każdej chwili możesz je usunąć w Ustawieniach — wtedy przestanie otwierać nowe kopie.</p>
+                            {krok === 1 ? (
+                                <>
+                                    <div className="grid sm:grid-cols-3 gap-3">
+                                        <input className="field" value={dane.label} onChange={e => setDane(Object.assign({}, dane, { label: e.target.value }))} placeholder="kto, np. żona Anna" />
+                                        <input type="password" className="field" value={dane.pass} onChange={e => setDane(Object.assign({}, dane, { pass: e.target.value }))} placeholder="hasło (min. 8 znaków)" autoComplete="new-password" />
+                                        <input type="password" className="field" value={dane.pass2} onChange={e => setDane(Object.assign({}, dane, { pass2: e.target.value }))} placeholder="powtórz" autoComplete="new-password" />
+                                    </div>
+                                    <button className="btn btn-main mt-3" disabled={busy || dane.pass.length < 8} onClick={dodajHaslo}>Dodaj hasło</button>
+                                </>
+                            ) : <p className="text-sm text-teal-300">✓ Hasło dodane{dane.label ? ` („${dane.label}”)` : ''}.</p>}
+                        </li>
+
+                        <li className={`rounded-2xl border p-4 ${krok === 2 ? 'border-teal-700 bg-teal-950/20' : 'border-slate-800'} ${krok < 2 ? 'opacity-50' : ''}`}>
+                            <h3 className="font-extrabold text-sm mb-1">2. Pobierz zaszyfrowaną kopię</h3>
+                            <p className="text-xs text-slate-400 mb-3">Plik zawiera kartotekę i zdjęcia, zaszyfrowane. Bez hasła to nieczytelny szum, więc możesz go wysłać mailem albo wrzucić na dysk w chmurze.</p>
+                            {krok === 2 ? <button className="btn btn-main" disabled={busy} onClick={pobierzKopie}><Icon name="download-simple" /> Pobierz plik</button> : null}
+                            {krok > 2 ? <p className="text-sm text-teal-300">✓ Plik pobrany.</p> : null}
+                        </li>
+
+                        <li className={`rounded-2xl border p-4 ${krok === 3 ? 'border-teal-700 bg-teal-950/20' : 'border-slate-800'} ${krok < 3 ? 'opacity-50' : ''}`}>
+                            <h3 className="font-extrabold text-sm mb-1">3. Co ta osoba ma zrobić</h3>
+                            <ol className="text-sm text-slate-300 space-y-1 list-decimal pl-5">
+                                <li>Otworzyć tę samą stronę na swoim komputerze lub telefonie (hasło do strony podajesz jej osobno).</li>
+                                <li>Na ekranie hasła kliknąć „Otwórz z kopii zapasowej” i wskazać przesłany plik.</li>
+                                <li>Wpisać hasło, które przed chwilą ustaliłeś — <strong>przekaż je inną drogą niż plik</strong>, najlepiej ustnie.</li>
+                            </ol>
+                        </li>
+                    </ol>
+
+                    {err ? <div className="mt-4"><Note tone="stop">{err}</Note></div> : null}
+                    <div className="flex gap-2 mt-6"><button className="btn btn-soft" onClick={onClose}>Zamknij</button></div>
+                </Modal>
+            );
+        }
+
         // ---------- aplikacja ----------
         const ZAKLADKI = [
             { id: 'dzis', label: 'Dziś', icon: 'sun' },
             { id: 'leki', label: 'Leki', icon: 'pill' },
             { id: 'wizyty', label: 'Wizyty', icon: 'stethoscope' },
+            { id: 'urzadzenia', label: 'Urządzenia', icon: 'heartbeat' },
+            { id: 'skora', label: 'Skóra', icon: 'eye' },
             { id: 'dokumenty', label: 'Dokumenty', icon: 'folders' },
+            { id: 'analiza', label: 'Dla lekarza', icon: 'first-aid-kit' },
             { id: 'kartki', label: 'Kartki', icon: 'printer' },
             { id: 'profil', label: 'Profil', icon: 'user' },
             { id: 'ustawienia', label: 'Ustawienia', icon: 'gear' }
@@ -1252,6 +2146,7 @@
                 if (!confirm('Usunąć całą kartotekę z tego urządzenia? Bez kopii zapasowej danych nie da się odzyskać.')) return;
                 if (!confirm('Na pewno? To już ostatnie pytanie.')) return;
                 localStorage.removeItem(Z.VAULT_KEY);
+                Z.clearPhotos().catch(() => { /* brak bazy zdjęć nie blokuje usunięcia kartoteki */ });
                 setStored(null);
                 zamknij();
             };
@@ -1300,7 +2195,10 @@
                         {tab === 'dzis' ? <Dzis vault={vault} save={save} goto={setTab} /> : null}
                         {tab === 'leki' ? <Leki vault={vault} save={save} /> : null}
                         {tab === 'wizyty' ? <Wizyty vault={vault} save={save} /> : null}
+                        {tab === 'urzadzenia' ? <Urzadzenia vault={vault} save={save} /> : null}
+                        {tab === 'skora' ? <Skora vault={vault} save={save} session={session} /> : null}
                         {tab === 'dokumenty' ? <Dokumenty vault={vault} save={save} /> : null}
+                        {tab === 'analiza' ? <Analiza vault={vault} save={save} /> : null}
                         {tab === 'kartki' ? <Kartki vault={vault} save={save} /> : null}
                         {tab === 'profil' ? <Profil vault={vault} save={save} /> : null}
                         {tab === 'ustawienia' ? <Ustawienia vault={vault} save={save} session={session} setSession={zmienSesje} onLock={zamknij} onWipe={wymaz} /> : null}
