@@ -282,6 +282,41 @@ zastąp / pomiń). Treść dokumentów (zaszyfrowana w karcie) idzie jako materi
 `nameVariants` dokleja popularne zdrobnienia (`DIMINUTIVES`: Katarzyna → Kasia…) – realny wyciek z testu: zdrobnienie
 z dokumentu nie trafiło do karty; krótkie imiona mają jawne formy odmiany (`shortForms`, żeby „Ala” nie zjadała „ale”).
 
+**Moje Zdrowie (`zdrowie.html` + `zdrowie-core.js`, od 27.10.2026):** prywatna kartoteka zdrowia właściciela (jedna
+osoba, nie narzędzie dla nauczycieli): dokumenty ze skanów, terminarz wizyt, leki z dawkowaniem i zapasem,
+przypomnienia, kartki do druku. **Dane tylko w przeglądarce**, w jednym zaszyfrowanym wpisie
+`localStorage.eduboxZdrowieV1` (ten sam sejf co w Teczce podopiecznych: PBKDF2-SHA256 310 000 + AES-GCM 256,
+losowy klucz danych „zawinięty” osobno każdym hasłem, do 5 haseł, klucz tylko w pamięci karty, blokada po
+bezczynności, kopia zapasowa = ten sam zaszyfrowany plik; hasła nie da się odzyskać). Strona celowo NIE ładuje
+Firebase, GA, `global-core.js`, `apps.js` ani menu, ma przypięte wersje bibliotek i **w etapie 1 nie woła żadnego
+API** (test pilnuje braku `fetch`/`XMLHttpRequest`/`sendBeacon`). Brak kafelka w `apps.js`, `noindex`, w
+`excludedPages` i `robots.txt`; **dodatkowo Basic Auth** – `/zdrowie.html` jest w matcherze `middleware.js`
+(`EWA_AUTH_USER`/`EWA_AUTH_PASS`), czyli hasło HTTP to pierwsza warstwa, a hasło szyfrujące druga.
+**Wczytywanie PDF / Word / zdjęć / skanów** jak w Teczce (pdf.js 3.11.174, mammoth 1.8.0, OCR tesseract.js 5.1.1
+w przeglądarce, max 15 stron) – dlatego `/zdrowie.html` ma w `vercel.json` własne CSP (`'wasm-unsafe-eval'`,
+`worker-src blob:`, bez analityki i Firebase, `no-store`), a globalna reguła wyklucza i `podopieczni.html`,
+i `zdrowie.html` – nie dopisuj `wasm-unsafe-eval` do CSP całego serwisu. Dane z nagłówka dokumentu (rodzaj, data,
+placówka, lekarz, PESEL → data urodzenia) rozpoznaje `extractDocInfo` lokalnie, bez AI.
+**Leki:** `dawki` to pory `{pora, ile}`, `dni` to `'codziennie'` albo numery dni tygodnia (1 = pon). Zapas podaje
+się RAZ (`zapas: {sztuk, odDnia}`), a `supply()` odlicza go sam – przy dawkowaniu „pon/śr/pt” po średniej
+tygodniowej. `alerts()` zbiera kończące się opakowania (domyślnie 14 dni przed) i nadchodzące wizyty.
+**Przypomnienia:** pewne daje kalendarz telefonu – `medEvents`/`visitEvents` + `buildIcs` generują plik .ics
+z czasem „pływającym” (bez TZID i bez `Z`, czyli w strefie urządzenia – dzięki temu nie trzeba bloku VTIMEZONE)
+i z `VALARM`. Głos (`speechSynthesis`) i powiadomienia działają TYLKO przy otwartej karcie – to dodatek, nie
+budzik. W pliku .ics celowo nie ma nazwiska ani nazwy choroby (kalendarz bywa synchronizowany z chmurą).
+**Sprawdzanie leków jest MECHANICZNE, nie farmakologiczne** (`checkCombo`): ta sama substancja czynna w dwóch
+preparatach, dwa NLPZ, NLPZ z lekiem rozrzedzającym krew, dobowa dawka paracetamolu > 4000 mg i uczulenie
+wpisane w profilu. Nazwy handlowe mapuje `NAZWY_HANDLOWE` (Apap → paracetamol, Tritace → ramipryl…). Zasada jak
+w ZanimKlikniesz: **nigdy „można wziąć” ani „to bezpieczne”** – tylko co sprawdzić i „zapytaj farmaceutę”,
+plus link do Rejestru Produktów Leczniczych. Nowa reguła = taka, którą da się policzyć bez wiedzy medycznej.
+**Anonimizacja gotowa pod etap 2 (AI):** `aiInput` buduje opis z wieku, płci, chorób, uczuleń i leków, `scrub`
+wycina imię, zdrobnienie i nazwisko w odmianie, PESEL, datę urodzenia, telefony, e-maile, adresy, **nazwiska
+lekarzy z wizyt i leków** oraz nazwy placówek, a `leaks()` jest ostatnią bramką przed wysyłką. Ustawienia
+pokazują podgląd „Co zobaczyłaby sztuczna inteligencja”. Testy: `npm run zdrowie:check` (w `npm test`).
+**Etap 2 (do zrobienia):** parsowanie wyników laboratoryjnych z PDF do tabeli porównawczej z normami i wykresem
+trendu (liczy przeglądarka, nie AI), komentarz AI do gotowych liczb i pytanie „czy mogę wziąć” z pełnym opisem
+przez `/api/chat.js` (bez nowej funkcji Vercel – limit 12 jest prawie wyczerpany), PWA z ikoną na telefonie.
+
 **Panel jakości Make:** `panel-jakosci.html` korzysta z odczytowego trybu
 `GET /api/weekly-report?view=make-health`, dzięki czemu nie powstaje trzynasta
 funkcja Vercel. Publiczny jest wyłącznie pusty ekran logowania; dane endpointu

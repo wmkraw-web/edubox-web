@@ -1,0 +1,834 @@
+// Moje Zdrowie – rdzeń bez interfejsu (szyfrowanie, model danych, leki, terminarz, kalendarz .ics, anonimizacja).
+// Zwykły skrypt: w przeglądarce window.EduZdrowie, w Node module.exports (testy: scripts/check-zdrowie.js).
+//
+// ZASADY (od 27.10.2026, prywatna aplikacja zdrowotna właściciela – jedna osoba, jedno urządzenie):
+// - Dane o zdrowiu są TYLKO w przeglądarce, zaszyfrowane hasłem (PBKDF2-SHA256 310 000 + AES-GCM 256, Web Crypto).
+//   Żadnego serwera, Firebase ani chmury. Bez hasła nie da się ich odczytać – także z kopii zapasowej.
+// - Do AI idzie wyłącznie anonimowy opis: bez imienia, nazwiska, PESEL-u, daty urodzenia, lekarzy i placówek.
+//   Strona pokazuje DOKŁADNIE to, co zostanie wysłane, zanim cokolwiek wyjdzie z komputera (leaks() wstrzymuje wysyłkę).
+// - Sprawdzanie leków w tym pliku jest MECHANICZNE (duplikat substancji, dwa NLPZ, dobowa dawka paracetamolu,
+//   alergia z profilu) – nie jest analizą farmakologiczną i nie zastępuje farmaceuty ani lekarza.
+(function () {
+  const root = typeof window !== 'undefined' ? window : globalThis;
+  const subtle = () => {
+    const c = root.crypto || (typeof globalThis !== 'undefined' && globalThis.crypto);
+    if (!c || !c.subtle) throw new Error('Ta przeglądarka nie obsługuje szyfrowania (Web Crypto). Użyj aktualnego Chrome, Edge albo Firefoksa.');
+    return c.subtle;
+  };
+  const randomBytes = (n) => {
+    const a = new Uint8Array(n);
+    (root.crypto || globalThis.crypto).getRandomValues(a);
+    return a;
+  };
+
+  const VAULT_KEY = 'eduboxZdrowieV1';
+  const APP_ID = 'edubox-zdrowie';
+  const ITERATIONS = 310000;
+  const DAY_MS = 24 * 60 * 60 * 1000;
+  const SOON_DAYS = 30;        // wizyta albo badanie „wkrótce”
+  const REFILL_DAYS = 14;      // na tyle dni przed końcem opakowania przypominamy o recepcie
+
+  // ---------- base64 (przeglądarka i Node) ----------
+  function toB64(bytes) {
+    let s = '';
+    const u = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+    for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000));
+    return btoa(s);
+  }
+  function fromB64(b64) {
+    const s = atob(String(b64 || ''));
+    const u = new Uint8Array(s.length);
+    for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i);
+    return u;
+  }
+
+  // ---------- szyfrowanie ----------
+  // Ten sam sprawdzony sejf co w Teczce podopiecznych: dane szyfruje losowy KLUCZ DANYCH (AES-GCM 256),
+  // a ten klucz jest „zawinięty” osobno każdym hasłem (sloty: codzienne i zapasowe – np. zapisane w sejfie domowym).
+  // Klucz danych istnieje tylko w pamięci otwartej karty – nigdy w localStorage ani w kopii zapasowej w jawnej postaci.
+  async function deriveKek(password, salt, iterations, usages) {
+    if (!password || String(password).length < 8) throw new Error('Hasło musi mieć co najmniej 8 znaków.');
+    const base = await subtle().importKey('raw', new TextEncoder().encode(String(password)), 'PBKDF2', false, ['deriveKey']);
+    return subtle().deriveKey(
+      { name: 'PBKDF2', salt, iterations: iterations || ITERATIONS, hash: 'SHA-256' },
+      base,
+      { name: 'AES-GCM', length: 256 },
+      false,
+      usages
+    );
+  }
+
+  async function makeSlot(dataKey, password, label) {
+    const salt = randomBytes(16);
+    const iv = randomBytes(12);
+    const kek = await deriveKek(password, salt, ITERATIONS, ['wrapKey', 'unwrapKey']);
+    const wrapped = await subtle().wrapKey('raw', dataKey, kek, { name: 'AES-GCM', iv });
+    return { id: uid(), label: String(label || 'Hasło').slice(0, 40), iter: ITERATIONS, salt: toB64(salt), iv: toB64(iv), key: toB64(new Uint8Array(wrapped)), created: new Date().toISOString() };
+  }
+
+  async function tryUnwrap(slot, password) {
+    const kek = await deriveKek(password, fromB64(slot.salt), slot.iter, ['wrapKey', 'unwrapKey']);
+    try {
+      return await subtle().unwrapKey('raw', fromB64(slot.key), kek, { name: 'AES-GCM', iv: fromB64(slot.iv) }, { name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  async function createSession(password, label) {
+    const dataKey = await subtle().generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
+    const slot = await makeSlot(dataKey, password, label || 'Hasło główne');
+    return { dataKey, slots: [slot], openedWith: slot.id };
+  }
+
+  async function addPassword(session, password, label) {
+    if (session.slots.length >= 5) throw new Error('Najwyżej 5 haseł.');
+    const slot = await makeSlot(session.dataKey, password, label);
+    return Object.assign({}, session, { slots: [...session.slots, slot] });
+  }
+
+  async function changePassword(session, slotId, password) {
+    const old = session.slots.find(s => s.id === slotId);
+    if (!old) throw new Error('Nie ma takiego hasła.');
+    const slot = Object.assign(await makeSlot(session.dataKey, password, old.label), { id: old.id });
+    return Object.assign({}, session, { slots: session.slots.map(s => s.id === slotId ? slot : s) });
+  }
+
+  function removePassword(session, slotId) {
+    if (session.slots.length <= 1) throw new Error('To jedyne hasło – nie można go usunąć.');
+    if (slotId === session.openedWith) throw new Error('Nie można usunąć hasła, którym właśnie otwarto aplikację.');
+    return Object.assign({}, session, { slots: session.slots.filter(s => s.id !== slotId) });
+  }
+
+  async function seal(data, session) {
+    const iv = randomBytes(12);
+    const plain = new TextEncoder().encode(JSON.stringify(data));
+    const ct = await subtle().encrypt({ name: 'AES-GCM', iv }, session.dataKey, plain);
+    return { v: 1, app: APP_ID, kdf: 'PBKDF2-SHA256', slots: session.slots, iv: toB64(iv), ct: toB64(new Uint8Array(ct)), saved: new Date().toISOString() };
+  }
+
+  // Złe hasło = AES-GCM odrzuca dane (uwierzytelnione szyfrowanie), więc nie ma „częściowego” odczytu.
+  async function open(blob, password) {
+    if (!blob || blob.app !== APP_ID || !blob.ct || !Array.isArray(blob.slots)) throw new Error('To nie jest plik aplikacji Moje Zdrowie.');
+    for (const slot of blob.slots) {
+      const dataKey = await tryUnwrap(slot, password);
+      if (!dataKey) continue;
+      let plain;
+      try {
+        plain = await subtle().decrypt({ name: 'AES-GCM', iv: fromB64(blob.iv) }, dataKey, fromB64(blob.ct));
+      } catch (e) {
+        throw new Error('Plik aplikacji jest uszkodzony.');
+      }
+      return { data: migrate(JSON.parse(new TextDecoder().decode(plain))), session: { dataKey, slots: blob.slots, openedWith: slot.id } };
+    }
+    throw new Error('Nieprawidłowe hasło.');
+  }
+
+  const slotLabel = (session) => ((session && session.slots.find(s => s.id === session.openedWith)) || {}).label || '';
+
+  // ---------- model danych ----------
+  const PORY = [
+    { id: 'rano', label: 'Rano', czas: '08:00' },
+    { id: 'poludnie', label: 'Południe', czas: '13:00' },
+    { id: 'wieczor', label: 'Wieczór', czas: '19:00' },
+    { id: 'noc', label: 'Na noc', czas: '22:00' }
+  ];
+  const DNI_TYGODNIA = ['poniedziałek', 'wtorek', 'środa', 'czwartek', 'piątek', 'sobota', 'niedziela'];
+  const POSILEK = [
+    { id: '', label: 'bez znaczenia' },
+    { id: 'przed', label: 'przed posiłkiem' },
+    { id: 'wtrakcie', label: 'w trakcie posiłku' },
+    { id: 'po', label: 'po posiłku' },
+    { id: 'naczczo', label: 'na czczo' }
+  ];
+  const RODZAJE_DOKUMENTOW = [
+    { id: 'wypis', label: 'Wypis ze szpitala' },
+    { id: 'badanie', label: 'Wynik badania' },
+    { id: 'zalecenia', label: 'Zalecenia lekarskie' },
+    { id: 'skierowanie', label: 'Skierowanie' },
+    { id: 'recepta', label: 'Recepta' },
+    { id: 'opis', label: 'Opis badania obrazowego' },
+    { id: 'inne', label: 'Inny dokument' }
+  ];
+  const GRUPY_KRWI = ['0 Rh+', '0 Rh−', 'A Rh+', 'A Rh−', 'B Rh+', 'B Rh−', 'AB Rh+', 'AB Rh−'];
+
+  const uid = () => toB64(randomBytes(9)).replace(/[+/=]/g, '').slice(0, 12);
+  const nowIso = () => new Date().toISOString();
+  const today = (now) => new Date(now == null ? Date.now() : now).toLocaleDateString('sv-SE'); // lokalna data, format YYYY-MM-DD
+
+  function emptyVault() {
+    return {
+      version: 1,
+      profil: {
+        imie: '', nazwisko: '', zdrobnienie: '', dataUr: '', pesel: '', plec: '', grupaKrwi: '', wzrost: '', waga: '',
+        alergie: '', choroby: '', uwagi: '', ice: []
+      },
+      leki: [], wizyty: [], dokumenty: [], badania: [], pytania: [], dziennik: {},
+      settings: { lockMinutes: 15, refillDays: REFILL_DAYS, alarmMinutes: 0 }
+    };
+  }
+
+  function newMed() {
+    return {
+      id: uid(), nazwa: '', substancja: '', moc: '', postac: 'tabletka',
+      dawki: [{ pora: '08:00', ile: 1 }], dni: 'codziennie', posilek: '',
+      naCo: '', lekarz: '', odKiedy: '', doKiedy: '', uwagi: '',
+      zapas: { sztuk: '', odDnia: '' }, aktywny: true, utworzono: nowIso()
+    };
+  }
+  function newVisit() {
+    return { id: uid(), data: '', godzina: '', lekarz: '', specjalizacja: '', telefon: '', miejsce: '', powod: '', przygotowanie: '', notatka: '', zrobione: false, utworzono: nowIso() };
+  }
+  function newDoc() {
+    return { id: uid(), rodzaj: 'inne', tytul: '', data: '', placowka: '', lekarz: '', tekst: '', ocr: false, uwagi: '', utworzono: nowIso() };
+  }
+  function newLab() {
+    return { id: uid(), data: '', laboratorium: '', opis: '', pozycje: [], utworzono: nowIso() };
+  }
+  function newQuestion() {
+    return { id: uid(), tekst: '', dodano: nowIso(), zadane: false };
+  }
+
+  // Starszy albo niekompletny zapis → pełny kształt (żeby interfejs nigdy nie trafił na undefined).
+  function migrate(v) {
+    const out = Object.assign(emptyVault(), v || {});
+    out.profil = Object.assign(emptyVault().profil, out.profil || {});
+    if (!Array.isArray(out.profil.ice)) out.profil.ice = [];
+    out.settings = Object.assign(emptyVault().settings, out.settings || {});
+    out.leki = (Array.isArray(out.leki) ? out.leki : []).map(m => {
+      const x = Object.assign(newMed(), m || {});
+      x.dawki = (Array.isArray(x.dawki) ? x.dawki : []).filter(d => d && d.pora).map(d => ({ pora: String(d.pora), ile: Number(d.ile) || 1 }));
+      if (!x.dawki.length) x.dawki = [{ pora: '08:00', ile: 1 }];
+      x.zapas = Object.assign({ sztuk: '', odDnia: '' }, x.zapas || {});
+      return x;
+    });
+    ['wizyty', 'dokumenty', 'badania', 'pytania'].forEach(k => { if (!Array.isArray(out[k])) out[k] = []; });
+    if (!out.dziennik || typeof out.dziennik !== 'object' || Array.isArray(out.dziennik)) out.dziennik = {};
+    out.wizyty = out.wizyty.map(w => Object.assign(newVisit(), w || {}));
+    out.dokumenty = out.dokumenty.map(d => Object.assign(newDoc(), d || {}));
+    out.badania = out.badania.map(b => {
+      const x = Object.assign(newLab(), b || {});
+      x.pozycje = Array.isArray(x.pozycje) ? x.pozycje : [];
+      return x;
+    });
+    out.pytania = out.pytania.map(p => Object.assign(newQuestion(), p || {}));
+    return out;
+  }
+
+  const fullName = (p) => [p && p.imie, p && p.nazwisko].filter(Boolean).join(' ').trim();
+
+  // ---------- daty ----------
+  function parseDate(s) {
+    const t = String(s || '').trim();
+    let m = t.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (m) return Date.UTC(+m[1], +m[2] - 1, +m[3]);
+    m = t.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+    if (m) return Date.UTC(+m[3], +m[2] - 1, +m[1]);
+    return NaN;
+  }
+  function formatDatePl(iso) {
+    const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+    return m ? `${m[3]}.${m[2]}.${m[1]}` : '';
+  }
+  function daysUntil(date, now) {
+    const t = parseDate(date);
+    if (!Number.isFinite(t)) return null;
+    const d = today(now).split('-');
+    return Math.round((t - Date.UTC(+d[0], +d[1] - 1, +d[2])) / DAY_MS);
+  }
+  function addDays(isoDate, n) {
+    const t = parseDate(isoDate);
+    if (!Number.isFinite(t)) return '';
+    return new Date(t + n * DAY_MS).toISOString().slice(0, 10);
+  }
+  function ageYears(dataUr, now) {
+    const b = parseDate(dataUr);
+    if (!Number.isFinite(b)) return '';
+    const d = today(now).split('-').map(Number);
+    const bd = new Date(b);
+    let y = d[0] - bd.getUTCFullYear();
+    const before = (d[1] - 1) < bd.getUTCMonth() || ((d[1] - 1) === bd.getUTCMonth() && d[2] < bd.getUTCDate());
+    if (before) y--;
+    return y >= 0 && y < 130 ? y : '';
+  }
+  const plural = (n, one, few, many) => n === 1 ? one : (n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20)) ? few : many;
+  const dni = (n) => `${n} ${plural(n, 'dzień', 'dni', 'dni')}`;
+
+  // ---------- leki: dawkowanie i zapas ----------
+  // „dni” to 'codziennie' albo lista numerów dni tygodnia (1 = poniedziałek … 7 = niedziela).
+  function weekdayOf(isoDate) {
+    const t = parseDate(isoDate);
+    if (!Number.isFinite(t)) return null;
+    return ((new Date(t).getUTCDay() + 6) % 7) + 1;
+  }
+  function activeDays(med) {
+    const d = med && med.dni;
+    return Array.isArray(d) && d.length ? d.filter(x => x >= 1 && x <= 7) : [1, 2, 3, 4, 5, 6, 7];
+  }
+  function takesOnDay(med, isoDate) {
+    const wd = weekdayOf(isoDate);
+    if (wd == null) return false;
+    if (med.odKiedy && daysUntil(med.odKiedy) != null && parseDate(isoDate) < parseDate(med.odKiedy)) return false;
+    if (med.doKiedy && parseDate(isoDate) > parseDate(med.doKiedy)) return false;
+    return activeDays(med).includes(wd);
+  }
+  // Średnie zużycie na dobę – przy dawkowaniu co drugi dzień albo „pon/śr/pt” liczymy tygodniową średnią.
+  function dailyUse(med) {
+    const perTake = (med.dawki || []).reduce((a, d) => a + (Number(d.ile) || 0), 0);
+    return perTake * activeDays(med).length / 7;
+  }
+
+  // Zapas podajemy RAZ: ile sztuk i na jaki dzień – resztę aplikacja odlicza sama, bez codziennego klikania.
+  function supply(med, now) {
+    const sztuk = Number(med && med.zapas && med.zapas.sztuk);
+    const od = med && med.zapas && med.zapas.odDnia;
+    const dziennie = dailyUse(med);
+    if (!Number.isFinite(sztuk) || sztuk <= 0 || !od || !dziennie) return { znany: false, dziennie, zostalo: null, dniStarczy: null, konczySie: '', status: 'brak' };
+    const minelo = Math.max(0, -(daysUntil(od, now) || 0));
+    const zostalo = Math.max(0, sztuk - minelo * dziennie);
+    const dniStarczy = Math.floor(zostalo / dziennie);
+    const konczySie = addDays(today(now), dniStarczy);
+    const status = zostalo <= 0 ? 'pusto' : dniStarczy <= 3 ? 'pilne' : dniStarczy <= REFILL_DAYS ? 'wkrotce' : 'ok';
+    return { znany: true, dziennie, zostalo: Math.round(zostalo * 10) / 10, dniStarczy, konczySie, status };
+  }
+
+  // Plan jednego dnia: godzina → leki do wzięcia o tej porze.
+  function planForDay(leki, isoDate) {
+    const map = new Map();
+    (leki || []).filter(m => m.aktywny !== false && takesOnDay(m, isoDate)).forEach(m => {
+      (m.dawki || []).forEach(d => {
+        const key = String(d.pora || '').slice(0, 5);
+        if (!/^\d{2}:\d{2}$/.test(key)) return;
+        if (!map.has(key)) map.set(key, []);
+        map.get(key).push({ id: m.id, nazwa: m.nazwa, moc: m.moc, postac: m.postac, ile: Number(d.ile) || 1, posilek: m.posilek });
+      });
+    });
+    return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([czas, leki]) => ({ czas, leki }));
+  }
+
+  // Zdanie do wypowiedzenia na głos przy przypomnieniu (speechSynthesis) – krótkie, bez nazwisk.
+  function spokenReminder(czas, leki) {
+    const parts = (leki || []).map(l => `${l.nazwa}${l.moc ? ' ' + l.moc : ''}, ${l.ile} ${plural(l.ile, 'sztuka', 'sztuki', 'sztuk')}`);
+    const posilek = (leki || []).map(l => (POSILEK.find(p => p.id === l.posilek) || {}).label).filter(x => x && x !== 'bez znaczenia');
+    return `Godzina ${czas.replace(':', ' ')}. Leki do wzięcia: ${parts.join('; ')}.${posilek.length ? ' Pamiętaj: ' + posilek[0] + '.' : ''}`;
+  }
+
+  // ---------- co wymaga uwagi (ekran główny) ----------
+  function alerts(vault, now) {
+    const v = vault || emptyVault();
+    const out = [];
+    const refill = Number(v.settings && v.settings.refillDays) || REFILL_DAYS;
+    (v.leki || []).filter(m => m.aktywny !== false).forEach(m => {
+      const s = supply(m, now);
+      if (s.znany && s.dniStarczy <= refill) {
+        out.push({
+          kind: 'lek', refId: m.id, days: s.dniStarczy,
+          label: s.zostalo <= 0 ? `${m.nazwa} – opakowanie puste` : `${m.nazwa} – zostało na ${dni(s.dniStarczy)}`,
+          date: s.konczySie, status: s.status === 'ok' ? 'wkrotce' : s.status
+        });
+      }
+      const koniec = m.doKiedy ? daysUntil(m.doKiedy, now) : null;
+      if (koniec != null && koniec >= 0 && koniec <= 7) out.push({ kind: 'lek', refId: m.id, days: koniec, label: `${m.nazwa} – koniec kuracji`, date: m.doKiedy, status: 'wkrotce' });
+    });
+    (v.wizyty || []).filter(w => !w.zrobione && w.data).forEach(w => {
+      const d = daysUntil(w.data, now);
+      if (d == null || d > SOON_DAYS) return;
+      const kto = [w.specjalizacja, w.lekarz].filter(Boolean).join(' – ') || 'Wizyta';
+      out.push({ kind: 'wizyta', refId: w.id, days: d, label: `${kto}${w.godzina ? ', godz. ' + w.godzina : ''}`, date: w.data, status: d < 0 ? 'minelo' : d === 0 ? 'dzisiaj' : 'wkrotce' });
+    });
+    return out.sort((a, b) => a.days - b.days);
+  }
+
+  // ---------- kalendarz .ics ----------
+  // Czas „pływający” (bez strefy i bez Z): telefon potraktuje go jako swój czas lokalny – dokładnie o to chodzi
+  // przy lekach. Dzięki temu plik nie wymaga bloku VTIMEZONE, który różne kalendarze czytają po swojemu.
+  const icsEscape = (s) => String(s || '').replace(/\\/g, '\\\\').replace(/;/g, '\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
+  function icsFold(line) {
+    const bytes = new TextEncoder().encode(line);
+    if (bytes.length <= 73) return line;
+    const out = [];
+    let cur = '', len = 0;
+    for (const ch of line) {
+      const n = new TextEncoder().encode(ch).length;
+      if (len + n > 72) { out.push(cur); cur = ' '; len = 1; }
+      cur += ch; len += n;
+    }
+    out.push(cur);
+    return out.join('\r\n');
+  }
+  const icsStamp = (now) => new Date(now == null ? Date.now() : now).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+  const icsLocal = (isoDate, hhmm) => `${String(isoDate).replace(/-/g, '')}T${String(hhmm || '09:00').replace(':', '')}00`;
+  const WD = { 1: 'MO', 2: 'TU', 3: 'WE', 4: 'TH', 5: 'FR', 6: 'SA', 7: 'SU' };
+
+  function icsEvent(ev, now) {
+    const lines = [
+      'BEGIN:VEVENT',
+      `UID:${ev.uid}@eduboxpro.pl`,
+      `DTSTAMP:${icsStamp(now)}`,
+      `DTSTART:${ev.start}`,
+      `DTEND:${ev.end || ev.start}`,
+      `SUMMARY:${icsEscape(ev.summary)}`
+    ];
+    if (ev.description) lines.push(`DESCRIPTION:${icsEscape(ev.description)}`);
+    if (ev.location) lines.push(`LOCATION:${icsEscape(ev.location)}`);
+    if (ev.rrule) lines.push(`RRULE:${ev.rrule}`);
+    if (ev.alarm != null) {
+      lines.push('BEGIN:VALARM', 'ACTION:DISPLAY', `DESCRIPTION:${icsEscape(ev.summary)}`, `TRIGGER:-PT${Math.max(0, ev.alarm)}M`, 'END:VALARM');
+    }
+    lines.push('END:VEVENT');
+    return lines;
+  }
+
+  // Leki: jedno wydarzenie cykliczne na każdą porę dnia. Celowo BEZ nazwiska i bez nazwy choroby –
+  // plik trafia do kalendarza telefonu, który bywa synchronizowany z chmurą.
+  function medEvents(leki, opts) {
+    const o = opts || {};
+    const start = o.from || today(o.now);
+    const byTime = new Map();
+    (leki || []).filter(m => m.aktywny !== false).forEach(m => {
+      (m.dawki || []).forEach(d => {
+        const czas = String(d.pora || '').slice(0, 5);
+        if (!/^\d{2}:\d{2}$/.test(czas)) return;
+        const key = czas + '|' + activeDays(m).join(',') + '|' + (m.doKiedy || '');
+        if (!byTime.has(key)) byTime.set(key, { czas, dni: activeDays(m), doKiedy: m.doKiedy || '', leki: [] });
+        byTime.get(key).leki.push(`${m.nazwa}${m.moc ? ' ' + m.moc : ''} – ${Number(d.ile) || 1} ${plural(Number(d.ile) || 1, 'szt.', 'szt.', 'szt.')}`);
+      });
+    });
+    return [...byTime.values()].sort((a, b) => a.czas.localeCompare(b.czas)).map((g, i) => {
+      const codziennie = g.dni.length === 7;
+      const until = g.doKiedy ? `;UNTIL=${icsLocal(g.doKiedy, '23:59')}` : '';
+      return {
+        uid: `lek-${g.czas.replace(':', '')}-${i}-${o.seed || 'moje-zdrowie'}`,
+        start: icsLocal(start, g.czas),
+        end: icsLocal(start, g.czas),
+        summary: `💊 Leki ${g.czas}`,
+        description: g.leki.join('\n'),
+        rrule: codziennie ? `FREQ=DAILY${until}` : `FREQ=WEEKLY;BYDAY=${g.dni.map(d => WD[d]).join(',')}${until}`,
+        alarm: o.alarmMinutes == null ? 0 : o.alarmMinutes
+      };
+    });
+  }
+
+  // Wizyty: pojedyncze wydarzenia z przypomnieniem dzień wcześniej i godzinę wcześniej.
+  function visitEvents(wizyty, opts) {
+    const o = opts || {};
+    return (wizyty || []).filter(w => w.data && !w.zrobione).map(w => ({
+      uid: `wizyta-${w.id}`,
+      start: icsLocal(w.data, w.godzina || '09:00'),
+      end: icsLocal(w.data, addMinutes(w.godzina || '09:00', 30)),
+      summary: `🩺 ${[w.specjalizacja, w.lekarz].filter(Boolean).join(' – ') || 'Wizyta lekarska'}`,
+      description: [w.powod, w.przygotowanie ? 'Przygotowanie: ' + w.przygotowanie : '', w.telefon ? 'Tel.: ' + w.telefon : ''].filter(Boolean).join('\n'),
+      location: w.miejsce || '',
+      alarm: o.alarmMinutes == null ? 60 : o.alarmMinutes
+    }));
+  }
+
+  function addMinutes(hhmm, mins) {
+    const [h, m] = String(hhmm || '09:00').split(':').map(Number);
+    const t = (h * 60 + m + mins + 1440) % 1440;
+    return `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`;
+  }
+
+  function buildIcs(events, now) {
+    const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//EduBox//Moje Zdrowie//PL', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH'];
+    (events || []).forEach(ev => lines.push(...icsEvent(ev, now)));
+    lines.push('END:VCALENDAR');
+    return lines.map(icsFold).join('\r\n') + '\r\n';
+  }
+
+  // ---------- substancje czynne i mechaniczne sprawdzenie zestawu leków ----------
+  // To NIE jest analiza farmakologiczna. Łapie tylko cztery rzeczy, które da się stwierdzić bez wiedzy medycznej:
+  // ten sam związek w dwóch opakowaniach, dwa leki przeciwbólowe z grupy NLPZ, przekroczoną dobową dawkę
+  // paracetamolu i substancję wpisaną w profilu jako uczulająca. Resztę ocenia farmaceuta albo lekarz.
+  const NAZWY_HANDLOWE = {
+    paracetamol: 'apap panadol paracetamol codipar efferalgan gripex grypolek theraflu febrisan plusssz paramax pedicetamol calpol acenol',
+    ibuprofen: 'ibuprofen ibuprom nurofen ibum mig metafen brufen ibufen spalmine',
+    ketoprofen: 'ketoprofen ketonal ketores profenid fastum',
+    naproksen: 'naproksen aleve apo-napro naxii nalgesin',
+    diklofenak: 'diklofenak diclofenac olfen voltaren dicloziaja majamil naklofen',
+    deksketoprofen: 'deksketoprofen dexak ketesse dexprofen',
+    nimesulid: 'nimesulid aulin coxtral nimesil',
+    meloksykam: 'meloksykam movalis aspicam opokan',
+    'kwas acetylosalicylowy': 'aspiryna aspirin polopiryna acard asa acesan cardiopirin etopiryna upsarin',
+    metamizol: 'metamizol pyralgina pyralginum novalgin',
+    drotaweryna: 'drotaweryna no-spa deespa galospa',
+    omeprazol: 'omeprazol polprazol bioprazol helicid ortanol losec',
+    pantoprazol: 'pantoprazol controloc nolpaza anesteloc contix',
+    ramipryl: 'ramipryl tritace polpril piramil axtil vivace',
+    perindopryl: 'perindopryl prestarium co-prestarium irpax prenessa',
+    bisoprolol: 'bisoprolol bisocard concor bisoratio sobycor',
+    metoprolol: 'metoprolol betaloc metocard metoprolol-ratiopharm',
+    amlodypina: 'amlodypina amlozek normodipine tenox norvasc',
+    atorwastatyna: 'atorwastatyna atoris tulip sortis apo-atorva storvas',
+    rosuwastatyna: 'rosuwastatyna crestor roswera zahron suvardio',
+    metformina: 'metformina metformax siofor glucophage formetic avamina',
+    lewotyroksyna: 'lewotyroksyna euthyrox letrox eltroxin',
+    cetyryzyna: 'cetyryzyna zyrtec amertil allertec cetrix',
+    loratadyna: 'loratadyna claritine flonidan aleric loratan',
+    furosemid: 'furosemid furosemidum',
+    torasemid: 'torasemid trifas diuver toramide',
+    acenokumarol: 'acenokumarol sintrom syncumar',
+    warfaryna: 'warfaryna warfin',
+    rywaroksaban: 'rywaroksaban xarelto',
+    apiksaban: 'apiksaban eliquis',
+    'witamina d3': 'witamina d3 vigantol vigantoletten devikap juvit ibd3'
+  };
+  const NLPZ = ['ibuprofen', 'ketoprofen', 'naproksen', 'diklofenak', 'deksketoprofen', 'nimesulid', 'meloksykam', 'piroksykam', 'indometacyna', 'etorykoksyb', 'celekoksyb', 'aceklofenak', 'nabumeton', 'kwas acetylosalicylowy'];
+  const PARACETAMOL_MAX_MG = 4000;
+  const PARACETAMOL_OSTROZNIE_MG = 3000;
+  const ROZRZEDZAJACE = ['acenokumarol', 'warfaryna', 'rywaroksaban', 'apiksaban', 'dabigatran', 'edoksaban', 'klopidogrel', 'tikagrelor'];
+
+  const norm = (s) => String(s || '').toLocaleLowerCase('pl').replace(/[®™]/g, '').trim();
+
+  // Nazwa handlowa („Ibuprom Max 400”) → substancja czynna. Gdy nie znamy, zwracamy to, co wpisano ręcznie.
+  function substanceOf(med) {
+    const own = norm(med && med.substancja);
+    if (own) return own;
+    const hay = ' ' + norm(med && med.nazwa).replace(/[^\p{L}\p{N}-]+/gu, ' ') + ' ';
+    for (const [sub, aliases] of Object.entries(NAZWY_HANDLOWE)) {
+      if (aliases.split(' ').some(a => hay.includes(' ' + a + ' '))) return sub;
+    }
+    return '';
+  }
+
+  // „500 mg”, „0,5 g”, „12,5mg” → miligramy.
+  function mgOf(moc) {
+    const m = norm(moc).replace(',', '.').match(/(\d+(?:\.\d+)?)\s*(mg|g|mcg|µg|ug)?/);
+    if (!m) return null;
+    const v = parseFloat(m[1]);
+    if (!Number.isFinite(v)) return null;
+    const unit = m[2] || 'mg';
+    return unit === 'g' ? v * 1000 : (unit === 'mg' ? v : v / 1000);
+  }
+  function dailyMg(med) {
+    const mg = mgOf(med.moc);
+    return mg == null ? null : Math.round(mg * dailyUse(med));
+  }
+
+  function allergyHits(profil, med) {
+    const sub = substanceOf(med);
+    const words = norm(profil && profil.alergie).split(/[\n,;.]+/).map(x => x.trim()).filter(x => x.length >= 4);
+    const nazwa = norm(med && med.nazwa);
+    return words.filter(w => (sub && (w.includes(sub) || sub.includes(w))) || (nazwa && (nazwa.includes(w) || w.includes(nazwa))));
+  }
+
+  // Zestaw leków (aktywne + ewentualny kandydat „czy mogę to wziąć”) → lista ostrzeżeń liczonych lokalnie.
+  function checkCombo(leki, profil) {
+    const list = (leki || []).filter(m => m && m.aktywny !== false && (m.nazwa || m.substancja));
+    const out = [];
+    const bySub = new Map();
+    list.forEach(m => {
+      const s = substanceOf(m);
+      if (!s) { out.push({ poziom: 'sprawdz', regula: 'nieznana-substancja', tekst: `Nie rozpoznaję substancji czynnej preparatu „${m.nazwa}”. Przepisz ją z ulotki do pola „substancja czynna” – bez tego nie sprawdzę powtórzeń.` }); return; }
+      if (!bySub.has(s)) bySub.set(s, []);
+      bySub.get(s).push(m);
+    });
+
+    bySub.forEach((meds, sub) => {
+      if (meds.length > 1) out.push({ poziom: 'stop', regula: 'duplikat', tekst: `Ta sama substancja czynna (${sub}) jest w ${meds.length} preparatach: ${meds.map(m => m.nazwa).join(', ')}. Razem to podwójna dawka – zanim weźmiesz oba, zapytaj farmaceutę.` });
+    });
+
+    const nlpz = [...bySub.keys()].filter(s => NLPZ.includes(s));
+    if (nlpz.length > 1) out.push({ poziom: 'stop', regula: 'nlpz', tekst: `Dwa leki przeciwzapalne z tej samej grupy (NLPZ): ${nlpz.join(', ')}. Łączenie ich obciąża żołądek i nerki, a nie działa mocniej. Wybierz jeden albo zapytaj farmaceutę.` });
+    if (nlpz.length && [...bySub.keys()].some(s => ROZRZEDZAJACE.includes(s))) {
+      out.push({ poziom: 'stop', regula: 'nlpz-przeciwzakrzepowe', tekst: `Lek przeciwbólowy z grupy NLPZ (${nlpz.join(', ')}) razem z lekiem rozrzedzającym krew. To zestawienie wymaga rozmowy z lekarzem albo farmaceutą – nie bierz na własną rękę.` });
+    }
+
+    const para = bySub.get('paracetamol') || [];
+    const sumaPara = para.reduce((a, m) => a + (dailyMg(m) || 0), 0);
+    if (sumaPara > PARACETAMOL_MAX_MG) out.push({ poziom: 'stop', regula: 'paracetamol-dawka', tekst: `Paracetamol w sumie ok. ${sumaPara} mg na dobę. Maksymalna dawka dobowa dla dorosłego to 4000 mg – powyżej grozi uszkodzeniem wątroby. Przelicz dawki i sprawdź ulotkę.` });
+    else if (sumaPara > PARACETAMOL_OSTROZNIE_MG) out.push({ poziom: 'sprawdz', regula: 'paracetamol-blisko', tekst: `Paracetamol w sumie ok. ${sumaPara} mg na dobę – blisko maksymalnej dawki 4000 mg. Uważaj na preparaty na przeziębienie, bo też go zawierają.` });
+
+    list.forEach(m => {
+      const hits = allergyHits(profil, m);
+      if (hits.length) out.push({ poziom: 'stop', regula: 'alergia', tekst: `W profilu masz wpisane uczulenie („${hits[0]}”), a preparat „${m.nazwa}” do niego pasuje. Nie bierz go bez rozmowy z lekarzem.` });
+    });
+
+    const order = { stop: 0, sprawdz: 1 };
+    return out.sort((a, b) => (order[a.poziom] || 2) - (order[b.poziom] || 2));
+  }
+
+  // ---------- anonimizacja (wszystko, co wychodzi do AI) ----------
+  // Granice słowa bez \b (nie zna polskich liter) i bez lookbehind (starsze Safari).
+  const SOFT = { 'ś': 's', 'ć': 'c', 'ń': 'n', 'ź': 'z' };
+  function shortForms(v) {
+    const last = v.slice(-1);
+    if (last === 'a') { const st = v.slice(0, -1); return [v, st + 'i', st + 'ę', st + 'ą', st + 'u', st + 'o', st + 'y']; }
+    if (SOFT[last]) { const st = v.slice(0, -1) + SOFT[last] + 'i'; return [v, st + 'a', st + 'owi', st + 'em', st + 'u', st + 'e']; }
+    return [v, v + 'a', v + 'owi', v + 'em', v + 'ie', v + 'u', v + 'e', v + 'y', v + 'i'];
+  }
+  function matchesVariant(word, variants) {
+    const w = word.toLocaleLowerCase('pl');
+    return variants.some(v => {
+      if (w === v) return true;
+      if (v.length <= 4) return shortForms(v).includes(w);
+      const stem = v.slice(0, Math.max(4, v.length - 2));
+      if (w.startsWith(stem) && w.length <= v.length + 4) return true;
+      return v.endsWith('ek') && w.startsWith(v.slice(0, -2) + 'k') && w.length <= v.length + 3;
+    });
+  }
+  const splitWords = (s) => String(s || '').split(/[\s,;/-]+/).map(x => x.trim().toLocaleLowerCase('pl')).filter(x => x.length >= 3);
+
+  // Moje imię, nazwisko i zdrobnienie – wszystko, co identyfikuje właściciela aplikacji.
+  function nameVariants(profil) {
+    const p = profil || {};
+    return [...splitWords(p.imie), ...splitWords(p.nazwisko), ...splitWords(p.zdrobnienie)].filter((x, i, a) => a.indexOf(x) === i);
+  }
+  // Nazwiska lekarzy z wizyt i leków – też dane osobowe (cudze), więc nie wychodzą.
+  function doctorVariants(vault) {
+    const v = vault || {};
+    const raw = [...(v.wizyty || []).map(w => w.lekarz), ...(v.leki || []).map(m => m.lekarz), ...(v.dokumenty || []).map(d => d.lekarz)];
+    return raw.flatMap(splitWords)
+      .filter(x => !['dr', 'lek', 'med', 'prof', 'hab', 'spec', 'nauk'].includes(x))
+      .filter((x, i, a) => a.indexOf(x) === i);
+  }
+  // Placówki: przychodnie, szpitale, laboratoria – wskazują miasto i konkretnego pacjenta.
+  function placePhrases(vault) {
+    const v = vault || {};
+    return [...(v.wizyty || []).map(w => w.miejsce), ...(v.dokumenty || []).map(d => d.placowka), ...(v.badania || []).map(b => b.laboratorium)]
+      .map(x => String(x || '').trim())
+      .filter(x => x.length >= 4)
+      .filter((x, i, a) => a.indexOf(x) === i)
+      .sort((a, b) => b.length - a.length);
+  }
+  const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+  function scrub(text, vault) {
+    const v = vault || {};
+    const p = v.profil || v;
+    let t = String(text || '');
+    if (!t.trim()) return '';
+    placePhrases(v).forEach(phrase => { t = t.replace(new RegExp(escapeRe(phrase), 'giu'), '[placówka]'); });
+    const mine = nameVariants(p);
+    const docs = doctorVariants(v).filter(x => !mine.includes(x));
+    if (mine.length || docs.length) {
+      t = t.replace(/[\p{L}]+/gu, (w) => {
+        if (mine.length && matchesVariant(w, mine)) return '[imię]';
+        if (docs.length && matchesVariant(w, docs)) return '[lekarz]';
+        return w;
+      });
+    }
+    t = t.replace(/(^|[^\d])\d{11}(?!\d)/g, '$1[PESEL]');
+    t = t.replace(/[\w.+-]+@[\w-]+\.[\w.-]+/g, '[e-mail]');
+    t = t.replace(/(?:tel\.?|telefon[u]?|kom\.?)\s*:?\s*[+\d][\d\s()\-]{6,18}\d/gi, '[telefon]');
+    t = t.replace(/(^|[^\d])(?:\+48[\s-]?)?\d{3}[\s-]?\d{3}[\s-]?\d{3}(?!\d)/g, '$1[telefon]');
+    t = t.replace(/\d{2}-\d{3}[ \t]+\p{Lu}[\p{L}-]+/gu, '[adres]');
+    t = t.replace(/(^|[^\p{L}])(?:ul|al|os|pl)\.[ \t]*[^\n,;]{2,40}/gu, '$1[adres]');
+    const du = p.dataUr;
+    if (du) [du, formatDatePl(du), formatDatePl(du).replace(/^0/, '').replace(/\.0/, '.')].filter(Boolean).forEach(d => { t = t.split(d).join('[data urodzenia]'); });
+    return t.replace(/\[imię\](\s+\[imię\])+/g, '[imię]').replace(/\[lekarz\](\s+\[lekarz\])+/g, '[lekarz]').trim();
+  }
+
+  // Linie z danymi osobowymi w nagłówkach wypisów i wyników – wycinamy całe, z wartością w następnej linii.
+  const PERSONAL_LABEL = /^\s*(?:\d+[.)]\s*)?(?:imi[ęe]|imiona|nazwisko|pacjent|dane\s+pacjenta|numer\s+pesel|pesel|data\s+(?:i\s+miejsce\s+)?urodzenia|miejsce\s+urodzenia|adres|miejsce\s+zamieszkania|zamieszka[łl]|ubezpieczon|nr\s+ksi[ąa][żz]eczki|numer\s+karty|telefon|tel\.|e-?mail|nr\s+telefonu|lekarz\s+(?:kieruj[ąa]cy|prowadz[ąa]cy)|wystawi[łl])/i;
+  function stripPersonalLines(text) {
+    const lines = String(text || '').replace(/\r/g, '').split('\n');
+    const out = [];
+    for (let i = 0; i < lines.length; i++) {
+      const l = lines[i];
+      if (PERSONAL_LABEL.test(l) && l.length < 200) {
+        const value = l.replace(PERSONAL_LABEL, '').replace(/^[\s:–\-()a-ząćęłńóśźż]*/i, '').trim();
+        if (!value || /[:–\-]\s*$/.test(l)) {
+          let j = i + 1;
+          while (j < lines.length && !lines[j].trim()) j++;
+          if (j < lines.length && lines[j].trim().length < 120 && !PERSONAL_LABEL.test(lines[j])) i = j;
+        }
+        continue;
+      }
+      out.push(l);
+    }
+    return out.join('\n');
+  }
+
+  function anonymizeDocText(text, vault) {
+    let t = stripPersonalLines(text);
+    t = t.replace(/(?:dr|lek\.?|lek\.?\s*med\.?|prof\.?|dr\s*hab\.?)[\s.]*(?:n\.?\s*med\.?)?\s*\p{Lu}[\p{L}'-]+(?:\s+\p{Lu}[\p{L}'-]+)?/gu, '[lekarz]');
+    t = t.replace(/(?:Szpital|Przychodnia|Centrum\s+Medyczne|NZOZ|SPZOZ|Poradnia|Laboratorium)[^\n,;]{0,60}/gi, '[placówka]');
+    t = t.replace(/^\s*[\p{Lu}][\p{L} -]{1,40},\s*(?:dnia|dn\.)\s*[^\n]{4,30}$/gmu, '[miejscowość, data]');
+    t = scrub(t, vault);
+    return t.replace(/[ \t]{2,}/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
+  }
+
+  // Ostatnia linia obrony przed wysłaniem: czy w tekście nie został ślad tożsamości.
+  function leaks(text, vault) {
+    const v = vault || {};
+    const p = v.profil || {};
+    const t = String(text || '');
+    const found = [];
+    const mine = nameVariants(p);
+    const docs = doctorVariants(v);
+    (t.match(/[\p{L}]+/gu) || []).forEach(w => {
+      if (mine.length && matchesVariant(w, mine)) found.push(w);
+      else if (docs.length && matchesVariant(w, docs)) found.push(w);
+    });
+    if (/(^|[^\d])\d{11}(?!\d)/.test(t)) found.push('PESEL');
+    const lower = t.toLocaleLowerCase('pl');
+    placePhrases(v).forEach(ph => { if (lower.includes(ph.toLocaleLowerCase('pl'))) found.push(ph); });
+    [p.dataUr, formatDatePl(p.dataUr)].filter(Boolean).forEach(d => { if (t.includes(d)) found.push(d); });
+    return found.filter((x, i, a) => a.indexOf(x) === i);
+  }
+
+  // ---------- opis dla AI (anonimowy) ----------
+  const dawkowanieTekst = (med) => {
+    const czasy = (med.dawki || []).map(d => `${String(d.pora).slice(0, 5)} – ${Number(d.ile) || 1} szt.`).join(', ');
+    const rytm = Array.isArray(med.dni) && med.dni.length && med.dni.length < 7 ? ` (${med.dni.map(d => DNI_TYGODNIA[d - 1]).join(', ')})` : '';
+    const pos = (POSILEK.find(x => x.id === med.posilek) || {}).label;
+    return `${czasy}${rytm}${pos && med.posilek ? ', ' + pos : ''}`;
+  };
+  const medLine = (med) => {
+    const sub = substanceOf(med);
+    return `- ${med.nazwa}${med.moc ? ' ' + med.moc : ''}${sub && norm(med.nazwa) !== sub ? ` (substancja czynna: ${sub})` : ''}: ${dawkowanieTekst(med)}${med.naCo ? '; na: ' + med.naCo : ''}`;
+  };
+
+  // Wejście dla AI: wiek, płeć, choroby, alergie i leki – BEZ imienia, PESEL-u, lekarzy i placówek.
+  function aiInput(vault, opts) {
+    const v = vault || emptyVault();
+    const o = opts || {};
+    const p = v.profil || {};
+    const age = ageYears(p.dataUr, o.now);
+    const kto = [
+      age === '' ? '' : `Wiek: ${age} lat`,
+      p.plec === 'k' ? 'płeć: kobieta' : p.plec === 'm' ? 'płeć: mężczyzna' : '',
+      p.waga ? `waga: ${String(p.waga).replace(/[^\d,.]/g, '')} kg` : '',
+      p.wzrost ? `wzrost: ${String(p.wzrost).replace(/[^\d,.]/g, '')} cm` : ''
+    ].filter(Boolean).join(', ');
+    const aktywne = (v.leki || []).filter(m => m.aktywny !== false && m.nazwa);
+    return [
+      kto ? `OSOBA: ${kto}.` : '',
+      p.choroby ? `ROZPOZNANIA I CHOROBY PRZEWLEKŁE:\n${scrub(p.choroby, v)}` : '',
+      p.alergie ? `UCZULENIA I NIETOLERANCJE:\n${scrub(p.alergie, v)}` : '',
+      aktywne.length ? `LEKI PRZYJMOWANE NA STAŁE:\n${scrub(aktywne.map(medLine).join('\n'), v)}` : 'LEKI PRZYJMOWANE NA STAŁE: brak wpisanych.',
+      o.extra ? `DODATKOWO:\n${scrub(o.extra, v)}` : ''
+    ].filter(Boolean).join('\n\n');
+  }
+
+  // ---------- rozpoznanie danych z wczytanego dokumentu (lokalnie, bez AI) ----------
+  const MONTHS = { stycznia: 1, lutego: 2, marca: 3, kwietnia: 4, maja: 5, czerwca: 6, lipca: 7, sierpnia: 8, września: 9, wrzesnia: 9, października: 10, pazdziernika: 10, listopada: 11, grudnia: 12 };
+  const pad = (n) => String(n).padStart(2, '0');
+  const isoOf = (y, m, d) => (y >= 1900 && y <= 2100 && m >= 1 && m <= 12 && d >= 1 && d <= 31) ? `${y}-${pad(m)}-${pad(d)}` : '';
+  const DATE_RE = /(\d{1,2})[.\-/](\d{1,2})[.\-/](\d{4})|(\d{4})-(\d{2})-(\d{2})|(\d{1,2})\s+(stycznia|lutego|marca|kwietnia|maja|czerwca|lipca|sierpnia|wrze[sś]nia|pa[zź]dziernika|listopada|grudnia)\s+(\d{4})/i;
+  function findDate(s) {
+    const m = String(s || '').match(DATE_RE);
+    if (!m) return '';
+    if (m[1]) return isoOf(+m[3], +m[2], +m[1]);
+    if (m[4]) return isoOf(+m[4], +m[5], +m[6]);
+    const key = m[8].toLocaleLowerCase('pl');
+    return isoOf(+m[9], MONTHS[key] || MONTHS[key.replace('ś', 's').replace('ź', 'z')], +m[7]);
+  }
+  function peselValid(p) {
+    if (!/^\d{11}$/.test(p)) return false;
+    const w = [1, 3, 7, 9, 1, 3, 7, 9, 1, 3];
+    return (10 - (w.reduce((a, x, i) => a + x * +p[i], 0) % 10)) % 10 === +p[10];
+  }
+  function birthFromPesel(p) {
+    if (!peselValid(p)) return '';
+    let y = +p.slice(0, 2), m = +p.slice(2, 4);
+    const d = +p.slice(4, 6);
+    if (m > 80) { y += 1800; m -= 80; } else if (m > 60) { y += 2200; m -= 60; } else if (m > 40) { y += 2100; m -= 40; } else if (m > 20) { y += 2000; m -= 20; } else y += 1900;
+    return isoOf(y, m, d);
+  }
+  function detectDocKind(text) {
+    const t = String(text || '').slice(0, 4000).toLocaleLowerCase('pl');
+    if (/karta informacyjna|wypis ze szpital|leczenia szpitalnego/.test(t)) return 'wypis';
+    if (/skierowanie/.test(t)) return 'skierowanie';
+    if (/recept|rpw|kod dost[ęe]pu/.test(t)) return 'recepta';
+    if (/wynik bada|morfolog|lipidogram|parametr\s+wynik|warto[śs]ci referencyjne|norma\s/.test(t)) return 'badanie';
+    if (/opis badania|usg|tomografi|rezonans|rtg|echo serca/.test(t)) return 'opis';
+    if (/zalecenia|zalecono/.test(t)) return 'zalecenia';
+    return 'inne';
+  }
+  // Propozycje do formularza – zawsze do zatwierdzenia przez człowieka, nigdy zapis „na ślepo”.
+  function extractDocInfo(text) {
+    const t = String(text || '').replace(/\r/g, '');
+    const lines = t.split('\n').map(l => l.trim()).filter(Boolean);
+    const out = { rodzaj: detectDocKind(t), data: '', placowka: '', lekarz: '', pesel: '', dataUr: '', tytul: '' };
+    const pesels = (t.match(/(?:^|\D)(\d{11})(?!\d)/g) || []).map(x => x.replace(/\D/g, '')).filter(peselValid);
+    if (pesels.length) { out.pesel = pesels[0]; out.dataUr = birthFromPesel(pesels[0]); }
+    const dataLine = lines.find(l => /data\s+(?:wystawienia|badania|wypisu|przyj[ęe]cia|wizyty|pobrania)/i.test(l));
+    const dniaLine = lines.find(l => /,\s*(?:dnia|dn\.)\s*\d/i.test(l));
+    out.data = (dataLine && findDate(dataLine)) || (dniaLine && findDate(dniaLine)) || findDate(lines.slice(0, 12).join(' ')) || '';
+    const plac = lines.slice(0, 15).find(l => /(szpital|przychodni|centrum medyczn|nzoz|spzoz|poradni|laboratorium|diagnostyk|alab|synevo)/i.test(l));
+    if (plac) out.placowka = plac.replace(/\s{2,}/g, ' ').slice(0, 120);
+    const lek = t.match(/(?:lek\.?\s*med\.?|lek\.?|dr\s*n\.?\s*med\.?|dr\s*hab\.?|prof\.?\s*dr\s*hab\.?|dr)\s+([\p{Lu}][\p{L}'-]+(?:\s+[\p{Lu}][\p{L}'-]+)?)/u);
+    if (lek) out.lekarz = lek[0].replace(/\s{2,}/g, ' ').trim();
+    out.tytul = (RODZAJE_DOKUMENTOW.find(r => r.id === out.rodzaj) || {}).label || 'Dokument';
+    return out;
+  }
+
+  // ---------- kartki do druku ----------
+  // Karta na wizytę: to, co lekarz pyta na początku, na jednej kartce A4. Z imieniem – zostaje w przeglądarce.
+  function visitCard(vault, now) {
+    const v = migrate(vault);
+    const p = v.profil;
+    const age = ageYears(p.dataUr, now);
+    return {
+      kto: [fullName(p), age === '' ? '' : `${age} lat`, p.grupaKrwi ? `grupa krwi ${p.grupaKrwi}` : ''].filter(Boolean).join(', '),
+      data: formatDatePl(today(now)),
+      choroby: p.choroby || '',
+      alergie: p.alergie || 'Nie zgłaszam znanych uczuleń.',
+      leki: (v.leki || []).filter(m => m.aktywny !== false && m.nazwa).map(m => ({
+        nazwa: `${m.nazwa}${m.moc ? ' ' + m.moc : ''}`, dawkowanie: dawkowanieTekst(m), naCo: m.naCo || ''
+      })),
+      ostatnieBadania: (v.badania || []).slice().sort((a, b) => String(b.data).localeCompare(String(a.data))).slice(0, 2)
+        .map(b => ({ data: formatDatePl(b.data), opis: b.opis || b.laboratorium || 'Badanie', odstajace: (b.pozycje || []).filter(x => x && x.flaga && x.flaga !== 'ok') })),
+      pytania: (v.pytania || []).filter(q => !q.zadane && q.tekst).map(q => q.tekst),
+      uwagi: p.uwagi || ''
+    };
+  }
+
+  // Karta ICE do portfela – tylko to, co ratownikowi potrzebne od razu.
+  function iceCard(vault, now) {
+    const v = migrate(vault);
+    const p = v.profil;
+    const age = ageYears(p.dataUr, now);
+    return {
+      imie: fullName(p),
+      wiek: age === '' ? '' : String(age),
+      grupaKrwi: p.grupaKrwi || '',
+      alergie: p.alergie || '',
+      choroby: p.choroby || '',
+      leki: (v.leki || []).filter(m => m.aktywny !== false && m.nazwa).map(m => `${m.nazwa}${m.moc ? ' ' + m.moc : ''}`),
+      ice: (p.ice || []).filter(k => k && (k.kto || k.telefon))
+    };
+  }
+
+
+  // ---------- dziennik: co już wzięte ----------
+  // Klucz „idLeku|HH:MM” w obrębie jednego dnia. Starsze niż 60 dni czyścimy, żeby sejf nie puchł.
+  const doseKey = (medId, czas) => `${medId}|${String(czas).slice(0, 5)}`;
+  const isTaken = (vault, isoDate, medId, czas) => !!((vault.dziennik || {})[isoDate] || {})[doseKey(medId, czas)];
+  function markDose(vault, isoDate, medId, czas, taken) {
+    const dz = Object.assign({}, vault.dziennik || {});
+    const day = Object.assign({}, dz[isoDate] || {});
+    if (taken) day[doseKey(medId, czas)] = true; else delete day[doseKey(medId, czas)];
+    if (Object.keys(day).length) dz[isoDate] = day; else delete dz[isoDate];
+    Object.keys(dz).forEach(d => { const n = daysUntil(d, Date.parse(isoDate + 'T12:00:00Z')); if (n != null && n < -60) delete dz[d]; });
+    return Object.assign({}, vault, { dziennik: dz });
+  }
+  // Dawki, których pora już minęła, a nie są odhaczone – do przypomnienia głosowego.
+  function dueDoses(vault, isoDate, hhmm) {
+    const teraz = String(hhmm || '').slice(0, 5);
+    return planForDay(vault.leki, isoDate)
+      .filter(g => g.czas <= teraz)
+      .map(g => ({ czas: g.czas, leki: g.leki.filter(l => !isTaken(vault, isoDate, l.id, g.czas)) }))
+      .filter(g => g.leki.length);
+  }
+
+  const api = {
+    VAULT_KEY, APP_ID, ITERATIONS, SOON_DAYS, REFILL_DAYS,
+    PORY, DNI_TYGODNIA, POSILEK, RODZAJE_DOKUMENTOW, GRUPY_KRWI, NAZWY_HANDLOWE, NLPZ, PARACETAMOL_MAX_MG,
+    toB64, fromB64, createSession, addPassword, changePassword, removePassword, slotLabel, seal, open,
+    emptyVault, newMed, newVisit, newDoc, newLab, newQuestion, migrate, fullName, uid, today,
+    parseDate, formatDatePl, daysUntil, addDays, ageYears, plural, dni,
+    weekdayOf, activeDays, takesOnDay, dailyUse, supply, planForDay, spokenReminder, alerts,
+    medEvents, visitEvents, buildIcs, addMinutes,
+    substanceOf, mgOf, dailyMg, allergyHits, checkCombo,
+    nameVariants, doctorVariants, placePhrases, scrub, stripPersonalLines, anonymizeDocText, leaks,
+    dawkowanieTekst, medLine, aiInput,
+    findDate, peselValid, birthFromPesel, detectDocKind, extractDocInfo,
+    visitCard, iceCard,
+    doseKey, isTaken, markDose, dueDoses
+  };
+  if (typeof window !== 'undefined') window.EduZdrowie = api;
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+})();

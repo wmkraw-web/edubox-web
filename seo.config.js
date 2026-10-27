@@ -118,6 +118,7 @@ module.exports = {
     { path: 'menu.html', reason: 'Fragment nawigacji, nie samodzielna strona' },
     { path: 'teczka.html', reason: 'Prywatna lokalna Teczka użytkownika, bez treści publicznej' },
     { path: 'podopieczni.html', reason: 'Prywatna zaszyfrowana Teczka podopiecznych (dane dzieci tylko w przeglądarce)' },
+    { path: 'zdrowie.html', reason: 'Prywatna zaszyfrowana kartoteka zdrowia właściciela (Basic Auth, dane tylko w przeglądarce)' },
   ],
   robotsDisallow: [
     '/api/',
@@ -132,6 +133,7 @@ module.exports = {
     '/panel-materialy.html',
     '/teczka.html',
     '/podopieczni.html',
+    '/zdrowie.html',
   ],
   blog: {
     page: 'blog.html',

@@ -1,0 +1,1320 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Moje Zdrowie</title>
+    <meta name="description" content="Prywatna, zaszyfrowana kartoteka zdrowia. Dane tylko na tym urządzeniu.">
+    <meta name="robots" content="noindex, nofollow, noarchive">
+    <meta name="theme-color" content="#020617">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <!-- PRYWATNA APLIKACJA (27.10.2026). Dane o zdrowiu są wyłącznie w tej przeglądarce, zaszyfrowane hasłem
+         (zdrowie-core.js). Celowo bez analityki, bazy w chmurze, wspólnego global-core.js i menu EduBox – nic nie
+         może wysyłać danych w tle (pilnuje tego scripts/check-zdrowie.js). Skany i PDF-y czyta pdf.js, mammoth
+         i OCR tesseract LOKALNIE, dlatego /zdrowie.html ma w vercel.json własne CSP z 'wasm-unsafe-eval'. -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js" crossorigin=""></script>
+    <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js" crossorigin=""></script>
+    <script src="https://unpkg.com/@babel/standalone@7.26.10/babel.min.js"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+    <script src="/doc-tools.js"></script>
+    <script src="/zdrowie-core.js"></script>
+    <link rel="stylesheet" href="/doc-paper.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+    <style>
+        body { font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+        .field { width: 100%; background: #0b1220; border: 1px solid #334155; border-radius: 12px; padding: 10px 12px; font-size: 14px; color: #e2e8f0; outline: none; }
+        .field:focus { border-color: #2dd4bf; box-shadow: 0 0 0 3px rgba(45,212,191,.15); }
+        textarea.field { resize: vertical; min-height: 84px; line-height: 1.5; }
+        .lbl { display: block; font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: #94a3b8; margin-bottom: 6px; }
+        .card { background: #0f172a; border: 1px solid #1e293b; border-radius: 20px; }
+        .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-weight: 800; font-size: 14px; border-radius: 12px; padding: 10px 16px; transition: background .15s, opacity .15s; }
+        .btn:disabled { opacity: .5; cursor: not-allowed; }
+        .btn-main { background: #2dd4bf; color: #042f2e; } .btn-main:hover:not(:disabled) { background: #5eead4; }
+        .btn-soft { background: #1e293b; color: #e2e8f0; } .btn-soft:hover:not(:disabled) { background: #334155; }
+        .btn-danger { background: transparent; color: #fca5a5; border: 1px solid #7f1d1d; } .btn-danger:hover { background: #450a0a; }
+        .tab { padding: 8px 14px; border-radius: 999px; font-size: 13px; font-weight: 800; color: #94a3b8; white-space: nowrap; }
+        .tab[aria-pressed="true"] { background: #2dd4bf; color: #042f2e; }
+        .pill { font-size: 11px; font-weight: 800; padding: 3px 9px; border-radius: 999px; }
+        .pill-stop { background: #450a0a; color: #fca5a5; }
+        .pill-sprawdz { background: #422006; color: #fcd34d; }
+        .pill-ok { background: #052e1c; color: #6ee7b7; }
+        .dose { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 14px; border: 1px solid #1e293b; background: #0b1220; }
+        .dose.done { opacity: .55; }
+        .dose.done .dose-name { text-decoration: line-through; }
+        @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+        @media print { #root { display: none !important; } }
+    </style>
+</head>
+<body class="min-h-screen bg-slate-950 text-slate-100">
+    <div id="root"></div>
+    <noscript><p style="padding:24px">Aplikacja wymaga włączonego JavaScriptu.</p></noscript>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useMemo, useCallback } = React;
+        const Z = window.EduZdrowie;
+        const DT = window.EduDocTools;
+
+        const IS_LOCAL = location.protocol === 'file:';
+        const todayIso = () => Z.today();
+        const nowHHMM = () => new Date().toTimeString().slice(0, 5);
+        const escapeHtml = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        const readStored = () => { try { const r = localStorage.getItem(Z.VAULT_KEY); return r ? JSON.parse(r) : null; } catch (e) { return null; } };
+        const fileSafe = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/ł/g, 'l').replace(/Ł/g, 'L').replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '');
+
+        function download(content, name, type) {
+            const blob = content instanceof Blob ? content : new Blob([content], { type: type || 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = name;
+            document.body.appendChild(a); a.click(); a.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 2000);
+        }
+
+        // ---------- drobne elementy ----------
+        const Icon = ({ name, className }) => <i className={`ph ph-${name} ${className || ''}`} aria-hidden="true"></i>;
+
+        function Field({ label, hint, children }) {
+            return (
+                <label className="block">
+                    <span className="lbl">{label}</span>
+                    {children}
+                    {hint ? <span className="block mt-1 text-[11px] text-slate-500">{hint}</span> : null}
+                </label>
+            );
+        }
+
+        function Modal({ title, onClose, children, wide }) {
+            useEffect(() => {
+                const esc = (e) => { if (e.key === 'Escape') onClose(); };
+                document.addEventListener('keydown', esc);
+                return () => document.removeEventListener('keydown', esc);
+            }, [onClose]);
+            return (
+                <div className="fixed inset-0 z-50 bg-slate-950/80 p-3 sm:p-6 overflow-y-auto" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+                    <div className={`card mx-auto p-5 sm:p-6 ${wide ? 'max-w-3xl' : 'max-w-xl'}`} role="dialog" aria-modal="true" aria-label={title}>
+                        <div className="flex items-start justify-between gap-4 mb-4">
+                            <h2 className="text-lg font-extrabold">{title}</h2>
+                            <button className="text-slate-400 hover:text-slate-100 text-xl leading-none" onClick={onClose} aria-label="Zamknij">×</button>
+                        </div>
+                        {children}
+                    </div>
+                </div>
+            );
+        }
+
+        function Note({ children, tone }) {
+            const tones = { info: 'border-sky-900 bg-sky-950/40 text-sky-200', warn: 'border-amber-900 bg-amber-950/40 text-amber-200', stop: 'border-red-900 bg-red-950/40 text-red-200' };
+            return <div className={`rounded-2xl border px-4 py-3 text-sm leading-relaxed ${tones[tone || 'info']}`}>{children}</div>;
+        }
+
+        const STATUS_PILL = { pusto: 'pill-stop', pilne: 'pill-stop', minelo: 'pill-stop', dzisiaj: 'pill-sprawdz', wkrotce: 'pill-sprawdz', ok: 'pill-ok' };
+        const dayWord = (n) => n < 0 ? `${Z.dni(-n)} temu` : n === 0 ? 'dzisiaj' : n === 1 ? 'jutro' : `za ${Z.dni(n)}`;
+
+        // ---------- ekran hasła ----------
+        function Gate({ stored, onOpen }) {
+            const [pass, setPass] = useState('');
+            const [pass2, setPass2] = useState('');
+            const [busy, setBusy] = useState(false);
+            const [err, setErr] = useState('');
+            const [importBlob, setImportBlob] = useState(null);
+            const fileRef = useRef(null);
+            const blob = importBlob || stored;
+            const isNew = !blob;
+
+            const go = async (e) => {
+                e.preventDefault();
+                setErr(''); setBusy(true);
+                try {
+                    if (isNew) {
+                        if (pass !== pass2) throw new Error('Hasła się różnią.');
+                        const session = await Z.createSession(pass, 'Hasło główne');
+                        onOpen(Z.emptyVault(), session);
+                    } else {
+                        const r = await Z.open(blob, pass);
+                        onOpen(r.data, r.session);
+                    }
+                } catch (x) { setErr(x.message); } finally { setBusy(false); setPass(''); setPass2(''); }
+            };
+
+            const pickBackup = async (e) => {
+                const f = e.target.files && e.target.files[0];
+                e.target.value = '';
+                if (!f) return;
+                try {
+                    const j = JSON.parse(await f.text());
+                    if (j.app !== Z.APP_ID) throw new Error('To nie jest kopia zapasowa aplikacji Moje Zdrowie.');
+                    setImportBlob(j); setErr('');
+                } catch (x) { setErr(x.message || 'Nie udało się odczytać pliku.'); }
+            };
+
+            return (
+                <div className="min-h-screen flex items-center justify-center p-4">
+                    <div className="card w-full max-w-md p-6 sm:p-8">
+                        <div className="flex items-center gap-3 mb-5">
+                            <div className="w-11 h-11 rounded-2xl bg-teal-400 text-teal-950 grid place-items-center text-2xl"><Icon name="heartbeat" /></div>
+                            <div>
+                                <h1 className="text-xl font-extrabold">Moje Zdrowie</h1>
+                                <p className="text-xs text-slate-400">Kartoteka zaszyfrowana na tym urządzeniu</p>
+                            </div>
+                        </div>
+
+                        {isNew ? (
+                            <Note tone="info">
+                                Zakładasz kartotekę po raz pierwszy. Hasło szyfruje wszystko, co w niej zapiszesz —
+                                leki, wyniki, skany. <strong>Nie da się go odzyskać.</strong> Zapisz je w menedżerze haseł,
+                                zanim przejdziesz dalej.
+                            </Note>
+                        ) : (
+                            <Note tone="info">Dane są w tej przeglądarce i nigdzie poza nią. Podaj hasło, żeby je odszyfrować.</Note>
+                        )}
+
+                        <form onSubmit={go} className="mt-5 space-y-4">
+                            <Field label={isNew ? 'Nowe hasło (min. 8 znaków)' : 'Hasło'}>
+                                <input type="password" className="field" value={pass} onChange={e => setPass(e.target.value)}
+                                    autoFocus autoComplete={isNew ? 'new-password' : 'current-password'} />
+                            </Field>
+                            {isNew ? (
+                                <Field label="Powtórz hasło">
+                                    <input type="password" className="field" value={pass2} onChange={e => setPass2(e.target.value)} autoComplete="new-password" />
+                                </Field>
+                            ) : null}
+                            {err ? <Note tone="stop">{err}</Note> : null}
+                            <button className="btn btn-main w-full" disabled={busy || pass.length < 8}>
+                                {busy ? 'Odszyfrowuję…' : isNew ? 'Załóż kartotekę' : 'Otwórz'}
+                            </button>
+                        </form>
+
+                        <div className="mt-5 pt-4 border-t border-slate-800 text-xs text-slate-400 space-y-2">
+                            <button className="underline hover:text-slate-200" onClick={() => fileRef.current.click()}>
+                                {importBlob ? 'Wczytano kopię zapasową – podaj do niej hasło' : 'Otwórz z kopii zapasowej (plik .json)'}
+                            </button>
+                            <input ref={fileRef} type="file" accept="application/json,.json" className="hidden" onChange={pickBackup} />
+                            <p>Szyfrowanie: PBKDF2-SHA256 ({Z.ITERATIONS.toLocaleString('pl')} obiegów) + AES-GCM 256. Bez hasła dane są nie do odczytania — także dla mnie.</p>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // ---------- przypomnienia w otwartej karcie ----------
+        // Uczciwie: przeglądarka nie obudzi nikogo przy zamkniętej karcie. Dlatego to tylko dodatek do pliku .ics,
+        // który trafia do kalendarza telefonu i dzwoni sam. Tu przypominamy, gdy aplikacja jest otwarta.
+        function useReminders(vault, enabled) {
+            const announced = useRef(new Set());
+            useEffect(() => {
+                if (!enabled) return;
+                const tick = () => {
+                    const day = todayIso();
+                    Z.dueDoses(vault, day, nowHHMM()).forEach(g => {
+                        const key = day + '|' + g.czas;
+                        if (announced.current.has(key)) return;
+                        announced.current.add(key);
+                        const tekst = Z.spokenReminder(g.czas, g.leki);
+                        try {
+                            if (window.speechSynthesis) {
+                                const u = new SpeechSynthesisUtterance(tekst);
+                                u.lang = 'pl-PL'; u.rate = 0.95;
+                                window.speechSynthesis.speak(u);
+                            }
+                        } catch (e) { /* głos jest dodatkiem – brak syntezatora nie psuje przypomnienia */ }
+                        try {
+                            if (window.Notification && Notification.permission === 'granted') {
+                                new Notification('Pora na leki — ' + g.czas, { body: g.leki.map(l => `${l.nazwa} ${l.ile} szt.`).join(', '), tag: key });
+                            }
+                        } catch (e) { /* powiadomienia bywają zablokowane – to nie błąd aplikacji */ }
+                    });
+                };
+                tick();
+                const id = setInterval(tick, 30000);
+                return () => clearInterval(id);
+            }, [vault, enabled]);
+        }
+
+        // ---------- zakładka: Dziś ----------
+        function Dzis({ vault, save, goto }) {
+            const day = todayIso();
+            const [, odswiez] = useState(0);
+            useEffect(() => { const id = setInterval(() => odswiez(x => x + 1), 60000); return () => clearInterval(id); }, []);
+
+            const plan = Z.planForDay(vault.leki, day);
+            const alerty = Z.alerts(vault);
+            const ostrzezenia = Z.checkCombo(vault.leki, vault.profil).filter(o => o.poziom === 'stop');
+            const teraz = nowHHMM();
+            const wzieteDzis = plan.reduce((a, g) => a + g.leki.filter(l => Z.isTaken(vault, day, l.id, g.czas)).length, 0);
+            const wszystkie = plan.reduce((a, g) => a + g.leki.length, 0);
+            const dataPl = new Date().toLocaleDateString('pl-PL', { weekday: 'long', day: 'numeric', month: 'long' });
+
+            const przelacz = (medId, czas, stan) => save(Z.markDose(vault, day, medId, czas, stan));
+
+            return (
+                <div className="space-y-5">
+                    <div className="flex flex-wrap items-end justify-between gap-3">
+                        <div>
+                            <h2 className="text-2xl font-extrabold capitalize">{dataPl}</h2>
+                            <p className="text-sm text-slate-400">{wszystkie ? `Leki na dziś: ${wzieteDzis} z ${wszystkie} wzięte` : 'Na dziś nie masz wpisanych leków.'}</p>
+                        </div>
+                        {wszystkie ? (
+                            <div className="text-right">
+                                <div className="text-3xl font-extrabold text-teal-300">{Math.round((wzieteDzis / wszystkie) * 100)}%</div>
+                                <div className="text-[11px] uppercase tracking-wider text-slate-500">dzisiejszego planu</div>
+                            </div>
+                        ) : null}
+                    </div>
+
+                    {ostrzezenia.length ? (
+                        <Note tone="stop">
+                            <strong>Sprawdź zestaw leków.</strong>
+                            <ul className="mt-2 space-y-1 list-disc pl-5">{ostrzezenia.map((o, i) => <li key={i}>{o.tekst}</li>)}</ul>
+                        </Note>
+                    ) : null}
+
+                    {alerty.length ? (
+                        <div className="card p-4">
+                            <h3 className="text-sm font-extrabold uppercase tracking-wider text-slate-400 mb-3">Wymaga uwagi</h3>
+                            <ul className="space-y-2">
+                                {alerty.map((a, i) => (
+                                    <li key={i}>
+                                        <button className="w-full flex items-center gap-3 text-left hover:bg-slate-800/60 rounded-xl px-2 py-2"
+                                            onClick={() => goto(a.kind === 'wizyta' ? 'wizyty' : 'leki')}>
+                                            <Icon name={a.kind === 'wizyta' ? 'stethoscope' : 'pill'} className="text-lg text-slate-400" />
+                                            <span className="flex-1 text-sm">{a.label}</span>
+                                            <span className={`pill ${STATUS_PILL[a.status] || 'pill-ok'}`}>{dayWord(a.days)}</span>
+                                        </button>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    ) : null}
+
+                    {plan.length ? (
+                        <div className="space-y-3">
+                            {plan.map(g => {
+                                const minelo = g.czas <= teraz;
+                                const komplet = g.leki.every(l => Z.isTaken(vault, day, l.id, g.czas));
+                                return (
+                                    <div key={g.czas} className={`card p-4 ${minelo && !komplet ? 'border-amber-800' : ''}`}>
+                                        <div className="flex items-center justify-between mb-3">
+                                            <h3 className="text-lg font-extrabold tabular-nums">{g.czas}</h3>
+                                            {minelo && !komplet ? <span className="pill pill-sprawdz">pora minęła</span> : komplet ? <span className="pill pill-ok">wzięte</span> : null}
+                                        </div>
+                                        <div className="space-y-2">
+                                            {g.leki.map(l => {
+                                                const done = Z.isTaken(vault, day, l.id, g.czas);
+                                                const pos = (Z.POSILEK.find(p => p.id === l.posilek) || {}).label;
+                                                return (
+                                                    <label key={l.id} className={`dose ${done ? 'done' : ''} cursor-pointer`}>
+                                                        <input type="checkbox" className="w-5 h-5 accent-teal-400" checked={done} onChange={e => przelacz(l.id, g.czas, e.target.checked)} />
+                                                        <span className="flex-1">
+                                                            <span className="dose-name font-bold">{l.nazwa}{l.moc ? ' ' + l.moc : ''}</span>
+                                                            <span className="block text-xs text-slate-400">{l.ile} {Z.plural(l.ile, 'sztuka', 'sztuki', 'sztuk')}{pos && l.posilek ? ' · ' + pos : ''}</span>
+                                                        </span>
+                                                    </label>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    ) : (
+                        <div className="card p-6 text-center text-sm text-slate-400">
+                            <p className="mb-3">Nie masz jeszcze wpisanych leków na dziś.</p>
+                            <button className="btn btn-main" onClick={() => goto('leki')}><Icon name="plus" /> Dodaj pierwszy lek</button>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        // ---------- zakładka: Leki ----------
+        const POSTACIE = ['tabletka', 'kapsułka', 'saszetka', 'ml', 'kropla', 'dawka wziewna', 'zastrzyk', 'plaster', 'czopek'];
+
+        function MedForm({ med, isNew, onSave, onClose, onDelete }) {
+            const [m, setM] = useState(() => Object.assign(Z.newMed(), med || {}));
+            const set = (k, v) => setM(prev => Object.assign({}, prev, { [k]: v }));
+            const setDawka = (i, k, v) => setM(prev => Object.assign({}, prev, { dawki: prev.dawki.map((d, j) => j === i ? Object.assign({}, d, { [k]: v }) : d) }));
+            const codziennie = !Array.isArray(m.dni);
+            const sub = Z.substanceOf(m);
+
+            return (
+                <Modal title={isNew ? 'Nowy lek' : 'Lek: ' + (med.nazwa || '')} onClose={onClose} wide>
+                    <div className="grid sm:grid-cols-2 gap-4">
+                        <Field label="Nazwa z opakowania">
+                            <input className="field" value={m.nazwa} onChange={e => set('nazwa', e.target.value)} placeholder="np. Ibuprom Max" autoFocus />
+                        </Field>
+                        <Field label="Moc jednej sztuki" hint="np. 400 mg, 12,5 mg, 5 ml">
+                            <input className="field" value={m.moc} onChange={e => set('moc', e.target.value)} placeholder="400 mg" />
+                        </Field>
+                        <Field label="Substancja czynna" hint={sub && !m.substancja ? `Rozpoznana z nazwy: ${sub}` : 'Przepisz z ulotki — dzięki temu wyłapię powtórzenia'}>
+                            <input className="field" value={m.substancja} onChange={e => set('substancja', e.target.value)} placeholder={sub || 'np. ibuprofen'} />
+                        </Field>
+                        <Field label="Postać">
+                            <select className="field" value={m.postac} onChange={e => set('postac', e.target.value)}>
+                                {POSTACIE.map(p => <option key={p} value={p}>{p}</option>)}
+                            </select>
+                        </Field>
+                    </div>
+
+                    <div className="mt-5">
+                        <span className="lbl">Pory i dawki</span>
+                        <div className="space-y-2">
+                            {m.dawki.map((d, i) => (
+                                <div key={i} className="flex items-center gap-2">
+                                    <input type="time" className="field w-32" value={d.pora} onChange={e => setDawka(i, 'pora', e.target.value)} />
+                                    <input type="number" min="0.25" step="0.25" className="field w-24" value={d.ile} onChange={e => setDawka(i, 'ile', Number(e.target.value))} />
+                                    <span className="text-sm text-slate-400 flex-1">{m.postac}{Number(d.ile) === 1 ? '' : 'i/ek'}</span>
+                                    {m.dawki.length > 1 ? (
+                                        <button className="btn btn-danger !py-1.5 !px-3" onClick={() => set('dawki', m.dawki.filter((_, j) => j !== i))} aria-label="Usuń porę">×</button>
+                                    ) : null}
+                                </div>
+                            ))}
+                        </div>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                            <button className="btn btn-soft !py-1.5 !text-xs" onClick={() => set('dawki', [...m.dawki, { pora: '20:00', ile: 1 }])}><Icon name="plus" /> Dodaj porę</button>
+                            {Z.PORY.map(p => (
+                                <button key={p.id} className="btn btn-soft !py-1.5 !text-xs" onClick={() => set('dawki', [...m.dawki.filter(d => d.pora !== p.czas), { pora: p.czas, ile: 1 }].sort((a, b) => a.pora.localeCompare(b.pora)))}>
+                                    {p.label} {p.czas}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="mt-5">
+                        <span className="lbl">Które dni</span>
+                        <div className="flex flex-wrap gap-2">
+                            <button className="tab" aria-pressed={codziennie} onClick={() => set('dni', 'codziennie')}>Codziennie</button>
+                            {Z.DNI_TYGODNIA.map((nazwa, i) => {
+                                const nr = i + 1;
+                                const on = Array.isArray(m.dni) && m.dni.includes(nr);
+                                return (
+                                    <button key={nr} className="tab" aria-pressed={on} onClick={() => {
+                                        const base = Array.isArray(m.dni) ? m.dni : [];
+                                        const next = on ? base.filter(x => x !== nr) : [...base, nr].sort();
+                                        set('dni', next.length ? next : 'codziennie');
+                                    }}>{nazwa.slice(0, 3)}</button>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    <div className="grid sm:grid-cols-2 gap-4 mt-5">
+                        <Field label="Kiedy względem posiłku">
+                            <select className="field" value={m.posilek} onChange={e => set('posilek', e.target.value)}>
+                                {Z.POSILEK.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
+                            </select>
+                        </Field>
+                        <Field label="Na co">
+                            <input className="field" value={m.naCo} onChange={e => set('naCo', e.target.value)} placeholder="np. ciśnienie" />
+                        </Field>
+                        <Field label="Kto przepisał" hint="Zostaje w przeglądarce, do AI nie trafia">
+                            <input className="field" value={m.lekarz} onChange={e => set('lekarz', e.target.value)} placeholder="np. dr Nowak, kardiolog" />
+                        </Field>
+                        <Field label="Koniec kuracji (jeśli dotyczy)">
+                            <input type="date" className="field" value={m.doKiedy} onChange={e => set('doKiedy', e.target.value)} />
+                        </Field>
+                    </div>
+
+                    <div className="mt-5 rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
+                        <span className="lbl">Zapas w domu</span>
+                        <p className="text-xs text-slate-400 mb-3">Podaj raz, ile sztuk masz i na jaki dzień — resztę odliczę sam, bez codziennego klikania.</p>
+                        <div className="grid sm:grid-cols-2 gap-4">
+                            <Field label="Zostało sztuk">
+                                <input type="number" min="0" className="field" value={m.zapas.sztuk} onChange={e => set('zapas', Object.assign({}, m.zapas, { sztuk: e.target.value, odDnia: m.zapas.odDnia || todayIso() }))} placeholder="30" />
+                            </Field>
+                            <Field label="Policzone w dniu">
+                                <input type="date" className="field" value={m.zapas.odDnia} onChange={e => set('zapas', Object.assign({}, m.zapas, { odDnia: e.target.value }))} />
+                            </Field>
+                        </div>
+                        {(() => { const s = Z.supply(m); return s.znany ? (
+                            <p className="mt-3 text-sm text-slate-300">Na dziś zostaje ok. <strong>{s.zostalo}</strong> szt. — starczy na <strong>{Z.dni(s.dniStarczy)}</strong>, do {Z.formatDatePl(s.konczySie)}.</p>
+                        ) : null; })()}
+                    </div>
+
+                    <Field label="Uwagi">
+                        <textarea className="field mt-4" value={m.uwagi} onChange={e => set('uwagi', e.target.value)} placeholder="np. nie łączyć z sokiem grejpfrutowym (z ulotki)" />
+                    </Field>
+
+                    <label className="flex items-center gap-2 mt-4 text-sm">
+                        <input type="checkbox" className="w-4 h-4 accent-teal-400" checked={m.aktywny !== false} onChange={e => set('aktywny', e.target.checked)} />
+                        Biorę ten lek obecnie
+                    </label>
+
+                    <div className="flex flex-wrap gap-2 mt-6">
+                        <button className="btn btn-main" disabled={!m.nazwa.trim()} onClick={() => onSave(m)}><Icon name="check" /> Zapisz</button>
+                        <button className="btn btn-soft" onClick={onClose}>Anuluj</button>
+                        {onDelete ? <button className="btn btn-danger sm:ml-auto" onClick={() => { if (confirm('Usunąć ten lek z kartoteki?')) onDelete(med.id); }}>Usuń</button> : null}
+                    </div>
+                </Modal>
+            );
+        }
+
+        function Leki({ vault, save }) {
+            const [edit, setEdit] = useState(null);
+            const [sprawdz, setSprawdz] = useState(null);
+            const aktywne = vault.leki.filter(m => m.aktywny !== false);
+            const odstawione = vault.leki.filter(m => m.aktywny === false);
+            const ostrzezenia = Z.checkCombo(vault.leki, vault.profil);
+
+            const zapisz = (m) => {
+                const exists = vault.leki.some(x => x.id === m.id);
+                save(Object.assign({}, vault, { leki: exists ? vault.leki.map(x => x.id === m.id ? m : x) : [...vault.leki, m] }));
+                setEdit(null);
+            };
+            const usun = (id) => { save(Object.assign({}, vault, { leki: vault.leki.filter(x => x.id !== id) })); setEdit(null); };
+
+            const Lista = ({ items }) => (
+                <div className="space-y-2">
+                    {items.map(m => {
+                        const s = Z.supply(m);
+                        return (
+                            <button key={m.id} className="card w-full text-left p-4 hover:border-slate-700" onClick={() => setEdit(m)}>
+                                <div className="flex items-start justify-between gap-3">
+                                    <div className="min-w-0">
+                                        <div className="font-extrabold truncate">{m.nazwa} {m.moc ? <span className="text-slate-400 font-semibold">{m.moc}</span> : null}</div>
+                                        <div className="text-xs text-slate-400 mt-0.5">{Z.dawkowanieTekst(m)}</div>
+                                        {m.naCo ? <div className="text-xs text-slate-500 mt-0.5">na: {m.naCo}</div> : null}
+                                    </div>
+                                    {s.znany ? <span className={`pill ${STATUS_PILL[s.status]} shrink-0`}>{s.zostalo <= 0 ? 'brak' : Z.dni(s.dniStarczy)}</span> : null}
+                                </div>
+                            </button>
+                        );
+                    })}
+                </div>
+            );
+
+            return (
+                <div className="space-y-5">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                        <h2 className="text-2xl font-extrabold">Leki</h2>
+                        <div className="flex gap-2">
+                            <button className="btn btn-soft" onClick={() => setSprawdz(Z.newMed())}><Icon name="question" /> Czy mogę wziąć?</button>
+                            <button className="btn btn-main" onClick={() => setEdit(Z.newMed())}><Icon name="plus" /> Dodaj lek</button>
+                        </div>
+                    </div>
+
+                    {ostrzezenia.length ? (
+                        <div className="space-y-2">
+                            {ostrzezenia.map((o, i) => (
+                                <Note key={i} tone={o.poziom === 'stop' ? 'stop' : 'warn'}>
+                                    <span className={`pill ${o.poziom === 'stop' ? 'pill-stop' : 'pill-sprawdz'} mr-2`}>{o.poziom === 'stop' ? 'sprawdź koniecznie' : 'zwróć uwagę'}</span>
+                                    {o.tekst}
+                                </Note>
+                            ))}
+                        </div>
+                    ) : aktywne.length > 1 ? (
+                        <Note tone="info">Mechaniczne sprawdzenie zestawu nie znalazło powtórzonych substancji ani przekroczonych dawek. To nie jest analiza farmakologiczna — przy nowym leku i tak zapytaj farmaceutę.</Note>
+                    ) : null}
+
+                    {aktywne.length ? <Lista items={aktywne} /> : <div className="card p-6 text-center text-sm text-slate-400">Brak wpisanych leków.</div>}
+
+                    {odstawione.length ? (
+                        <details className="card p-4">
+                            <summary className="cursor-pointer text-sm font-bold text-slate-400">Odstawione ({odstawione.length})</summary>
+                            <div className="mt-3"><Lista items={odstawione} /></div>
+                        </details>
+                    ) : null}
+
+                    {edit ? <MedForm med={edit} isNew={!vault.leki.some(x => x.id === edit.id)} onSave={zapisz} onClose={() => setEdit(null)} onDelete={vault.leki.some(x => x.id === edit.id) ? usun : null} /> : null}
+                    {sprawdz ? <SprawdzLek vault={vault} onClose={() => setSprawdz(null)} /> : null}
+                </div>
+            );
+        }
+
+        // ---------- „Czy mogę to wziąć?” (sprawdzenie mechaniczne, bez AI) ----------
+        const RPL_URL = 'https://rejestrymedyczne.ezdrowie.gov.pl/rpl/search/public';
+
+        function SprawdzLek({ vault, onClose }) {
+            const [kandydat, setKandydat] = useState(() => Object.assign(Z.newMed(), { nazwa: '', dawki: [{ pora: '12:00', ile: 1 }] }));
+            const set = (k, v) => setKandydat(prev => Object.assign({}, prev, { [k]: v }));
+            const sub = Z.substanceOf(kandydat);
+            const zestaw = [...vault.leki.filter(m => m.aktywny !== false), Object.assign({}, kandydat, { aktywny: true })];
+            const wynik = kandydat.nazwa.trim() ? Z.checkCombo(zestaw, vault.profil) : [];
+            const stop = wynik.filter(o => o.poziom === 'stop');
+
+            return (
+                <Modal title="Czy mogę to wziąć?" onClose={onClose} wide>
+                    <Note tone="info">
+                        Porównuję preparat z Twoją listą leków i uczuleniami — mechanicznie: ta sama substancja czynna,
+                        dwa leki z grupy NLPZ, dawka dobowa paracetamolu, wpisane uczulenie.
+                        <strong> To nie jest porada medyczna ani pełna analiza interakcji.</strong> Ostatnie słowo ma farmaceuta albo lekarz.
+                    </Note>
+
+                    <div className="grid sm:grid-cols-3 gap-4 mt-5">
+                        <Field label="Nazwa preparatu">
+                            <input className="field" value={kandydat.nazwa} onChange={e => set('nazwa', e.target.value)} placeholder="np. Ibuprom Max" autoFocus />
+                        </Field>
+                        <Field label="Moc" hint={sub ? `substancja: ${sub}` : 'nie rozpoznaję — wpisz substancję'}>
+                            <input className="field" value={kandydat.moc} onChange={e => set('moc', e.target.value)} placeholder="400 mg" />
+                        </Field>
+                        <Field label="Ile razy dziennie">
+                            <input type="number" min="1" max="6" className="field"
+                                value={kandydat.dawki.length}
+                                onChange={e => {
+                                    const n = Math.max(1, Math.min(6, Number(e.target.value) || 1));
+                                    set('dawki', Array.from({ length: n }, (_, i) => ({ pora: String(8 + i * Math.floor(12 / n)).padStart(2, '0') + ':00', ile: 1 })));
+                                }} />
+                        </Field>
+                    </div>
+                    {!sub ? (
+                        <Field label="Substancja czynna (z ulotki)">
+                            <input className="field" value={kandydat.substancja} onChange={e => set('substancja', e.target.value)} placeholder="np. ibuprofen" />
+                        </Field>
+                    ) : null}
+
+                    {kandydat.nazwa.trim() ? (
+                        <div className="mt-5 space-y-2">
+                            {wynik.length ? wynik.map((o, i) => (
+                                <Note key={i} tone={o.poziom === 'stop' ? 'stop' : 'warn'}>{o.tekst}</Note>
+                            )) : (
+                                <Note tone="info">
+                                    Nie wykryłem powtórzonej substancji, drugiego NLPZ, przekroczonej dawki paracetamolu ani uczulenia z Twojego profilu.
+                                    To wciąż nie znaczy „można” — sprawdź ulotkę i przy wątpliwościach zapytaj farmaceutę.
+                                </Note>
+                            )}
+                            {stop.length ? <p className="text-sm text-red-300 font-bold">Przy takim wyniku nie bierz preparatu na własną rękę.</p> : null}
+                        </div>
+                    ) : null}
+
+                    <div className="flex flex-wrap gap-2 mt-6">
+                        <a className="btn btn-soft" href={RPL_URL} target="_blank" rel="noopener noreferrer"><Icon name="file-text" /> Znajdź ulotkę w Rejestrze Produktów Leczniczych</a>
+                        <button className="btn btn-main sm:ml-auto" onClick={onClose}>Zamknij</button>
+                    </div>
+                </Modal>
+            );
+        }
+
+        // ---------- zakładka: Wizyty ----------
+        function VisitForm({ visit, isNew, onSave, onClose, onDelete }) {
+            const [w, setW] = useState(() => Object.assign(Z.newVisit(), visit || {}));
+            const set = (k, v) => setW(prev => Object.assign({}, prev, { [k]: v }));
+            return (
+                <Modal title={isNew ? 'Nowa wizyta' : 'Wizyta'} onClose={onClose} wide>
+                    <div className="grid sm:grid-cols-2 gap-4">
+                        <Field label="Data"><input type="date" className="field" value={w.data} onChange={e => set('data', e.target.value)} autoFocus /></Field>
+                        <Field label="Godzina"><input type="time" className="field" value={w.godzina} onChange={e => set('godzina', e.target.value)} /></Field>
+                        <Field label="Specjalizacja"><input className="field" value={w.specjalizacja} onChange={e => set('specjalizacja', e.target.value)} placeholder="np. kardiolog" /></Field>
+                        <Field label="Lekarz" hint="Zostaje w przeglądarce, do AI nie trafia"><input className="field" value={w.lekarz} onChange={e => set('lekarz', e.target.value)} placeholder="np. dr Anna Nowak" /></Field>
+                        <Field label="Telefon do rejestracji"><input className="field" value={w.telefon} onChange={e => set('telefon', e.target.value)} inputMode="tel" /></Field>
+                        <Field label="Miejsce"><input className="field" value={w.miejsce} onChange={e => set('miejsce', e.target.value)} placeholder="przychodnia, adres, gabinet" /></Field>
+                    </div>
+                    <div className="mt-4 space-y-4">
+                        <Field label="Powód wizyty"><textarea className="field" value={w.powod} onChange={e => set('powod', e.target.value)} /></Field>
+                        <Field label="Jak się przygotować" hint="np. na czczo, zabrać poprzednie wyniki, skierowanie"><textarea className="field" value={w.przygotowanie} onChange={e => set('przygotowanie', e.target.value)} /></Field>
+                        <Field label="Notatka po wizycie"><textarea className="field" value={w.notatka} onChange={e => set('notatka', e.target.value)} placeholder="co powiedział lekarz, co dalej" /></Field>
+                    </div>
+                    <label className="flex items-center gap-2 mt-4 text-sm">
+                        <input type="checkbox" className="w-4 h-4 accent-teal-400" checked={!!w.zrobione} onChange={e => set('zrobione', e.target.checked)} />
+                        Wizyta już się odbyła
+                    </label>
+                    <div className="flex flex-wrap gap-2 mt-6">
+                        <button className="btn btn-main" disabled={!w.data} onClick={() => onSave(w)}><Icon name="check" /> Zapisz</button>
+                        <button className="btn btn-soft" onClick={onClose}>Anuluj</button>
+                        {onDelete ? <button className="btn btn-danger sm:ml-auto" onClick={() => { if (confirm('Usunąć tę wizytę?')) onDelete(visit.id); }}>Usuń</button> : null}
+                    </div>
+                </Modal>
+            );
+        }
+
+        function Wizyty({ vault, save }) {
+            const [edit, setEdit] = useState(null);
+            const sorted = vault.wizyty.slice().sort((a, b) => String(a.data).localeCompare(String(b.data)));
+            const przyszle = sorted.filter(w => !w.zrobione);
+            const minione = sorted.filter(w => w.zrobione).reverse();
+
+            const zapisz = (w) => {
+                const exists = vault.wizyty.some(x => x.id === w.id);
+                save(Object.assign({}, vault, { wizyty: exists ? vault.wizyty.map(x => x.id === w.id ? w : x) : [...vault.wizyty, w] }));
+                setEdit(null);
+            };
+            const usun = (id) => { save(Object.assign({}, vault, { wizyty: vault.wizyty.filter(x => x.id !== id) })); setEdit(null); };
+            const doKalendarza = () => {
+                const ev = Z.visitEvents(vault.wizyty, { alarmMinutes: 60 });
+                if (!ev.length) return alert('Nie masz zaplanowanych wizyt do wyeksportowania.');
+                download(Z.buildIcs(ev), 'wizyty.ics', 'text/calendar;charset=utf-8');
+            };
+
+            const Karta = ({ w }) => {
+                const d = Z.daysUntil(w.data);
+                return (
+                    <button className="card w-full text-left p-4 hover:border-slate-700" onClick={() => setEdit(w)}>
+                        <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                                <div className="font-extrabold">{[w.specjalizacja, w.lekarz].filter(Boolean).join(' – ') || 'Wizyta'}</div>
+                                <div className="text-xs text-slate-400 mt-0.5">{Z.formatDatePl(w.data)}{w.godzina ? ', godz. ' + w.godzina : ''}{w.miejsce ? ' · ' + w.miejsce : ''}</div>
+                                {w.powod ? <div className="text-xs text-slate-500 mt-1 line-clamp-2">{w.powod}</div> : null}
+                            </div>
+                            {!w.zrobione && d != null ? <span className={`pill ${d < 0 ? 'pill-stop' : d <= Z.SOON_DAYS ? 'pill-sprawdz' : 'pill-ok'} shrink-0`}>{dayWord(d)}</span> : null}
+                        </div>
+                    </button>
+                );
+            };
+
+            return (
+                <div className="space-y-5">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                        <h2 className="text-2xl font-extrabold">Wizyty</h2>
+                        <div className="flex gap-2">
+                            <button className="btn btn-soft" onClick={doKalendarza}><Icon name="calendar-plus" /> Do kalendarza (.ics)</button>
+                            <button className="btn btn-main" onClick={() => setEdit(Z.newVisit())}><Icon name="plus" /> Dodaj wizytę</button>
+                        </div>
+                    </div>
+                    {przyszle.length ? <div className="space-y-2">{przyszle.map(w => <Karta key={w.id} w={w} />)}</div>
+                        : <div className="card p-6 text-center text-sm text-slate-400">Brak zaplanowanych wizyt.</div>}
+                    {minione.length ? (
+                        <details className="card p-4">
+                            <summary className="cursor-pointer text-sm font-bold text-slate-400">Odbyte ({minione.length})</summary>
+                            <div className="mt-3 space-y-2">{minione.map(w => <Karta key={w.id} w={w} />)}</div>
+                        </details>
+                    ) : null}
+                    {edit ? <VisitForm visit={edit} isNew={!vault.wizyty.some(x => x.id === edit.id)} onSave={zapisz} onClose={() => setEdit(null)} onDelete={vault.wizyty.some(x => x.id === edit.id) ? usun : null} /> : null}
+                </div>
+            );
+        }
+
+        // ---------- zakładka: Dokumenty (odczyt plików LOKALNIE) ----------
+        const LIBS = {
+            pdf: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js',
+            pdfWorker: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js',
+            mammoth: 'https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.8.0/mammoth.browser.min.js',
+            tesseract: 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js',
+            tessWorker: 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/worker.min.js',
+            tessCore: 'https://cdn.jsdelivr.net/npm/tesseract.js-core@5.1.1',
+            tessLang: 'https://cdn.jsdelivr.net/npm/@tesseract.js-data/pol/4.0.0_best_int'
+        };
+        const scriptCache = {};
+        const loadScript = (src) => scriptCache[src] || (scriptCache[src] = new Promise((resolve, reject) => {
+            const sc = document.createElement('script');
+            sc.src = src;
+            sc.onload = resolve;
+            sc.onerror = () => { delete scriptCache[src]; reject(new Error('Nie udało się wczytać biblioteki do odczytu plików. Sprawdź internet i spróbuj ponownie.')); };
+            document.head.appendChild(sc);
+        }));
+        const MAX_OCR_PAGES = 15;
+
+        // Rozpoznawanie tekstu chodzi w przeglądarce (WebAssembly). Skan z PESEL-em nie trafia do żadnego OCR w chmurze.
+        async function ocrImages(sources, onProgress) {
+            await loadScript(LIBS.tesseract);
+            const worker = await window.Tesseract.createWorker('pol', 1, {
+                workerPath: LIBS.tessWorker, corePath: LIBS.tessCore, langPath: LIBS.tessLang,
+                logger: (m) => { if (m.status === 'recognizing text') onProgress(`Rozpoznaję tekst… ${Math.round((m.progress || 0) * 100)}%`); else if (/load/.test(m.status || '')) onProgress('Pobieram słownik polski do rozpoznawania (jednorazowo, ok. 3 MB)…'); }
+            });
+            try {
+                const out = [];
+                for (let i = 0; i < sources.length; i++) {
+                    onProgress(`Rozpoznaję stronę ${i + 1} z ${sources.length}…`);
+                    const { data } = await worker.recognize(sources[i]);
+                    out.push(data.text || '');
+                }
+                return out.join('\n\n');
+            } finally { await worker.terminate(); }
+        }
+
+        async function readDocument(file, onProgress) {
+            const ext = ((file.name || '').split('.').pop() || '').toLowerCase();
+            if (ext === 'doc') throw new Error('Stary format .doc – otwórz plik w Wordzie i zapisz jako .docx albo PDF.');
+            if (ext === 'txt') return { text: await file.text(), ocr: false, pages: 1 };
+            if (ext === 'docx') {
+                onProgress('Czytam dokument Word…');
+                await loadScript(LIBS.mammoth);
+                const r = await window.mammoth.extractRawText({ arrayBuffer: await file.arrayBuffer() });
+                return { text: r.value || '', ocr: false, pages: 1 };
+            }
+            if (['jpg', 'jpeg', 'png', 'webp', 'bmp'].includes(ext) || /^image\//.test(file.type)) {
+                if (/heic|heif/.test(ext + file.type)) throw new Error('Zdjęcie w formacie HEIC (iPhone) – zapisz je jako JPG albo zrób skan do PDF.');
+                return { text: await ocrImages([file], onProgress), ocr: true, pages: 1 };
+            }
+            if (ext !== 'pdf') throw new Error('Obsługiwane pliki: PDF, Word (.docx), zdjęcia (JPG, PNG) i .txt.');
+            onProgress('Czytam PDF…');
+            await loadScript(LIBS.pdf);
+            window.pdfjsLib.GlobalWorkerOptions.workerSrc = LIBS.pdfWorker;
+            const pdf = await window.pdfjsLib.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
+            const parts = [];
+            for (let i = 1; i <= pdf.numPages; i++) {
+                const tc = await (await pdf.getPage(i)).getTextContent();
+                parts.push(tc.items.map(it => it.str + (it.hasEOL ? '\n' : ' ')).join('').replace(/[ \t]+\n/g, '\n'));
+            }
+            const text = parts.join('\n\n');
+            if (text.replace(/\s/g, '').length >= 40 * pdf.numPages) return { text, ocr: false, pages: pdf.numPages };
+            const n = Math.min(pdf.numPages, MAX_OCR_PAGES);
+            const canvases = [];
+            for (let i = 1; i <= n; i++) {
+                onProgress(`To skan – przygotowuję stronę ${i} z ${n} do rozpoznania…`);
+                const page = await pdf.getPage(i);
+                const vp = page.getViewport({ scale: 2 });
+                const c = document.createElement('canvas');
+                c.width = vp.width; c.height = vp.height;
+                await page.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise;
+                canvases.push(c);
+            }
+            return { text: await ocrImages(canvases, onProgress), ocr: true, pages: pdf.numPages, cut: pdf.numPages > n };
+        }
+
+        function DocForm({ doc, isNew, onSave, onClose, onDelete }) {
+            const [d, setD] = useState(() => Object.assign(Z.newDoc(), doc || {}));
+            const [progress, setProgress] = useState('');
+            const [err, setErr] = useState('');
+            const [podglad, setPodglad] = useState(false);
+            const fileRef = useRef(null);
+            const set = (k, v) => setD(prev => Object.assign({}, prev, { [k]: v }));
+
+            const wczytaj = async (e) => {
+                const f = e.target.files && e.target.files[0];
+                e.target.value = '';
+                if (!f) return;
+                setErr(''); setProgress('Otwieram plik…');
+                try {
+                    const r = await readDocument(f, setProgress);
+                    const clean = String(r.text || '').replace(/\u0000/g, '').trim();
+                    if (clean.replace(/\s/g, '').length < 20) throw new Error('Nie udało się odczytać tekstu. Jeśli to zdjęcie, zrób je prosto i w dobrym świetle.');
+                    const info = Z.extractDocInfo(clean);
+                    setD(prev => Object.assign({}, prev, {
+                        tekst: clean, ocr: r.ocr,
+                        rodzaj: prev.rodzaj === 'inne' ? info.rodzaj : prev.rodzaj,
+                        tytul: prev.tytul || info.tytul,
+                        data: prev.data || info.data,
+                        placowka: prev.placowka || info.placowka,
+                        lekarz: prev.lekarz || info.lekarz
+                    }));
+                    setProgress(r.cut ? `Odczytano ${MAX_OCR_PAGES} z ${r.pages} stron (reszta pominięta).` : `Odczytano ${r.pages} ${Z.plural(r.pages, 'stronę', 'strony', 'stron')}${r.ocr ? ' (rozpoznawanie tekstu)' : ''}.`);
+                } catch (x) { setErr(x.message); setProgress(''); }
+            };
+
+            return (
+                <Modal title={isNew ? 'Nowy dokument' : (doc.tytul || 'Dokument')} onClose={onClose} wide>
+                    <Note tone="info">
+                        Plik jest czytany w tej przeglądarce — PDF przez pdf.js, skan i zdjęcie przez rozpoznawanie tekstu
+                        w WebAssembly. Nic nie jest wysyłane na żaden serwer. W kartotece zostaje sam tekst, zaszyfrowany.
+                    </Note>
+
+                    <div className="mt-4 flex flex-wrap items-center gap-3">
+                        <button className="btn btn-soft" onClick={() => fileRef.current.click()}><Icon name="upload-simple" /> Wczytaj plik (PDF, Word, zdjęcie)</button>
+                        <input ref={fileRef} type="file" accept=".pdf,.docx,.txt,image/*" className="hidden" onChange={wczytaj} />
+                        {progress ? <span className="text-xs text-slate-400">{progress}</span> : null}
+                    </div>
+                    {err ? <div className="mt-3"><Note tone="stop">{err}</Note></div> : null}
+
+                    <div className="grid sm:grid-cols-2 gap-4 mt-5">
+                        <Field label="Rodzaj">
+                            <select className="field" value={d.rodzaj} onChange={e => set('rodzaj', e.target.value)}>
+                                {Z.RODZAJE_DOKUMENTOW.map(r => <option key={r.id} value={r.id}>{r.label}</option>)}
+                            </select>
+                        </Field>
+                        <Field label="Tytuł"><input className="field" value={d.tytul} onChange={e => set('tytul', e.target.value)} placeholder="np. Morfologia krwi" /></Field>
+                        <Field label="Data dokumentu"><input type="date" className="field" value={d.data} onChange={e => set('data', e.target.value)} /></Field>
+                        <Field label="Placówka"><input className="field" value={d.placowka} onChange={e => set('placowka', e.target.value)} /></Field>
+                        <Field label="Lekarz"><input className="field" value={d.lekarz} onChange={e => set('lekarz', e.target.value)} /></Field>
+                        <Field label="Moja notatka"><input className="field" value={d.uwagi} onChange={e => set('uwagi', e.target.value)} placeholder="o co chodziło, co dalej" /></Field>
+                    </div>
+
+                    {d.tekst ? (
+                        <div className="mt-5">
+                            <button className="text-xs underline text-slate-400 hover:text-slate-200" onClick={() => setPodglad(!podglad)}>
+                                {podglad ? 'Ukryj' : 'Pokaż'} odczytany tekst ({d.tekst.length.toLocaleString('pl')} znaków){d.ocr ? ' — z rozpoznawania, może mieć literówki' : ''}
+                            </button>
+                            {podglad ? <textarea className="field mt-2 font-mono text-xs" style={{ minHeight: '240px' }} value={d.tekst} onChange={e => set('tekst', e.target.value)} /> : null}
+                        </div>
+                    ) : null}
+
+                    <div className="flex flex-wrap gap-2 mt-6">
+                        <button className="btn btn-main" disabled={!d.tytul.trim() && !d.tekst} onClick={() => onSave(Object.assign({}, d, { tytul: d.tytul.trim() || 'Dokument' }))}><Icon name="check" /> Zapisz</button>
+                        <button className="btn btn-soft" onClick={onClose}>Anuluj</button>
+                        {onDelete ? <button className="btn btn-danger sm:ml-auto" onClick={() => { if (confirm('Usunąć ten dokument z kartoteki?')) onDelete(doc.id); }}>Usuń</button> : null}
+                    </div>
+                </Modal>
+            );
+        }
+
+        function Dokumenty({ vault, save }) {
+            const [edit, setEdit] = useState(null);
+            const [filtr, setFiltr] = useState('');
+            const lista = vault.dokumenty
+                .filter(d => !filtr || d.rodzaj === filtr)
+                .slice().sort((a, b) => String(b.data || b.utworzono).localeCompare(String(a.data || a.utworzono)));
+
+            const zapisz = (d) => {
+                const exists = vault.dokumenty.some(x => x.id === d.id);
+                save(Object.assign({}, vault, { dokumenty: exists ? vault.dokumenty.map(x => x.id === d.id ? d : x) : [...vault.dokumenty, d] }));
+                setEdit(null);
+            };
+            const usun = (id) => { save(Object.assign({}, vault, { dokumenty: vault.dokumenty.filter(x => x.id !== id) })); setEdit(null); };
+
+            return (
+                <div className="space-y-5">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                        <h2 className="text-2xl font-extrabold">Dokumenty</h2>
+                        <button className="btn btn-main" onClick={() => setEdit(Z.newDoc())}><Icon name="plus" /> Wczytaj dokument</button>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                        <button className="tab" aria-pressed={!filtr} onClick={() => setFiltr('')}>Wszystkie ({vault.dokumenty.length})</button>
+                        {Z.RODZAJE_DOKUMENTOW.map(r => {
+                            const n = vault.dokumenty.filter(d => d.rodzaj === r.id).length;
+                            return n ? <button key={r.id} className="tab" aria-pressed={filtr === r.id} onClick={() => setFiltr(r.id)}>{r.label} ({n})</button> : null;
+                        })}
+                    </div>
+
+                    {lista.length ? (
+                        <div className="space-y-2">
+                            {lista.map(d => (
+                                <button key={d.id} className="card w-full text-left p-4 hover:border-slate-700" onClick={() => setEdit(d)}>
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div className="min-w-0">
+                                            <div className="font-extrabold truncate">{d.tytul}</div>
+                                            <div className="text-xs text-slate-400 mt-0.5">
+                                                {(Z.RODZAJE_DOKUMENTOW.find(r => r.id === d.rodzaj) || {}).label}
+                                                {d.data ? ' · ' + Z.formatDatePl(d.data) : ''}{d.placowka ? ' · ' + d.placowka : ''}
+                                            </div>
+                                            {d.uwagi ? <div className="text-xs text-slate-500 mt-1">{d.uwagi}</div> : null}
+                                        </div>
+                                        {d.ocr ? <span className="pill pill-sprawdz shrink-0">skan</span> : null}
+                                    </div>
+                                </button>
+                            ))}
+                        </div>
+                    ) : <div className="card p-6 text-center text-sm text-slate-400">Brak dokumentów{filtr ? ' w tej kategorii' : ''}.</div>}
+
+                    {edit ? <DocForm doc={edit} isNew={!vault.dokumenty.some(x => x.id === edit.id)} onSave={zapisz} onClose={() => setEdit(null)} onDelete={vault.dokumenty.some(x => x.id === edit.id) ? usun : null} /> : null}
+                </div>
+            );
+        }
+
+        // ---------- zakładka: Kartki do druku ----------
+        const esc = escapeHtml;
+        const akapity = (txt) => String(txt || '').split(/\n+/).filter(Boolean).map(l => `<p>${esc(l)}</p>`).join('') || '<p>—</p>';
+
+        function visitCardHtml(vault) {
+            const k = Z.visitCard(vault);
+            const leki = k.leki.length
+                ? `<table><thead><tr><th>Lek</th><th>Dawkowanie</th><th>Na co</th></tr></thead><tbody>${k.leki.map(l => `<tr><td><strong>${esc(l.nazwa)}</strong></td><td>${esc(l.dawkowanie)}</td><td>${esc(l.naCo)}</td></tr>`).join('')}</tbody></table>`
+                : '<p>Nie przyjmuję leków na stałe.</p>';
+            const pytania = k.pytania.length
+                ? `<h2>Moje pytania</h2><ol>${k.pytania.map(p => `<li>${esc(p)}</li>`).join('')}</ol>`
+                : '';
+            const badania = k.ostatnieBadania.length
+                ? `<h2>Ostatnie badania</h2>${k.ostatnieBadania.map(b => `<p><strong>${esc(b.data)}</strong> — ${esc(b.opis)}${b.odstajace.length ? ': ' + b.odstajace.map(x => esc(x.parametr) + ' ' + esc(x.wynik)).join(', ') : ''}</p>`).join('')}`
+                : '';
+            return `<h1>Karta na wizytę</h1>
+                <table><tbody>
+                  <tr><th style="width:30%">Pacjent</th><td>${esc(k.kto)}</td></tr>
+                  <tr><th>Data</th><td>${esc(k.data)}</td></tr>
+                </tbody></table>
+                <h2>Rozpoznania i choroby przewlekłe</h2>${akapity(k.choroby)}
+                <h2>Uczulenia i nietolerancje</h2>${akapity(k.alergie)}
+                <h2>Leki przyjmowane na stałe</h2>${leki}
+                ${badania}
+                ${k.uwagi ? '<h2>Dodatkowe informacje</h2>' + akapity(k.uwagi) : ''}
+                ${pytania}
+                <h2>Notatki z wizyty</h2><p class="linia"></p><p class="linia"></p><p class="linia"></p><p class="linia"></p><p class="linia"></p><p class="linia"></p>`;
+        }
+
+        function iceCardHtml(vault) {
+            const k = Z.iceCard(vault);
+            const row = (a, b) => `<tr><th style="width:34%">${esc(a)}</th><td>${esc(b) || '—'}</td></tr>`;
+            return `<h1>W razie wypadku (ICE)</h1>
+                <table><tbody>
+                  ${row('Imię i nazwisko', k.imie)}
+                  ${row('Wiek', k.wiek ? k.wiek + ' lat' : '')}
+                  ${row('Grupa krwi', k.grupaKrwi)}
+                  ${row('Uczulenia', k.alergie)}
+                  ${row('Choroby przewlekłe', k.choroby)}
+                  ${row('Leki na stałe', k.leki.join(', '))}
+                </tbody></table>
+                <h2>Powiadomić</h2>
+                <table><tbody>${k.ice.length ? k.ice.map(x => `<tr><th style="width:34%">${esc(x.kto)}</th><td>${esc(x.telefon)}</td></tr>`).join('') : '<tr><td>Nie wpisano kontaktów.</td></tr>'}</tbody></table>
+                <p><em>Kartka wydrukowana z prywatnej kartoteki — dane nie są nigdzie przechowywane poza urządzeniem właściciela.</em></p>`;
+        }
+
+        function Kartki({ vault, save }) {
+            const [nowePytanie, setNowePytanie] = useState('');
+            const otwarte = vault.pytania.filter(p => !p.zadane);
+            const zadane = vault.pytania.filter(p => p.zadane);
+
+            const dodaj = () => {
+                const t = nowePytanie.trim();
+                if (!t) return;
+                save(Object.assign({}, vault, { pytania: [...vault.pytania, Object.assign(Z.newQuestion(), { tekst: t })] }));
+                setNowePytanie('');
+            };
+            const przelacz = (id) => save(Object.assign({}, vault, { pytania: vault.pytania.map(p => p.id === id ? Object.assign({}, p, { zadane: !p.zadane }) : p) }));
+            const usun = (id) => save(Object.assign({}, vault, { pytania: vault.pytania.filter(p => p.id !== id) }));
+            const drukuj = (html, tytul) => DT.printDoc(html, tytul);
+
+            return (
+                <div className="space-y-5">
+                    <h2 className="text-2xl font-extrabold">Kartki do druku</h2>
+
+                    <div className="card p-5">
+                        <h3 className="font-extrabold mb-1">Karta na wizytę</h3>
+                        <p className="text-sm text-slate-400 mb-4">Jedna kartka A4: choroby, uczulenia, leki z dawkowaniem, ostatnie badania i Twoje pytania. Na dole miejsce na notatki z gabinetu.</p>
+                        <div className="flex flex-wrap gap-2">
+                            <button className="btn btn-main" onClick={() => drukuj(visitCardHtml(vault), 'Karta na wizytę')}><Icon name="printer" /> Drukuj / zapisz PDF</button>
+                            <button className="btn btn-soft" onClick={() => DT.copyRich(visitCardHtml(vault))}><Icon name="copy" /> Kopiuj</button>
+                        </div>
+                    </div>
+
+                    <div className="card p-5">
+                        <h3 className="font-extrabold mb-1">Karta ICE do portfela</h3>
+                        <p className="text-sm text-slate-400 mb-4">Grupa krwi, uczulenia, leki i kontakt do bliskich — to, czego ratownik szuka najpierw.</p>
+                        <button className="btn btn-main" onClick={() => drukuj(iceCardHtml(vault), 'Karta ICE')}><Icon name="printer" /> Drukuj / zapisz PDF</button>
+                    </div>
+
+                    <div className="card p-5">
+                        <h3 className="font-extrabold mb-1">Pytania do lekarza</h3>
+                        <p className="text-sm text-slate-400 mb-4">Zapisuj je, kiedy przyjdą do głowy — na karcie na wizytę wydrukują się same.</p>
+                        <div className="flex gap-2">
+                            <input className="field" value={nowePytanie} onChange={e => setNowePytanie(e.target.value)}
+                                onKeyDown={e => { if (e.key === 'Enter') dodaj(); }} placeholder="np. czy mogę łączyć te dwa leki?" />
+                            <button className="btn btn-main shrink-0" onClick={dodaj}>Dodaj</button>
+                        </div>
+                        {otwarte.length ? (
+                            <ul className="mt-4 space-y-2">
+                                {otwarte.map(p => (
+                                    <li key={p.id} className="flex items-start gap-3 text-sm">
+                                        <input type="checkbox" className="w-4 h-4 mt-0.5 accent-teal-400" checked={false} onChange={() => przelacz(p.id)} title="Oznacz jako zadane" />
+                                        <span className="flex-1">{p.tekst}</span>
+                                        <button className="text-slate-500 hover:text-red-300" onClick={() => usun(p.id)} aria-label="Usuń pytanie">×</button>
+                                    </li>
+                                ))}
+                            </ul>
+                        ) : <p className="mt-4 text-sm text-slate-500">Brak otwartych pytań.</p>}
+                        {zadane.length ? (
+                            <details className="mt-4">
+                                <summary className="cursor-pointer text-xs font-bold text-slate-500">Zadane ({zadane.length})</summary>
+                                <ul className="mt-2 space-y-1 text-sm text-slate-500">
+                                    {zadane.map(p => (
+                                        <li key={p.id} className="flex items-start gap-3">
+                                            <button className="underline" onClick={() => przelacz(p.id)}>przywróć</button>
+                                            <span className="flex-1 line-through">{p.tekst}</span>
+                                            <button className="hover:text-red-300" onClick={() => usun(p.id)} aria-label="Usuń pytanie">×</button>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </details>
+                        ) : null}
+                    </div>
+                </div>
+            );
+        }
+
+        // ---------- zakładka: Profil ----------
+        function Profil({ vault, save }) {
+            const p = vault.profil;
+            const set = (k, v) => save(Object.assign({}, vault, { profil: Object.assign({}, p, { [k]: v }) }));
+            const setIce = (i, k, v) => set('ice', p.ice.map((x, j) => j === i ? Object.assign({}, x, { [k]: v }) : x));
+            const wiek = Z.ageYears(p.dataUr);
+
+            return (
+                <div className="space-y-5">
+                    <h2 className="text-2xl font-extrabold">Profil</h2>
+                    <Note tone="info">Te dane zostają w przeglądarce i wchodzą na kartki do druku. Do AI nigdy nie trafia imię, nazwisko, PESEL ani data urodzenia — tylko wiek, płeć i opis zdrowia.</Note>
+
+                    <div className="card p-5 grid sm:grid-cols-2 gap-4">
+                        <Field label="Imię"><input className="field" value={p.imie} onChange={e => set('imie', e.target.value)} /></Field>
+                        <Field label="Nazwisko"><input className="field" value={p.nazwisko} onChange={e => set('nazwisko', e.target.value)} /></Field>
+                        <Field label="Data urodzenia" hint={wiek === '' ? '' : `${wiek} lat`}><input type="date" className="field" value={p.dataUr} onChange={e => set('dataUr', e.target.value)} /></Field>
+                        <Field label="Płeć" hint="Trafia do AI — wpływa na normy w badaniach">
+                            <select className="field" value={p.plec} onChange={e => set('plec', e.target.value)}>
+                                <option value="">nie podaję</option><option value="k">kobieta</option><option value="m">mężczyzna</option>
+                            </select>
+                        </Field>
+                        <Field label="Grupa krwi">
+                            <select className="field" value={p.grupaKrwi} onChange={e => set('grupaKrwi', e.target.value)}>
+                                <option value="">nie podaję</option>
+                                {Z.GRUPY_KRWI.map(g => <option key={g} value={g}>{g}</option>)}
+                            </select>
+                        </Field>
+                        <Field label="Zdrobnienie / jak na mnie mówią" hint="Żeby anonimizacja wycięła je z dokumentów">
+                            <input className="field" value={p.zdrobnienie} onChange={e => set('zdrobnienie', e.target.value)} />
+                        </Field>
+                        <Field label="Wzrost (cm)"><input className="field" value={p.wzrost} onChange={e => set('wzrost', e.target.value)} inputMode="numeric" /></Field>
+                        <Field label="Waga (kg)"><input className="field" value={p.waga} onChange={e => set('waga', e.target.value)} inputMode="numeric" /></Field>
+                    </div>
+
+                    <div className="card p-5 space-y-4">
+                        <Field label="Uczulenia i nietolerancje" hint="Oddziel przecinkami — po tej liście sprawdzam nowe leki">
+                            <textarea className="field" value={p.alergie} onChange={e => set('alergie', e.target.value)} placeholder="penicylina, jad osy, laktoza" />
+                        </Field>
+                        <Field label="Rozpoznania i choroby przewlekłe">
+                            <textarea className="field" value={p.choroby} onChange={e => set('choroby', e.target.value)} placeholder="nadciśnienie od 2019, niedoczynność tarczycy" />
+                        </Field>
+                        <Field label="Inne ważne informacje" hint="np. rozrusznik, implant, przebyte operacje">
+                            <textarea className="field" value={p.uwagi} onChange={e => set('uwagi', e.target.value)} />
+                        </Field>
+                    </div>
+
+                    <div className="card p-5">
+                        <div className="flex items-center justify-between mb-3">
+                            <h3 className="font-extrabold">Kogo powiadomić w razie wypadku</h3>
+                            <button className="btn btn-soft !py-1.5 !text-xs" onClick={() => set('ice', [...p.ice, { kto: '', telefon: '' }])}><Icon name="plus" /> Dodaj</button>
+                        </div>
+                        {p.ice.length ? (
+                            <div className="space-y-2">
+                                {p.ice.map((x, i) => (
+                                    <div key={i} className="flex gap-2">
+                                        <input className="field" value={x.kto} onChange={e => setIce(i, 'kto', e.target.value)} placeholder="np. żona Anna" />
+                                        <input className="field sm:w-48" value={x.telefon} onChange={e => setIce(i, 'telefon', e.target.value)} placeholder="telefon" inputMode="tel" />
+                                        <button className="btn btn-danger !py-1.5 !px-3 shrink-0" onClick={() => set('ice', p.ice.filter((_, j) => j !== i))} aria-label="Usuń kontakt">×</button>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : <p className="text-sm text-slate-500">Brak kontaktów. Wejdą na kartkę ICE do portfela.</p>}
+                    </div>
+                </div>
+            );
+        }
+
+        // ---------- zakładka: Ustawienia ----------
+        function Ustawienia({ vault, save, session, setSession, onLock, onWipe }) {
+            const [nowe, setNowe] = useState({ label: '', pass: '', pass2: '' });
+            const [komunikat, setKomunikat] = useState('');
+            const [podgladAi, setPodgladAi] = useState(false);
+            const s = vault.settings;
+            const setS = (k, v) => save(Object.assign({}, vault, { settings: Object.assign({}, s, { [k]: v }) }));
+
+            const kopia = async () => {
+                const blob = await Z.seal(vault, session);
+                download(JSON.stringify(blob), `moje-zdrowie-kopia-${todayIso()}.json`, 'application/json');
+            };
+            const kalendarzLekow = () => {
+                const ev = Z.medEvents(vault.leki, { alarmMinutes: Number(s.alarmMinutes) || 0 });
+                if (!ev.length) return alert('Nie masz wpisanych leków do wyeksportowania.');
+                download(Z.buildIcs(ev), 'leki.ics', 'text/calendar;charset=utf-8');
+            };
+            const dodajHaslo = async () => {
+                setKomunikat('');
+                try {
+                    if (nowe.pass !== nowe.pass2) throw new Error('Hasła się różnią.');
+                    const next = await Z.addPassword(session, nowe.pass, nowe.label || 'Hasło zapasowe');
+                    setSession(next);
+                    setNowe({ label: '', pass: '', pass2: '' });
+                    setKomunikat('Dodano hasło. Zapisz je w bezpiecznym miejscu.');
+                } catch (x) { setKomunikat(x.message); }
+            };
+            const usunHaslo = async (id) => {
+                try { setSession(Z.removePassword(session, id)); setKomunikat('Hasło usunięte.'); }
+                catch (x) { setKomunikat(x.message); }
+            };
+            const wlaczPowiadomienia = async () => {
+                try {
+                    if (!window.Notification) return setKomunikat('Ta przeglądarka nie obsługuje powiadomień.');
+                    const r = await Notification.requestPermission();
+                    setKomunikat(r === 'granted' ? 'Powiadomienia włączone (działają, gdy aplikacja jest otwarta).' : 'Powiadomienia odrzucone — zostaje sam głos i kalendarz.');
+                } catch (x) { setKomunikat('Nie udało się włączyć powiadomień.'); }
+            };
+
+            return (
+                <div className="space-y-5">
+                    <h2 className="text-2xl font-extrabold">Ustawienia</h2>
+
+                    <div className="card p-5">
+                        <h3 className="font-extrabold mb-1">Przypomnienia o lekach</h3>
+                        <p className="text-sm text-slate-400 mb-4">
+                            Pewne przypomnienie daje kalendarz telefonu — pobierz plik .ics i otwórz go na telefonie.
+                            Głos i powiadomienia w aplikacji są dodatkiem i działają tylko przy otwartej karcie.
+                        </p>
+                        <div className="space-y-3">
+                            <label className="flex items-center gap-3 text-sm">
+                                <input type="checkbox" className="w-4 h-4 accent-teal-400" checked={!!s.glos} onChange={e => setS('glos', e.target.checked)} />
+                                Mów na głos, gdy minie pora leków
+                            </label>
+                            <Field label="Alarm w kalendarzu — ile minut wcześniej">
+                                <input type="number" min="0" max="120" className="field sm:w-40" value={s.alarmMinutes} onChange={e => setS('alarmMinutes', Number(e.target.value) || 0)} />
+                            </Field>
+                            <Field label="Przypominaj o recepcie, gdy zostało mniej niż (dni)">
+                                <input type="number" min="1" max="90" className="field sm:w-40" value={s.refillDays} onChange={e => setS('refillDays', Number(e.target.value) || Z.REFILL_DAYS)} />
+                            </Field>
+                        </div>
+                        <div className="flex flex-wrap gap-2 mt-4">
+                            <button className="btn btn-main" onClick={kalendarzLekow}><Icon name="calendar-plus" /> Plan leków do kalendarza (.ics)</button>
+                            <button className="btn btn-soft" onClick={wlaczPowiadomienia}><Icon name="bell" /> Włącz powiadomienia</button>
+                        </div>
+                    </div>
+
+                    <div className="card p-5">
+                        <h3 className="font-extrabold mb-1">Kopia zapasowa</h3>
+                        <p className="text-sm text-slate-400 mb-4">
+                            Plik jest zaszyfrowany tym samym hasłem — bez niego to nieczytelny szum, więc spokojnie możesz go trzymać
+                            na dysku w chmurze albo przenieść na telefon. Tak samo przenosisz kartotekę na drugie urządzenie.
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                            <button className="btn btn-main" onClick={kopia}><Icon name="download-simple" /> Pobierz kopię</button>
+                            <button className="btn btn-soft" onClick={onLock}><Icon name="lock" /> Zablokuj teraz</button>
+                        </div>
+                    </div>
+
+                    <div className="card p-5">
+                        <h3 className="font-extrabold mb-1">Hasła ({session.slots.length} z 5)</h3>
+                        <p className="text-sm text-slate-400 mb-4">Każde hasło otwiera te same dane. Dobrze mieć drugie, zapisane poza komputerem — zapomnianego nie da się odzyskać.</p>
+                        <ul className="space-y-2 mb-4">
+                            {session.slots.map(sl => (
+                                <li key={sl.id} className="flex items-center gap-3 text-sm">
+                                    <Icon name="key" className="text-slate-500" />
+                                    <span className="flex-1">{sl.label}{sl.id === session.openedWith ? <span className="text-xs text-teal-300"> — tym otworzyłeś</span> : null}</span>
+                                    {sl.id === session.openedWith || session.slots.length <= 1 ? null :
+                                        <button className="text-xs underline text-slate-500 hover:text-red-300" onClick={() => usunHaslo(sl.id)}>usuń</button>}
+                                </li>
+                            ))}
+                        </ul>
+                        {session.slots.length < 5 ? (
+                            <div className="grid sm:grid-cols-3 gap-3">
+                                <input className="field" value={nowe.label} onChange={e => setNowe(Object.assign({}, nowe, { label: e.target.value }))} placeholder="nazwa, np. zapasowe" />
+                                <input type="password" className="field" value={nowe.pass} onChange={e => setNowe(Object.assign({}, nowe, { pass: e.target.value }))} placeholder="nowe hasło" autoComplete="new-password" />
+                                <input type="password" className="field" value={nowe.pass2} onChange={e => setNowe(Object.assign({}, nowe, { pass2: e.target.value }))} placeholder="powtórz" autoComplete="new-password" />
+                            </div>
+                        ) : null}
+                        {session.slots.length < 5 ? <button className="btn btn-soft mt-3" disabled={nowe.pass.length < 8} onClick={dodajHaslo}><Icon name="plus" /> Dodaj hasło</button> : null}
+                        {komunikat ? <p className="mt-3 text-sm text-teal-300">{komunikat}</p> : null}
+                    </div>
+
+                    <div className="card p-5">
+                        <h3 className="font-extrabold mb-1">Co zobaczyłaby sztuczna inteligencja</h3>
+                        <p className="text-sm text-slate-400 mb-4">
+                            Na razie aplikacja <strong>nie wysyła niczego na zewnątrz</strong>. Tak wyglądałby opis przygotowany do wysłania —
+                            bez imienia, PESEL-u, lekarzy i placówek. Każda wysyłka i tak będzie go pokazywać przed wyjściem z komputera.
+                        </p>
+                        <button className="btn btn-soft" onClick={() => setPodgladAi(!podgladAi)}>{podgladAi ? 'Ukryj' : 'Pokaż'} podgląd</button>
+                        {podgladAi ? <pre className="mt-3 whitespace-pre-wrap text-xs bg-slate-950 border border-slate-800 rounded-xl p-3 text-slate-300">{Z.aiInput(vault) || '(za mało danych w profilu)'}</pre> : null}
+                    </div>
+
+                    <div className="card p-5 border-red-900/60">
+                        <h3 className="font-extrabold mb-1 text-red-300">Blokada i usuwanie</h3>
+                        <Field label="Zablokuj po bezczynności (minut)">
+                            <input type="number" min="1" max="120" className="field sm:w-40" value={s.lockMinutes} onChange={e => setS('lockMinutes', Number(e.target.value) || 15)} />
+                        </Field>
+                        <button className="btn btn-danger mt-4" onClick={onWipe}><Icon name="trash" /> Usuń kartotekę z tego urządzenia</button>
+                        <p className="text-xs text-slate-500 mt-2">Nieodwracalne. Jeśli masz kopię zapasową i hasło — odtworzysz z niej dane.</p>
+                    </div>
+                </div>
+            );
+        }
+
+        // ---------- aplikacja ----------
+        const ZAKLADKI = [
+            { id: 'dzis', label: 'Dziś', icon: 'sun' },
+            { id: 'leki', label: 'Leki', icon: 'pill' },
+            { id: 'wizyty', label: 'Wizyty', icon: 'stethoscope' },
+            { id: 'dokumenty', label: 'Dokumenty', icon: 'folders' },
+            { id: 'kartki', label: 'Kartki', icon: 'printer' },
+            { id: 'profil', label: 'Profil', icon: 'user' },
+            { id: 'ustawienia', label: 'Ustawienia', icon: 'gear' }
+        ];
+
+        function App() {
+            const [stored, setStored] = useState(readStored);
+            const [vault, setVault] = useState(null);
+            const [session, setSession] = useState(null);
+            const [tab, setTab] = useState('dzis');
+            const [zapis, setZapis] = useState('');
+            const sessionRef = useRef(null);
+            const ostatniRuch = useRef(Date.now());
+
+            useReminders(vault || Z.emptyVault(), !!(vault && vault.settings && vault.settings.glos));
+
+            const persist = useCallback(async (next, sess) => {
+                const s = sess || sessionRef.current;
+                if (!s) return;
+                try {
+                    const blob = await Z.seal(next, s);
+                    localStorage.setItem(Z.VAULT_KEY, JSON.stringify(blob));
+                    setStored(blob);
+                    setZapis('zapisano ' + new Date().toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' }));
+                } catch (e) {
+                    setZapis('BŁĄD ZAPISU — zrób kopię zapasową');
+                }
+            }, []);
+
+            const save = useCallback((next) => { setVault(next); persist(next); }, [persist]);
+
+            const otworz = (data, sess) => {
+                sessionRef.current = sess;
+                setSession(sess);
+                setVault(data);
+                ostatniRuch.current = Date.now();
+                persist(data, sess);
+            };
+
+            const zamknij = useCallback(() => {
+                sessionRef.current = null;
+                setSession(null); setVault(null); setTab('dzis');
+                // Kartka przygotowana do druku zostaje w DOM poza Reactem – po zablokowaniu musi zniknąć
+                // razem z danymi (znalezione przy teście w przeglądarce: leki były widoczne na ekranie hasła).
+                const kartka = document.getElementById('edubox-print-root');
+                if (kartka) kartka.innerHTML = '';
+                try { if (window.speechSynthesis) window.speechSynthesis.cancel(); } catch (e) { /* brak syntezatora nie przeszkadza w blokadzie */ }
+            }, []);
+
+            // Nowe hasło albo usunięte hasło zmienia sloty – trzeba je zapisać razem z danymi.
+            const zmienSesje = (next) => { sessionRef.current = next; setSession(next); persist(vault, next); };
+
+            const wymaz = () => {
+                if (!confirm('Usunąć całą kartotekę z tego urządzenia? Bez kopii zapasowej danych nie da się odzyskać.')) return;
+                if (!confirm('Na pewno? To już ostatnie pytanie.')) return;
+                localStorage.removeItem(Z.VAULT_KEY);
+                setStored(null);
+                zamknij();
+            };
+
+            // Blokada po bezczynności – klucz znika z pamięci, dane zostają zaszyfrowane.
+            useEffect(() => {
+                if (!vault) return;
+                const minut = Number(vault.settings && vault.settings.lockMinutes) || 15;
+                const ruch = () => { ostatniRuch.current = Date.now(); };
+                ['mousemove', 'keydown', 'touchstart', 'click'].forEach(ev => window.addEventListener(ev, ruch, { passive: true }));
+                const id = setInterval(() => { if (Date.now() - ostatniRuch.current > minut * 60000) zamknij(); }, 20000);
+                return () => {
+                    clearInterval(id);
+                    ['mousemove', 'keydown', 'touchstart', 'click'].forEach(ev => window.removeEventListener(ev, ruch));
+                };
+            }, [vault, zamknij]);
+
+            if (!vault || !session) return <Gate stored={stored} onOpen={otworz} />;
+
+            const ileAlertow = Z.alerts(vault).length + Z.checkCombo(vault.leki, vault.profil).filter(o => o.poziom === 'stop').length;
+
+            return (
+                <div className="min-h-screen">
+                    <header className="sticky top-0 z-30 bg-slate-950/90 backdrop-blur border-b border-slate-800">
+                        <div className="max-w-4xl mx-auto px-4 py-3">
+                            <div className="flex items-center gap-3">
+                                <div className="w-9 h-9 rounded-xl bg-teal-400 text-teal-950 grid place-items-center text-lg shrink-0"><Icon name="heartbeat" /></div>
+                                <div className="min-w-0 flex-1">
+                                    <h1 className="font-extrabold leading-tight">Moje Zdrowie</h1>
+                                    <p className="text-[11px] text-slate-500 truncate">{zapis || 'dane zaszyfrowane na tym urządzeniu'}{IS_LOCAL ? ' · plik lokalny' : ''}</p>
+                                </div>
+                                {ileAlertow ? <span className="pill pill-sprawdz shrink-0">{ileAlertow}</span> : null}
+                                <button className="btn btn-soft !py-1.5 !px-3 shrink-0" onClick={zamknij} title="Zablokuj"><Icon name="lock" /></button>
+                            </div>
+                            <nav className="flex gap-1 overflow-x-auto mt-3 -mx-1 px-1 pb-1">
+                                {ZAKLADKI.map(z => (
+                                    <button key={z.id} className="tab shrink-0" aria-pressed={tab === z.id} onClick={() => setTab(z.id)}>
+                                        <Icon name={z.icon} className="mr-1" />{z.label}
+                                    </button>
+                                ))}
+                            </nav>
+                        </div>
+                    </header>
+
+                    <main className="max-w-4xl mx-auto px-4 py-6">
+                        {tab === 'dzis' ? <Dzis vault={vault} save={save} goto={setTab} /> : null}
+                        {tab === 'leki' ? <Leki vault={vault} save={save} /> : null}
+                        {tab === 'wizyty' ? <Wizyty vault={vault} save={save} /> : null}
+                        {tab === 'dokumenty' ? <Dokumenty vault={vault} save={save} /> : null}
+                        {tab === 'kartki' ? <Kartki vault={vault} save={save} /> : null}
+                        {tab === 'profil' ? <Profil vault={vault} save={save} /> : null}
+                        {tab === 'ustawienia' ? <Ustawienia vault={vault} save={save} session={session} setSession={zmienSesje} onLock={zamknij} onWipe={wymaz} /> : null}
+                    </main>
+
+                    <footer className="max-w-4xl mx-auto px-4 pb-10 text-[11px] text-slate-600 leading-relaxed">
+                        Aplikacja pomaga się zorganizować — nie stawia diagnoz, nie zastępuje lekarza ani farmaceuty.
+                        W nagłym wypadku dzwoń na 112, wieczorem i w weekend nocna pomoc lekarska, infolinia NFZ 800 190 590.
+                    </footer>
+                </div>
+            );
+        }
+
+        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    </script>
+</body>
+</html>

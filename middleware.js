@@ -1,10 +1,12 @@
-// Middleware Vercel - chroni prywatne, wewnętrzne narzędzia marketingowe hasłem
-// (EduInfluencer Studio - posty Ewy, Generator Wideo Ani). Działa TYLKO dla ścieżek
+// Middleware Vercel - chroni prywatne narzędzia hasłem HTTP: wewnętrzne narzędzia marketingowe
+// (EduInfluencer Studio - posty Ewy, Generator Wideo Ani) oraz prywatną kartotekę zdrowia
+// (zdrowie.html - tam hasło HTTP to pierwsza warstwa, drugą jest hasło szyfrujące dane).
+// Działa TYLKO dla ścieżek
 // wymienionych w matcher poniżej - reszta strony (wszystkie narzędzia, blog, strona
 // główna) działa bez żadnych zmian.
 
 export const config = {
-  matcher: ['/ewamarketing.html', '/ewa-marketing.html', '/aniawideo.html', '/api/ewa-generate', '/api/weekly-report', '/api/social-stats'],
+  matcher: ['/ewamarketing.html', '/ewa-marketing.html', '/aniawideo.html', '/zdrowie.html', '/api/ewa-generate', '/api/weekly-report', '/api/social-stats'],
 };
 
 export default function middleware(request) {
