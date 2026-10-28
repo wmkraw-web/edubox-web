@@ -415,6 +415,22 @@ normę (czyli wydruk ma takie kolumny), wiersze bez jednej i drugiej są odrzuca
 odrzucamy niczego. Do tego nazwa dłuższa niż 7 słów to zdanie, nie parametr, a zapasowa ścieżka wyszukiwania wyniku
 wymaga spacji przed liczbą (inaczej „A01” w kodzie badania stawało się wynikiem).
 
+**Jednostki i opisy norm (28.10.2026, trzecie zgłoszenie: „źle rozpoznaje jednostki (kreatynina) i normy dopisuje
+do pozycji badań”):** trzy osobne usterki. 1) **Norma w osobnym wierszu pod parametrem** („Stężenie zalecane:
+poniżej 190 mg/dl” pod cholesterolem, samo „Poniżej 130 mg/dl” pod LDL) zakładała nową pozycję badania –
+`LAB_LINIA_NORMY` rozpoznaje taki wiersz PRZED próbą czytania go jako parametru i dopina normę (oraz jednostkę,
+jeśli brakowała) do pozycji poprzedniej, nigdy nie nadpisując normy wziętej z wiersza parametru. Wzorzec kończy
+się `\p{L}*`, nie `\b` – po `prawid[łl]ow` stoi „e”, więc `\b` nigdy nie trafiało („Norma:” też nie).
+2) **Dwie jednostki w jednym wierszu** (kreatynina 1,70 mg/dl i 150,3 µmol/l): `parseRange` brał OSTATNI zakres,
+czyli 67–117 µmol/l, i wynik w mg/dl wychodził „poniżej normy”. Teraz zbiera wszystkie zakresy i – znając już
+wynik – wybiera ten, w którego rząd wielkości wpada (`od/10 … do*10`); granicą między wynikiem a normą jest
+`poczatek`, czyli indeks PIERWSZEGO zakresu, niezależnie od wyboru. Jednostka, gdy nie ma jej przed normą,
+jest szukana za nią. 3) `labPodejrzany` oznacza wiersz, w którym wynik odbiega od dwustronnego zakresu o rząd
+wielkości – w tabeli zamiast fałszywego „▼ poniżej” pojawia się „⚠ sprawdź”, a do AI idzie wprost uwaga, żeby
+nie wyciągać z takiej pozycji wniosków. Nie zgadujemy, która liczba jest zła. Do tego `belkot` odrzuca nazwy
+rozsypane przez OCR na jedno- i dwuliterowe kawałki („I por eo jezkowscsgo”) – ale nie nazwę ze słownika
+(`OB`, `pH`) i nie kod w nawiasie.
+
 **Wspólna ocena jakości tekstu (`tekst-jakosc.js`, od 28.10.2026):** `window.EduTekstJakosc` – jeden plik dla
 „Mojego Zdrowia” i „Teczki podopiecznych”, bo ten sam `readDocument` jest skopiowany w obu stronach i oba miały
 ten sam błąd (orzeczenia z poradni bywają w takich PDF-ach dokładnie jak wyniki z laboratorium). Dołączaj go

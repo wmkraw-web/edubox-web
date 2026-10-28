@@ -804,6 +804,61 @@ test('liczba wewnątrz słowa nie jest wynikiem nawet w zapasowej ścieżce', ()
   assert(crp && crp.wynik === '28,4' && crp.jednostka === 'mg/l', 'zapis bez spacji musi działać: ' + JSON.stringify(crp));
 });
 
+// Zgłoszenie właściciela 28.10.2026: „źle rozpoznaje jednostki (kreatynina) i normy dopisuje do pozycji badań”.
+const WYDRUK_Z_OPISEM_NORM = [
+  'Nazwa badania              Wynik    Jednostka   Wartości referencyjne',
+  'Cholesterol całkowity (ICD-9: L21)   212    mg/dl',
+  'Stężenie zalecane: poniżej 190 mg/dl',
+  'Cholesterol HDL (ICD-9: L23)   38    mg/dl',
+  'Stężenie zalecane: powyżej 40 mg/dl',
+  'Cholesterol LDL (ICD-9: L24)   145    mg/dl',
+  'Poniżej 130 mg/dl',
+  'Triglicerydy (ICD-9: L41)   180    mg/dl',
+  'Wartości prawidłowe: 50 - 150 mg/dl'
+].join('\n');
+
+test('opis normy w osobnym wierszu nie jest parametrem, tylko normą poprzedniego', () => {
+  const poz = Z.parseLabText(WYDRUK_Z_OPISEM_NORM);
+  const smieci = poz.filter(p => /st[ęe][żz]enie|poni[żz]ej|powy[żz]ej|warto[śs]ci/i.test(p.parametr));
+  assert(smieci.length === 0, 'opis normy trafił na listę badań: ' + JSON.stringify(smieci.map(p => p.parametr)));
+  assert(poz.length === 4, 'rozpoznano ' + poz.length + ' zamiast 4: ' + poz.map(p => p.parametr).join(' | '));
+  const chol = poz.find(p => p.key === 'cholesterol');
+  assert(chol.normaTekst === '< 190' && chol.flaga === 'wysoki', 'cholesterol: ' + JSON.stringify(chol));
+  const hdl = poz.find(p => p.key === 'hdl');
+  assert(hdl.normaTekst === '> 40' && hdl.flaga === 'niski', 'HDL: ' + JSON.stringify(hdl));
+  const ldl = poz.find(p => p.key === 'ldl');
+  assert(ldl.normaTekst === '< 130', 'LDL z samego „Poniżej 130 mg/dl”: ' + JSON.stringify(ldl));
+  const tg = poz.find(p => p.key === 'triglicerydy');
+  assert(tg.normaOd === 50 && tg.normaDo === 150, 'zakres z osobnego wiersza: ' + JSON.stringify(tg));
+});
+test('opis normy nie nadpisuje normy wziętej z wiersza parametru', () => {
+  const poz = Z.parseLabText(['Glukoza   93   mg/dl   70 - 99', 'Zalecane: poniżej 140 mg/dl'].join('\n'));
+  assert(poz.length === 1 && poz[0].normaTekst === '70–99', JSON.stringify(poz));
+});
+test('przy dwóch jednostkach w wierszu normą jest zakres pasujący do wyniku', () => {
+  // Kreatynina bywa podana i w mg/dl, i w µmol/l. Branie ostatniego zakresu dawało normę 67–117
+  // przy wyniku 1,70 mg/dl, pustą jednostkę i fałszywe „poniżej normy”.
+  const k = Z.parseLabLine('Kreatynina (ICD-9: M37)   1,70   mg/dl   0,67 - 1,17   150,3 umol/l   67 - 117');
+  assert(k.wynik === '1,70', 'wynik: ' + JSON.stringify(k));
+  assert(k.jednostka === 'mg/dl', 'jednostka: ' + JSON.stringify(k));
+  assert(k.normaTekst === '0,67–1,17' && k.flaga === 'wysoki', 'norma: ' + JSON.stringify(k));
+});
+test('jednostka stojąca ZA zakresem normy też jest rozpoznawana', () => {
+  const g = Z.parseLabLine('Glukoza   93   70 - 99 mg/dl');
+  assert(g && g.jednostka === 'mg/dl' && g.wynik === '93' && g.flaga === 'ok', JSON.stringify(g));
+});
+test('wynik odbiegający od normy o rząd wielkości jest oznaczany do sprawdzenia', () => {
+  assert(Z.labPodejrzany({ wynik: '1,70', normaOd: 67, normaDo: 117 }) === true, 'inna jednostka niż norma');
+  assert(Z.labPodejrzany({ wynik: '28,4', normaOd: 0, normaDo: 5 }) === false, 'brak dolnej granicy > 0');
+  assert(Z.labPodejrzany({ wynik: '11,8', normaOd: 4, normaDo: 10 }) === false, 'zwykły wynik poza normą');
+  assert(Z.labPodejrzany({ wynik: '93', normaOd: 70, normaDo: 99 }) === false, 'wynik w normie');
+});
+test('nazwa rozsypana przez OCR nie staje się parametrem', () => {
+  assert(Z.parseLabLine('I por eo jezkowscsgo   6   3 - 364') === null, 'bełkot z OCR');
+  assert(Z.parseLabLine('OB (ICD-9: C59)   5   0 - 15') !== null, 'krótki skrót ze słownika zostaje');
+  assert(Z.parseLabLine('Hemoglobina glikowana HbA1c   6,1   %   4,0 - 6,0') !== null, 'trzywyrazowa nazwa zostaje');
+});
+
 (async () => {
   for (const [name, fn] of tests) {
     try { await fn(); ok++; console.log('✅ ' + name); }
