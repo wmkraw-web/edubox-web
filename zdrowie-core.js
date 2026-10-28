@@ -1288,15 +1288,44 @@
   const ICD_RE = /\bICD([-\s]?)(9|10)\b/gi;
   const LAB_SEP = '(?:-|–|—|÷|\\.\\.|\\bdo\\b)';
   const NUM_G = /[<>≤≥]\s*\d+(?:[.,]\d+)?|\d+(?:[.,]\d+)?/g;
+  // Wiersz z OPISEM NORMY poprzedniego parametru, a nie nowy parametr (zgłoszenie właściciela 28.10.2026:
+  // „Stężenie zalecane: poniżej 190 mg/dl” pod cholesterolem lądowało na liście badań jako osobna pozycja).
+  const LAB_LINIA_NORMY = /^\s*[-–•*]?\s*(?:norm[ay]\b|warto[śs][ćc]i?\s+(?:referencyjn|prawid[łl]ow|zalecan|docelow|po[żz][ąa]dan|oczekiwan)\p{L}*|zakres\s+(?:referencyjn|norm|prawid[łl]ow)\p{L}*|st[ęe][żz]enie\s+(?:zalecan|docelow|prawid[łl]ow|po[żz][ąa]dan|optymaln)\p{L}*|zalecane\b|docelowe\b|optymalne\b|poni[żz]ej\b|powy[żz]ej\b)/iu;
+  // Nazwa z bełkotu OCR („I por eo jezkowscsgo”): kilka słów, z czego większość to jedna–dwie litery.
+  // Kod w nawiasie („OB (ICD-9: C59)”) nie liczy się do oceny, a nazwa ze słownika jest zawsze w porządku –
+  // skróty parametrów (OB, pH, RF) same w sobie są krótkie.
+  const belkot = (nazwa) => {
+    if (LAB_SYNONYMS[paramKey(nazwa)]) return false;
+    const slowa = String(nazwa || '').replace(/\([^)]*\)?/g, ' ').split(/\s+/).filter(Boolean);
+    if (slowa.length < 3) return false;
+    const krotkie = slowa.filter(w => w.replace(/[^\p{L}]/gu, '').length <= 2).length;
+    return krotkie / slowa.length >= 0.4;
+  };
+  // Jednostka z fragmentu wiersza. Nawiasy i średniki obcinamy tylko z brzegów tokenu – globalne usuwanie
+  // przecinka psuło „ml/min/1,73m2”.
+  const unitIn = (txt) => String(txt || '').split(/\s+/)
+    .map(x => x.replace(/^[(,;]+/, '').replace(/[(),;]+$/, ''))
+    .filter(Boolean).find(isUnit) || '';
 
   // Zakres normy z wydruku: „13,0 - 17,0”, „(70-99)”, „< 190”, „do 15”, „> 40”.
-  function parseRange(text) {
+  // `wynik` jest opcjonalny. Wydruk podaje czasem ten sam parametr w dwóch jednostkach (kreatynina: mg/dl
+  // i µmol/l) – wtedy normą jest ten zakres, w którego rząd wielkości wpada wynik. Bez tego 1,70 mg/dl było
+  // porównywane z 67–117 µmol/l i wychodziło fałszywe „poniżej normy” (zgłoszenie właściciela 28.10.2026).
+  // `poczatek` to indeks PIERWSZEGO zakresu w wierszu: przed nim stoi wynik i jednostka, niezależnie od wyboru.
+  function parseRange(text, wynik) {
     const t = String(text || '');
-    const dwu = [...t.matchAll(new RegExp(`(\\d+(?:[.,]\\d+)?)\\s*${LAB_SEP}\\s*(\\d+(?:[.,]\\d+)?)`, 'g'))];
+    const dwu = [...t.matchAll(new RegExp(`(\\d+(?:[.,]\\d+)?)\\s*${LAB_SEP}\\s*(\\d+(?:[.,]\\d+)?)`, 'g'))]
+      .map(m => {
+        const od = toNum(m[1]), doo = toNum(m[2]);
+        return (od != null && doo != null && od <= doo)
+          ? { od, do: doo, tekst: `${fmtNum(od)}–${fmtNum(doo)}`, index: m.index, dlugosc: m[0].length }
+          : null;
+      })
+      .filter(Boolean);
     if (dwu.length) {
-      const m = dwu[dwu.length - 1];
-      const od = toNum(m[1]), doo = toNum(m[2]);
-      if (od != null && doo != null && od <= doo) return { od, do: doo, tekst: `${fmtNum(od)}–${fmtNum(doo)}`, index: m.index, dlugosc: m[0].length };
+      const w = toNum(String(wynik == null ? '' : wynik).replace(/^\s*[<>≤≥]\s*/, ''));
+      const pasuje = (w == null || dwu.length < 2) ? null : dwu.find(r => w >= r.od / 10 && w <= r.do * 10);
+      return Object.assign({}, pasuje || dwu[dwu.length - 1], { poczatek: dwu[0].index });
     }
     const jedno = [...t.matchAll(/(?:([<>≤≥])|\b(do|poni[żz]ej|powy[żz]ej)\b)\s*(\d+(?:[.,]\d+)?)/gi)];
     if (jedno.length) {
@@ -1305,10 +1334,20 @@
       const slowo = (m[2] || '').toLowerCase();
       const gorna = m[1] === '<' || m[1] === '≤' || slowo === 'do' || slowo.startsWith('poni');
       if (v != null) return gorna
-        ? { od: null, do: v, tekst: `< ${fmtNum(v)}`, index: m.index, dlugosc: m[0].length }
-        : { od: v, do: null, tekst: `> ${fmtNum(v)}`, index: m.index, dlugosc: m[0].length };
+        ? { od: null, do: v, tekst: `< ${fmtNum(v)}`, index: m.index, dlugosc: m[0].length, poczatek: m.index }
+        : { od: v, do: null, tekst: `> ${fmtNum(v)}`, index: m.index, dlugosc: m[0].length, poczatek: m.index };
     }
     return null;
+  }
+
+  // Wynik odbiegający od zakresu o rząd wielkości to zwykle źle odczytana kolumna (albo inna jednostka),
+  // a nie wynik krytyczny. Nie zgadujemy, która liczba jest zła – oznaczamy wiersz do sprawdzenia.
+  function labPodejrzany(poz) {
+    const v = toNum(String((poz && poz.wynik) || '').replace(/^\s*[<>≤≥]\s*/, ''));
+    const od = poz && poz.normaOd == null ? null : Number(poz.normaOd);
+    const doo = poz && poz.normaDo == null ? null : Number(poz.normaDo);
+    if (v == null || !Number.isFinite(od) || !Number.isFinite(doo) || od <= 0) return false;
+    return v < od / 10 || v > doo * 10;
   }
 
   // Ocena wyniku: tylko arytmetyka na zakresie z wydruku. Bez zakresu – flaga z wydruku (H/L) albo nic.
@@ -1349,9 +1388,11 @@
     const liczby = [...raw.matchAll(NUM_G)];
     if (!liczby.length) return null;
 
-    const norma = parseRange(raw);
+    let norma = parseRange(raw);
+    // Granicą między wynikiem a normą jest PIERWSZY zakres w wierszu, nawet gdy normą zostanie inny.
+    const granica = norma ? norma.poczatek : 0;
     // Zakres jest normą tylko wtedy, gdy PRZED nim stoi jakaś liczba (sam wynik).
-    const normaOk = norma && liczby.some(m => m.index < norma.index);
+    const normaOk = norma && liczby.some(m => m.index < granica);
     // Wynik musi stać osobno: liczba wtopiona w nazwę („Witamina D 25(OH)”, „HbA1c”) należy do nazwy,
     // a nie do wyniku – bez tego parser czytał 25 zamiast 18,5 i 1 zamiast 6,8.
     const osobno = (m) => {
@@ -1359,7 +1400,7 @@
       const po = raw[m.index + m[0].length] || ' ';
       return /[\s(]/.test(przed) && /[\s*]/.test(po);
     };
-    const przedNormaWszystkie = normaOk ? liczby.filter(m => m.index + m[0].length <= norma.index) : liczby;
+    const przedNormaWszystkie = normaOk ? liczby.filter(m => m.index + m[0].length <= granica) : liczby;
     const kandydaci = przedNormaWszystkie.filter(osobno);
     // Zapas dla zapisu bez spacji („CRP 28,4mg/l”): liczba musi mieć przed sobą spację, inaczej siedzi
     // w środku słowa i należy do nazwy (np. „A01” w kodzie badania).
@@ -1370,18 +1411,23 @@
 
     const wynikM = przedNorma[0];
     const wynikTxt = wynikM[0].replace(/\s+/g, '');
+    // Dopiero znając wynik umiemy wybrać właściwy zakres, gdy wydruk podaje dwa (dwie jednostki).
+    if (normaOk) norma = parseRange(raw, wynikTxt);
     // Nazwę bierzemy z ORYGINALNEJ linii – podmiana ICD służyła tylko szukaniu liczb.
     const nazwa = surowa.slice(0, wynikM.index).replace(/[.:;,\s]+$/, '').trim();
     if (nazwa.length < 2 || !/[\p{L}]{2}/u.test(nazwa)) return null;
     if (LAB_SKIP.test(nazwa)) return null;
     // Nazwa parametru to najwyżej kilka słów; dłuższa to zdanie z nagłówka albo adres.
     if (nazwa.split(/\s+/).filter(Boolean).length > 7) return null;
+    // Nazwa rozsypana przez OCR na jedno- i dwuliterowe kawałki to nie parametr.
+    if (belkot(nazwa)) return null;
     // Drugi bezpiecznik na wypadek nieczytelnego pliku: nazwa pełna glifów-krzaków to nie parametr.
     if ([...nazwa].some(ch => PODEJRZANY_ZNAK(ch.codePointAt(0)))) return null;
 
-    const ogon = raw.slice(wynikM.index + wynikM[0].length, normaOk ? norma.index : raw.length);
-    // Nawiasy i średniki obcinamy tylko z brzegów tokenu – globalne usuwanie przecinka psuło „ml/min/1,73m2”.
-    const jednostka = (ogon.split(/\s+/).map(x => x.replace(/^[(,;]+/, '').replace(/[(),;]+$/, '')).filter(Boolean).find(isUnit)) || '';
+    const ogon = raw.slice(wynikM.index + wynikM[0].length, normaOk ? granica : raw.length);
+    let jednostka = unitIn(ogon);
+    // Część wydruków stawia jednostkę dopiero ZA zakresem normy – wtedy szukamy jej w ogonie wiersza.
+    if (!jednostka && normaOk) jednostka = unitIn(raw.slice(granica));
     const flagaWydruku = (raw.match(/(?:^|\s)([HLN])(?:\s|$)/) || [])[1]
       || (raw.match(/([↑↓])/) || [])[1] || '';
 
@@ -1408,6 +1454,20 @@
     const pozycje = [];
     const widziane = new Set();
     linie.forEach(l => {
+      // Wiersz z opisem normy („Stężenie zalecane: poniżej 190 mg/dl”) należy do POPRZEDNIEGO parametru
+      // i nigdy nie zakłada nowej pozycji.
+      if (LAB_LINIA_NORMY.test(l)) {
+        const ost = pozycje[pozycje.length - 1];
+        const r = ost && !ost.normaTekst ? parseRange(l, ost.wynik) : null;
+        if (ost && r) {
+          ost.normaOd = r.od == null ? null : r.od;
+          ost.normaDo = r.do == null ? null : r.do;
+          ost.normaTekst = r.tekst;
+          if (!ost.jednostka) ost.jednostka = unitIn(l);
+          ost.flaga = labFlag(ost);
+        }
+        return;
+      }
       const p = parseLabLine(l);
       if (!p) return;
       const k = paramKey(p.parametr);
@@ -1472,7 +1532,7 @@
 
   const FLAGA_SLOWO = { wysoki: 'POWYŻEJ NORMY', niski: 'PONIŻEJ NORMY', ok: 'w normie', '': 'brak normy w wydruku' };
   const KIERUNEK_SLOWO = { rosnie: 'rośnie', spada: 'spada', stabilnie: 'bez istotnej zmiany', brak: 'jeden pomiar' };
-  const pozLinia = (p) => `  - ${p.parametr}: ${p.wynik}${p.jednostka ? ' ' + p.jednostka : ''}${p.normaTekst ? ` (norma z wydruku: ${p.normaTekst})` : ''} — ${FLAGA_SLOWO[p.flaga || ''] || 'brak normy w wydruku'}`;
+  const pozLinia = (p) => `  - ${p.parametr}: ${p.wynik}${p.jednostka ? ' ' + p.jednostka : ''}${p.normaTekst ? ` (norma z wydruku: ${p.normaTekst})` : ''} — ${FLAGA_SLOWO[p.flaga || ''] || 'brak normy w wydruku'}${labPodejrzany(p) ? ' [UWAGA: wynik odbiega od normy o rząd wielkości – możliwy błąd odczytu wydruku albo inna jednostka; nie wyciągaj z tej pozycji wniosków, napisz, że trzeba ją sprawdzić w oryginale]' : ''}`;
 
   // Wyniki badań dla AI: gotowe liczby, gotowe porównania. Model ma je skomentować, a nie przeliczać.
   function labReportText(vault, opts) {
@@ -1689,7 +1749,7 @@
     sortedEntries, skinWarnings, treatmentSummary,
     reportInput, docsTextZ, docsIndex, docTitle, shareBudget, deviceChecksText, reportPrompts, deviceCheckPrompts,
     skinInput, skinPrompts, SKIN_PHOTO_SYSTEM, ZASADY_WSPOLNE,
-    LAB_UNITS, LAB_SYNONYMS, normUnit, isUnit, paramKey, parseRange, labFlag, parseLabLine, parseLabText,
+    LAB_UNITS, LAB_SYNONYMS, normUnit, isUnit, paramKey, parseRange, labFlag, labPodejrzany, parseLabLine, parseLabText,
     extractLabInfo, labSeries, labTrend, labReportText, labPrompts, toNum, fmtNum, FLAGA_SLOWO, KIERUNEK_SLOWO
   };
   if (typeof window !== 'undefined') window.EduZdrowie = api;
