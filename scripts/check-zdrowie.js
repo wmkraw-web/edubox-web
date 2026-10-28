@@ -638,6 +638,59 @@ test('strona: zakładka Badania podłączona, wykres rysowany bez bibliotek', ()
   assert(!skrypty.some(u => /chart|recharts|d3|plotly|highcharts|echarts/i.test(u)), 'wykres nie może dociągać biblioteki (CSP): ' + skrypty.join(', '));
 });
 
+// ---------- PDF z uszkodzoną warstwą tekstową (zgłoszenie z 28.10.2026) ----------
+const KRZAKI = '▌▌▌AA (▌▌▌▌ ▌▌▌ ▌▌@ ▌▌ ▌▌▌ DB▌▌&) ▌▌ ▌▌▌ / ▌▌@ ! BB▌▌ ▌.-▌▌ M ▌▌▌ # ▌▌▌$▌▌ ▌%▌D▌& ▌▌% '.repeat(40);
+const CZYTELNY = [
+  'DIAGNOSTYKA Laboratorium Medyczne', 'Pacjent: Jan Kowalski', 'Data pobrania: 12.03.2026',
+  'Nazwa badania Wynik Jednostka Wartości referencyjne',
+  'Hemoglobina 14,2 g/dl 13,0 - 17,0', 'CRP 28,4 mg/l < 5,0'
+].join('\n');
+
+test('ocena tekstu: krzaki z czcionki bez mapy znaków są odrzucane', () => {
+  // Realny przypadek: PDF zwrócił 10 409 znaków, więc przechodził kontrolę „ma warstwę tekstową”,
+  // choć żaden znak nic nie znaczył — i plik nigdy nie trafiał do rozpoznawania obrazu.
+  const q = Z.textQuality(KRZAKI);
+  assert(!q.ok && q.powod === 'znaki-zastepcze', JSON.stringify(q));
+  assert(KRZAKI.replace(/\s/g, '').length > 1000, 'test ma sens tylko dla DŁUGIEGO tekstu-krzaków');
+  assert(/czcionka bez mapy znaków/.test(Z.qualityMessage(q)), Z.qualityMessage(q));
+});
+test('ocena tekstu: przestawione kodowanie liter (bez znaków zastępczych)', () => {
+  const q = Z.textQuality('Kjgqtmnqdc Rdwtkc Mdqxkcj Ygdfmz Prwfzk Bqdgmz Jkxwpd Mnqdcjz '.repeat(8));
+  assert(!q.ok && q.powod === 'bez-samoglosek', JSON.stringify(q));
+});
+test('ocena tekstu: czytelny wydruk laboratoryjny przechodzi', () => {
+  const q = Z.textQuality(CZYTELNY);
+  assert(q.ok, JSON.stringify(q));
+  assert(Z.textQuality(WYDRUK).ok, 'pełny wydruk z testów też musi przechodzić');
+});
+test('ocena tekstu: sama tabela liczb bez nagłówków nie jest fałszywie odrzucana', () => {
+  const tabela = ['Hemoglobina 14,2 g/dl 13,0 - 17,0', 'Leukocyty 11,8 10^3/ul 4,00 - 10,00',
+    'Plytki 198 10^3/ul 150 - 400', 'Mocznik 38 mg/dl 17 - 43'].join('\n');
+  const q = Z.textQuality(tabela);
+  assert(q.ok, JSON.stringify(q));
+});
+test('ocena tekstu: pusty i bardzo krótki odczyt odrzucony', () => {
+  assert(Z.textQuality('').powod === 'pusty' && Z.textQuality('  ab  ').powod === 'pusty', 'krótki tekst');
+});
+test('parser nie zapisuje parametrów o nazwie z glifów-krzaków', () => {
+  assert(Z.parseLabLine('▌▌▌AA (▌▌▌▌ ▌▌@ 1  2') === null, 'śmieciowa nazwa musi być odrzucona');
+  assert(Z.parseLabLine('DB▌▌&) ▌▌ ▌▌▌ 1') === null, 'śmieciowa nazwa z nawiasem też');
+  assert(Z.parseLabText(KRZAKI).length === 0, 'z nieczytelnego pliku nie powstaje ani jeden parametr');
+  assert(Z.parseLabLine('CRP   28,4   mg/l   < 5,0') !== null, 'normalny wiersz nadal działa');
+});
+test('strona: odczyt PDF sprawdza jakość tekstu, nie samą liczbę znaków', () => {
+  const blok = page.slice(page.indexOf("const text = parts.join"), page.indexOf('function DocForm'));
+  assert(/Z\.textQuality\(text\)/.test(blok), 'brak kontroli jakości odczytanego tekstu');
+  assert(/dosc && jakosc\.ok/.test(blok), 'warunek musi łączyć ilość i jakość');
+  assert(/const rozpoznany = await ocrImages/.test(blok) && /Z\.textQuality\(rozpoznany\)/.test(blok),
+    'po rozpoznaniu obrazu też trzeba sprawdzić, czy coś z tego wyszło');
+  assert(/uszkodzoną warstwę tekstową/.test(blok), 'użytkownik ma się dowiedzieć, co się stało z plikiem');
+});
+test('strona: tekst ze zdjęcia też przechodzi kontrolę jakości', () => {
+  const blok = page.slice(page.indexOf('const zeZdjecia'), page.indexOf('const zeZdjecia') + 500);
+  assert(/Z\.textQuality\(zeZdjecia\)\.ok/.test(blok), 'brak kontroli jakości po OCR zdjęcia');
+});
+
 (async () => {
   for (const [name, fn] of tests) {
     try { await fn(); ok++; console.log('✅ ' + name); }

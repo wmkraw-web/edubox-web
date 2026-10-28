@@ -1117,6 +1117,65 @@
     'Kończysz zdaniem: „To tylko opis wyglądu — ocenę zmiany stawia lekarz po obejrzeniu jej na żywo.”.'
   ].join('\n');
 
+  // ---------- czy wyciągnięty z PDF tekst w ogóle jest tekstem ----------
+  // Część PDF-ów (zwłaszcza z systemów laboratoryjnych) osadza czcionkę z własnym kodowaniem i bez poprawnej
+  // mapy ToUnicode. pdf.js wyciąga wtedy KODY GLIFÓW zamiast liter: tysiące znaków, z których żaden nic nie znaczy
+  // („▌▌▌AA (▌▌▌▌ ▌▌@ ▌▌”). Wcześniej liczyliśmy tylko ILE znaków wyszło, więc taki plik przechodził jako
+  // „ma warstwę tekstową” i nigdy nie trafiał do rozpoznawania obrazu (zgłoszenie właściciela 28.10.2026).
+  const PODEJRZANY_ZNAK = (c) =>
+    (c >= 0xE000 && c <= 0xF8FF) ||      // obszar prywatny – tu lądują glify bez ToUnicode
+    (c >= 0x2580 && c <= 0x259F) ||      // bloki rysunkowe ▌▐█▄
+    (c >= 0x25A0 && c <= 0x25FF) ||      // figury geometryczne ■●▲
+    c === 0xFFFD ||                       // znak zastępczy
+    (c < 0x20 && c !== 0x09 && c !== 0x0A && c !== 0x0D);
+  const SAMOGLOSKI = 'aeiouyąęó';
+  // Słowa, bez których polski (albo angielski) dokument medyczny praktycznie nie istnieje.
+  const SLOWA_KONTROLNE = [
+    'wynik', 'badan', 'norma', 'pacjent', 'data', 'lekarz', 'rozpozn', 'zalec', 'oddzia', 'szpital',
+    'jednostk', 'referen', 'materia', 'godzin', 'nazwisk', 'urodz', 'kontrol', 'leczen', 'poradni',
+    'result', 'patient', 'reference', 'report', 'date', 'unit'
+  ];
+
+  // Zwraca ocenę tekstu: czy nadaje się do czytania i dlaczego nie.
+  function textQuality(text) {
+    const t = String(text || '');
+    const znaki = [...t];
+    const wszystkie = znaki.length;
+    if (wszystkie < 20) return { ok: false, powod: 'pusty', litery: 0, podejrzane: 0, udzialPodejrzanych: 0, udzialSamoglosek: 0 };
+    let litery = 0, samogloski = 0, podejrzane = 0;
+    znaki.forEach(ch => {
+      const c = ch.codePointAt(0);
+      if (PODEJRZANY_ZNAK(c)) { podejrzane++; return; }
+      if (/\p{L}/u.test(ch)) {
+        litery++;
+        if (SAMOGLOSKI.includes(ch.toLocaleLowerCase('pl'))) samogloski++;
+      }
+    });
+    const udzialPodejrzanych = podejrzane / wszystkie;
+    const udzialSamoglosek = litery ? samogloski / litery : 0;
+    const lower = t.toLocaleLowerCase('pl');
+    const maSlowa = SLOWA_KONTROLNE.some(w => lower.includes(w));
+    const stat = { litery, podejrzane, udzialPodejrzanych: Math.round(udzialPodejrzanych * 1000) / 1000, udzialSamoglosek: Math.round(udzialSamoglosek * 1000) / 1000, maSlowa };
+
+    // Każdy próg osobno, żeby komunikat mówił, co konkretnie jest nie tak.
+    if (udzialPodejrzanych > 0.02) return Object.assign({ ok: false, powod: 'znaki-zastepcze' }, stat);
+    if (litery < wszystkie * 0.12) return Object.assign({ ok: false, powod: 'prawie-bez-liter' }, stat);
+    // Polski tekst ma ok. 40% samogłosek wśród liter; poniżej 20% to prawie na pewno przestawione kodowanie.
+    if (litery >= 60 && udzialSamoglosek < 0.2) return Object.assign({ ok: false, powod: 'bez-samoglosek' }, stat);
+    // Dokument medyczny bez ani jednego typowego słowa przy dużej liczbie liter = podmienione litery.
+    if (litery >= 200 && !maSlowa) return Object.assign({ ok: false, powod: 'brak-typowych-slow' }, stat);
+    return Object.assign({ ok: true, powod: '' }, stat);
+  }
+
+  const POWOD_OPIS = {
+    'pusty': 'w pliku nie ma tekstu',
+    'znaki-zastepcze': 'plik zwraca znaki zastępcze zamiast liter (czcionka bez mapy znaków)',
+    'prawie-bez-liter': 'w odczytanym tekście prawie nie ma liter',
+    'bez-samoglosek': 'odczytane litery nie układają się w słowa (przestawione kodowanie czcionki)',
+    'brak-typowych-slow': 'odczytany tekst nie zawiera ani jednego typowego słowa z dokumentu medycznego'
+  };
+  const qualityMessage = (q) => POWOD_OPIS[(q && q.powod) || ''] || '';
+
   // ---------- rozpoznanie danych z wczytanego dokumentu (lokalnie, bez AI) ----------
   const MONTHS = { stycznia: 1, lutego: 2, marca: 3, kwietnia: 4, maja: 5, czerwca: 6, lipca: 7, sierpnia: 8, września: 9, wrzesnia: 9, października: 10, pazdziernika: 10, listopada: 11, grudnia: 12 };
   const pad = (n) => String(n).padStart(2, '0');
@@ -1347,6 +1406,8 @@
     const nazwa = raw.slice(0, wynikM.index).replace(/[.:;,\s]+$/, '').trim();
     if (nazwa.length < 2 || !/[\p{L}]{2}/u.test(nazwa)) return null;
     if (LAB_SKIP.test(nazwa)) return null;
+    // Drugi bezpiecznik na wypadek nieczytelnego pliku: nazwa pełna glifów-krzaków to nie parametr.
+    if ([...nazwa].some(ch => PODEJRZANY_ZNAK(ch.codePointAt(0)))) return null;
 
     const ogon = raw.slice(wynikM.index + wynikM[0].length, normaOk ? norma.index : raw.length);
     // Nawiasy i średniki obcinamy tylko z brzegów tokenu – globalne usuwanie przecinka psuło „ml/min/1,73m2”.
@@ -1639,6 +1700,7 @@
     nameVariants, doctorVariants, placePhrases, scrub, stripPersonalLines, anonymizeDocText, leaks,
     dawkowanieTekst, medLine, aiInput,
     findDate, peselValid, birthFromPesel, detectDocKind, extractDocInfo,
+    textQuality, qualityMessage, PODEJRZANY_ZNAK,
     visitCard, iceCard, relativeCard,
     doseKey, isTaken, markDose, dueDoses,
     savePhoto, loadPhoto, deletePhoto, clearPhotos, listPhotoIds, exportPhotos, importPhotos,

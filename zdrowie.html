@@ -725,7 +725,9 @@
             }
             if (['jpg', 'jpeg', 'png', 'webp', 'bmp'].includes(ext) || /^image\//.test(file.type)) {
                 if (/heic|heif/.test(ext + file.type)) throw new Error('Zdjęcie w formacie HEIC (iPhone) – zapisz je jako JPG albo zrób skan do PDF.');
-                return { text: await ocrImages([file], onProgress), ocr: true, pages: 1 };
+                const zeZdjecia = await ocrImages([file], onProgress);
+                if (!Z.textQuality(zeZdjecia).ok) throw new Error('Ze zdjęcia nie udało się odczytać tekstu. Zrób je prosto nad kartką, w dobrym świetle, bez cienia i tak, żeby wypełniała cały kadr.');
+                return { text: zeZdjecia, ocr: true, pages: 1 };
             }
             if (ext !== 'pdf') throw new Error('Obsługiwane pliki: PDF, Word (.docx), zdjęcia (JPG, PNG) i .txt.');
             onProgress('Czytam PDF…');
@@ -738,11 +740,18 @@
                 parts.push(tc.items.map(it => it.str + (it.hasEOL ? '\n' : ' ')).join('').replace(/[ \t]+\n/g, '\n'));
             }
             const text = parts.join('\n\n');
-            if (text.replace(/\s/g, '').length >= 40 * pdf.numPages) return { text, ocr: false, pages: pdf.numPages };
+            // Sama liczba znaków nic nie mówi: PDF z czcionką bez mapy znaków zwraca tysiące glifów-krzaków.
+            // Liczy się, czy to w ogóle jest tekst — jeśli nie, renderujemy strony i rozpoznajemy je jak skan.
+            const dosc = text.replace(/\s/g, '').length >= 40 * pdf.numPages;
+            const jakosc = Z.textQuality(text);
+            if (dosc && jakosc.ok) return { text, ocr: false, pages: pdf.numPages };
+            const zepsuty = dosc && !jakosc.ok;
             const n = Math.min(pdf.numPages, MAX_OCR_PAGES);
             const canvases = [];
             for (let i = 1; i <= n; i++) {
-                onProgress(`To skan – przygotowuję stronę ${i} z ${n} do rozpoznania…`);
+                onProgress(zepsuty
+                    ? `Ten PDF ma uszkodzoną warstwę tekstową (${Z.qualityMessage(jakosc)}) – rozpoznaję go jak skan, strona ${i} z ${n}…`
+                    : `To skan – przygotowuję stronę ${i} z ${n} do rozpoznania…`);
                 const page = await pdf.getPage(i);
                 const vp = page.getViewport({ scale: 2 });
                 const c = document.createElement('canvas');
@@ -750,7 +759,14 @@
                 await page.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise;
                 canvases.push(c);
             }
-            return { text: await ocrImages(canvases, onProgress), ocr: true, pages: pdf.numPages, cut: pdf.numPages > n };
+            const rozpoznany = await ocrImages(canvases, onProgress);
+            const poOcr = Z.textQuality(rozpoznany);
+            if (!poOcr.ok) {
+                throw new Error(zepsuty
+                    ? 'Ten PDF ma uszkodzoną warstwę tekstową, a rozpoznawanie obrazu też nic nie dało. Spróbuj zapisać go jeszcze raz (Drukuj → Zapisz jako PDF) albo zrób wyraźne zdjęcie wydruku.'
+                    : 'Nie udało się odczytać tekstu z tego pliku. Jeśli to skan, zrób go prosto i w dobrym świetle.');
+            }
+            return { text: rozpoznany, ocr: true, pages: pdf.numPages, cut: pdf.numPages > n, naprawiony: zepsuty };
         }
 
         function DocForm({ doc, isNew, onSave, onClose, onDelete }) {
@@ -779,7 +795,8 @@
                         placowka: prev.placowka || info.placowka,
                         lekarz: prev.lekarz || info.lekarz
                     }));
-                    setProgress(r.cut ? `Odczytano ${MAX_OCR_PAGES} z ${r.pages} stron (reszta pominięta).` : `Odczytano ${r.pages} ${Z.plural(r.pages, 'stronę', 'strony', 'stron')}${r.ocr ? ' (rozpoznawanie tekstu)' : ''}.`);
+                    setProgress((r.naprawiony ? 'Ten PDF miał uszkodzoną warstwę tekstową, więc odczytałem go jak skan. ' : '')
+                        + (r.cut ? `Odczytano ${MAX_OCR_PAGES} z ${r.pages} stron (reszta pominięta).` : `Odczytano ${r.pages} ${Z.plural(r.pages, 'stronę', 'strony', 'stron')}${r.ocr ? ' (rozpoznawanie tekstu)' : ''}.`));
                 } catch (x) { setErr(x.message); setProgress(''); }
             };
 
@@ -1370,7 +1387,8 @@
                     if (clean.replace(/\s/g, '').length < 20) throw new Error('Nie udało się odczytać tekstu z tego pliku.');
                     const info = Z.extractDocInfo(clean);
                     setK(prev => Object.assign({}, prev, { tekst: clean, ocr: r.ocr, data: prev.data || info.data, miejsce: prev.miejsce || info.placowka }));
-                    setProgress(`Odczytano ${r.pages} ${Z.plural(r.pages, 'stronę', 'strony', 'stron')}${r.ocr ? ' (rozpoznawanie tekstu)' : ''}.`);
+                    setProgress((r.naprawiony ? 'Ten PDF miał uszkodzoną warstwę tekstową, więc odczytałem go jak skan. ' : '')
+                        + `Odczytano ${r.pages} ${Z.plural(r.pages, 'stronę', 'strony', 'stron')}${r.ocr ? ' (rozpoznawanie tekstu)' : ''}.`);
                 } catch (x) { setErr(x.message); setProgress(''); }
             };
 
@@ -2056,9 +2074,12 @@
                         laboratorium: prev.laboratorium || info.laboratorium,
                         pozycje: info.pozycje.length ? info.pozycje : prev.pozycje
                     }));
-                    setProgress(info.pozycje.length
+                    const skad = r.naprawiony
+                        ? 'Ten PDF miał uszkodzoną warstwę tekstową, więc odczytałem go jak skan — tym bardziej sprawdź liczby. '
+                        : r.ocr ? 'Odczyt z rozpoznawania obrazu — sprawdź liczby. ' : '';
+                    setProgress(skad + (info.pozycje.length
                         ? `Rozpoznano ${info.pozycje.length} ${Z.plural(info.pozycje.length, 'parametr', 'parametry', 'parametrów')} — sprawdź je i popraw, co trzeba.`
-                        : 'Odczytałem tekst, ale nie rozpoznałem żadnego parametru. Dopisz je ręcznie poniżej.');
+                        : 'Nie rozpoznałem żadnego parametru. Dopisz je ręcznie poniżej.'));
                 } catch (x) { setErr(x.message); setProgress(''); }
             };
 

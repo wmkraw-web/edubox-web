@@ -384,6 +384,22 @@ Dodatkowo `docsIndex` wypisuje SPIS wszystkich dokumentów (także bez wczytanej
 odznaczyć dokumenty (domyślnie zaznaczone są wszystkie – właśnie na pomijaniu wywróciła się pierwsza wersja).
 Limit treści dokumentów podniesiony z 16 000 do 45 000 znaków, protokoły mają własne 20 000.
 
+**PDF z uszkodzoną warstwą tekstową (naprawione 28.10.2026 po zgłoszeniu właściciela):** część PDF-ów
+z systemów laboratoryjnych osadza czcionkę z własnym kodowaniem i **bez poprawnej mapy ToUnicode** – pdf.js
+wyciąga wtedy KODY GLIFÓW zamiast liter („▌▌▌AA (▌▌▌▌ ▌▌@ ▌▌”). Warunek `text.length >= 40 * numPages`
+sprawdzał tylko ILE znaków wyszło, więc taki plik (realnie 10 409 znaków) przechodził jako „ma warstwę
+tekstową” i **nigdy nie trafiał do OCR**, a do kartoteki wpadały parametry o nazwach z krzaków.
+Teraz liczy się też jakość: `textQuality` (w core, testowalna) patrzy na udział znaków z obszaru prywatnego
+`U+E000–U+F8FF`, bloków rysunkowych `U+2580–U+25FF` i znaku zastępczego (> 2% = zepsute), na udział samogłosek
+wśród liter (polski ma ~40%, < 20% oznacza przestawione kodowanie – ten przypadek nie ma żadnych dziwnych
+znaków, więc sam próg na znaki by go nie złapał) i na obecność choć jednego typowego słowa dokumentu
+medycznego przy ≥ 200 literach. Gdy tekst jest zły, `readDocument` renderuje strony i rozpoznaje je jak skan,
+a użytkownik dostaje komunikat, CO było nie tak z plikiem (`qualityMessage`). Po OCR jakość jest sprawdzana
+jeszcze raz – jeśli dalej nic z tego nie ma, leci jasny błąd zamiast zapisania śmieci. To samo dla zdjęć.
+Drugi bezpiecznik jest w `parseLabLine`: nazwa parametru zawierająca taki glif nie tworzy pozycji.
+Progi dobrane tak, żeby tabela samych liczb z wynikami NIE była fałszywie odrzucana (test tego pilnuje).
+Ten sam wzorzec odczytu (`readDocument`) jest skopiowany w `podopieczni.html` – **tam poprawki jeszcze nie ma**.
+
 **Etap 3 (do zrobienia):** PWA z ikoną na telefonie; ewentualne rozpoznawanie układów wielokolumnowych
 w wydrukach laboratoryjnych (teraz parser czyta wiersz po wierszu – przy dwóch kolumnach wyników na stronie
 trzeba sprawdzić odczyt).
