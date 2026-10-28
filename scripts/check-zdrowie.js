@@ -859,6 +859,60 @@ test('nazwa rozsypana przez OCR nie staje się parametrem', () => {
   assert(Z.parseLabLine('Hemoglobina glikowana HbA1c   6,1   %   4,0 - 6,0') !== null, 'trzywyrazowa nazwa zostaje');
 });
 
+test('popsuty odczyt całego wydruku jest nazwany wprost, a liczby nie są poprawiane', () => {
+  // Realny zrzut właściciela: skan morfologii, w którym rozpoznawanie zgubiło przecinki dziesiętne
+  // („4,60 - 6,50” → „460 650”) i całą kolumnę jednostek.
+  const popsute = [
+    { parametr: 'Erytrocyty', wynik: '4,33', jednostka: '', normaOd: 460, normaDo: 650, normaTekst: '460–650' },
+    { parametr: 'Hematokryt', wynik: '39,0', jednostka: '', normaOd: 400, normaDo: 520, normaTekst: '400–520' },
+    { parametr: 'MCHC', wynik: '30,3', jednostka: '', normaOd: 310, normaDo: 370, normaTekst: '310–370' },
+    { parametr: 'MCV', wynik: '90,1', jednostka: '', normaOd: 80, normaDo: 98, normaTekst: '80–98' },
+    { parametr: 'Płytki krwi', wynik: '244', jednostka: '', normaOd: 150, normaDo: 400, normaTekst: '150–400' }
+  ];
+  const w = Z.labReadWarning(popsute);
+  assert(/rz[ęe]d[óo]w wielko[śs]ci/.test(w), 'brak powodu o rzędzie wielkości: ' + w);
+  assert(/jednostek/.test(w), 'brak powodu o jednostkach: ' + w);
+  // Liczby zostają takie, jakie przyszły z wydruku – aplikacja nie zgaduje przecinka.
+  assert(popsute[0].normaOd === 460 && popsute[0].wynik === '4,33', 'ostrzeżenie nie może zmieniać danych');
+});
+test('porządny odczyt nie dostaje ostrzeżenia', () => {
+  const dobre = Z.parseLabText([
+    'Nazwa badania        Wynik    Jednostka   Wartości referencyjne',
+    'Erytrocyty    4,33   10^12/l   4,60 - 6,50',
+    'Hemoglobina   13,1   g/dl      13,5 - 18,6',
+    'Hematokryt    39,0   %         40,0 - 52,0',
+    'MCV           90,1   fl        80 - 98',
+    'Płytki krwi   244    10^3/ul   150 - 400'
+  ].join('\n'));
+  assert(dobre.length === 5, 'rozpoznano ' + dobre.length + ' zamiast 5');
+  assert(dobre.every(p => p.jednostka), 'jednostki: ' + JSON.stringify(dobre.map(p => p.jednostka)));
+  assert(Z.labReadWarning(dobre) === '', 'fałszywe ostrzeżenie: ' + Z.labReadWarning(dobre));
+});
+test('wydruk w jednostkach SI nie jest brany za popsuty odczyt', () => {
+  // Hemoglobina 118 g/l przy normie 135–186 g/l to zapis prawidłowy, nie zgubiony przecinek –
+  // dlatego nie „poprawiamy” liczb, a ostrzeżenie wymaga kilku wierszy naraz.
+  const si = Z.parseLabText([
+    'Nazwa badania        Wynik    Jednostka   Wartości referencyjne',
+    'Hemoglobina   118    g/l       135 - 186',
+    'Erytrocyty    4,33   10^12/l   4,60 - 6,50',
+    'Hematokryt    0,39   l/l       0,40 - 0,52',
+    'Płytki krwi   244    10^9/l    150 - 400'
+  ].join('\n'));
+  assert(si.length === 4, 'rozpoznano ' + si.length + ' zamiast 4: ' + si.map(p => p.parametr).join(' | '));
+  assert(Z.labReadWarning(si) === '', 'wydruk SI oznaczony jako popsuty: ' + Z.labReadWarning(si));
+});
+test('skan do rozpoznawania renderuje się w 300 dpi, strona po stronie', () => {
+  [['zdrowie.html', 'Moje Zdrowie'], ['podopieczni.html', 'Teczka podopiecznych']].forEach(([plik, nazwa]) => {
+    const h = fs.readFileSync(path.join(ROOT, plik), 'utf8');
+    assert(/const OCR_DPI = 300;/.test(h), nazwa + ': brak docelowej rozdzielczości OCR');
+    assert(/getViewport\(\{ scale: ocrScale\(page\) \}\)/.test(h), nazwa + ': render skanu nadal na sztywnej skali');
+    assert(!/getViewport\(\{ scale: 2 \}\)/.test(h), nazwa + ': została stara skala 2 (≈145 dpi)');
+    assert(/typeof sources\[i\] === 'function'/.test(h), nazwa + ': strony nie są renderowane leniwie');
+    assert(/src\.width = 0; src\.height = 0;/.test(h), nazwa + ': canvas nie jest zwalniany po rozpoznaniu');
+    assert(/preserve_interword_spaces/.test(h), nazwa + ': brak zachowania odstępów między kolumnami');
+  });
+});
+
 (async () => {
   for (const [name, fn] of tests) {
     try { await fn(); ok++; console.log('✅ ' + name); }

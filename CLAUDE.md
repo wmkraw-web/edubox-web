@@ -431,6 +431,23 @@ nie wyciągać z takiej pozycji wniosków. Nie zgadujemy, która liczba jest zł
 rozsypane przez OCR na jedno- i dwuliterowe kawałki („I por eo jezkowscsgo”) – ale nie nazwę ze słownika
 (`OB`, `pH`) i nie kod w nawiasie.
 
+**Skan czytany za grubo (28.10.2026, czwarte zgłoszenie: „dalej kiepsko wczytuje, większość trzeba wpisywać
+ręcznie”):** na zrzucie morfologia miała 33 parametry z PUSTYMI jednostkami i normami bez przecinka
+(erytrocyty 4,33 przy „normie” 460–650, czyli 4,60–6,50; MPV 99 zamiast 9,9). To nie parser – to odczyt:
+strony do rozpoznawania renderowały się przez `getViewport({ scale: 2 })`, czyli **≈145 dpi**, a tesseract
+potrzebuje ok. **300 dpi**, żeby nie gubić przecinka dziesiętnego i drobnego druku kolumny jednostek.
+Teraz `ocrScale(page)` liczy skalę z `OCR_DPI / 72` z sufitem `MAX_PIKSELI` (przeglądarki mobilne odmawiają
+canvasu powyżej ok. 16 mln px). Przy okazji naprawiony drugi błąd: wszystkie strony leżały naraz w tablicy
+canvasów – 15 stron A4 w 300 dpi to kilkaset MB, więc strony idą teraz **leniwie** (element tablicy to
+funkcja rysująca stronę) i canvas jest zwalniany zaraz po rozpoznaniu. Do tego
+`preserve_interword_spaces: '1'`, żeby kolumny nie sklejały się w jedno słowo. **Ta sama poprawka jest
+w `podopieczni.html`** (ten sam `readDocument`), a test pilnuje obu stron.
+**Liczb po odczycie NIE poprawiamy** – 118 g/l przy normie 135–186 to zapis w jednostkach SI, całkowicie
+prawidłowy, a „dzielenie przez 10, gdy nie pasuje” zepsułoby go. Zamiast tego `labReadWarning` nazywa rzecz
+po imieniu nad listą parametrów: gdy co najmniej dwa wiersze mają wynik i normę z różnych rzędów wielkości,
+gdy żaden wiersz nie ma jednostki albo żaden nie ma normy – aplikacja pisze, że odczyt jest niepełny i że
+trzeba go porównać z oryginałem, zanim uzna się strzałki za ocenę wyników.
+
 **Wspólna ocena jakości tekstu (`tekst-jakosc.js`, od 28.10.2026):** `window.EduTekstJakosc` – jeden plik dla
 „Mojego Zdrowia” i „Teczki podopiecznych”, bo ten sam `readDocument` jest skopiowany w obu stronach i oba miały
 ten sam błąd (orzeczenia z poradni bywają w takich PDF-ach dokładnie jak wyniki z laboratorium). Dołączaj go
