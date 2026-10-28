@@ -349,8 +349,44 @@ instrukcja dla tej osoby). Uczciwie napisane, że to **pełny dostęp do kopii i
 nie da się dać „tylko podglądu”, bo kto ma hasło, ten ma klucz. Dla lżejszego wariantu jest kartka do druku
 „Co trzeba o mnie wiedzieć” (`relativeCard`): leki, urządzenia, lekarze z telefonami, najbliższe terminy, kontakty.
 
-**Etap 3 (do zrobienia):** parsowanie wyników laboratoryjnych z PDF do tabeli porównawczej z normami i wykresem
-trendu (liczy przeglądarka, nie AI) plus komentarz AI do gotowych liczb, PWA z ikoną na telefonie.
+**Badania laboratoryjne (`badania`, od 28.10.2026):** wczytany PDF/skan rozbiera `parseLabText` – wiersz po wierszu
+na parametr, wynik, jednostkę i **zakres normy z TEGO wydruku**. Norm nie bierzemy z własnej listy ani z pamięci
+modelu: każde laboratorium ma inne (inna metoda, inny aparat), więc „poza normą” to arytmetyka na liczbach
+z kartki pacjenta, nie wiedza. Pułapki rozwiązane w parserze: wiodące `\s*` w regexie liczb powodowało, że indeks
+wskazywał spację i kontrola „czy liczba stoi osobno” patrzyła na zły znak – stąd `Witamina D 25(OH)` dawało wynik
+25, a `HbA1c` wynik 1 (liczba wtopiona w nazwę należy do nazwy); globalne czyszczenie przecinka psuło jednostkę
+`ml/min/1,73m2`; wynik z operatorem (`<0,19`) jest oceniany wobec normy górnej. `paramKey` szuka klucza po kolei:
+cała nazwa (słownik ma wielowyrazowe, „czynnik reumatoidalny” → `rf`), potem tokeny OD KOŃCA („Cholesterol HDL”
+to `hdl`, nie `cholesterol`; „Hemoglobina glikowana HbA1c” to `hba1c`, nie `hemoglobina`), nawias, na końcu prefiks.
+`LAB_SYNONYMS` obejmuje morfologię, wątrobę, nerki, tarczycę, lipidogram, krzepnięcie i panel reumatologiczny
+(OB, CRP, RF, anty-CCP, ASO, kwas moczowy). `labSeries` zbiera ten sam parametr z kolejnych badań, `labTrend`
+liczy kierunek z dwóch ostatnich pomiarów (próg 5% – mniej to szum metody). Wykres rysuje `WykresTrendu`
+**wprost w SVG**, bez biblioteki (CSP; test pilnuje, że nic takiego nie jest dociągane): pasmo normy jako
+prostokąt w tle, punkty kolorowane flagą. Tabela porównawcza ma parametry w wierszach i do 6 badań w kolumnach,
+przewija się w obrębie karty (nie całą stroną). Do AI idzie `labReportText` – **gotowe liczby i gotowe
+porównania**, a instrukcja (`labPrompts`) zabrania podawania własnych norm, rozpoznań, zaleceń leków i diety oraz
+oceniania „dobry / zły wynik”. Parametry poza normą w najnowszym badaniu wchodzą do `alerts()`, a na kartę na
+wizytę – jako tabela z normami plus osobna tabela „co się zmienia w kolejnych badaniach”.
+
+**Kompletność dokumentów w zapytaniu do AI (naprawione 28.10.2026 po zgłoszeniu właściciela):** dokument dla
+lekarza pomijał część kartoteki. Cztery przyczyny, wszystkie naprawione i objęte testami:
+1. treść wczytanego **protokołu kontroli urządzenia** (`kontrole[].tekst`) nigdy nie szła do AI – do zapytania
+   trafiały tylko pola wpisane ręcznie, więc protokół kardiowertera nie był analizowany; teraz wchodzi przez
+   `deviceChecksText` tak samo jak treść dokumentu;
+2. kontrole brane przez `slice(-2)` **bez sortowania** – czyli dwie ostatnio DODANE, nie dwie najnowsze;
+3. pierwszy długi dokument zjadał limit znaków (`Math.min(6000, left)`), a kolejne wypadały bez śladu
+   (`if (left < 400) return`) – teraz `shareBudget` dzieli budżet sprawiedliwie: krótkie dokumenty wchodzą całe,
+   nadwyżkę po nich dostają długie po równo, a ucięcie jest w tekście powiedziane wprost;
+4. dokument **bez rozpoznanej daty** (częste przy skanach wypisów) lądował na końcu sortowania malejącego i był
+   ucinany – `docDate` używa `data || utworzono`.
+Dodatkowo `docsIndex` wypisuje SPIS wszystkich dokumentów (także bez wczytanej treści i odznaczonych), instrukcja
+`reportPrompts` wymusza akapit o KAŻDYM dokumencie ze spisu i o każdym protokole, a zakładka „Dla lekarza” pozwala
+odznaczyć dokumenty (domyślnie zaznaczone są wszystkie – właśnie na pomijaniu wywróciła się pierwsza wersja).
+Limit treści dokumentów podniesiony z 16 000 do 45 000 znaków, protokoły mają własne 20 000.
+
+**Etap 3 (do zrobienia):** PWA z ikoną na telefonie; ewentualne rozpoznawanie układów wielokolumnowych
+w wydrukach laboratoryjnych (teraz parser czyta wiersz po wierszu – przy dwóch kolumnach wyników na stronie
+trzeba sprawdzić odczyt).
 
 **Panel jakości Make:** `panel-jakosci.html` korzysta z odczytowego trybu
 `GET /api/weekly-report?view=make-health`, dzięki czemu nie powstaje trzynasta

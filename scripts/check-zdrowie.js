@@ -429,6 +429,215 @@ test('strona przypomina, że to nie porada medyczna', () => {
   assert(/112/.test(page), 'brak numeru alarmowego');
 });
 
+// ---------- wyniki badań: parser wydruku z laboratorium ----------
+const WYDRUK = [
+  'DIAGNOSTYKA Sp. z o.o. Laboratorium Medyczne',
+  'Pacjent: Witold Kraw        PESEL: 62031512345',
+  'Data pobrania: 12.03.2026 07:40',
+  'Materiał: krew pełna EDTA',
+  '',
+  'Nazwa badania            Wynik     Jednostka    Wartości referencyjne',
+  'Hemoglobina (HGB)        14,2      g/dl         13,0 - 17,0',
+  'Leukocyty (WBC)          11,8  H   10^3/µl      4,00 - 10,00',
+  'Płytki krwi (PLT)        198       10^3/µl      150 - 400',
+  'OB                       34        mm/h         do 15',
+  'CRP                      28,4      mg/l         < 5,0',
+  'Czynnik reumatoidalny    62,0      IU/ml        < 14,0',
+  'Przeciwciała anty-CCP    102       U/ml         < 17',
+  'Kwas moczowy             7,8       mg/dl        3,5 - 7,2',
+  'Witamina D 25(OH)        18,5      ng/ml        30,0 - 50,0',
+  'Hemoglobina glikowana HbA1c  6,8   %            4,0 - 6,0',
+  'Witamina B12             310       pg/ml        191 - 663',
+  'D-dimery                 <0,19     mg/l         < 0,50',
+  'Cholesterol HDL          38        mg/dl        > 40',
+  'eGFR                     82        ml/min/1,73m2  > 60',
+  'Strona 1 z 2',
+  'Autoryzował: dr n. med. Jan Lis'
+].join('\n');
+
+test('parser wydruku: rozpoznaje parametry, wyniki, jednostki i normy', () => {
+  const poz = Z.parseLabText(WYDRUK);
+  assert(poz.length === 14, 'rozpoznano pozycji: ' + poz.length);
+  const p = (nazwa) => poz.find(x => x.parametr.startsWith(nazwa));
+  assert(p('Hemoglobina (HGB)').wynik === '14,2' && p('Hemoglobina (HGB)').jednostka === 'g/dl', JSON.stringify(p('Hemoglobina (HGB)')));
+  assert(p('eGFR').jednostka === 'ml/min/1,73m2', 'jednostka z przecinkiem: ' + p('eGFR').jednostka);
+  assert(p('OB').normaDo === 15 && p('OB').normaTekst === '< 15', JSON.stringify(p('OB')));
+  assert(p('Płytki').normaOd === 150 && p('Płytki').normaDo === 400, JSON.stringify(p('Płytki')));
+});
+test('parser: liczba wtopiona w nazwę nie jest wynikiem', () => {
+  // Realny błąd z pierwszej wersji: „Witamina D 25(OH)” dawało wynik 25, a „HbA1c” wynik 1.
+  const wit = Z.parseLabLine('Witamina D 25(OH)        18,5      ng/ml        30,0 - 50,0');
+  assert(wit.wynik === '18,5' && wit.parametr === 'Witamina D 25(OH)', JSON.stringify(wit));
+  const hba = Z.parseLabLine('Hemoglobina glikowana HbA1c  6,8   %            4,0 - 6,0');
+  assert(hba.wynik === '6,8' && Z.paramKey(hba.parametr) === 'hba1c', JSON.stringify(hba));
+  const b12 = Z.parseLabLine('Witamina B12             310       pg/ml        191 - 663');
+  assert(b12.wynik === '310' && Z.paramKey(b12.parametr) === 'witaminab12', JSON.stringify(b12));
+});
+test('parser: pomija nagłówki, dane pacjenta i stopki', () => {
+  ['Pacjent: Witold Kraw        PESEL: 62031512345', 'Data pobrania: 12.03.2026 07:40',
+   'Nazwa badania            Wynik     Jednostka    Wartości referencyjne', 'Strona 1 z 2',
+   'Autoryzował: dr n. med. Jan Lis', 'Materiał: krew pełna EDTA', 'Laboratorium Medyczne'
+  ].forEach(l => assert(Z.parseLabLine(l) === null, 'wiersz wzięty za wynik: ' + l));
+});
+test('ocena wyniku to arytmetyka na normie z wydruku, nie wiedza modelu', () => {
+  const f = (w, od, doo) => Z.labFlag({ wynik: w, normaOd: od, normaDo: doo });
+  assert(f('14,2', 13, 17) === 'ok' && f('11,8', 4, 10) === 'wysoki' && f('3,9', 4, 10) === 'niski', 'zakres dwustronny');
+  assert(f('28,4', null, 5) === 'wysoki' && f('4,1', null, 5) === 'ok', 'norma górna');
+  assert(f('38', 40, null) === 'niski' && f('82', 60, null) === 'ok', 'norma dolna');
+  assert(f('100', null, null) === '', 'bez normy nie oceniamy');
+  assert(Z.labFlag({ wynik: '<0,19', normaDo: 0.5 }) === 'ok', 'wynik „poniżej progu” wobec normy górnej');
+  assert(Z.labFlag({ wynik: '100', flagaWydruku: 'H' }) === 'wysoki', 'flaga H z wydruku, gdy brak zakresu');
+});
+test('klucz parametru: skrót z nawiasu i z końca nazwy wygrywa z nazwą ogólną', () => {
+  assert(Z.paramKey('Hemoglobina (HGB)') === Z.paramKey('HGB'), 'nazwa i skrót muszą dać ten sam klucz');
+  assert(Z.paramKey('Cholesterol HDL') === 'hdl' && Z.paramKey('Cholesterol całkowity') === 'cholesterol', 'HDL nie może wpaść do cholesterolu');
+  assert(Z.paramKey('Czynnik reumatoidalny') === 'rf' && Z.paramKey('Przeciwciała anty-CCP') === 'antyccp', 'parametry reumatologiczne');
+  assert(Z.paramKey('ALT (ALAT)') === 'alt' && Z.paramKey('OB') === 'ob', 'skróty wątrobowe i OB');
+});
+test('data pobrania i laboratorium rozpoznane lokalnie, bez AI', () => {
+  const info = Z.extractLabInfo(WYDRUK);
+  assert(info.data === '2026-03-12', 'data: ' + info.data);
+  assert(/DIAGNOSTYKA/i.test(info.laboratorium), 'laboratorium: ' + info.laboratorium);
+  assert(info.pozycje.length === 14, 'pozycje: ' + info.pozycje.length);
+});
+
+// ---------- trendy ----------
+const labBadania = [
+  { id: 'b1', data: '2026-01-10', opis: 'morfologia', pozycje: [
+    { parametr: 'CRP', wynik: '5,2', jednostka: 'mg/l', normaDo: 5, normaTekst: '< 5,0', key: 'crp' },
+    { parametr: 'OB', wynik: '14', jednostka: 'mm/h', normaDo: 15, normaTekst: '< 15', key: 'ob' },
+    { parametr: 'Hemoglobina', wynik: '14,0', jednostka: 'g/dl', normaOd: 13, normaDo: 17, normaTekst: '13–17', key: 'hemoglobina' }
+  ] },
+  { id: 'b2', data: '2026-06-10', opis: 'morfologia', pozycje: [
+    { parametr: 'CRP', wynik: '12,0', jednostka: 'mg/l', normaDo: 5, normaTekst: '< 5,0', key: 'crp' },
+    { parametr: 'OB', wynik: '26', jednostka: 'mm/h', normaDo: 15, normaTekst: '< 15', key: 'ob' },
+    { parametr: 'Hemoglobina', wynik: '13,8', jednostka: 'g/dl', normaOd: 13, normaDo: 17, normaTekst: '13–17', key: 'hemoglobina' }
+  ] },
+  { id: 'b3', data: '2026-10-12', opis: 'panel reumatologiczny', pozycje: [
+    { parametr: 'CRP', wynik: '28,4', jednostka: 'mg/l', normaDo: 5, normaTekst: '< 5,0', key: 'crp' },
+    { parametr: 'OB', wynik: '34', jednostka: 'mm/h', normaDo: 15, normaTekst: '< 15', key: 'ob' },
+    { parametr: 'Hemoglobina', wynik: '13,9', jednostka: 'g/dl', normaOd: 13, normaDo: 17, normaTekst: '13–17', key: 'hemoglobina' }
+  ] }
+].map(b => Object.assign(Z.newLab(), b, { pozycje: b.pozycje.map(p => Object.assign({}, p, { flaga: Z.labFlag(p) })) }));
+const vaultLab = Z.migrate(Object.assign({}, JSON.parse(JSON.stringify({ profil: vault.profil, leki: vault.leki, urzadzenia: vault.urzadzenia })), { badania: labBadania }));
+
+test('serie: ten sam parametr zbiera się w jedną linię, od najstarszego pomiaru', () => {
+  const serie = Z.labSeries(labBadania);
+  const crp = serie.find(s => s.key === 'crp');
+  assert(crp && crp.punkty.map(p => p.wynik).join('|') === '5,2|12,0|28,4', JSON.stringify(crp && crp.punkty));
+  assert(serie[0].key === 'crp' || serie[0].key === 'ob', 'parametry poza normą mają być na górze: ' + serie[0].key);
+});
+test('trend: kierunek z dwóch ostatnich pomiarów, wahanie poniżej 5% to brak zmiany', () => {
+  const serie = Z.labSeries(labBadania);
+  const crp = serie.find(s => s.key === 'crp');
+  const hgb = serie.find(s => s.key === 'hemoglobina');
+  assert(crp.trend.kierunek === 'rosnie' && crp.trend.zmianaProc === 137, JSON.stringify(crp.trend));
+  assert(hgb.trend.kierunek === 'stabilnie', JSON.stringify(hgb.trend));
+  assert(Z.labTrend([{ wartosc: 10 }]).kierunek === 'brak', 'jeden pomiar to nie trend');
+});
+test('wyniki badań dla AI: gotowe liczby, normy z wydruku i policzone zmiany', () => {
+  const t = Z.labReportText(vaultLab, {});
+  assert(/CRP: 28,4 mg\/l \(norma z wydruku: < 5,0\) — POWYŻEJ NORMY/.test(t), t.slice(0, 400));
+  assert(/CRP: 5,2 → 12,0 → 28,4 mg\/l \(rośnie, ostatnia zmiana \+137%\)/.test(t), 'brak policzonej zmiany');
+  assert(/Hemoglobina: 14,0 → 13,8 → 13,9 g\/dl \(bez istotnej zmiany\)/.test(t), 'stabilny parametr opisany źle');
+  assert(Z.leaks(t, vaultLab).length === 0, 'przeciek: ' + Z.leaks(t, vaultLab).join(', '));
+});
+test('instrukcja do badań zabrania własnych norm, rozpoznań i oceniania', () => {
+  const sys = Z.labPrompts(vaultLab, {}).system;
+  assert(/nie podajesz własnych norm/.test(sys), 'brak zakazu własnych norm');
+  assert(/nie stawiasz rozpoznań/i.test(sys), 'brak zakazu rozpoznań');
+  assert(/nie zalecasz leków, suplementów ani diety/.test(sys), 'brak zakazu zaleceń');
+  assert(/brak normy w wydruku/.test(sys), 'brak reguły dla parametrów bez normy');
+  assert(Z.leaks(Z.labPrompts(vaultLab, {}).prompt, vaultLab).length === 0, 'przeciek w zapytaniu o badania');
+});
+test('parametry poza normą trafiają na ekran główny', () => {
+  const a = Z.alerts(vaultLab, NOW).find(x => x.kind === 'badanie');
+  assert(a && /2 parametry poza normą/.test(a.label), JSON.stringify(a));
+});
+
+// ---------- kompletność dokumentów w raporcie (zgłoszenie z 28.10.2026) ----------
+const vaultDocs = Z.migrate({
+  profil: { imie: 'Witold', nazwisko: 'Kraw', dataUr: '1962-03-15', plec: 'm', choroby: 'niewydolność serca' },
+  urzadzenia: [{
+    id: 'u1', typ: 'icd', producent: 'Medtronic', model: 'Evera', numerSeryjny: 'PJN4471203', szpital: 'Klinika w Zgierzu',
+    ostatniaKontrola: '2026-05-10', kontrolaCo: 6, kontrole: [
+      { id: 'k1', data: '2025-11-10', miejsce: 'Klinika w Zgierzu', wynik: 'bez interwencji', tekst: 'PROTOKOL STARSZY\nBateria: 7,1 roku. Epizody VT: 0.' },
+      { id: 'k2', data: '2026-05-10', miejsce: 'Klinika w Zgierzu', bateria: '6,5 roku', tekst: 'PROTOKOL NOWSZY ICD\nStan baterii ERI: 6,5 roku. Epizody VT: 3, interwencje ATP: 2.' }
+    ]
+  }],
+  dokumenty: [
+    { id: 'd1', rodzaj: 'wypis', tytul: 'Reumatologia', data: '', utworzono: '2026-03-10T10:00:00Z', tekst: 'KARTA INFORMACYJNA\nOddzial Reumatologii\nRozpoznanie: reumatoidalne zapalenie stawow.\n' + 'X'.repeat(9000) },
+    { id: 'd2', rodzaj: 'badanie', tytul: 'Morfologia', data: '2026-09-01', tekst: 'Wynik morfologii w normie.' },
+    { id: 'd3', rodzaj: 'zalecenia', tytul: 'Kardiolog', data: '2026-10-01', tekst: 'Zalecenia kardiologiczne.\n' + 'Y'.repeat(20000) },
+    { id: 'd4', rodzaj: 'opis', tytul: 'USG jamy brzusznej', data: '2026-07-01', tekst: 'Opis USG: bez zmian ogniskowych.' }
+  ]
+});
+
+test('budżet znaków dzielony sprawiedliwie: krótkie dokumenty całe, długie po równo', () => {
+  const u = Z.shareBudget([20000, 1500, 30000, 800], 10000);
+  assert(u[1] === 1500 && u[3] === 800, 'krótkie dokumenty muszą wejść w całości: ' + JSON.stringify(u));
+  assert(Math.abs(u[0] - u[2]) <= 1, 'dwa długie dzielą resztę po równo: ' + JSON.stringify(u));
+  assert(u.reduce((a, b) => a + b, 0) <= 10000, 'przekroczony budżet');
+});
+test('ŻADEN dokument nie wypada z zapytania, także wypis bez rozpoznanej daty', () => {
+  // Realne zgłoszenie: wypis ze szpitala z reumatologii nie trafiał do AI, bo skan nie miał daty
+  // i dokument lądował na końcu kolejki, a pierwszy długi dokument zjadał cały limit.
+  const t = Z.docsTextZ(vaultDocs, 10000);
+  ['Reumatologia', 'Morfologia', 'Kardiolog', 'USG jamy brzusznej'].forEach(n => assert(t.includes(n), 'dokument pominięty: ' + n));
+  assert(/reumatoidalne zapalenie stawow/.test(t), 'treść wypisu z reumatologii musi być w zapytaniu');
+  assert(/Wynik morfologii w normie/.test(t) && /bez zmian ogniskowych/.test(t), 'krótkie dokumenty muszą wejść całe');
+});
+test('spis dokumentów wymienia wszystkie, także bez wczytanej treści i pominięte', () => {
+  const v = Z.migrate(Object.assign({}, vaultDocs, { dokumenty: [...vaultDocs.dokumenty, { id: 'd5', rodzaj: 'recepta', tytul: 'Recepta', data: '2026-10-05', tekst: '' }] }));
+  const spis = Z.docsIndex(v, ['d1', 'd2']);
+  assert((spis.match(/\n/g) || []).length === 4, 'spis ma mieć 5 pozycji: ' + spis);
+  assert(/Recepta[^\n]*bez wczytanej treści/.test(spis), 'dokument bez treści musi być widoczny');
+  assert(/Kardiolog[^\n]*pominięta na życzenie/.test(spis), 'odznaczony dokument musi być wymieniony jako pominięty');
+  assert(/bez daty w dokumencie/.test(spis), 'brak daty ma być powiedziany wprost');
+});
+test('treść protokołu kontroli urządzenia trafia do zapytania, najnowsza pierwsza', () => {
+  // Realne zgłoszenie: wczytany protokół kardiowertera nie był analizowany, bo do AI szły tylko
+  // pola wpisane ręcznie. Kontrole były też brane po kolejności dodania, nie po dacie.
+  const t = Z.deviceChecksText(vaultDocs, {});
+  assert(/PROTOKOL NOWSZY ICD/.test(t) && /Epizody VT: 3/.test(t), 'brak treści nowszego protokołu: ' + t.slice(0, 300));
+  assert(/PROTOKOL STARSZY/.test(t), 'brak treści starszego protokołu');
+  assert(t.indexOf('PROTOKOL NOWSZY') < t.indexOf('PROTOKOL STARSZY'), 'kontrole muszą iść od najnowszej');
+  assert(!/PJN4471203|Zgierzu/.test(t), 'wyciekł numer seryjny albo szpital');
+});
+test('pełne zapytanie dla lekarza ma wszystko i zero danych identyfikujących', () => {
+  const t = Z.reportInput(vaultDocs, {});
+  ['Reumatologia', 'Morfologia', 'Kardiolog', 'USG jamy brzusznej', 'PROTOKOL NOWSZY ICD', 'Kardiowerter-defibrylator']
+    .forEach(x => assert(t.includes(x), 'brak w zapytaniu: ' + x));
+  assert(/SPIS DOKUMENTÓW W KARTOTECE \(4\)/.test(t), 'brak spisu dokumentów');
+  assert(Z.leaks(t, vaultDocs).length === 0, 'przeciek: ' + Z.leaks(t, vaultDocs).join(', '));
+});
+test('odznaczone dokumenty nie wchodzą treścią, ale zostają w spisie', () => {
+  const t = Z.reportInput(vaultDocs, { docs: ['d2'] });
+  assert(/Wynik morfologii w normie/.test(t), 'wybrany dokument musi wejść treścią');
+  assert(!/reumatoidalne zapalenie stawow/.test(t), 'odznaczony dokument nie może wchodzić treścią');
+  assert(/Reumatologia/.test(t), 'odznaczony dokument musi zostać w spisie');
+});
+test('instrukcja dla lekarza wymusza omówienie każdego dokumentu i każdej kontroli', () => {
+  const sys = Z.reportPrompts(vaultDocs, {}).system;
+  assert(/KAŻDY dokument wymieniony w spisie/.test(sys), 'brak nakazu kompletności dokumentów');
+  assert(/każdym protokołem kontroli/.test(sys), 'brak nakazu omówienia protokołów');
+  assert(/Kontrole urządzeń/.test(sys) && /Wyniki badań/.test(sys), 'brak sekcji na kontrole i badania');
+});
+test('karta na wizytę pokazuje odstające wyniki z normami i kierunek zmian', () => {
+  const k = Z.visitCard(vaultLab, NOW);
+  const b = k.ostatnieBadania[0];
+  assert(b.odstajace.length === 2 && b.odstajace[0].norma === '< 5,0', JSON.stringify(b.odstajace));
+  assert(b.odstajace[0].kierunek === 'powyżej', JSON.stringify(b.odstajace[0]));
+  assert(k.trendy.some(t => t.parametr === 'CRP' && /5,2 → 12,0 → 28,4/.test(t.ciag)), JSON.stringify(k.trendy));
+  assert(!k.trendy.some(t => t.parametr === 'Hemoglobina'), 'stabilny parametr nie zaśmieca kartki');
+});
+test('strona: zakładka Badania podłączona, wykres rysowany bez bibliotek', () => {
+  assert(/id: 'badania'/.test(page) && /<Badania vault=\{vault\} save=\{save\} \/>/.test(page), 'brak zakładki Badania');
+  assert(/function WykresTrendu/.test(page) && /<svg viewBox/.test(page), 'brak wykresu w SVG');
+  const skrypty = [...page.matchAll(/<script[^>]+src="([^"]+)"/g)].map(m => m[1]);
+  assert(!skrypty.some(u => /chart|recharts|d3|plotly|highcharts|echarts/i.test(u)), 'wykres nie może dociągać biblioteki (CSP): ' + skrypty.join(', '));
+});
+
 (async () => {
   for (const [name, fn] of tests) {
     try { await fn(); ok++; console.log('✅ ' + name); }

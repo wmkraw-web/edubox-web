@@ -279,8 +279,8 @@
                                 {alerty.map((a, i) => (
                                     <li key={i}>
                                         <button className="w-full flex items-center gap-3 text-left hover:bg-slate-800/60 rounded-xl px-2 py-2"
-                                            onClick={() => goto({ wizyta: 'wizyty', urzadzenie: 'urzadzenia', skora: 'skora' }[a.kind] || 'leki')}>
-                                            <Icon name={{ wizyta: 'stethoscope', urzadzenie: 'heartbeat', skora: 'eye' }[a.kind] || 'pill'} className="text-lg text-slate-400" />
+                                            onClick={() => goto({ wizyta: 'wizyty', urzadzenie: 'urzadzenia', skora: 'skora', badanie: 'badania' }[a.kind] || 'leki')}>
+                                            <Icon name={{ wizyta: 'stethoscope', urzadzenie: 'heartbeat', skora: 'eye', badanie: 'test-tube' }[a.kind] || 'pill'} className="text-lg text-slate-400" />
                                             <span className="flex-1 text-sm">{a.label}</span>
                                             <span className={`pill ${STATUS_PILL[a.status] || 'pill-ok'}`}>{dayWord(a.days)}</span>
                                         </button>
@@ -901,7 +901,16 @@
                 ? `<h2>Obserwowane zmiany skórne</h2>${k.skora.map(z => `<p><strong>${esc(z.nazwa)}</strong>${z.lokalizacja ? ' — ' + esc(z.lokalizacja) : ''}${z.odKiedy ? ', od ' + esc(z.odKiedy) : ''}: ${esc(z.opis)}${z.ostrzezenia.length ? ' <em>(' + esc(z.ostrzezenia.join(' ')) + ')</em>' : ''}</p>`).join('')}`
                 : '';
             const badania = k.ostatnieBadania.length
-                ? `<h2>Ostatnie badania</h2>${k.ostatnieBadania.map(b => `<p><strong>${esc(b.data)}</strong> — ${esc(b.opis)}${b.odstajace.length ? ': ' + b.odstajace.map(x => esc(x.parametr) + ' ' + esc(x.wynik)).join(', ') : ''}</p>`).join('')}`
+                ? `<h2>Ostatnie badania</h2>${k.ostatnieBadania.map(b => {
+                    const naglowek = `<p><strong>${esc(b.data)}</strong> — ${esc(b.opis)} (${b.ile} ${Z.plural(b.ile, 'parametr', 'parametry', 'parametrów')}, poza normą: ${b.odstajace.length})</p>`;
+                    const tabela = b.odstajace.length
+                        ? `<table><thead><tr><th>Parametr</th><th>Wynik</th><th>Norma z wydruku</th></tr></thead><tbody>${b.odstajace.map(x => `<tr><td>${esc(x.parametr)}</td><td><strong>${esc(x.wynik)}</strong> (${esc(x.kierunek)})</td><td>${esc(x.norma) || '—'}</td></tr>`).join('')}</tbody></table>`
+                        : '';
+                    return naglowek + tabela;
+                }).join('')}`
+                : '';
+            const trendy = k.trendy.length
+                ? `<h2>Co się zmienia w kolejnych badaniach</h2><table><thead><tr><th>Parametr</th><th>Kolejne wyniki</th><th>Kierunek</th></tr></thead><tbody>${k.trendy.map(t => `<tr><td>${esc(t.parametr)}${t.jednostka ? ' [' + esc(t.jednostka) + ']' : ''}</td><td>${esc(t.ciag)}</td><td>${esc(t.kierunek)}</td></tr>`).join('')}</tbody></table>`
                 : '';
             return `<h1>Karta na wizytę</h1>
                 <table><tbody>
@@ -913,6 +922,7 @@
                 ${urzadzenia}
                 <h2>Leki przyjmowane na stałe</h2>${leki}
                 ${badania}
+                ${trendy}
                 ${skora}
                 ${k.uwagi ? '<h2>Dodatkowe informacje</h2>' + akapity(k.uwagi) : ''}
                 ${pytania}
@@ -1948,14 +1958,362 @@
             );
         }
 
+        // ---------- zakładka: Badania ----------
+        const FLAGA_KOLOR = { wysoki: 'text-red-300', niski: 'text-sky-300', ok: 'text-slate-200', '': 'text-slate-400' };
+        const FLAGA_PILL = { wysoki: 'pill-stop', niski: 'pill-sprawdz', ok: 'pill-ok', '': '' };
+        const STRZALKA = { rosnie: '↑', spada: '↓', stabilnie: '→', brak: '' };
+
+        // Wykres trendu rysowany wprost w SVG – żadnej biblioteki, więc nie trzeba ruszać CSP.
+        // Pasmo normy to prostokąt w tle: od razu widać, czy punkt z niego wyszedł.
+        function WykresTrendu({ seria }) {
+            const punkty = (seria.punkty || []).filter(p => p.wartosc != null);
+            if (punkty.length < 2) return null;
+            const W = 320, H = 120, L = 6, R = 6, T = 10, B = 18;
+            const wartosci = punkty.map(p => p.wartosc);
+            const last = punkty[punkty.length - 1];
+            const granice = [
+                ...wartosci,
+                ...(Number.isFinite(Number(last.normaOd)) ? [Number(last.normaOd)] : []),
+                ...(Number.isFinite(Number(last.normaDo)) ? [Number(last.normaDo)] : [])
+            ];
+            let min = Math.min(...granice), max = Math.max(...granice);
+            if (max === min) { max = min + 1; min = min - 1; }
+            const zapas = (max - min) * 0.12;
+            min -= zapas; max += zapas;
+            const x = (i) => L + (i * (W - L - R)) / (punkty.length - 1);
+            const y = (v) => T + (H - T - B) * (1 - (v - min) / (max - min));
+
+            const od = Number(last.normaOd), doo = Number(last.normaDo);
+            const gornaY = Number.isFinite(doo) ? y(doo) : T;
+            const dolnaY = Number.isFinite(od) ? y(od) : H - B;
+            const pasmo = (Number.isFinite(od) || Number.isFinite(doo)) && dolnaY > gornaY;
+
+            return (
+                <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-28" role="img"
+                    aria-label={`Przebieg ${seria.parametr}: ${punkty.map(p => p.wynik).join(', ')}`}>
+                    {pasmo ? <rect x="0" y={gornaY} width={W} height={dolnaY - gornaY} fill="#14532d" opacity="0.35" /> : null}
+                    {pasmo ? <line x1="0" y1={gornaY} x2={W} y2={gornaY} stroke="#34d399" strokeWidth="1" strokeDasharray="4 3" opacity="0.7" /> : null}
+                    {pasmo && Number.isFinite(od) ? <line x1="0" y1={dolnaY} x2={W} y2={dolnaY} stroke="#34d399" strokeWidth="1" strokeDasharray="4 3" opacity="0.7" /> : null}
+                    <polyline fill="none" stroke="#2dd4bf" strokeWidth="2" strokeLinejoin="round"
+                        points={punkty.map((p, i) => `${x(i)},${y(p.wartosc)}`).join(' ')} />
+                    {punkty.map((p, i) => (
+                        <circle key={i} cx={x(i)} cy={y(p.wartosc)} r={i === punkty.length - 1 ? 4.5 : 3}
+                            fill={p.flaga === 'wysoki' ? '#fca5a5' : p.flaga === 'niski' ? '#7dd3fc' : '#2dd4bf'} />
+                    ))}
+                    <text x={L} y={H - 4} fill="#64748b" fontSize="9">{Z.formatDatePl(punkty[0].data)}</text>
+                    <text x={W - R} y={H - 4} fill="#64748b" fontSize="9" textAnchor="end">{Z.formatDatePl(last.data)}</text>
+                </svg>
+            );
+        }
+
+        function PozycjaWiersz({ poz, onChange, onDelete }) {
+            const set = (k, v) => {
+                const next = Object.assign({}, poz, { [k]: v });
+                if (k === 'parametr') next.key = Z.paramKey(v);
+                if (k === 'wynik' || k === 'normaOd' || k === 'normaDo') next.flaga = Z.labFlag(next);
+                onChange(next);
+            };
+            const liczba = (v) => (v === '' || v == null ? null : Number(String(v).replace(',', '.')));
+            return (
+                <div className="grid grid-cols-2 sm:grid-cols-12 gap-2 items-center">
+                    <input className="field sm:col-span-4" value={poz.parametr} onChange={e => set('parametr', e.target.value)} placeholder="parametr" />
+                    <input className="field sm:col-span-2" value={poz.wynik} onChange={e => set('wynik', e.target.value)} placeholder="wynik" inputMode="decimal" />
+                    <input className="field sm:col-span-2" value={poz.jednostka} onChange={e => set('jednostka', e.target.value)} placeholder="jednostka" />
+                    <input className="field sm:col-span-1" value={poz.normaOd == null ? '' : poz.normaOd} onChange={e => set('normaOd', liczba(e.target.value))} placeholder="od" inputMode="decimal" title="dolna granica normy z wydruku" />
+                    <input className="field sm:col-span-1" value={poz.normaDo == null ? '' : poz.normaDo} onChange={e => set('normaDo', liczba(e.target.value))} placeholder="do" inputMode="decimal" title="górna granica normy z wydruku" />
+                    <span className={`text-xs font-bold sm:col-span-1 ${FLAGA_KOLOR[poz.flaga || '']}`}>
+                        {poz.flaga === 'wysoki' ? '▲ ponad' : poz.flaga === 'niski' ? '▼ poniżej' : poz.flaga === 'ok' ? '✓' : '—'}
+                    </span>
+                    <button className="btn btn-danger !py-1.5 !px-3 sm:col-span-1" onClick={onDelete} aria-label="Usuń pozycję">×</button>
+                </div>
+            );
+        }
+
+        function LabForm({ lab, isNew, vault, onSave, onClose, onDelete }) {
+            const [b, setB] = useState(() => {
+                const base = Object.assign(Z.newLab(), lab || {});
+                return Object.assign(base, { data: base.data || todayIso() });
+            });
+            const [progress, setProgress] = useState('');
+            const [err, setErr] = useState('');
+            const [podglad, setPodglad] = useState(false);
+            const fileRef = useRef(null);
+            const set = (k, v) => setB(prev => Object.assign({}, prev, { [k]: v }));
+
+            const wczytaj = async (e) => {
+                const f = e.target.files && e.target.files[0];
+                e.target.value = '';
+                if (!f) return;
+                setErr(''); setProgress('Otwieram plik…');
+                try {
+                    const r = await readDocument(f, setProgress);
+                    const clean = String(r.text || '').replace(/\u0000/g, '').trim();
+                    if (clean.replace(/\s/g, '').length < 20) throw new Error('Nie udało się odczytać tekstu z tego pliku.');
+                    const info = Z.extractLabInfo(clean);
+                    setB(prev => Object.assign({}, prev, {
+                        tekst: clean, ocr: r.ocr,
+                        data: info.data || prev.data,
+                        laboratorium: prev.laboratorium || info.laboratorium,
+                        pozycje: info.pozycje.length ? info.pozycje : prev.pozycje
+                    }));
+                    setProgress(info.pozycje.length
+                        ? `Rozpoznano ${info.pozycje.length} ${Z.plural(info.pozycje.length, 'parametr', 'parametry', 'parametrów')} — sprawdź je i popraw, co trzeba.`
+                        : 'Odczytałem tekst, ale nie rozpoznałem żadnego parametru. Dopisz je ręcznie poniżej.');
+                } catch (x) { setErr(x.message); setProgress(''); }
+            };
+
+            const poza = (b.pozycje || []).filter(p => p.flaga === 'wysoki' || p.flaga === 'niski');
+
+            return (
+                <Modal title={isNew ? 'Nowy wynik badania' : `Badanie ${Z.formatDatePl(b.data) || ''}`} onClose={onClose} wide>
+                    <Note tone="info">
+                        Wczytaj PDF z laboratorium — aplikacja wyciągnie parametry, wyniki i <strong>normy z tego wydruku</strong>.
+                        Normy biorę wyłącznie z Twojego wyniku, nigdy z własnej listy: każde laboratorium ma inne.
+                        Odczyt zawsze sprawdź, zwłaszcza przy skanach.
+                    </Note>
+
+                    <div className="mt-4 flex flex-wrap items-center gap-3">
+                        <button className="btn btn-soft" onClick={() => fileRef.current.click()}><Icon name="upload-simple" /> Wczytaj wynik (PDF, zdjęcie)</button>
+                        <input ref={fileRef} type="file" accept=".pdf,.docx,.txt,image/*" className="hidden" onChange={wczytaj} />
+                        {progress ? <span className="text-xs text-slate-400">{progress}</span> : null}
+                    </div>
+                    {err ? <div className="mt-3"><Note tone="stop">{err}</Note></div> : null}
+
+                    <div className="grid sm:grid-cols-3 gap-4 mt-5">
+                        <Field label="Data pobrania"><input type="date" className="field" value={b.data} onChange={e => set('data', e.target.value)} /></Field>
+                        <Field label="Laboratorium" hint="Do AI nie trafia"><input className="field" value={b.laboratorium} onChange={e => set('laboratorium', e.target.value)} /></Field>
+                        <Field label="Co to za badanie"><input className="field" value={b.opis} onChange={e => set('opis', e.target.value)} placeholder="np. morfologia, panel reumatologiczny" /></Field>
+                    </div>
+
+                    <div className="mt-5">
+                        <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                            <span className="lbl !mb-0">Parametry ({(b.pozycje || []).length}{poza.length ? `, poza normą: ${poza.length}` : ''})</span>
+                            <button className="btn btn-soft !py-1.5 !text-xs" onClick={() => set('pozycje', [...(b.pozycje || []), { id: Z.uid(), parametr: '', wynik: '', jednostka: '', normaOd: null, normaDo: null, normaTekst: '', flaga: '' }])}>
+                                <Icon name="plus" /> Dopisz parametr
+                            </button>
+                        </div>
+                        {(b.pozycje || []).length ? (
+                            <div className="space-y-2">
+                                {(b.pozycje || []).map((p, i) => (
+                                    <PozycjaWiersz key={p.id || i} poz={p}
+                                        onChange={(np) => set('pozycje', b.pozycje.map((x, j) => j === i ? np : x))}
+                                        onDelete={() => set('pozycje', b.pozycje.filter((_, j) => j !== i))} />
+                                ))}
+                            </div>
+                        ) : <p className="text-sm text-slate-500">Brak parametrów. Wczytaj plik albo dopisz je ręcznie.</p>}
+                    </div>
+
+                    {b.tekst ? (
+                        <div className="mt-5">
+                            <button className="text-xs underline text-slate-400 hover:text-slate-200" onClick={() => setPodglad(!podglad)}>
+                                {podglad ? 'Ukryj' : 'Pokaż'} odczytany tekst ({b.tekst.length.toLocaleString('pl')} znaków){b.ocr ? ' — z rozpoznawania, może mieć literówki' : ''}
+                            </button>
+                            {podglad ? <textarea className="field mt-2 font-mono text-xs" style={{ minHeight: '200px' }} value={b.tekst} onChange={e => set('tekst', e.target.value)} /> : null}
+                        </div>
+                    ) : null}
+
+                    <Field label="Moja notatka"><input className="field mt-4" value={b.uwagi} onChange={e => set('uwagi', e.target.value)} placeholder="np. na czczo, po antybiotyku" /></Field>
+
+                    <div className="flex flex-wrap gap-2 mt-6">
+                        <button className="btn btn-main" disabled={!b.data || !(b.pozycje || []).length} onClick={() => onSave(Object.assign({}, b, {
+                            pozycje: b.pozycje.filter(p => String(p.parametr || '').trim()).map(p => Object.assign({}, p, { key: p.key || Z.paramKey(p.parametr), flaga: Z.labFlag(p) }))
+                        }))}><Icon name="check" /> Zapisz badanie</button>
+                        <button className="btn btn-soft" onClick={onClose}>Anuluj</button>
+                        {onDelete ? <button className="btn btn-danger sm:ml-auto" onClick={() => { if (confirm('Usunąć ten wynik badania?')) onDelete(b.id); }}>Usuń</button> : null}
+                    </div>
+                </Modal>
+            );
+        }
+
+        function TabelaPorownawcza({ badania, serie }) {
+            const kolumny = badania.slice().sort((a, b) => String(b.data).localeCompare(String(a.data))).slice(0, 6);
+            if (!serie.length) return null;
+            const wartosc = (s, badanieId) => (s.punkty || []).find(p => p.badanieId === badanieId);
+            return (
+                <div className="card p-4">
+                    <h3 className="text-sm font-extrabold uppercase tracking-wider text-slate-400 mb-3">Tabela porównawcza</h3>
+                    <div className="overflow-x-auto -mx-1 px-1">
+                        <table className="w-full text-sm border-collapse">
+                            <thead>
+                                <tr className="text-left">
+                                    <th className="py-2 pr-3 font-bold text-slate-400 whitespace-nowrap">Parametr</th>
+                                    <th className="py-2 pr-3 font-bold text-slate-400 whitespace-nowrap">Norma</th>
+                                    {kolumny.map(b => <th key={b.id} className="py-2 px-2 font-bold text-slate-400 whitespace-nowrap text-right">{Z.formatDatePl(b.data) || '—'}</th>)}
+                                    <th className="py-2 pl-2 font-bold text-slate-400 text-center">Trend</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {serie.map(s => {
+                                    const ost = (s.punkty || []).slice(-1)[0] || {};
+                                    return (
+                                        <tr key={s.key} className="border-t border-slate-800">
+                                            <td className="py-2 pr-3 font-bold whitespace-nowrap">{s.parametr}{s.jednostka ? <span className="text-slate-500 font-normal"> [{s.jednostka}]</span> : null}</td>
+                                            <td className="py-2 pr-3 text-xs text-slate-500 whitespace-nowrap">{ost.normaTekst || '—'}</td>
+                                            {kolumny.map(b => {
+                                                const p = wartosc(s, b.id);
+                                                return (
+                                                    <td key={b.id} className={`py-2 px-2 text-right tabular-nums whitespace-nowrap ${p ? FLAGA_KOLOR[p.flaga || ''] : 'text-slate-600'}`}>
+                                                        {p ? <>{p.wynik}{p.flaga === 'wysoki' ? ' ▲' : p.flaga === 'niski' ? ' ▼' : ''}</> : '·'}
+                                                    </td>
+                                                );
+                                            })}
+                                            <td className="py-2 pl-2 text-center text-lg" title={Z.KIERUNEK_SLOWO[s.trend.kierunek]}>{STRZALKA[s.trend.kierunek] || '·'}</td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                    <p className="text-[11px] text-slate-500 mt-3">
+                        ▲ powyżej normy z wydruku, ▼ poniżej. Strzałka trendu to porównanie dwóch ostatnich pomiarów
+                        (zmiana poniżej 5% liczona jako brak zmiany). Ocenę liczy aplikacja z norm wpisanych w Twoich wynikach.
+                    </p>
+                </div>
+            );
+        }
+
+        function Badania({ vault, save }) {
+            const [edit, setEdit] = useState(null);
+            const [analiza, setAnaliza] = useState(false);
+            const [extra, setExtra] = useState('');
+            const badania = vault.badania.slice().sort((a, b) => String(b.data).localeCompare(String(a.data)));
+            const serie = useMemo(() => Z.labSeries(vault.badania), [vault.badania]);
+            const zTrendem = serie.filter(s => s.punkty.length > 1);
+            const odstajace = serie.filter(s => { const o = s.punkty.slice(-1)[0] || {}; return o.flaga === 'wysoki' || o.flaga === 'niski'; });
+
+            const zapisz = (b) => {
+                const exists = vault.badania.some(x => x.id === b.id);
+                save(Object.assign({}, vault, { badania: exists ? vault.badania.map(x => x.id === b.id ? b : x) : [...vault.badania, b] }));
+                setEdit(null);
+            };
+            const usun = (id) => { save(Object.assign({}, vault, { badania: vault.badania.filter(x => x.id !== id) })); setEdit(null); };
+
+            return (
+                <div className="space-y-5">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                        <h2 className="text-2xl font-extrabold">Badania</h2>
+                        <button className="btn btn-main" onClick={() => setEdit(Z.newLab())}><Icon name="plus" /> Dodaj wynik</button>
+                    </div>
+
+                    {!badania.length ? (
+                        <div className="card p-6 text-center text-sm text-slate-400">
+                            <p className="mb-3">Nie masz jeszcze wpisanych wyników.</p>
+                            <p className="text-xs">Wczytaj PDF z laboratorium — parametry, wyniki i normy wyciągnę z wydruku, a potem pokażę, co się zmienia między badaniami.</p>
+                        </div>
+                    ) : null}
+
+                    {odstajace.length ? (
+                        <div className="card p-4">
+                            <h3 className="text-sm font-extrabold uppercase tracking-wider text-slate-400 mb-3">Poza normą w najnowszym wyniku ({odstajace.length})</h3>
+                            <div className="flex flex-wrap gap-2">
+                                {odstajace.map(s => {
+                                    const o = s.punkty.slice(-1)[0];
+                                    return (
+                                        <span key={s.key} className={`pill ${FLAGA_PILL[o.flaga]}`}>
+                                            {s.parametr}: {o.wynik}{s.jednostka ? ' ' + s.jednostka : ''} {o.flaga === 'wysoki' ? '▲' : '▼'} {STRZALKA[s.trend.kierunek]}
+                                        </span>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    ) : null}
+
+                    {zTrendem.length ? <TabelaPorownawcza badania={badania} serie={serie} /> : null}
+
+                    {zTrendem.length ? (
+                        <div className="card p-4">
+                            <h3 className="text-sm font-extrabold uppercase tracking-wider text-slate-400 mb-3">Przebieg w czasie</h3>
+                            <div className="grid sm:grid-cols-2 gap-4">
+                                {zTrendem.map(s => (
+                                    <div key={s.key} className="rounded-xl border border-slate-800 bg-slate-950 p-3">
+                                        <div className="flex items-baseline justify-between gap-2">
+                                            <span className="font-bold text-sm">{s.parametr}</span>
+                                            <span className="text-xs text-slate-500">{s.jednostka}</span>
+                                        </div>
+                                        <WykresTrendu seria={s} />
+                                        <div className="text-xs text-slate-400">
+                                            {s.punkty.map(p => p.wynik).join(' → ')}
+                                            {s.trend.zmianaProc != null && s.trend.kierunek !== 'stabilnie'
+                                                ? ` (${s.trend.zmianaProc > 0 ? '+' : ''}${s.trend.zmianaProc}%)` : ''}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    ) : null}
+
+                    {badania.length ? (
+                        <div className="space-y-2">
+                            {badania.map(b => {
+                                const poza = (b.pozycje || []).filter(p => p.flaga === 'wysoki' || p.flaga === 'niski');
+                                return (
+                                    <button key={b.id} className="card w-full text-left p-4 hover:border-slate-700" onClick={() => setEdit(b)}>
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div className="min-w-0">
+                                                <div className="font-extrabold">{Z.formatDatePl(b.data) || 'bez daty'}{b.opis ? ' — ' + b.opis : ''}</div>
+                                                <div className="text-xs text-slate-400 mt-0.5">
+                                                    {(b.pozycje || []).length} {Z.plural((b.pozycje || []).length, 'parametr', 'parametry', 'parametrów')}
+                                                    {b.laboratorium ? ' · ' + b.laboratorium : ''}{b.uwagi ? ' · ' + b.uwagi : ''}
+                                                </div>
+                                            </div>
+                                            {poza.length ? <span className="pill pill-stop shrink-0">poza normą: {poza.length}</span> : <span className="pill pill-ok shrink-0">wszystko w normie</span>}
+                                        </div>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    ) : null}
+
+                    {badania.length ? (
+                        <div className="card p-5">
+                            <div className="flex items-center justify-between">
+                                <h3 className="font-extrabold">Co z tych liczb wynika</h3>
+                                <button className="btn btn-soft !py-1.5 !text-xs" onClick={() => setAnaliza(!analiza)}>{analiza ? 'Ukryj' : 'Pokaż'}</button>
+                            </div>
+                            <p className="text-sm text-slate-400 mt-1 mb-3">
+                                AI dostaje gotowe liczby i porównania policzone tutaj — nie przelicza ich i nie dopisuje własnych norm.
+                                Wypisze, co odstaje, co się zmienia i o co zapytać lekarza.
+                            </p>
+                            {analiza ? (
+                                <>
+                                    <Field label="Co dopisać od siebie" hint="np. od miesiąca bóle stawów rąk nad ranem">
+                                        <textarea className="field" value={extra} onChange={e => setExtra(e.target.value)} />
+                                    </Field>
+                                    <div className="mt-4"><AiKartka tytul="Omów moje wyniki" prompts={Z.labPrompts(vault, { extra })} vault={vault} /></div>
+                                </>
+                            ) : null}
+                        </div>
+                    ) : null}
+
+                    {edit ? <LabForm lab={edit} isNew={!vault.badania.some(x => x.id === edit.id)} vault={vault}
+                        onSave={zapisz} onClose={() => setEdit(null)} onDelete={vault.badania.some(x => x.id === edit.id) ? usun : null} /> : null}
+                </div>
+            );
+        }
+
         // ---------- zakładka: Analiza (dokument dla lekarza) ----------
         function Analiza({ vault, save }) {
             const [extra, setExtra] = useState('');
-            const prompts = useMemo(() => Z.reportPrompts(vault, { extra }), [vault, extra]);
+            // Domyślnie bierzemy KAŻDY dokument z wczytaną treścią – właśnie na pomijaniu dokumentów
+            // wywróciła się pierwsza wersja. Odznaczenie jest świadomą decyzją, nie przypadkiem.
+            const zTrescia = vault.dokumenty.filter(d => d.tekst);
+            const [docs, setDocs] = useState(() => zTrescia.map(d => d.id));
+            const [wybor, setWybor] = useState(false);
+            // Nowy dokument dokładamy do zaznaczonych sam, usunięty wypada z listy. Odznaczenia użytkownika zostają.
+            const znaneRef = useRef(zTrescia.map(d => d.id));
+            useEffect(() => {
+                const istnieja = zTrescia.map(d => d.id);
+                const nowe = istnieja.filter(id => !znaneRef.current.includes(id));
+                znaneRef.current = istnieja;
+                setDocs(prev => [...new Set([...prev.filter(id => istnieja.includes(id)), ...nowe])]);
+            }, [vault.dokumenty]);
+            const prompts = useMemo(() => Z.reportPrompts(vault, { extra, docs }), [vault, extra, docs]);
             const ile = {
                 leki: vault.leki.filter(m => m.aktywny !== false).length,
                 urzadzenia: vault.urzadzenia.filter(u => u.aktywne !== false).length,
-                dokumenty: vault.dokumenty.filter(d => d.tekst).length,
+                kontrole: vault.urzadzenia.reduce((a, u) => a + (u.kontrole || []).length, 0),
+                badania: vault.badania.length,
+                dokumenty: docs.length,
                 skora: vault.skora.filter(z => z.status !== 'zagojona' && z.status !== 'usunieta').length,
                 pytania: vault.pytania.filter(q => !q.zadane).length
             };
@@ -1981,8 +2339,9 @@
 
                     <div className="card p-4">
                         <h3 className="text-sm font-extrabold uppercase tracking-wider text-slate-400 mb-3">Co wejdzie do dokumentu</h3>
-                        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-center">
-                            {[['Leki', ile.leki, 'pill'], ['Urządzenia', ile.urzadzenia, 'heartbeat'], ['Dokumenty', ile.dokumenty, 'folders'], ['Zmiany skórne', ile.skora, 'eye'], ['Pytania', ile.pytania, 'question']].map(([label, n, ikona]) => (
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+                            {[['Leki', ile.leki, 'pill'], ['Urządzenia', ile.urzadzenia, 'heartbeat'], ['Kontrole', ile.kontrole, 'activity'], ['Badania', ile.badania, 'test-tube'],
+                              ['Dokumenty', ile.dokumenty, 'folders'], ['Zmiany skórne', ile.skora, 'eye'], ['Pytania', ile.pytania, 'question']].map(([label, n, ikona]) => (
                                 <div key={label} className="rounded-xl border border-slate-800 bg-slate-950 p-3">
                                     <Icon name={ikona} className="text-lg text-slate-500" />
                                     <div className="text-xl font-extrabold text-teal-300">{n}</div>
@@ -1990,7 +2349,48 @@
                                 </div>
                             ))}
                         </div>
+                        <p className="text-xs text-slate-500 mt-3">
+                            Do zapytania idzie treść <strong>każdego</strong> wczytanego dokumentu i każdego protokołu kontroli —
+                            przy długich wypisach każdy dostaje swój udział w limicie, zamiast wypadać na rzecz pierwszego.
+                        </p>
                     </div>
+
+                    {zTrescia.length ? (
+                        <div className="card p-4">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                                <h3 className="text-sm font-extrabold uppercase tracking-wider text-slate-400">
+                                    Dokumenty w zapytaniu ({docs.length} z {zTrescia.length})
+                                </h3>
+                                <button className="btn btn-soft !py-1.5 !text-xs" onClick={() => setWybor(!wybor)}>
+                                    {wybor ? 'Ukryj listę' : 'Wybierz, które brać'}
+                                </button>
+                            </div>
+                            {wybor ? (
+                                <>
+                                    <p className="text-xs text-slate-400 mt-2 mb-3">
+                                        Wszystkie są zaznaczone. Odznacz tylko to, czego lekarz nie potrzebuje — im mniej dokumentów,
+                                        tym więcej miejsca dla pozostałych.
+                                    </p>
+                                    <div className="space-y-2">
+                                        {zTrescia.map(d => (
+                                            <label key={d.id} className="flex items-start gap-3 text-sm cursor-pointer">
+                                                <input type="checkbox" className="w-4 h-4 mt-0.5 accent-teal-400" checked={docs.includes(d.id)}
+                                                    onChange={e => setDocs(prev => e.target.checked ? [...prev, d.id] : prev.filter(x => x !== d.id))} />
+                                                <span className="flex-1">
+                                                    {d.tytul || 'Dokument'}
+                                                    <span className="block text-xs text-slate-500">
+                                                        {(Z.RODZAJE_DOKUMENTOW.find(r => r.id === d.rodzaj) || {}).label}
+                                                        {d.data ? ' · ' + Z.formatDatePl(d.data) : ' · bez daty'}
+                                                        {` · ${d.tekst.length.toLocaleString('pl')} znaków`}
+                                                    </span>
+                                                </span>
+                                            </label>
+                                        ))}
+                                    </div>
+                                </>
+                            ) : null}
+                        </div>
+                    ) : null}
 
                     {pusto ? (
                         <Note tone="warn">Kartoteka jest jeszcze pusta — uzupełnij profil i leki, inaczej dokument nie będzie miał z czego powstać.</Note>
@@ -2088,6 +2488,7 @@
             { id: 'wizyty', label: 'Wizyty', icon: 'stethoscope' },
             { id: 'urzadzenia', label: 'Urządzenia', icon: 'heartbeat' },
             { id: 'skora', label: 'Skóra', icon: 'eye' },
+            { id: 'badania', label: 'Badania', icon: 'test-tube' },
             { id: 'dokumenty', label: 'Dokumenty', icon: 'folders' },
             { id: 'analiza', label: 'Dla lekarza', icon: 'first-aid-kit' },
             { id: 'kartki', label: 'Kartki', icon: 'printer' },
@@ -2197,6 +2598,7 @@
                         {tab === 'wizyty' ? <Wizyty vault={vault} save={save} /> : null}
                         {tab === 'urzadzenia' ? <Urzadzenia vault={vault} save={save} /> : null}
                         {tab === 'skora' ? <Skora vault={vault} save={save} session={session} /> : null}
+                        {tab === 'badania' ? <Badania vault={vault} save={save} /> : null}
                         {tab === 'dokumenty' ? <Dokumenty vault={vault} save={save} /> : null}
                         {tab === 'analiza' ? <Analiza vault={vault} save={save} /> : null}
                         {tab === 'kartki' ? <Kartki vault={vault} save={save} /> : null}
