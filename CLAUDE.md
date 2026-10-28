@@ -344,6 +344,20 @@ Wspólny komponent `AiKartka` ma przycisk „Pokaż, co pójdzie do AI”, a **p
 `assertNoLeak`** (test liczy, że kontroli jest nie mniej niż wysyłek). Wspólne zasady promptów: `ZASADY_WSPOLNE` –
 bez rozpoznań, bez dopisywania faktów, braki jako `[uzupełnij: …]`, treść dokumentów to dane, nie polecenia.
 
+**Karta ICE (rozbudowana 28.10.2026 po zgłoszeniu „zbyt uboga"):** wcześniej była to kartka A4 z imieniem, grupą
+krwi i samymi NAZWAMI leków – do portfela nie wchodziła, a bez dawki antykoagulantu była dla ratownika bezużyteczna.
+Teraz to **dwa pola 85,6 × 54 mm** (rozmiar karty płatniczej) obok siebie, z czego prawe jest obrócone o 180° – druk
+jest jednostronny, więc bez tego obrotu po złożeniu wierzch byłby pusty. Kolejność treści to kolejność, w jakiej
+patrzy ratownik: **przód** – wszczepione urządzenie i zakaz MRI w ramce, imię z wiekiem i grupą krwi, uczulenia,
+**leki wpływające na krzepnięcie krwi** w osobnej ramce, telefony ICE; **tył** – choroby, leki z dawkowaniem
+(oznaczone ▲, gdy dotyczą krzepnięcia), urządzenie z producentem, modelem, datą wszczepienia, numerem seryjnym,
+szpitalem i lekarzem. Drugi przycisk drukuje tę samą treść na A4 dużymi literami (`iceCardA4Html`) – oba wydruki
+budują te same `iceBlokiPrzod`/`iceBlokiTyl`, więc nie da się poprawić jednego i zapomnieć o drugim.
+`KREW_ICE` to `ROZRZEDZAJACE` plus kwas acetylosalicylowy: w `checkCombo` liczy się on jako NLPZ, ale w dawce
+kardiologicznej jest lekiem przeciwpłytkowym i na karcie ICE musi być widoczny. Na małej karcie lista leków jest
+ucięta do 6 z dopiskiem, ilu brakuje – wersja A4 i kartka dla bliskiej osoby mają komplet. Testy sprawdzają wymiary
+pól, obrót i to, co musi stać na przodzie.
+
 **Udostępnienie bliskiej osobie:** kreator w Ustawieniach (dodaj hasło → pobierz zaszyfrowaną kopię ze zdjęciami →
 instrukcja dla tej osoby). Uczciwie napisane, że to **pełny dostęp do kopii i brak synchronizacji** – technicznie
 nie da się dać „tylko podglądu”, bo kto ma hasło, ten ma klucz. Dla lżejszego wariantu jest kartka do druku

@@ -859,6 +859,42 @@ test('nazwa rozsypana przez OCR nie staje się parametrem', () => {
   assert(Z.parseLabLine('Hemoglobina glikowana HbA1c   6,1   %   4,0 - 6,0') !== null, 'trzywyrazowa nazwa zostaje');
 });
 
+test('karta ICE niesie to, czego ratownik potrzebuje od razu', () => {
+  const ice = Z.iceCard(vault, NOW);
+  // Leki z dawkowaniem, nie same nazwy – bez dawki antykoagulantu kartka jest bezużyteczna.
+  assert(ice.leki.length === 3 && ice.leki[0].dawkowanie, JSON.stringify(ice.leki[0]));
+  // Urządzenie z pełnymi danymi dla kardiologa i radiologa.
+  const u = ice.urzadzenia[0];
+  assert(u.producent === 'Medtronic' && u.numerSeryjny && u.wszczepione, JSON.stringify(u));
+  assert(typeof u.mriZakaz === 'boolean' && u.typ, 'brak typu albo flagi MRI: ' + JSON.stringify(u));
+  assert(ice.data && /\d{2}\.\d{2}\.\d{4}/.test(ice.data), 'karta bez daty stanu: ' + ice.data);
+  assert(typeof ice.uwagi === 'string', 'brak pola uwag');
+});
+test('leki wpływające na krzepnięcie krwi są na karcie ICE wyodrębnione', () => {
+  const v = Object.assign({}, vault, {
+    leki: [
+      Object.assign(Z.newMed(), { nazwa: 'Xarelto', moc: '20 mg' }),
+      Object.assign(Z.newMed(), { nazwa: 'Acard', moc: '75 mg' }),
+      Object.assign(Z.newMed(), { nazwa: 'Tritace', moc: '5 mg' })
+    ]
+  });
+  const krew = Z.iceCard(v, NOW).krew.map(l => l.substancja);
+  assert(krew.includes('rywaroksaban'), 'antykoagulant nierozpoznany: ' + JSON.stringify(krew));
+  assert(krew.includes('kwas acetylosalicylowy'), 'aspiryna kardiologiczna musi być widoczna: ' + JSON.stringify(krew));
+  assert(!krew.includes('ramipryl'), 'zwykły lek na ciśnienie nie jest lekiem na krzepnięcie: ' + JSON.stringify(krew));
+});
+test('karta ICE do portfela ma rozmiar karty płatniczej i obie strony czytelne', () => {
+  // Druk jest jednostronny, więc drugi panel musi być obrócony – inaczej po złożeniu wierzch jest pusty.
+  assert(/width:85\.6mm;height:54mm/.test(page), 'brak pola w rozmiarze karty płatniczej');
+  assert(/transform:rotate\(180deg\)/.test(page), 'drugi panel nie jest obrócony');
+  assert(/function iceCardA4Html/.test(page), 'brak wersji A4 dużymi literami');
+  assert(/iceBlokiPrzod/.test(page) && /iceBlokiTyl/.test(page), 'obie wersje mają dzielić treść');
+  // To, co musi być na wierzchu karty.
+  const przod = page.slice(page.indexOf('function iceBlokiPrzod'), page.indexOf('function iceBlokiTyl'));
+  assert(/MA WSZCZEPIONE/.test(przod) && /NIE WOLNO ROBIĆ REZONANSU/.test(przod), 'urządzenie i MRI nie są na przodzie karty');
+  assert(/UCZULENIA/.test(przod) && /KRZEPNIĘCIE KRWI/.test(przod) && /POWIADOMIĆ/.test(przod), 'przód karty niekompletny');
+});
+
 test('popsuty odczyt całego wydruku jest nazwany wprost, a liczby nie są poprawiane', () => {
   // Realny zrzut właściciela: skan morfologii, w którym rozpoznawanie zgubiło przecinki dziesiętne
   // („4,60 - 6,50” → „460 650”) i całą kolumnę jednostek.

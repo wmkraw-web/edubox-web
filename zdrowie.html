@@ -974,25 +974,90 @@
                 <h2>Notatki z wizyty</h2><p class="linia"></p><p class="linia"></p><p class="linia"></p><p class="linia"></p><p class="linia"></p><p class="linia"></p>`;
         }
 
+        // Karta ICE. Kolejność jest taka, w jakiej patrzy ratownik: urządzenie i MRI, uczulenia,
+        // leki rozrzedzające krew, kontakt – dopiero potem choroby i reszta leków.
+        const ICE_LEKOW_NA_KARCIE = 6;
+
+        function iceBlokiPrzod(k, male) {
+            const b = [];
+            k.urzadzenia.forEach(u => {
+                b.push(`<div style="border:${male ? '0.6mm' : '1.2mm'} solid #000;padding:${male ? '1mm 1.5mm' : '3mm 4mm'};margin-bottom:${male ? '1mm' : '3mm'}">`
+                    + `<strong>MA WSZCZEPIONE: ${esc(u.typ.toUpperCase())}</strong>`
+                    + (u.mriZakaz ? '<br><strong>NIE WOLNO ROBIĆ REZONANSU (MRI)</strong>' : (u.mri ? `<br>MRI: ${esc(u.mri)}` : ''))
+                    + `<br>${esc(u.ostrzezenia[0])}</div>`);
+            });
+            const osoba = [esc(k.imie), k.wiek ? k.wiek + ' lat' : '', k.grupaKrwi ? 'grupa krwi ' + esc(k.grupaKrwi) : ''].filter(Boolean).join(' · ');
+            b.push(`<div style="margin-bottom:${male ? '1mm' : '3mm'}"><strong>${osoba}</strong></div>`);
+            b.push(`<div style="margin-bottom:${male ? '1mm' : '3mm'}"><strong>UCZULENIA:</strong> ${esc(k.alergie) || 'nie zgłaszam znanych uczuleń'}</div>`);
+            if (k.krew.length) {
+                b.push(`<div style="border:${male ? '0.4mm' : '0.8mm'} solid #000;padding:${male ? '1mm 1.5mm' : '3mm 4mm'};margin-bottom:${male ? '1mm' : '3mm'}">`
+                    + `<strong>BIERZE LEK WPŁYWAJĄCY NA KRZEPNIĘCIE KRWI:</strong><br>`
+                    + k.krew.map(l => esc(l.nazwa) + (l.substancja ? ` (${esc(l.substancja)})` : '')).join('<br>')
+                    + '</div>');
+            }
+            b.push(`<div><strong>POWIADOMIĆ:</strong><br>`
+                + (k.ice.length
+                    ? k.ice.slice(0, male ? 2 : 6).map(x => `${esc(x.kto)} — <strong>${esc(x.telefon)}</strong>`).join('<br>')
+                    : 'nie wpisano kontaktów')
+                + '</div>');
+            return b.join('');
+        }
+
+        function iceBlokiTyl(k, male) {
+            const b = [];
+            const odstep = male ? '1mm' : '3mm';
+            if (k.choroby) b.push(`<div style="margin-bottom:${odstep}"><strong>CHOROBY:</strong> ${esc(k.choroby)}</div>`);
+            const widoczne = male ? k.leki.slice(0, ICE_LEKOW_NA_KARCIE) : k.leki;
+            const reszta = k.leki.length - widoczne.length;
+            b.push(`<div style="margin-bottom:${odstep}"><strong>LEKI NA STAŁE:</strong><br>`
+                + (k.leki.length
+                    ? widoczne.map(l => `${l.krew ? '▲ ' : ''}${esc(l.nazwa)}${l.dawkowanie ? ' — ' + esc(l.dawkowanie) : ''}`).join('<br>')
+                      + (reszta > 0 ? `<br>…i jeszcze ${reszta} — pełna lista u rodziny` : '')
+                    : 'nie przyjmuję leków na stałe')
+                + '</div>');
+            k.urzadzenia.forEach(u => {
+                const szczegoly = [u.producent, u.model].filter(Boolean).join(' ');
+                const reszta2 = [u.wszczepione ? 'wszcz. ' + esc(u.wszczepione) : '', u.numerSeryjny ? 'nr ' + esc(u.numerSeryjny) : '',
+                    u.szpital ? esc(u.szpital) : '', u.lekarz ? esc(u.lekarz) : ''].filter(Boolean).join(' · ');
+                b.push(`<div style="margin-bottom:${odstep}"><strong>URZĄDZENIE:</strong> ${esc(u.typ)}${szczegoly ? ', ' + esc(szczegoly) : ''}`
+                    + (reszta2 ? '<br>' + reszta2 : '') + '</div>');
+            });
+            if (!male && k.ice.length) {
+                b.push(`<div style="margin-bottom:${odstep}"><strong>KONTAKTY:</strong><br>${k.ice.map(x => `${esc(x.kto)} — ${esc(x.telefon)}`).join('<br>')}</div>`);
+            }
+            if (k.uwagi) b.push(`<div style="margin-bottom:${odstep}"><strong>INNE:</strong> ${esc(k.uwagi)}</div>`);
+            return b.join('');
+        }
+
+        // Wersja do portfela: dwa pola 85,6 × 54 mm (rozmiar karty płatniczej) obok siebie, prawe obrócone
+        // o 180°. Po wycięciu i złożeniu wzdłuż linii środkowej powstaje dwustronna karta, a oba panele są
+        // czytelne z zewnątrz — bez tego obrotu druk jednostronny dałby pustą stronę na wierzchu.
         function iceCardHtml(vault) {
             const k = Z.iceCard(vault);
-            const row = (a, b) => `<tr><th style="width:34%">${esc(a)}</th><td>${esc(b) || '—'}</td></tr>`;
-            const urzadzenia = k.urzadzenia.length
-                ? `<p style="border:2px solid #000;padding:8px"><strong>UWAGA — wszczepione urządzenia:</strong> ${esc(k.urzadzenia.map(u => u.nazwa).join('; '))}.<br>${esc(k.urzadzenia.flatMap(u => u.ostrzezenia).join(' '))}</p>`
-                : '';
-            return `<h1>W razie wypadku (ICE)</h1>
-                ${urzadzenia}
-                <table><tbody>
-                  ${row('Imię i nazwisko', k.imie)}
-                  ${row('Wiek', k.wiek ? k.wiek + ' lat' : '')}
-                  ${row('Grupa krwi', k.grupaKrwi)}
-                  ${row('Uczulenia', k.alergie)}
-                  ${row('Choroby przewlekłe', k.choroby)}
-                  ${row('Leki na stałe', k.leki.join(', '))}
-                </tbody></table>
-                <h2>Powiadomić</h2>
-                <table><tbody>${k.ice.length ? k.ice.map(x => `<tr><th style="width:34%">${esc(x.kto)}</th><td>${esc(x.telefon)}</td></tr>`).join('') : '<tr><td>Nie wpisano kontaktów.</td></tr>'}</tbody></table>
-                <p><em>Kartka wydrukowana z prywatnej kartoteki — dane nie są nigdzie przechowywane poza urządzeniem właściciela.</em></p>`;
+            const panel = (srodek, naglowek, stopka) => `<div style="width:85.6mm;height:54mm;box-sizing:border-box;padding:3mm;font-family:Arial,Helvetica,sans-serif;font-size:6.8pt;line-height:1.3;color:#000;overflow:hidden">`
+                + `<div style="border-bottom:0.4mm solid #000;padding-bottom:0.8mm;margin-bottom:1.2mm;font-size:8pt"><strong>${naglowek}</strong></div>`
+                + srodek
+                + `<div style="position:relative;margin-top:1mm;font-size:5.6pt">${stopka}</div></div>`;
+            return `<div style="font-family:Arial,Helvetica,sans-serif;color:#000">
+                <table style="border-collapse:collapse;margin:0 0 4mm"><tbody><tr>
+                  <td style="padding:0;vertical-align:top;border:0.3mm solid #000;border-right:0.3mm dashed #000">${panel(iceBlokiPrzod(k, true), 'ICE — W RAZIE WYPADKU · 112', `Stan na ${esc(k.data)} · na drugiej stronie leki i choroby`)}</td>
+                  <td style="padding:0;vertical-align:top;border:0.3mm solid #000;border-left:0"><div style="transform:rotate(180deg)">${panel(iceBlokiTyl(k, true), 'ICE — CIĄG DALSZY', k.krew.length ? '▲ = lek wpływający na krzepnięcie krwi' : '')}</div></td>
+                </tr></tbody></table>
+                <p style="font-size:9pt;margin:0">Wytnij po obwodzie, zegnij wzdłuż linii przerywanej (prawa połowa idzie pod lewą) — wyjdzie dwustronna karta wielkości karty płatniczej. Warto ją zalaminować.</p>
+            </div>`;
+        }
+
+        // Ta sama treść na A4, dużymi literami — do teczki z dokumentami i dla ratownika, który nie będzie
+        // czytał 7-punktowego druku.
+        function iceCardA4Html(vault) {
+            const k = Z.iceCard(vault);
+            return `<div style="font-family:Arial,Helvetica,sans-serif;color:#000;font-size:13pt;line-height:1.5">
+                <div style="text-align:center;font-size:22pt;font-weight:bold;margin-bottom:6mm">W RAZIE WYPADKU (ICE)</div>
+                ${iceBlokiPrzod(k, false)}
+                <div style="border-top:0.5mm solid #000;margin:6mm 0"></div>
+                ${iceBlokiTyl(k, false)}
+                <div style="font-size:10pt;margin-top:6mm">${k.krew.length ? '▲ = lek wpływający na krzepnięcie krwi. ' : ''}Stan na ${esc(k.data)}. Kartka z prywatnej kartoteki — dane nie są przechowywane poza urządzeniem właściciela.</div>
+            </div>`;
         }
 
         function relativeCardHtml(vault) {
@@ -1055,8 +1120,11 @@
 
                     <div className="card p-5">
                         <h3 className="font-extrabold mb-1">Karta ICE do portfela</h3>
-                        <p className="text-sm text-slate-400 mb-4">Grupa krwi, uczulenia, leki i kontakt do bliskich — to, czego ratownik szuka najpierw.</p>
-                        <button className="btn btn-main" onClick={() => drukuj(iceCardHtml(vault), 'Karta ICE')}><Icon name="printer" /> Drukuj / zapisz PDF</button>
+                        <p className="text-sm text-slate-400 mb-4">Wielkości karty płatniczej, dwustronna: z przodu wszczepione urządzenie i zakaz MRI, uczulenia, leki wpływające na krzepnięcie krwi i telefon do bliskich; z tyłu choroby, leki z dawkowaniem i dane urządzenia. Wytnij, zegnij na pół, zalaminuj.</p>
+                        <div className="flex flex-wrap gap-2">
+                            <button className="btn btn-main" onClick={() => drukuj(iceCardHtml(vault), 'Karta ICE')}><Icon name="printer" /> Drukuj kartę do portfela</button>
+                            <button className="btn btn-soft" onClick={() => drukuj(iceCardA4Html(vault), 'Karta ICE A4')}><Icon name="printer" /> Ta sama treść na A4</button>
+                        </div>
                     </div>
 
                     <div className="card p-5">
