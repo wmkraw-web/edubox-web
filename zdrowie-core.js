@@ -1376,6 +1376,31 @@
     return '';
   }
 
+  // Czy CAŁY odczyt wydruku wygląda na popsuty. Kilka wierszy naraz „poza normą” dokładnie o rząd
+  // wielkości to nie choroba, tylko wspólna usterka odczytu – rozpoznawanie skanu gubi przecinek
+  // dziesiętny („4,60 - 6,50” → „460 650”). Liczb NIE poprawiamy po swojemu (118 g/l przy normie
+  // 135–186 to zapis całkowicie prawidłowy i ta sama „poprawka” by go zepsuła) – mówimy wprost,
+  // że tę listę trzeba porównać z oryginałem.
+  function labReadWarning(pozycje) {
+    const lista = (pozycje || []).filter(p => p && String(p.parametr || '').trim());
+    if (lista.length < 4) return '';
+    const powody = [];
+    const podejrzane = lista.filter(labPodejrzany);
+    if (podejrzane.length >= 2) {
+      powody.push(`w ${podejrzane.length} wierszach wynik i norma są z różnych rzędów wielkości (${podejrzane.slice(0, 3).map(p => p.parametr).join(', ')}${podejrzane.length > 3 ? '…' : ''}) – przy skanach gubi się przecinek dziesiętny, np. „4,60” czytane jako „460”`);
+    }
+    const bezJednostki = lista.filter(p => !String(p.jednostka || '').trim()).length;
+    if (bezJednostki >= Math.ceil(lista.length * 0.8)) {
+      powody.push('kolumna jednostek nie została odczytana ani w jednym wierszu');
+    }
+    const bezNormy = lista.filter(p => !String(p.normaTekst || '').trim()).length;
+    if (bezNormy >= Math.ceil(lista.length * 0.8)) {
+      powody.push('żaden wiersz nie ma normy z wydruku, więc nie ma czego porównywać');
+    }
+    if (!powody.length) return '';
+    return `Ten odczyt wygląda na niepełny: ${powody.join('; ')}. Porównaj listę z oryginałem i popraw, co trzeba – dopóki tego nie zrobisz, nie traktuj strzałek jako oceny wyników.`;
+  }
+
   // Jeden wiersz wydruku → pozycja wyniku. Zwraca null, gdy wiersz nie wygląda na wynik badania.
   function parseLabLine(line) {
     const surowa = String(line || '').replace(/ /g, ' ').trim();
@@ -1749,7 +1774,7 @@
     sortedEntries, skinWarnings, treatmentSummary,
     reportInput, docsTextZ, docsIndex, docTitle, shareBudget, deviceChecksText, reportPrompts, deviceCheckPrompts,
     skinInput, skinPrompts, SKIN_PHOTO_SYSTEM, ZASADY_WSPOLNE,
-    LAB_UNITS, LAB_SYNONYMS, normUnit, isUnit, paramKey, parseRange, labFlag, labPodejrzany, parseLabLine, parseLabText,
+    LAB_UNITS, LAB_SYNONYMS, normUnit, isUnit, paramKey, parseRange, labFlag, labPodejrzany, labReadWarning, parseLabLine, parseLabText,
     extractLabInfo, labSeries, labTrend, labReportText, labPrompts, toNum, fmtNum, FLAGA_SLOWO, KIERUNEK_SLOWO
   };
   if (typeof window !== 'undefined') window.EduZdrowie = api;

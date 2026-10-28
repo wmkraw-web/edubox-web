@@ -602,6 +602,16 @@
             document.head.appendChild(sc);
         }));
         const MAX_OCR_PAGES = 15;
+        // Rozpoznawanie tekstu chce ok. 300 dpi. PDF liczy w punktach (72 na cal), więc skala to 300/72.
+        // Przy dotychczasowej skali 2 (≈145 dpi) ginęły przecinki dziesiętne i drobny druk.
+        // Sufit: przeglądarki mobilne odmawiają canvasu powyżej ok. 16 mln pikseli.
+        const OCR_DPI = 300;
+        const MAX_PIKSELI = 16e6;
+        const ocrScale = (page) => {
+            const baza = page.getViewport({ scale: 1 });
+            const limit = Math.sqrt(MAX_PIKSELI / Math.max(1, baza.width * baza.height));
+            return Math.max(2, Math.min(OCR_DPI / 72, limit));
+        };
 
         async function ocrImages(sources, onProgress) {
             await loadScript(LIBS.tesseract);
@@ -611,9 +621,14 @@
             });
             try {
                 const out = [];
+                await worker.setParameters({ preserve_interword_spaces: '1' });
                 for (let i = 0; i < sources.length; i++) {
                     onProgress(`Rozpoznaję stronę ${i + 1} z ${sources.length}…`);
-                    const { data } = await worker.recognize(sources[i]);
+                    // Strona bywa podana jako funkcja: rysujemy ją dopiero teraz i od razu zwalniamy,
+                    // bo 15 stron A4 w 300 dpi trzymanych naraz to kilkaset MB i telefon by padł.
+                    const src = typeof sources[i] === 'function' ? await sources[i]() : sources[i];
+                    const { data } = await worker.recognize(src);
+                    if (src && src.tagName === 'CANVAS') { src.width = 0; src.height = 0; }
                     out.push(data.text || '');
                 }
                 return out.join('\n\n');
@@ -655,19 +670,21 @@
             if (dosc && jakosc.ok) return { text, ocr: false, pages: pdf.numPages };
             const zepsuty = dosc && !jakosc.ok;
             const n = Math.min(pdf.numPages, MAX_OCR_PAGES);
-            const canvases = [];
+            const strony = [];
             for (let i = 1; i <= n; i++) {
-                onProgress(zepsuty
-                    ? `Ten PDF ma uszkodzoną warstwę tekstową (${window.EduTekstJakosc.qualityMessage(jakosc)}) – rozpoznaję go jak skan, strona ${i} z ${n}…`
-                    : `To skan – przygotowuję stronę ${i} z ${n} do rozpoznania…`);
-                const page = await pdf.getPage(i);
-                const vp = page.getViewport({ scale: 2 });
-                const c = document.createElement('canvas');
-                c.width = vp.width; c.height = vp.height;
-                await page.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise;
-                canvases.push(c);
+                strony.push(async () => {
+                    onProgress(zepsuty
+                        ? `Ten PDF ma uszkodzoną warstwę tekstową (${window.EduTekstJakosc.qualityMessage(jakosc)}) – rozpoznaję go jak skan, strona ${i} z ${n}…`
+                        : `To skan – przygotowuję stronę ${i} z ${n} do rozpoznania…`);
+                    const page = await pdf.getPage(i);
+                    const vp = page.getViewport({ scale: ocrScale(page) });
+                    const c = document.createElement('canvas');
+                    c.width = vp.width; c.height = vp.height;
+                    await page.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise;
+                    return c;
+                });
             }
-            const rozpoznany = await ocrImages(canvases, onProgress);
+            const rozpoznany = await ocrImages(strony, onProgress);
             if (!window.EduTekstJakosc.textQuality(rozpoznany).ok) {
                 throw new Error(zepsuty
                     ? 'Ten PDF ma uszkodzoną warstwę tekstową, a rozpoznawanie obrazu też nic nie dało. Spróbuj zapisać go jeszcze raz (Drukuj → Zapisz jako PDF) albo zrób wyraźne zdjęcie dokumentu.'
