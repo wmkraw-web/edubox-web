@@ -401,6 +401,20 @@ Progi dobrane tak, żeby tabela samych liczb z wynikami NIE była fałszywie odr
 Ten sam wzorzec odczytu (`readDocument`) jest skopiowany w `podopieczni.html` – **tam poprawka też jest**,
 przez wspólny `tekst-jakosc.js` (patrz niżej).
 
+**Nagłówek wydruku nie może udawać wyników (28.10.2026, drugie zgłoszenie):** po naprawie odczytu parser zaczął
+czytać prawdziwe nazwy, ale brał też administrację z góry wydruku – adres laboratorium (numer ulicy jako wynik,
+**kod pocztowy `36-222` jako zakres normy**), „Zlecający”, „Kod oddziału”, „Odbiorca wyniku” (rok z daty jako
+wynik) i nazwę panelu „Badanie ogólne moczu (ICD-9: …)”, z której `9` wyszło jako wynik. Cztery warstwy obrony,
+wszystkie w testach: 1) `LAB_NAGLOWEK` znajduje wiersz nagłówka tabeli (ma „wynik” i jednocześnie „jednostka”,
+„norma”, „referencyjne” albo „zakres”) i **wszystko nad nim jest pomijane**; 2) `LAB_SKIP` rozszerzone o etykiety
+administracyjne (zlecający, oddział, odbiorca, płatnik, NIP, konto, `ul.`, `al.`, telefon, e-mail…) i `KOD_POCZTOWY`
+odrzuca całą linię; 3) `ICD_RE` podmienia numer klasyfikacji na litery **tej samej długości** (`ICD-9` → `ICD-x`),
+żeby nie był liczbą, a indeksy zgadzały się z oryginałem – nazwa jest wycinana z linii SUROWEJ, więc „OB (ICD-9: C59)”
+zostaje w całości; 4) w `parseLabText` filtr adaptacyjny: jeśli **większość** rozpoznanych pozycji ma jednostkę albo
+normę (czyli wydruk ma takie kolumny), wiersze bez jednej i drugiej są odrzucane – a przy wydrukach bez norm nie
+odrzucamy niczego. Do tego nazwa dłuższa niż 7 słów to zdanie, nie parametr, a zapasowa ścieżka wyszukiwania wyniku
+wymaga spacji przed liczbą (inaczej „A01” w kodzie badania stawało się wynikiem).
+
 **Wspólna ocena jakości tekstu (`tekst-jakosc.js`, od 28.10.2026):** `window.EduTekstJakosc` – jeden plik dla
 „Mojego Zdrowia” i „Teczki podopiecznych”, bo ten sam `readDocument` jest skopiowany w obu stronach i oba miały
 ten sam błąd (orzeczenia z poradni bywają w takich PDF-ach dokładnie jak wyniki z laboratorium). Dołączaj go

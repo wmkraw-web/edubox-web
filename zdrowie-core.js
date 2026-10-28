@@ -1277,11 +1277,16 @@
   };
   const fmtNum = (v) => (v == null ? '' : String(Math.round(v * 1000) / 1000).replace('.', ','));
 
-  // Linie, które wyglądają jak wynik, ale nim nie są: dane pacjenta, nagłówki tabel, stopki.
-  const LAB_SKIP = /^\s*(?:imi[ęe]|nazwisko|pacjent|pesel|data|godzina|numer|nr\b|zlecenie|materia[łl]|lekarz|kierowa|wystawi|laboratorium|pracowni|adres|telefon|strona|wynik(?:i)?\s*bada|nazwa\s+badania|parametr|jednostk|norma|zakres|warto[śs]ci\s+referencyjn|metoda|uwagi|podpis|autoryz|wykona|przyj[ęe]|pobran|zatwierdz|opis|komentarz|interpretacj)/i;
+  // Linie, które wyglądają jak wynik, ale nim nie są: dane pacjenta, nagłówki tabel, stopki, a przede wszystkim
+  // CAŁA administracja z góry wydruku (zgłoszenie właściciela 28.10.2026: do parametrów wpadł adres laboratorium,
+  // zleceniodawca, kod oddziału i odbiorca wyniku – numer ulicy jako wynik, a kod pocztowy jako zakres normy).
+  const LAB_SKIP = /^\s*(?:imi[ęe]|nazwisko|pacjent|pesel|data|godzina|numer|nr\b|zlecenie|zlecaj[ąa]c|zleceniodawc|materia[łl]|lekarz|kierowa|wystawi|laboratorium|pracowni|adres|ul\.|al\.|os\.|pl\.|telefon|tel\.|fax|e-?mail|www|strona|oddzia[łl]|kod\s+oddzia[łl]|kom[óo]rka|jednostka\s+kieruj|odbiorc|odbi[óo]r|p[łl]atnik|p[łl]atne|nip|regon|krs|konto|faktura|rachunek|cennik|wynik(?:i)?\s*bada|nazwa\s+badania|parametr|jednostk|norma|zakres|warto[śs]ci\s+referencyjn|metoda|uwagi|podpis|autoryz|wykona|przyj[ęe]|pobran|zatwierdz|opis|komentarz|interpretacj|legenda|obja[śs]nieni|piecz|kierownik|diagnost)/i;
+  // Nagłówek tabeli wyników – wszystko nad nim to dane administracyjne, nie badania.
+  const LAB_NAGLOWEK = /(?=.*\bwynik)(?=.*(?:jednostk|norma|referencyjn|zakres))/i;
+  // „36-222” wygląda jak zakres normy, a „ICD-9” jak wynik – oba trzeba unieszkodliwić.
+  const KOD_POCZTOWY = /\b\d{2}-\d{3}\b/;
+  const ICD_RE = /\bICD([-\s]?)(9|10)\b/gi;
   const LAB_SEP = '(?:-|–|—|÷|\\.\\.|\\bdo\\b)';
-  // Dwie gałęzie, żeby dopasowanie NIE zaczynało się od spacji: z operatorem („< 5,0”) albo goła liczba.
-  // Przy wiodącym \s* indeks wskazywał spację, a kontrola „czy liczba stoi osobno” patrzyła na zły znak.
   const NUM_G = /[<>≤≥]\s*\d+(?:[.,]\d+)?|\d+(?:[.,]\d+)?/g;
 
   // Zakres normy z wydruku: „13,0 - 17,0”, „(70-99)”, „< 190”, „do 15”, „> 40”.
@@ -1334,9 +1339,13 @@
 
   // Jeden wiersz wydruku → pozycja wyniku. Zwraca null, gdy wiersz nie wygląda na wynik badania.
   function parseLabLine(line) {
-    const raw = String(line || '').replace(/ /g, ' ').trim();
-    if (raw.length < 3 || LAB_SKIP.test(raw)) return null;
-    if (/\d{2}[.\-/]\d{2}[.\-/]\d{4}/.test(raw) || /\b\d{11}\b/.test(raw)) return null;
+    const surowa = String(line || '').replace(/ /g, ' ').trim();
+    if (surowa.length < 3 || LAB_SKIP.test(surowa)) return null;
+    if (/\d{2}[.\-/]\d{2}[.\-/]\d{4}/.test(surowa) || /\b\d{11}\b/.test(surowa)) return null;
+    if (KOD_POCZTOWY.test(surowa)) return null;
+    // Numer klasyfikacji ICD zostaje w nazwie, ale nie może udawać wyniku („Badanie ogólne moczu (ICD-9: …)”).
+    // Podmieniamy go na litery TEJ SAMEJ długości, żeby indeksy zgadzały się z oryginalną linią.
+    const raw = surowa.replace(ICD_RE, (m, sep, nr) => 'ICD' + sep + 'x'.repeat(nr.length));
     const liczby = [...raw.matchAll(NUM_G)];
     if (!liczby.length) return null;
 
@@ -1350,15 +1359,23 @@
       const po = raw[m.index + m[0].length] || ' ';
       return /[\s(]/.test(przed) && /[\s*]/.test(po);
     };
-    const kandydaci = (normaOk ? liczby.filter(m => m.index + m[0].length <= norma.index) : liczby).filter(osobno);
-    const przedNorma = kandydaci.length ? kandydaci : (normaOk ? liczby.filter(m => m.index + m[0].length <= norma.index) : liczby);
+    const przedNormaWszystkie = normaOk ? liczby.filter(m => m.index + m[0].length <= norma.index) : liczby;
+    const kandydaci = przedNormaWszystkie.filter(osobno);
+    // Zapas dla zapisu bez spacji („CRP 28,4mg/l”): liczba musi mieć przed sobą spację, inaczej siedzi
+    // w środku słowa i należy do nazwy (np. „A01” w kodzie badania).
+    const przedNorma = kandydaci.length
+        ? kandydaci
+        : przedNormaWszystkie.filter(m => m.index === 0 || /[\s(]/.test(raw[m.index - 1]));
     if (!przedNorma.length) return null;
 
     const wynikM = przedNorma[0];
     const wynikTxt = wynikM[0].replace(/\s+/g, '');
-    const nazwa = raw.slice(0, wynikM.index).replace(/[.:;,\s]+$/, '').trim();
+    // Nazwę bierzemy z ORYGINALNEJ linii – podmiana ICD służyła tylko szukaniu liczb.
+    const nazwa = surowa.slice(0, wynikM.index).replace(/[.:;,\s]+$/, '').trim();
     if (nazwa.length < 2 || !/[\p{L}]{2}/u.test(nazwa)) return null;
     if (LAB_SKIP.test(nazwa)) return null;
+    // Nazwa parametru to najwyżej kilka słów; dłuższa to zdanie z nagłówka albo adres.
+    if (nazwa.split(/\s+/).filter(Boolean).length > 7) return null;
     // Drugi bezpiecznik na wypadek nieczytelnego pliku: nazwa pełna glifów-krzaków to nie parametr.
     if ([...nazwa].some(ch => PODEJRZANY_ZNAK(ch.codePointAt(0)))) return null;
 
@@ -1383,7 +1400,11 @@
 
   // Cały wydruk → lista pozycji. Duplikaty tego samego parametru w jednym wyniku: zostaje pierwszy.
   function parseLabText(text) {
-    const linie = String(text || '').replace(/\r/g, '').split('\n');
+    const wszystkie = String(text || '').replace(/\r/g, '').split('\n');
+    // Wydruki zaczynają się od danych laboratorium, pacjenta i zleceniodawcy. Jeśli jest nagłówek tabeli
+    // („Nazwa badania | Wynik | Jednostka | Wartości referencyjne”), wszystko nad nim pomijamy.
+    const naglowek = wszystkie.findIndex(l => LAB_NAGLOWEK.test(l));
+    const linie = naglowek >= 0 ? wszystkie.slice(naglowek + 1) : wszystkie;
     const pozycje = [];
     const widziane = new Set();
     linie.forEach(l => {
@@ -1394,7 +1415,12 @@
       widziane.add(k);
       pozycje.push(Object.assign({ id: uid(), key: k }, p));
     });
-    return pozycje;
+    // Gdy wydruk ma kolumnę jednostek albo norm (większość pozycji je ma), wiersz bez jednej i drugiej
+    // to prawie na pewno resztka nagłówka, a nie parametr. Przy wydrukach bez norm nie odrzucamy niczego.
+    const opisane = pozycje.filter(p => p.jednostka || p.normaTekst).length;
+    return opisane >= Math.ceil(pozycje.length * 0.5) && pozycje.length > 3
+      ? pozycje.filter(p => p.jednostka || p.normaTekst || p.flagaWydruku)
+      : pozycje;
   }
 
   // Data badania i laboratorium z wydruku – lokalnie, bez AI (korzysta z tego samego rozpoznawania co dokumenty).

@@ -743,6 +743,67 @@ test('wszystkie strony rejestrują tę samą wersję Service Workera', () => {
   assert(stare.length === 0, 'strony ze starą wersją: ' + stare.join(', '));
 });
 
+// ---------- nagłówek wydruku nie może udawać wyników (zgłoszenie z 28.10.2026) ----------
+const WYDRUK_Z_NAGLOWKIEM = [
+  'Laboratorium Analiz Lekarskich',
+  'z Zyzoongo 6',
+  'ul. Gen. Leopolda Okulickiego 12  36-222 Zyzoongo',
+  'Zlecający BADANIA PŁATNE Kod zlecenia 1',
+  'oddział PP Leżajsk Kod oddziału 0034',
+  'Odbiorca wyniku: ODBIÓR OSOBISTY 2026',
+  'Pacjent: Witold Kraw   PESEL: 62031512345',
+  'Data pobrania: 12.03.2026',
+  '',
+  'Nazwa badania              Wynik    Jednostka   Wartości referencyjne',
+  'OB (ICD-9: C59)            5                    0 - 15',
+  'Badanie ogólne moczu (ICD-9: A01)',
+  'Ciężar właściwy            1,019    g/ml        1.015 - 1.03',
+  'pH                         6,0                  5.0 - 7.0',
+  'Hemoglobina (HGB)          14,2     g/dl        13,0 - 17,0',
+  'Leukocyty (WBC)            11,8     10^3/ul     4,00 - 10,00',
+  'CRP                        28,4     mg/l        < 5,0',
+  'Czynnik reumatoidalny      62,0     IU/ml       < 14,0',
+  'Autoryzował: dr n. med. Jan Lis'
+].join('\n');
+
+test('dane laboratorium, zleceniodawcy i odbiorcy nie stają się parametrami', () => {
+  const poz = Z.parseLabText(WYDRUK_Z_NAGLOWKIEM);
+  const smieci = poz.filter(p => /Zyzoongo|Okulickiego|Zlecaj|oddzia|Odbiorc|P[ła]atn/i.test(p.parametr));
+  assert(smieci.length === 0, 'do wyników wpadł nagłówek: ' + JSON.stringify(smieci.map(p => p.parametr)));
+});
+test('kod pocztowy nie jest brany za zakres normy', () => {
+  // Realny przypadek: „ul. Gen. Leopolda Okulickiego 12  36-222” dało wynik 12 i normę 36–222.
+  assert(Z.parseLabLine('ul. Gen. Leopolda Okulickiego 12  36-222 Zyzoongo') === null, 'adres z kodem pocztowym');
+  assert(Z.parseLabLine('Przychodnia, 00-950 Warszawa 15') === null, 'inny kod pocztowy');
+});
+test('numer klasyfikacji ICD nie jest wynikiem, ale zostaje w nazwie', () => {
+  assert(Z.parseLabLine('Badanie ogólne moczu (ICD-9: A01)') === null, 'nazwa panelu bez wyniku nie jest parametrem');
+  const ob = Z.parseLabLine('OB (ICD-9: C59)            5          0 - 15');
+  assert(ob && ob.wynik === '5' && ob.parametr === 'OB (ICD-9: C59)', JSON.stringify(ob));
+  assert(Z.paramKey(ob.parametr) === 'ob', 'klucz mimo kodu ICD: ' + Z.paramKey(ob.parametr));
+});
+test('prawdziwe parametry przeżywają filtrowanie nagłówka', () => {
+  const poz = Z.parseLabText(WYDRUK_Z_NAGLOWKIEM);
+  ['OB', 'Ciężar właściwy', 'pH', 'Hemoglobina', 'Leukocyty', 'CRP', 'Czynnik reumatoidalny']
+    .forEach(n => assert(poz.some(p => p.parametr.startsWith(n.split(' ')[0])), 'zgubiony parametr: ' + n));
+  assert(poz.length === 7, 'rozpoznano ' + poz.length + ' zamiast 7: ' + poz.map(p => p.parametr).join(' | '));
+  assert(poz.find(p => p.parametr.startsWith('Ciężar')).normaTekst === '1,015–1,03', 'norma z kropkami dziesiętnymi');
+});
+test('wydruk BEZ kolumny norm nie jest przez filtr wycinany', () => {
+  // Tam, gdzie żaden parametr nie ma normy ani jednostki, nie ma czego porównywać – bierzemy wszystko.
+  const prosty = ['Hemoglobina 14,2', 'Leukocyty 11,8', 'Płytki 198', 'Glukoza 98'].join('\n');
+  assert(Z.parseLabText(prosty).length === 4, 'zgubione parametry: ' + JSON.stringify(Z.parseLabText(prosty).map(p => p.parametr)));
+});
+test('nazwa dłuższa niż kilka słów to zdanie z nagłówka, nie parametr', () => {
+  assert(Z.parseLabLine('Wyniki badań laboratoryjnych wykonanych na zlecenie poradni rejonowej 5') === null, 'długie zdanie');
+  assert(Z.parseLabLine('Przeciwciała anty-CCP    102   U/ml   < 17') !== null, 'normalna nazwa wielowyrazowa musi zostać');
+});
+test('liczba wewnątrz słowa nie jest wynikiem nawet w zapasowej ścieżce', () => {
+  assert(Z.parseLabLine('Kod badania A01 B02') === null, 'kody bez wyniku');
+  const crp = Z.parseLabLine('CRP 28,4mg/l < 5,0');
+  assert(crp && crp.wynik === '28,4' && crp.jednostka === 'mg/l', 'zapis bez spacji musi działać: ' + JSON.stringify(crp));
+});
+
 (async () => {
   for (const [name, fn] of tests) {
     try { await fn(); ok++; console.log('✅ ' + name); }
