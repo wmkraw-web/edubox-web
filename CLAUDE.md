@@ -398,11 +398,34 @@ a użytkownik dostaje komunikat, CO było nie tak z plikiem (`qualityMessage`). 
 jeszcze raz – jeśli dalej nic z tego nie ma, leci jasny błąd zamiast zapisania śmieci. To samo dla zdjęć.
 Drugi bezpiecznik jest w `parseLabLine`: nazwa parametru zawierająca taki glif nie tworzy pozycji.
 Progi dobrane tak, żeby tabela samych liczb z wynikami NIE była fałszywie odrzucana (test tego pilnuje).
-Ten sam wzorzec odczytu (`readDocument`) jest skopiowany w `podopieczni.html` – **tam poprawki jeszcze nie ma**.
+Ten sam wzorzec odczytu (`readDocument`) jest skopiowany w `podopieczni.html` – **tam poprawka też jest**,
+przez wspólny `tekst-jakosc.js` (patrz niżej).
 
-**Etap 3 (do zrobienia):** PWA z ikoną na telefonie; ewentualne rozpoznawanie układów wielokolumnowych
-w wydrukach laboratoryjnych (teraz parser czyta wiersz po wierszu – przy dwóch kolumnach wyników na stronie
-trzeba sprawdzić odczyt).
+**Wspólna ocena jakości tekstu (`tekst-jakosc.js`, od 28.10.2026):** `window.EduTekstJakosc` – jeden plik dla
+„Mojego Zdrowia” i „Teczki podopiecznych”, bo ten sam `readDocument` jest skopiowany w obu stronach i oba miały
+ten sam błąd (orzeczenia z poradni bywają w takich PDF-ach dokładnie jak wyniki z laboratorium). Dołączaj go
+PRZED `zdrowie-core.js` / `podopieczni-core.js`; `zdrowie-core.js` ma do niego cienki mostek (`jakoscApi`),
+więc `Z.textQuality` nadal działa jak wcześniej. Testy po obu stronach: `zdrowie:check` i `podopieczni:check`.
+
+**PWA „Moje Zdrowie” (od 28.10.2026):** `zdrowie-manifest.json` (osobny od wspólnego `/manifest.json`: inna
+ikona, `start_url` i `scope` = `/zdrowie.html`, `display: standalone`), ikony `zdrowie-icon-*.png` (192, 512
+i osobna **maskowalna**, bo Android przycina ikonę do własnego kształtu) plus `zdrowie-apple-touch.png`.
+**Nie ma własnego Service Workera** – zakres SW to cała domena, więc drugi podmieniłby ten od EduBoxa; strona
+rejestruje wspólny `/service-worker.js?v=5`. `shortcuts` w manifeście prowadzą do `?tab=dzis|badania|kartki`,
+a strona czyta ten parametr przy starcie (test pilnuje, że każdy skrót trafia w istniejącą zakładkę).
+**Service Worker v5:** biblioteki z CDN **z przypiętym numerem wersji** (React, Babel, pdf.js, Phosphor)
+wchodzą teraz do cache – wcześniej Worker pomijał wszystkie obce domeny, więc strona otwarta bez internetu
+wczytywała się pusta. Przypięta wersja nigdy nie zmienia treści pod tym samym adresem, więc „najpierw cache,
+świeża kopia w tle” jest tu bezpieczne; `cdn.tailwindcss.com` i czcionki Google nie mają wersji w adresie,
+ale bez nich strona offline jest nieczytelna, więc są na osobnej liście `BEZ_WERSJI` z tą samą strategią.
+Adres bez wersji z CDN (np. `unpkg.com/react/…`) i pozostałe obce domeny (fal.media, analityka) nadal nie
+wchodzą do cache, `/api/` tak samo jak dotąd omija Workera. Nazwa cache zmieniona na `edubox-cache-v5`,
+żeby stara zawartość została wyczyszczona – **rejestracja we WSZYSTKICH stronach to teraz `?v=5`** (test
+sprawdza, że żadna strona nie została z `?v=4`). Po zmianie wersji w stronach publicznych trzeba odświeżyć
+mapę strony: `npm run seo:sitemap`.
+
+**Etap 3 (do zrobienia):** ewentualne rozpoznawanie układów wielokolumnowych w wydrukach laboratoryjnych
+(teraz parser czyta wiersz po wierszu – przy dwóch kolumnach wyników na stronie trzeba sprawdzić odczyt).
 
 **Panel jakości Make:** `panel-jakosci.html` korzysta z odczytowego trybu
 `GET /api/weekly-report?view=make-health`, dzięki czemu nie powstaje trzynasta
@@ -736,11 +759,12 @@ MagicLetters (25.10.2026): drukowała się tylko 1 strona, bo cała aplikacja si
 aplikacji” = w `@media print` zdejmij wysokość/overflow/flex z KAŻDEGO przodka wersji do druku (klasy `ml-app`,
 `ml-main`) i łam strony `break-after: page` na `:not(:last-child)`, nie `100vh`.
 
-**Service Worker (`service-worker.js`, v4 od 7.10.2026):** strony, skrypty, style i dane ZAWSZE
-najpierw z sieci (cache tylko offline), obrazki/czcionki z cache z odświeżaniem w tle, inne domeny
-i `/api/` poza SW. Wcześniej (v3) wszystko poza stroną główną szło „najpierw z cache” – kto raz
-otworzył narzędzie, nie dostawał poprawek. Nie wracaj do cache-first dla HTML/JS. Rejestracja
-wszędzie jako `/service-worker.js?v=4`.
+**Service Worker (`service-worker.js`, v5 od 28.10.2026):** strony, skrypty, style i dane ZAWSZE
+najpierw z sieci (cache tylko offline), obrazki/czcionki z cache z odświeżaniem w tle, `/api/` poza SW.
+Wcześniej (v3) wszystko poza stroną główną szło „najpierw z cache” – kto raz otworzył narzędzie, nie
+dostawał poprawek. **Nie wracaj do cache-first dla HTML/JS.** Od v5 biblioteki z CDN z przypiętą wersją
+(oraz Tailwind i czcionki Google) wchodzą do cache, żeby PWA działała bez internetu – szczegóły przy
+opisie PWA „Moje Zdrowie”. Rejestracja wszędzie jako `/service-worker.js?v=5`.
 
 **Układ na telefonie:** 12 narzędzi z panelem bocznym (EduBajka, EduDekorator, EduDetox,
 EduKalendarz, EduKatalog, EduMalarz, EduNotariusz, EduPDF, EduRaport, EduWakacje, EduWpisy,

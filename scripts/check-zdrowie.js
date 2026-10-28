@@ -691,6 +691,58 @@ test('strona: tekst ze zdjęcia też przechodzi kontrolę jakości', () => {
   assert(/Z\.textQuality\(zeZdjecia\)\.ok/.test(blok), 'brak kontroli jakości po OCR zdjęcia');
 });
 
+// ---------- PWA: aplikacja na telefonie ----------
+test('manifest PWA opisuje osobną aplikację, nie EduBoxa', () => {
+  const m = JSON.parse(fs.readFileSync(path.join(ROOT, 'zdrowie-manifest.json'), 'utf8'));
+  assert(m.start_url === '/zdrowie.html' && m.display === 'standalone', JSON.stringify({ s: m.start_url, d: m.display }));
+  assert(m.scope === '/zdrowie.html', 'zakres ma obejmować tylko tę stronę: ' + m.scope);
+  assert(m.name === 'Moje Zdrowie' && m.short_name.length <= 12, 'nazwa na ekranie głównym: ' + m.short_name);
+  const rozmiary = m.icons.map(i => i.sizes);
+  assert(rozmiary.includes('192x192') && rozmiary.includes('512x512'), 'brak wymaganych rozmiarów ikon: ' + rozmiary.join(', '));
+  assert(m.icons.some(i => i.purpose === 'maskable'), 'brak ikony maskowalnej (Android przycina ikonę do swojego kształtu)');
+  m.icons.concat(m.shortcuts.flatMap(s => s.icons || [])).forEach(i =>
+    assert(fs.existsSync(path.join(ROOT, i.src.replace(/^\//, ''))), 'brak pliku ikony: ' + i.src));
+  m.shortcuts.forEach(s => assert(/^\/zdrowie\.html\?tab=/.test(s.url), 'skrót musi prowadzić do zakładki: ' + s.url));
+});
+test('skróty z manifestu trafiają w istniejące zakładki', () => {
+  const m = JSON.parse(fs.readFileSync(path.join(ROOT, 'zdrowie-manifest.json'), 'utf8'));
+  const zakladki = [...page.matchAll(/\{ id: '([a-z]+)', label:/g)].map(x => x[1]);
+  assert(zakladki.length >= 8, 'nie udało się odczytać listy zakładek: ' + zakladki.join(','));
+  m.shortcuts.forEach(s => {
+    const id = s.url.split('tab=')[1];
+    assert(zakladki.includes(id), 'skrót prowadzi do nieistniejącej zakładki: ' + id);
+  });
+  assert(/new URLSearchParams\(location\.search\)\.get\('tab'\)/.test(page), 'strona nie czyta zakładki z adresu');
+});
+test('strona podpina manifest, ikonę i Service Workera EduBoxa (bez własnego)', () => {
+  assert(/<link rel="manifest" href="\/zdrowie-manifest\.json">/.test(page), 'brak manifestu');
+  assert(/<link rel="apple-touch-icon"/.test(page), 'brak ikony dla iPhone’a');
+  assert(/serviceWorker.*register\('\/service-worker\.js\?v=5'\)/s.test(page), 'brak rejestracji wspólnego Service Workera');
+  assert(!/zdrowie-sw|zdrowie-service-worker/.test(page), 'własny Service Worker podmieniłby ten od EduBoxa (ten sam zakres)');
+});
+test('Service Worker trzyma w cache biblioteki z przypiętą wersją, ale nie /api/', () => {
+  const sw = fs.readFileSync(path.join(ROOT, 'service-worker.js'), 'utf8');
+  assert(/edubox-cache-v5/.test(sw), 'nazwa cache musi się zmienić, inaczej zostanie stara zawartość');
+  assert(/cacheableCdn/.test(sw) && /unpkg\.com/.test(sw), 'brak obsługi bibliotek z CDN – bez nich strona offline jest pusta');
+  assert(/pathname\.startsWith\('\/api\/'\)\) return;/.test(sw), 'zapytania do API nie mogą iść przez cache');
+  // Adres bez numeru wersji nie może trafić do cache – tylko przypięte wersje są niezmienne.
+  const fn = new Function('CDN_HOSTS', 'PINNED', 'BEZ_WERSJI', 'return ' + (sw.match(/const cacheableCdn = ([\s\S]*?);\n/) || [])[1]);
+  const hosts = JSON.parse((sw.match(/const CDN_HOSTS = (\[[^\]]+\])/) || [])[1].replace(/'/g, '"'));
+  const pinned = new RegExp((sw.match(/const PINNED = \/(.+?)\/;/) || [])[1]);
+  const bezWersji = JSON.parse((sw.match(/const BEZ_WERSJI = (\[[^\]]+\])/) || [])[1].replace(/'/g, '"'));
+  const test1 = fn(hosts, pinned, bezWersji);
+  assert(test1(new URL('https://unpkg.com/react@18.3.1/umd/react.production.min.js')), 'przypięta wersja powinna wejść do cache');
+  assert(!test1(new URL('https://unpkg.com/react/umd/react.production.min.js')), 'adres bez wersji NIE może wejść do cache');
+  assert(!test1(new URL('https://fal.media/files/obrazek.png')), 'obce domeny spoza listy nie wchodzą do cache');
+  assert(test1(new URL('https://fonts.gstatic.com/s/inter/v13/font.woff2')), 'czcionki Google mają działać offline');
+  assert(test1(new URL('https://cdn.tailwindcss.com/')), 'bez Tailwinda strona offline jest nieczytelna');
+});
+test('wszystkie strony rejestrują tę samą wersję Service Workera', () => {
+  const strony = fs.readdirSync(ROOT).filter(f => f.endsWith('.html'));
+  const stare = strony.filter(f => /service-worker\.js\?v=4/.test(fs.readFileSync(path.join(ROOT, f), 'utf8')));
+  assert(stare.length === 0, 'strony ze starą wersją: ' + stare.join(', '));
+});
+
 (async () => {
   for (const [name, fn] of tests) {
     try { await fn(); ok++; console.log('✅ ' + name); }

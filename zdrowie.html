@@ -9,6 +9,14 @@
     <meta name="theme-color" content="#020617">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Zdrowie">
+    <meta name="mobile-web-app-capable" content="yes">
+    <!-- Własny manifest, nie wspólny /manifest.json: to osobna aplikacja na telefonie (inna ikona, inny
+         start_url, zakres ograniczony do tej jednej strony). Service Workera NIE rejestrujemy osobnego –
+         jego zakres to cała domena, więc drugi podmieniłby ten od EduBoxa. -->
+    <link rel="manifest" href="/zdrowie-manifest.json">
+    <link rel="apple-touch-icon" href="/zdrowie-apple-touch.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="/zdrowie-icon-192.png">
     <!-- PRYWATNA APLIKACJA (27.10.2026). Dane o zdrowiu są wyłącznie w tej przeglądarce, zaszyfrowane hasłem
          (zdrowie-core.js). Celowo bez analityki, bazy w chmurze, wspólnego global-core.js i menu EduBox – nic nie
          może wysyłać danych w tle (pilnuje tego scripts/check-zdrowie.js). Skany i PDF-y czyta pdf.js, mammoth
@@ -19,6 +27,7 @@
     <script src="https://unpkg.com/@babel/standalone@7.26.10/babel.min.js"></script>
     <script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
     <script src="/doc-tools.js"></script>
+    <script src="/tekst-jakosc.js"></script>
     <script src="/zdrowie-core.js"></script>
     <link rel="stylesheet" href="/doc-paper.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
@@ -2521,7 +2530,11 @@
             const [stored, setStored] = useState(readStored);
             const [vault, setVault] = useState(null);
             const [session, setSession] = useState(null);
-            const [tab, setTab] = useState('dzis');
+            // Skróty z ikony na telefonie (manifest → shortcuts) wchodzą od razu we właściwą zakładkę.
+            const [tab, setTab] = useState(() => {
+                const z = new URLSearchParams(location.search).get('tab');
+                return ZAKLADKI.some(x => x.id === z) ? z : 'dzis';
+            });
             const [zapis, setZapis] = useState('');
             const sessionRef = useRef(null);
             const ostatniRuch = useRef(Date.now());
@@ -2636,6 +2649,14 @@
         }
 
         ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+
+        // Ten sam Service Worker co reszta EduBoxa (jego zakres to cała domena – osobny by go podmienił).
+        // Dzięki niemu aplikacja dodana do ekranu głównego otwiera się też bez internetu: dane i tak są lokalne.
+        if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/service-worker.js?v=5').catch(() => { /* brak SW = brak trybu offline, aplikacja działa normalnie */ });
+            });
+        }
     </script>
 </body>
 </html>

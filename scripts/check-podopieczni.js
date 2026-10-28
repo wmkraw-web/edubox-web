@@ -326,6 +326,24 @@ test('strona: każde zapytanie do AI przechodzi przez kontrolę leaks()', () => 
   assert(calls > 0 && guards >= calls, `streamChat: ${calls}, kontrole: ${guards}`);
 });
 
+// ---------- PDF z uszkodzoną warstwą tekstową (ten sam błąd co w Moim Zdrowiu, 28.10.2026) ----------
+const J = require(path.join(ROOT, 'tekst-jakosc.js'));
+test('ocena tekstu: orzeczenie w PDF-ie z czcionką bez mapy znaków jest odrzucane', () => {
+  const krzaki = '▌▌▌AA (▌▌▌▌ ▌▌▌ ▌▌@ ▌▌ ▌▌▌ DB▌▌&) ▌▌ ▌▌▌ / ▌▌@ ! BB▌▌ ▌.-▌▌ M ▌▌▌ '.repeat(40);
+  const q = J.textQuality(krzaki);
+  assert(!q.ok && q.powod === 'znaki-zastepcze', JSON.stringify(q));
+  assert(krzaki.replace(/\s/g, '').length > 1000, 'test ma sens tylko dla długiego tekstu-krzaków');
+  assert(J.textQuality(ORZ).ok, 'prawdziwe orzeczenie musi przechodzić: ' + JSON.stringify(J.textQuality(ORZ)));
+});
+test('strona: odczyt PDF sprawdza jakość tekstu, nie samą liczbę znaków', () => {
+  const blok = page.slice(page.indexOf("const text = parts.join"), page.indexOf('const FIELD_LABELS'));
+  assert(/EduTekstJakosc\.textQuality\(text\)/.test(blok), 'brak kontroli jakości odczytanego tekstu');
+  assert(/dosc && jakosc\.ok/.test(blok), 'warunek musi łączyć ilość i jakość');
+  assert(/textQuality\(rozpoznany\)/.test(blok), 'po rozpoznaniu obrazu też trzeba sprawdzić wynik');
+  assert(/uszkodzoną warstwę tekstową/.test(blok), 'nauczycielka ma się dowiedzieć, co się stało z plikiem');
+  assert(/<script src="\/tekst-jakosc\.js"><\/script>/.test(page), 'brak wspólnego pliku oceny tekstu');
+});
+
 (async () => {
   for (const [name, fn] of tests) {
     try { await fn(); ok++; console.log('✅ ' + name); }
