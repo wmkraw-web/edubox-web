@@ -358,6 +358,30 @@ kardiologicznej jest lekiem przeciwpłytkowym i na karcie ICE musi być widoczny
 ucięta do 6 z dopiskiem, ilu brakuje – wersja A4 i kartka dla bliskiej osoby mają komplet. Testy sprawdzają wymiary
 pól, obrót i to, co musi stać na przodzie.
 
+**Rozpoznania z wypisów i puste pola profilu (29.10.2026, zgłoszenie „brak wpisanych chorób przewlekłych,
+a przecież twardzina…"):** kod kartek był poprawny – pole `profil.choroby` było po prostu puste, bo rozpoznania
+stoją w **wczytanym wypisie ze szpitala**, a nic ich stamtąd nie brało. Dwie naprawy:
+1. `profileExtractPrompts` + `parseProfileSuggestion` (core) i przycisk **„Wypisz rozpoznania z moich dokumentów"**
+   w Profilu: model czyta `docsTextZ` i `deviceChecksText` (już anonimizowane, `assertNoLeak` przed wysyłką),
+   odpowiada w sekcjach `=== ROZPOZNANIA ===` / `=== UCZULENIA ===` (sekcje, nie JSON – dzięki temu strumień
+   i gpt-6.1), a przeglądarka robi z tego dwie **edytowalne** listy z przyciskami „Dopisz" / „Zastąp".
+   **Do profilu nic nie wchodzi samo** – test w przeglądarce pilnuje, że przed kliknięciem pole zostaje puste.
+   Instrukcja zabrania wnioskowania z objawów i z nazw leków: model przepisuje tylko to, co w dokumencie padło
+   wprost. Duplikaty są scalane po `bareName`, więc „Twardzina" i „twardzina" to jedna pozycja.
+2. **Puste pole znaczy „nie uzupełniono", nigdy „nie mam".** `akapity(txt, brak)` wstawia teraz jawny komunikat
+   zamiast `—`, bo samo „—" pod nagłówkiem „Choroby przewlekłe" lekarz czyta jako brak chorób. Z tego samego
+   powodu zniknęły zdania „Nie przyjmuję leków na stałe" i „nie zgłaszam znanych uczuleń" (karta ICE) – aplikacja
+   nie wie, czy pacjent ich nie ma, czy tylko nie wpisał. `profileGaps` wylicza braki, a zakładka Kartki ostrzega
+   o nich **przed** wydrukiem.
+
+**Przeniesienie kartoteki na telefon:** nie ma i nie będzie synchronizacji – dane są zaszyfrowane w `localStorage`
+jednej przeglądarki, więc na telefonie jest pusto. Droga: Ustawienia → **Pobierz kopię** (zaszyfrowany `.json`
+ze zdjęciami) → przeniesienie pliku dowolnie (mailem, dyskiem w chmurze) → na telefonie ekran hasła →
+**„Otwórz z kopii zapasowej (plik .json)"** → to samo hasło. Sprawdzone testem w przeglądarce na czystym
+kontekście: kopia jest nieczytelna bez hasła, złe hasło nie otwiera, a po otwarciu profil jest kompletny.
+Ustawienia prowadzą przez to krok po kroku i mówią wprost, że od tej chwili telefon i komputer to **dwie osobne
+kartoteki** (co dopiszesz na jednym, nie pojawi się na drugim).
+
 **Udostępnienie bliskiej osobie:** kreator w Ustawieniach (dodaj hasło → pobierz zaszyfrowaną kopię ze zdjęciami →
 instrukcja dla tej osoby). Uczciwie napisane, że to **pełny dostęp do kopii i brak synchronizacji** – technicznie
 nie da się dać „tylko podglądu”, bo kto ma hasło, ten ma klucz. Dla lżejszego wariantu jest kartka do druku

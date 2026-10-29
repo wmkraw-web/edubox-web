@@ -929,13 +929,17 @@
 
         // ---------- zakładka: Kartki do druku ----------
         const esc = escapeHtml;
-        const akapity = (txt) => String(txt || '').split(/\n+/).filter(Boolean).map(l => `<p>${esc(l)}</p>`).join('') || '<p>—</p>';
+        // Puste pole znaczy „nie uzupełniono”, a NIE „nie mam”. Samo „—” pod nagłówkiem „Choroby przewlekłe”
+        // lekarz czyta jako brak chorób – stąd jawny komunikat (zgłoszenie właściciela 29.10.2026).
+        const akapity = (txt, brak) => String(txt || '').split(/\n+/).filter(Boolean).map(l => `<p>${esc(l)}</p>`).join('')
+            || `<p><em>${esc(brak || 'nie uzupełniono w kartotece')}</em></p>`;
+        const NIEUZUPELNIONE = 'Nie uzupełniono w kartotece — to nie znaczy, że tego nie ma. Zapytaj pacjenta.';
 
         function visitCardHtml(vault) {
             const k = Z.visitCard(vault);
             const leki = k.leki.length
                 ? `<table><thead><tr><th>Lek</th><th>Dawkowanie</th><th>Na co</th></tr></thead><tbody>${k.leki.map(l => `<tr><td><strong>${esc(l.nazwa)}</strong></td><td>${esc(l.dawkowanie)}</td><td>${esc(l.naCo)}</td></tr>`).join('')}</tbody></table>`
-                : '<p>Nie przyjmuję leków na stałe.</p>';
+                : `<p><em>${esc(NIEUZUPELNIONE)}</em></p>`;
             const pytania = k.pytania.length
                 ? `<h2>Moje pytania</h2><ol>${k.pytania.map(p => `<li>${esc(p)}</li>`).join('')}</ol>`
                 : '';
@@ -962,8 +966,8 @@
                   <tr><th style="width:30%">Pacjent</th><td>${esc(k.kto)}</td></tr>
                   <tr><th>Data</th><td>${esc(k.data)}</td></tr>
                 </tbody></table>
-                <h2>Rozpoznania i choroby przewlekłe</h2>${akapity(k.choroby)}
-                <h2>Uczulenia i nietolerancje</h2>${akapity(k.alergie)}
+                <h2>Rozpoznania i choroby przewlekłe</h2>${akapity(k.choroby, NIEUZUPELNIONE)}
+                <h2>Uczulenia i nietolerancje</h2>${akapity(k.alergie, NIEUZUPELNIONE)}
                 ${urzadzenia}
                 <h2>Leki przyjmowane na stałe</h2>${leki}
                 ${badania}
@@ -988,7 +992,7 @@
             });
             const osoba = [esc(k.imie), k.wiek ? k.wiek + ' lat' : '', k.grupaKrwi ? 'grupa krwi ' + esc(k.grupaKrwi) : ''].filter(Boolean).join(' · ');
             b.push(`<div style="margin-bottom:${male ? '1mm' : '3mm'}"><strong>${osoba}</strong></div>`);
-            b.push(`<div style="margin-bottom:${male ? '1mm' : '3mm'}"><strong>UCZULENIA:</strong> ${esc(k.alergie) || 'nie zgłaszam znanych uczuleń'}</div>`);
+            b.push(`<div style="margin-bottom:${male ? '1mm' : '3mm'}"><strong>UCZULENIA:</strong> ${esc(k.alergie) || 'NIE UZUPEŁNIONO — zapytaj'}</div>`);
             if (k.krew.length) {
                 b.push(`<div style="border:${male ? '0.4mm' : '0.8mm'} solid #000;padding:${male ? '1mm 1.5mm' : '3mm 4mm'};margin-bottom:${male ? '1mm' : '3mm'}">`
                     + `<strong>BIERZE LEK WPŁYWAJĄCY NA KRZEPNIĘCIE KRWI:</strong><br>`
@@ -1013,7 +1017,7 @@
                 + (k.leki.length
                     ? widoczne.map(l => `${l.krew ? '▲ ' : ''}${esc(l.nazwa)}${l.dawkowanie ? ' — ' + esc(l.dawkowanie) : ''}`).join('<br>')
                       + (reszta > 0 ? `<br>…i jeszcze ${reszta} — pełna lista u rodziny` : '')
-                    : 'nie przyjmuję leków na stałe')
+                    : 'NIE UZUPEŁNIONO — zapytaj')
                 + '</div>');
             k.urzadzenia.forEach(u => {
                 const szczegoly = [u.producent, u.model].filter(Boolean).join(' ');
@@ -1065,7 +1069,7 @@
             const row = (a, b) => `<tr><th style="width:32%">${esc(a)}</th><td>${esc(b) || '—'}</td></tr>`;
             const leki = k.leki.length
                 ? `<table><thead><tr><th>Lek</th><th>Dawkowanie</th><th>Na co</th></tr></thead><tbody>${k.leki.map(l => `<tr><td><strong>${esc(l.nazwa)}</strong></td><td>${esc(l.dawkowanie)}</td><td>${esc(l.naCo)}</td></tr>`).join('')}</tbody></table>`
-                : '<p>Brak leków na stałe.</p>';
+                : `<p><em>${esc(NIEUZUPELNIONE)}</em></p>`;
             const urzadzenia = k.urzadzenia.length
                 ? `<h2>Wszczepione urządzenia</h2><p style="border:2px solid #000;padding:8px"><strong>${esc(k.urzadzenia.map(u => u.nazwa).join('; '))}</strong><br>${esc(k.urzadzenia.flatMap(u => u.ostrzezenia).join(' '))}</p>`
                 : '';
@@ -1079,8 +1083,8 @@
                 ? `<h2>Kogo powiadomić</h2><table><tbody>${k.ice.map(x => `<tr><th style="width:40%">${esc(x.kto)}</th><td>${esc(x.telefon)}</td></tr>`).join('')}</tbody></table>`
                 : '';
             return `<h1>Co trzeba o mnie wiedzieć</h1>
-                <table><tbody>${row('Osoba', k.kto)}${row('Grupa krwi', k.grupaKrwi)}${row('Uczulenia', k.alergie)}</tbody></table>
-                <h2>Choroby przewlekłe</h2>${akapity(k.choroby)}
+                <table><tbody>${row('Osoba', k.kto)}${row('Grupa krwi', k.grupaKrwi)}${row('Uczulenia', k.alergie || 'nie uzupełniono')}</tbody></table>
+                <h2>Choroby przewlekłe</h2>${akapity(k.choroby, NIEUZUPELNIONE)}
                 ${urzadzenia}
                 <h2>Leki przyjmowane na stałe</h2>${leki}
                 ${lekarze}
@@ -1104,10 +1108,20 @@
             const przelacz = (id) => save(Object.assign({}, vault, { pytania: vault.pytania.map(p => p.id === id ? Object.assign({}, p, { zadane: !p.zadane }) : p) }));
             const usun = (id) => save(Object.assign({}, vault, { pytania: vault.pytania.filter(p => p.id !== id) }));
             const drukuj = (html, tytul) => DT.printDoc(html, tytul);
+            const braki = Z.profileGaps(vault);
 
             return (
                 <div className="space-y-5">
                     <h2 className="text-2xl font-extrabold">Kartki do druku</h2>
+
+                    {braki.length ? (
+                        <Note tone="stop">
+                            Zanim wydrukujesz: w profilu nie masz uzupełnionych pól <strong>{braki.join(', ')}</strong>.
+                            Na kartce puste pole jest podpisane „nie uzupełniono”, żeby nikt nie odczytał go jako „nie mam” —
+                            ale lepiej je wypełnić. W zakładce <strong>Profil</strong> jest przycisk, który wypisze rozpoznania
+                            i uczulenia z Twoich wczytanych dokumentów.
+                        </Note>
+                    ) : null}
 
                     <div className="card p-5">
                         <h3 className="font-extrabold mb-1">Karta na wizytę</h3>
@@ -1175,6 +1189,73 @@
         }
 
         // ---------- zakładka: Profil ----------
+        // Rozpoznania przewlekłe stoją w wypisie ze szpitala, a profil zostawał pusty i karta na wizytę
+        // drukowała samo „—”. Model TYLKO przepisuje to, co w dokumentach padło wprost; do profilu nic nie
+        // wchodzi samo — człowiek poprawia listę i decyduje, czy dopisać, czy zastąpić.
+        function PodpowiedzZDokumentow({ vault, p, set }) {
+            const [stan, setStan] = useState('gotowe');
+            const [err, setErr] = useState('');
+            const [podglad, setPodglad] = useState(false);
+            const [propozycja, setPropozycja] = useState(null);
+            const zrodla = (vault.dokumenty || []).filter(d => d.tekst).length
+                + (vault.urzadzenia || []).reduce((n, u) => n + (u.kontrole || []).filter(k => k.tekst).length, 0);
+            const prompts = Z.profileExtractPrompts(vault);
+
+            const start = async () => {
+                setErr(''); setStan('pisze'); setPropozycja(null);
+                try {
+                    assertNoLeak(prompts.prompt, vault);
+                    const r = await DT.streamChat({ system: prompts.system, prompt: prompts.prompt, model: 'strong', stream: true }, () => {});
+                    const w = Z.parseProfileSuggestion(r.text);
+                    if (!w.choroby.length && !w.alergie.length) throw new Error('W dokumentach nie znalazłem wypisanych wprost rozpoznań ani uczuleń. Wpisz je ręcznie w polach wyżej.');
+                    setPropozycja({ choroby: w.choroby.join('\n'), alergie: w.alergie.join('\n') });
+                    setStan('gotowe');
+                } catch (x) { setErr(x.message); setStan('gotowe'); }
+            };
+
+            const zastosuj = (pole, tryb) => {
+                const nowe = (propozycja[pole] || '').split('\n').map(x => x.trim()).filter(Boolean);
+                if (!nowe.length) return;
+                const stare = String(p[pole] || '').split(/[\n,]+/).map(x => x.trim()).filter(Boolean);
+                const razem = tryb === 'zastap' ? nowe : [...stare, ...nowe.filter(x => !stare.some(y => y.toLowerCase() === x.toLowerCase()))];
+                set(pole, razem.join(pole === 'alergie' ? ', ' : '\n'));
+                setPropozycja(Object.assign({}, propozycja, { [pole]: '' }));
+            };
+
+            const blok = (pole, tytul) => propozycja && propozycja[pole] ? (
+                <div className="mt-4">
+                    <span className="lbl">{tytul} — popraw, zanim zapiszesz</span>
+                    <textarea className="field" style={{ minHeight: '90px' }} value={propozycja[pole]}
+                        onChange={e => setPropozycja(Object.assign({}, propozycja, { [pole]: e.target.value }))} />
+                    <div className="flex flex-wrap gap-2 mt-2">
+                        <button className="btn btn-main !py-1.5 !text-xs" onClick={() => zastosuj(pole, 'dopisz')}><Icon name="plus" /> Dopisz do profilu</button>
+                        <button className="btn btn-soft !py-1.5 !text-xs" onClick={() => zastosuj(pole, 'zastap')}><Icon name="arrows-clockwise" /> Zastąp to, co mam</button>
+                    </div>
+                </div>
+            ) : null;
+
+            return (
+                <div className="card p-5">
+                    <h3 className="font-extrabold mb-1">Wypisz rozpoznania z moich dokumentów</h3>
+                    <p className="text-sm text-slate-400 mb-3">
+                        Przeczytam wczytane wypisy, konsultacje i protokoły ({zrodla} {Z.plural(zrodla, 'dokument', 'dokumenty', 'dokumentów')} z treścią)
+                        i wypiszę rozpoznania oraz uczulenia, które w nich padły. Nic nie trafia do profilu samo — najpierw poprawisz listę.
+                    </p>
+                    {zrodla ? null : <Note tone="info">Nie masz jeszcze wczytanego żadnego dokumentu z treścią. Wczytaj wypis albo konsultację w zakładce Dokumenty.</Note>}
+                    <div className="flex flex-wrap gap-2">
+                        <button className="btn btn-main" disabled={!zrodla || stan === 'pisze'} onClick={start}>
+                            <Icon name={stan === 'pisze' ? 'circle-notch' : 'sparkle'} /> {stan === 'pisze' ? 'Czytam dokumenty…' : 'Wypisz rozpoznania'}
+                        </button>
+                        <button className="btn btn-soft" onClick={() => setPodglad(!podglad)}><Icon name="eye" /> Pokaż, co pójdzie do AI</button>
+                    </div>
+                    {podglad ? <pre className="field mt-3 whitespace-pre-wrap text-xs" style={{ maxHeight: '240px', overflow: 'auto' }}>{prompts.prompt}</pre> : null}
+                    {err ? <div className="mt-3"><Note tone="stop">{err}</Note></div> : null}
+                    {blok('choroby', 'Rozpoznania i choroby przewlekłe')}
+                    {blok('alergie', 'Uczulenia')}
+                </div>
+            );
+        }
+
         function Profil({ vault, save }) {
             const p = vault.profil;
             const set = (k, v) => save(Object.assign({}, vault, { profil: Object.assign({}, p, { [k]: v }) }));
@@ -1219,6 +1300,8 @@
                             <textarea className="field" value={p.uwagi} onChange={e => set('uwagi', e.target.value)} />
                         </Field>
                     </div>
+
+                    <PodpowiedzZDokumentow vault={vault} p={p} set={set} />
 
                     <div className="card p-5">
                         <div className="flex items-center justify-between mb-3">
@@ -1314,12 +1397,32 @@
                         <h3 className="font-extrabold mb-1">Kopia zapasowa</h3>
                         <p className="text-sm text-slate-400 mb-4">
                             Plik jest zaszyfrowany tym samym hasłem — bez niego to nieczytelny szum, więc spokojnie możesz go trzymać
-                            na dysku w chmurze albo przenieść na telefon. Tak samo przenosisz kartotekę na drugie urządzenie.
+                            na dysku w chmurze albo wysłać sobie mailem.
                         </p>
                         <div className="flex flex-wrap gap-2">
                             <button className="btn btn-main" onClick={kopia}><Icon name="download-simple" /> Pobierz kopię</button>
                             <button className="btn btn-soft" onClick={onLock}><Icon name="lock" /> Zablokuj teraz</button>
                         </div>
+                    </div>
+
+                    <div className="card p-5">
+                        <h3 className="font-extrabold mb-1">Przeniesienie na telefon albo drugi komputer</h3>
+                        <p className="text-sm text-slate-400 mb-3">
+                            Kartoteka jest zaszyfrowana w pamięci tej jednej przeglądarki i <strong>nie synchronizuje się nigdzie sama</strong> —
+                            dlatego na telefonie jest pusto. Nie musisz wpisywać wszystkiego od nowa: przenosi się ją plikiem kopii.
+                        </p>
+                        <ol className="text-sm text-slate-300 space-y-1.5 list-decimal pl-5 mb-3">
+                            <li>Tu, na komputerze, kliknij wyżej <strong>Pobierz kopię</strong> — zapisze się plik <code>moje-zdrowie-kopia-….json</code> ze wszystkim, razem ze zdjęciami.</li>
+                            <li>Przenieś go na telefon tak, jak Ci wygodnie: mailem do siebie, przez dysk w chmurze albo kablem. Plik jest zaszyfrowany, więc po drodze nikt go nie odczyta.</li>
+                            <li>Na telefonie otwórz tę stronę i na ekranie z hasłem dotknij <strong>„Otwórz z kopii zapasowej (plik .json)”</strong>, wskaż plik.</li>
+                            <li>Podaj <strong>to samo hasło</strong> co tutaj. Bez niego plik jest bezużyteczny — nie da się go odzyskać ani zresetować.</li>
+                            <li>Dopiero wtedy warto dodać aplikację do ekranu głównego (w przeglądarce: „Dodaj do ekranu głównego”).</li>
+                        </ol>
+                        <Note tone="info">
+                            Od tej chwili telefon i komputer to dwie osobne kartoteki — co dopiszesz na jednym, nie pojawi się na drugim.
+                            Jeśli chcesz mieć wszystko w jednym miejscu, prowadź kartotekę na jednym urządzeniu, a na drugie przenoś
+                            świeżą kopię, kiedy coś ważnego dojdzie.
+                        </Note>
                     </div>
 
                     <div className="card p-5">
