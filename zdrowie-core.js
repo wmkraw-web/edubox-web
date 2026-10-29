@@ -1641,20 +1641,53 @@
     };
   }
 
-  // Karta ICE do portfela – tylko to, co ratownikowi potrzebne od razu.
+  // Leki, o których ratownik i SOR muszą wiedzieć OD RAZU: przy urazie, udarze i każdym krwawieniu
+  // zmieniają postępowanie. To lista substancji, nie ocena – aplikacja tylko wypisuje, co pacjent bierze.
+  // Kwas acetylosalicylowy jest tu obok antykoagulantów, choć w `checkCombo` liczy się jako NLPZ:
+  // w dawce kardiologicznej to lek przeciwpłytkowy i na karcie ICE musi być widoczny.
+  const KREW_ICE = [...ROZRZEDZAJACE, 'kwas acetylosalicylowy'];
+
+  // Karta ICE do portfela. Układ ma kolejność, w jakiej patrzy ratownik: urządzenie i MRI, uczulenia,
+  // leki rozrzedzające krew, kontakt – dopiero potem reszta.
   function iceCard(vault, now) {
     const v = migrate(vault);
     const p = v.profil;
     const age = ageYears(p.dataUr, now);
+    const leki = (v.leki || []).filter(m => m.aktywny !== false && m.nazwa).map(m => {
+      const sub = substanceOf(m) || '';
+      return {
+        nazwa: `${m.nazwa}${m.moc ? ' ' + m.moc : ''}`,
+        dawkowanie: dawkowanieTekst(m),
+        naCo: m.naCo || '',
+        substancja: sub,
+        krew: KREW_ICE.includes(sub)
+      };
+    });
     return {
       imie: fullName(p),
       wiek: age === '' ? '' : String(age),
       grupaKrwi: p.grupaKrwi || '',
       alergie: p.alergie || '',
       choroby: p.choroby || '',
-      leki: (v.leki || []).filter(m => m.aktywny !== false && m.nazwa).map(m => `${m.nazwa}${m.moc ? ' ' + m.moc : ''}`),
-      urzadzenia: (v.urzadzenia || []).filter(u => u.aktywne !== false).map(u => ({ nazwa: deviceLabel(u), ostrzezenia: deviceWarnings(u) })),
-      ice: (p.ice || []).filter(k => k && (k.kto || k.telefon))
+      leki,
+      // Osobno, bo to jedyna grupa leków, która musi być widoczna na pierwszy rzut oka.
+      krew: leki.filter(l => l.krew),
+      urzadzenia: (v.urzadzenia || []).filter(u => u.aktywne !== false).map(u => ({
+        nazwa: deviceLabel(u),
+        typ: deviceType(u).label,
+        producent: u.producent || '',
+        model: u.model || '',
+        numerSeryjny: u.numerSeryjny || '',
+        wszczepione: u.dataWszczepienia ? formatDatePl(u.dataWszczepienia) : '',
+        szpital: u.szpital || '',
+        lekarz: u.lekarz || '',
+        mri: (MRI.find(m => m.id === u.mri) || {}).label || '',
+        mriZakaz: u.mri === 'nie',
+        ostrzezenia: deviceWarnings(u)
+      })),
+      ice: (p.ice || []).filter(k => k && (k.kto || k.telefon)),
+      uwagi: p.uwagi || '',
+      data: formatDatePl(today(now))
     };
   }
 
@@ -1754,7 +1787,7 @@
 
   const api = {
     VAULT_KEY, APP_ID, ITERATIONS, SOON_DAYS, REFILL_DAYS,
-    PORY, DNI_TYGODNIA, POSILEK, RODZAJE_DOKUMENTOW, GRUPY_KRWI, NAZWY_HANDLOWE, NLPZ, PARACETAMOL_MAX_MG,
+    PORY, DNI_TYGODNIA, POSILEK, RODZAJE_DOKUMENTOW, GRUPY_KRWI, NAZWY_HANDLOWE, NLPZ, ROZRZEDZAJACE, KREW_ICE, PARACETAMOL_MAX_MG,
     toB64, fromB64, createSession, addPassword, changePassword, removePassword, slotLabel, seal, open,
     emptyVault, newMed, newVisit, newDoc, newLab, newQuestion, migrate, fullName, uid, today,
     parseDate, formatDatePl, daysUntil, addDays, ageYears, plural, dni,
