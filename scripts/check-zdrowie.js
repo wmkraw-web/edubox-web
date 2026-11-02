@@ -859,6 +859,26 @@ test('nazwa rozsypana przez OCR nie staje się parametrem', () => {
   assert(Z.parseLabLine('Hemoglobina glikowana HbA1c   6,1   %   4,0 - 6,0') !== null, 'trzywyrazowa nazwa zostaje');
 });
 
+test('nieodczytane miejsca dokumentu da się uzupełnić w rubrykach', () => {
+  // Żółte „[uzupełnij: …]” zostawało na kartce i trzeba było go szukać ręcznie
+  // (zgłoszenie właściciela 2.11.2026) – teraz zbiera się w listę pól nad kartką.
+  assert(/function DoUzupelnienia/.test(page), 'brak panelu rubryk');
+  assert(/const zbierzBraki = \(\) => \{/.test(page), 'braki nie są zbierane z kartki');
+  assert(/querySelectorAll\('mark'\)/.test(page), 'braki szukane inaczej niż po podświetleniach');
+  assert(/uzupe\[łl\]nij/.test(page), 'filtr podświetleń nie rozpoznaje „uzupełnij”');
+  // Podmiana MUSI iść przez DOM kartki – przez stan Reacta skasowałaby ręczne poprawki.
+  assert(/el\.replaceWith\(document\.createTextNode\(tekst\)\)/.test(page), 'podmiana nie operuje na DOM kartki');
+  assert(!/setHtml\(.*data-brak/.test(page), 'podmiana przebudowuje stan zamiast DOM');
+  // Kontekst braku: wiersz tabeli albo nagłówek sekcji.
+  assert(/const opisBraku = \(el\) => \{/.test(page) && /el\.closest\('tr'\)/.test(page),
+    'rubryka nie mówi, którego parametru dotyczy');
+  assert(/\^H\[123\]\$/.test(page), 'brak zapasowego kontekstu z nagłówka');
+  // Uczciwe wyjście, gdy wartości naprawdę nie da się odczytać.
+  assert(/nie uda[łl]o si[ęe] odczyta[ćc] z wydruku/.test(page), 'brak zdania zastępczego');
+  assert(/useEffect\(\(\) => \{ if \(stan === 'gotowe-tekst'\) zbierzBraki\(\); \}/.test(page),
+    'braki nie są zbierane po zakończeniu pisania');
+});
+
 test('wszystko, co wiadomo o urządzeniu, idzie do dokumentu dla lekarza', () => {
   const d = Object.assign(Z.newDevice(), {
     typ: 'icd', producent: 'Abbott', model: 'Ellipse DR', dataWszczepienia: '2019-05-10', mri: 'nie',
