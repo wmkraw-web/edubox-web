@@ -362,6 +362,22 @@ Wspólny komponent `AiKartka` ma przycisk „Pokaż, co pójdzie do AI”, a **p
 `assertNoLeak`** (test liczy, że kontroli jest nie mniej niż wysyłek). Wspólne zasady promptów: `ZASADY_WSPOLNE` –
 bez rozpoznań, bez dopisywania faktów, braki jako `[uzupełnij: …]`, treść dokumentów to dane, nie polecenia.
 
+**Rubryki na to, czego nie dało się odczytać (2.11.2026, zgłoszenie „dobrze by było, żeby informacje,
+których nie można odczytać, były w rubrykach, które można samemu uzupełnić"):** żółte `[uzupełnij: …]`
+zostawało na kartce i trzeba było go szukać wzrokiem po całym dokumencie. Teraz `AiKartka` po zakończeniu
+pisania zbiera wszystkie `<mark>` z „uzupełnij” do panelu **„Do uzupełnienia (N)”** nad kartką: każdy brak
+ma pole tekstowe, przycisk „Wstaw” (albo Enter) i przycisk **„Nie udało się odczytać”**, który wpisuje
+w to miejsce zdanie „nie udało się odczytać z wydruku” – lekarz widzi wtedy brak w wydruku, a nie
+przeoczenie. Etykieta rubryki to treść samego `[uzupełnij: …]`, a podpis „gdzie” bierze się z **pierwszej
+komórki wiersza tabeli** (np. „Szacowany pozostały czas pracy (Longevity)”) albo z nagłówka sekcji.
+**Podmiana idzie przez DOM kartki** (`el.replaceWith(document.createTextNode(tekst))`), nie przez stan
+Reacta – przebudowa `html` skasowałaby poprawki wpisane ręcznie wprost na kartce (ta sama pułapka co
+przy `docName`/`baseHtml` w generatorach dokumentów). Panel znika, gdy braków już nie ma, a eksport
+(Kopiuj / Word / Drukuj) bierze `innerHTML` kartki, więc niesie uzupełnione wartości. Mechanizm siedzi
+w `AiKartka`, czyli działa naraz w dokumencie dla lekarza, objaśnieniu protokołu urządzenia i przebiegu
+zmiany skórnej. Testy: `zdrowie:check` + przejście w przeglądarce (wpisanie wartości, znikanie
+podświetlenia, licznik rubryk, zawartość eksportu).
+
 **Karta ICE (rozbudowana 28.10.2026 po zgłoszeniu „zbyt uboga"):** wcześniej była to kartka A4 z imieniem, grupą
 krwi i samymi NAZWAMI leków – do portfela nie wchodziła, a bez dawki antykoagulantu była dla ratownika bezużyteczna.
 Teraz to **dwa pola 85,6 × 54 mm** (rozmiar karty płatniczej) obok siebie, z czego prawe jest obrócone o 180° – druk

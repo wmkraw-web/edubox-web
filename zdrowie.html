@@ -1537,13 +1537,96 @@
             if (found.length) throw new Error('Wysyłka wstrzymana: w tekście dla AI zostało „' + found.join('”, „') + '”. Popraw zapis i spróbuj jeszcze raz.');
         }
 
+        // Rubryki na to, czego model nie mógł wypełnić. Etykieta bierze się z samego „[uzupełnij: …]”,
+        // a podpis „gdzie” – z pierwszej komórki wiersza tabeli albo z nagłówka sekcji.
+        function DoUzupelnienia({ braki, onWstaw }) {
+            const [tekst, setTekst] = useState({});
+            const wstaw = (id, wartosc) => {
+                const t = String(wartosc || '').trim();
+                if (!t) return;
+                onWstaw(id, t);
+                setTekst(prev => Object.assign({}, prev, { [id]: '' }));
+            };
+            return (
+                <div className="card p-5 border-amber-500/40">
+                    <h3 className="font-extrabold mb-1">Do uzupełnienia ({braki.length})</h3>
+                    <p className="text-sm text-slate-400 mb-3">
+                        Tych wartości nie dało się odczytać ze skanu — przepisz je z oryginału, a wejdą wprost
+                        w dokument i żółte podświetlenie zniknie. „Nie udało się odczytać” wpisuje to zdanie
+                        zamiast pustego miejsca, żeby lekarz wiedział, że to brak w wydruku, a nie przeoczenie.
+                    </p>
+                    <div className="space-y-3">
+                        {braki.map(b => (
+                            <div key={b.id}>
+                                <span className="lbl">{b.gdzie ? b.gdzie + ' — ' : ''}{b.czego}</span>
+                                <div className="flex flex-wrap gap-2">
+                                    <input className="field flex-1 min-w-[12rem]" value={tekst[b.id] || ''}
+                                        placeholder="przepisz z wydruku"
+                                        onChange={e => setTekst(prev => Object.assign({}, prev, { [b.id]: e.target.value }))}
+                                        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); wstaw(b.id, tekst[b.id]); } }} />
+                                    <button className="btn btn-main !py-1.5 !text-xs" onClick={() => wstaw(b.id, tekst[b.id])}>
+                                        <Icon name="check" /> Wstaw
+                                    </button>
+                                    <button className="btn btn-soft !py-1.5 !text-xs" onClick={() => onWstaw(b.id, 'nie udało się odczytać z wydruku')}>
+                                        Nie udało się odczytać
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        }
+
         function AiKartka({ tytul, prompts, vault, model, onZapisz, dodatkowe }) {
             const [stan, setStan] = useState('gotowe');
             const [html, setHtml] = useState('');
             const [err, setErr] = useState('');
             const [podglad, setPodglad] = useState(false);
+            const [braki, setBraki] = useState([]);
             const kartkaRef = useRef(null);
             const baseRef = useRef('');
+
+            // Żółte „[uzupełnij: …]” to miejsca, których model NIE mógł wypełnić – zwykle dlatego, że w skanie
+            // ta liczba była nieczytelna. Zamiast kazać ich szukać po całej kartce, zbieramy je w listę rubryk
+            // (zgłoszenie właściciela 2.11.2026). Pracujemy na DOM kartki, nie na stanie Reacta – inaczej
+            // przerysowanie skasowałoby poprawki wpisane ręcznie wprost na kartce.
+            const opisBraku = (el) => {
+                const wiersz = el.closest('tr');
+                if (wiersz && wiersz.cells && wiersz.cells.length) {
+                    const pierwsza = (wiersz.cells[0].textContent || '').trim();
+                    if (pierwsza && !/uzupe[łl]nij/i.test(pierwsza)) return pierwsza;
+                }
+                let w = el.parentElement;
+                while (w && w !== kartkaRef.current) {
+                    const nag = w.previousElementSibling;
+                    if (nag && /^H[123]$/.test(nag.tagName)) return (nag.textContent || '').trim();
+                    w = w.parentElement;
+                }
+                return '';
+            };
+
+            const zbierzBraki = () => {
+                const root = kartkaRef.current;
+                if (!root) return setBraki([]);
+                setBraki([...root.querySelectorAll('mark')]
+                    .filter(m => /uzupe[łl]nij/i.test(m.textContent || ''))
+                    .map((m, i) => {
+                        m.setAttribute('data-brak', String(i));
+                        const czego = (m.textContent || '')
+                            .replace(/^[\s\[]*uzupe[łl]nij\s*:?\s*/i, '').replace(/\]\s*$/, '').trim();
+                        return { id: String(i), czego: czego || 'brakująca informacja', gdzie: opisBraku(m) };
+                    }));
+            };
+
+            useEffect(() => { if (stan === 'gotowe-tekst') zbierzBraki(); }, [stan, html]);
+
+            const podmien = (id, tekst) => {
+                const el = kartkaRef.current && kartkaRef.current.querySelector('[data-brak="' + id + '"]');
+                if (!el) return;
+                el.replaceWith(document.createTextNode(tekst));
+                setBraki(prev => prev.filter(b => b.id !== id));
+            };
 
             const start = async () => {
                 setErr(''); setStan('pisze'); setHtml('');
@@ -1584,6 +1667,8 @@
 
                     {dodatkowe}
 
+                    {braki.length ? <DoUzupelnienia braki={braki} onWstaw={podmien} /> : null}
+
                     {podglad ? (
                         <div>
                             <Note tone="info">Dokładnie ten tekst zostanie wysłany. Nie ma w nim imienia, PESEL-u, nazwisk lekarzy, placówek ani numerów urządzeń — przed wysyłką sprawdza to jeszcze raz osobna kontrola.</Note>
@@ -1595,7 +1680,12 @@
 
                     {html ? (
                         <div>
-                            {stan === 'gotowe-tekst' ? <p className="text-xs text-slate-500 mb-2">Możesz poprawiać tekst wprost na kartce — eksport bierze to, co widzisz.</p> : null}
+                            {stan === 'gotowe-tekst' ? (
+                                <p className="text-xs text-slate-500 mb-2">
+                                    Możesz poprawiać tekst wprost na kartce — eksport bierze to, co widzisz.
+                                    {braki.length ? ' Żółte miejsca są nadal puste: uzupełnij je wyżej albo kliknij w nie na kartce.' : ''}
+                                </p>
+                            ) : null}
                             <div
                                 ref={kartkaRef}
                                 className="doc-paper"
