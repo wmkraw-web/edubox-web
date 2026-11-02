@@ -859,6 +859,38 @@ test('nazwa rozsypana przez OCR nie staje się parametrem', () => {
   assert(Z.parseLabLine('Hemoglobina glikowana HbA1c   6,1   %   4,0 - 6,0') !== null, 'trzywyrazowa nazwa zostaje');
 });
 
+test('wszystko, co wiadomo o urządzeniu, idzie do dokumentu dla lekarza', () => {
+  const d = Object.assign(Z.newDevice(), {
+    typ: 'icd', producent: 'Abbott', model: 'Ellipse DR', dataWszczepienia: '2019-05-10', mri: 'nie',
+    bateria: '5,9–6,3 roku', ostatniaKontrola: '2025-12-12', kontrolaCo: 6, wskazanie: 'kardiomiopatia', uwagi: 'pilot w domu'
+  });
+  const v = Object.assign({}, Z.emptyVault(), { urzadzenia: [d] });
+  const txt = Z.reportInput(v, { now: NOW });
+  // Pole wypełnione, a model pisał „[uzupełnij: przewidywany okres działania]” – bo go nie dostawał.
+  assert(/przewidywany okres dzia[łl]ania: 5,9/.test(txt), 'brak baterii w zapytaniu:\n' + txt.slice(0, 500));
+  assert(/ostatnia kontrola: 12\.12\.2025/.test(txt), 'brak daty ostatniej kontroli');
+  assert(/nast[ęe]pna kontrola: 12\.06\.2026/.test(txt), 'brak policzonego terminu następnej kontroli');
+  assert(/wskazanie: kardiomiopatia/.test(txt) && /uwagi: pilot/.test(txt), 'brak wskazania albo uwag');
+  // Numer seryjny i szpital nadal NIE mogą wyjść do AI.
+  const zNumerem = Object.assign({}, v, { urzadzenia: [Object.assign({}, d, { numerSeryjny: 'PJN4471203', szpital: 'Szpital X' })] });
+  const t2 = Z.reportInput(zNumerem, { now: NOW });
+  assert(!/PJN4471203/.test(t2), 'numer seryjny wyciekł do AI');
+  assert(!/Szpital X/.test(t2), 'nazwa szpitala wyciekła do AI');
+});
+test('zapisana kontrola trafia od razu do kartoteki, nie tylko do okna', () => {
+  // Kontrola ma własny przycisk „Zapisz”, więc nikt nie zapisuje urządzenia drugi raz – wcześniej
+  // ginęła przy zamknięciu okna (zgłoszenie właściciela 2.11.2026).
+  assert(/const zeZmianami = \(zmiana\) => \{/.test(page), 'brak natychmiastowego zapisu zmian urządzenia');
+  assert(/onSave\(nowy, true\);/.test(page), 'zapis kontroli nie woła zapisu kartoteki');
+  assert(/zapisz = \(u, zostawOtwarte\)/.test(page) && /if \(!zostawOtwarte\) setEdit\(null\);/.test(page),
+    'zapis urządzenia nie umie zostawić okna otwartego');
+  assert(/zapiszKontrole = \(k\) => \{[\s\S]{0,400}zeZmianami\(\{/.test(page), 'zapiszKontrole nie przechodzi przez zeZmianami');
+  assert(/zeZmianami\(\{ kontrole: \(u\.kontrole \|\| \[\]\)\.filter/.test(page), 'usunięcie kontroli nie jest zapisywane');
+  // Bezpiecznik na pozostałe pola okna.
+  assert(/niezapisane zmiany w danych urz[ąa]dzenia/.test(page), 'brak ostrzeżenia przed zamknięciem bez zapisania');
+  assert(/onClose=\{zamknij\}/.test(page), 'krzyżyk okna omija ostrzeżenie');
+});
+
 test('miara ułożenia strony odróżnia tekst od obróconych śmieci', () => {
   const J = require(path.join(ROOT, 'tekst-jakosc.js'));
   const poziomo = 'Test Results Capture Sense Today Mode Base Rate Max Track Paced Sensed AV Delay Longevity';

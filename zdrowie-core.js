@@ -905,9 +905,21 @@
 
   // Urządzenie dla AI: typ, producent, model, rok wszczepienia i dopuszczenie do MRI – to ma znaczenie
   // medyczne. Numer seryjny, szpital i lekarz zostają w przeglądarce.
+  // Wszystko, co o urządzeniu wiadomo z kartoteki. Przewidywany okres działania baterii i terminy kontroli
+  // trzeba wymienić WPROST – bez nich model pisał „[uzupełnij: przewidywany okres działania]”, choć pole
+  // było wypełnione (zgłoszenie właściciela 2.11.2026).
   const deviceLine = (dev) => {
     const rok = String(dev.dataWszczepienia || '').slice(0, 4);
-    return `- ${deviceType(dev).label}${dev.producent || dev.model ? ` (${[dev.producent, dev.model].filter(Boolean).join(' ')})` : ''}${rok ? `, wszczepione w ${rok} r.` : ''}${dev.mri ? `, MRI: ${(MRI.find(m => m.id === dev.mri) || {}).label}` : ''}${dev.wskazanie ? `; wskazanie: ${dev.wskazanie}` : ''}`;
+    const dod = [
+      dev.bateria ? `bateria / przewidywany okres działania: ${dev.bateria}` : '',
+      dev.ostatniaKontrola ? `ostatnia kontrola: ${formatDatePl(dev.ostatniaKontrola)}` : '',
+      nextCheck(dev) ? `następna kontrola: ${formatDatePl(nextCheck(dev))}` : '',
+      dev.wskazanie ? `wskazanie: ${dev.wskazanie}` : '',
+      dev.uwagi ? `uwagi: ${dev.uwagi}` : ''
+    ].filter(Boolean);
+    return `- ${deviceType(dev).label}${dev.producent || dev.model ? ` (${[dev.producent, dev.model].filter(Boolean).join(' ')})` : ''}`
+      + `${rok ? `, wszczepione w ${rok} r.` : ''}${dev.mri ? `, MRI: ${(MRI.find(m => m.id === dev.mri) || {}).label}` : ''}`
+      + `${dod.length ? '; ' + dod.join('; ') : ''}`;
   };
 
   // Kontrole urządzeń dla AI. Treść protokołu (`tekst`) wchodzi tak samo jak treść dokumentu – wcześniej
