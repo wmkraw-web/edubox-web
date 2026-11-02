@@ -859,6 +859,77 @@ test('nazwa rozsypana przez OCR nie staje się parametrem', () => {
   assert(Z.parseLabLine('Hemoglobina glikowana HbA1c   6,1   %   4,0 - 6,0') !== null, 'trzywyrazowa nazwa zostaje');
 });
 
+test('miara ułożenia strony odróżnia tekst od obróconych śmieci', () => {
+  const J = require(path.join(ROOT, 'tekst-jakosc.js'));
+  const poziomo = 'Test Results Capture Sense Today Mode Base Rate Max Track Paced Sensed AV Delay Longevity';
+  const bokiem = 'I l1 Ii1 ll1I \u2592\u2592 |I1l ,, .. \u2588 1l ll I1 \u2592 ,,,, ||| 1Il';
+  assert(J.orientationScore(poziomo) > J.orientationScore(bokiem) * 3,
+    'tekst poziomy ma wyraźnie wygrywać: ' + J.orientationScore(poziomo) + ' vs ' + J.orientationScore(bokiem));
+  assert(J.orientationScore('') === 0 && J.orientationScore(null) === 0, 'pusty odczyt to zero');
+  // Sama tabela liczb (wydruk laboratoryjny) nie może dostać wysokiej noty za „słowa”.
+  assert(J.orientationScore('12,4 5,6 130 99 7,2') < J.orientationScore(poziomo), 'same liczby to nie tekst');
+});
+test('skan położony bokiem jest prostowany przed rozpoznawaniem', () => {
+  // Wydruk z programatora kardiowertera ma zrzut ekranu obrócony o 90° na kartce – bez tego
+  // rozpoznawanie czyta tylko poziomy nagłówek, a wszystkie parametry zostają śmieciami.
+  [['zdrowie.html', 'Moje Zdrowie'], ['podopieczni.html', 'Teczka podopiecznych']].forEach(([plik, nazwa]) => {
+    const h = fs.readFileSync(path.join(ROOT, plik), 'utf8');
+    assert(/async function wykryjObrot/.test(h), nazwa + ': brak wykrywania ułożenia strony');
+    assert(/for \(const deg of \[0, 90, 180, 270\]\)/.test(h), nazwa + ': nie sprawdza czterech ułożeń');
+    assert(/orientationScore/.test(h), nazwa + ': ułożenie wybierane bez miary jakości tekstu');
+    assert(/wyniki\[najlepszy\] > Math\.max\(1, wyniki\[0\] \* 1\.3\)/.test(h),
+      nazwa + ': brak progu – dobrze ustawiony skan mógłby zostać przekręcony');
+    assert(/obrot === null\) obrot = await wykryjObrot/.test(h), nazwa + ': obrót nie jest ustalany raz dla całego pliku');
+    assert(/obrot \? await obrocNaCanvas\(src, obrot\) : src/.test(h), nazwa + ': strony nie są prostowane przed odczytem');
+  });
+});
+
+test('rozpoznania da się wypisać z wczytanych dokumentów', () => {
+  const pr = Z.profileExtractPrompts(vault);
+  assert(/wypis|dokument/i.test(pr.prompt), 'do zapytania nie trafiła treść dokumentów');
+  assert(/nie wnioskujesz z objaw/i.test(pr.system), 'brak zakazu wnioskowania z objawów');
+  assert(/ROZPOZNANIA/.test(pr.system) && /UCZULENIA/.test(pr.system), 'brak formatu sekcji');
+  assert(Z.leaks(pr.prompt, vault).length === 0, 'w zapytaniu zostały dane osobowe: ' + Z.leaks(pr.prompt, vault).join(', '));
+});
+test('odpowiedź modelu zamienia się w dwie listy bez powtórzeń', () => {
+  const w = Z.parseProfileSuggestion([
+    'Oto co znalazłem:',
+    '=== ROZPOZNANIA ===',
+    '- twardzina układowa z zajęciem narządów wewnętrznych',
+    '- niewydolność serca po przebytych zawałach',
+    '- Twardzina układowa z zajęciem narządów wewnętrznych',
+    '=== UCZULENIA ===',
+    '- brak w dokumentach'
+  ].join('\n'));
+  assert(w.choroby.length === 2, 'rozpoznania: ' + JSON.stringify(w.choroby));
+  assert(/twardzina/.test(w.choroby[0]) && /niewydolno/.test(w.choroby[1]), JSON.stringify(w.choroby));
+  assert(w.alergie.length === 0, '„brak w dokumentach” nie jest uczuleniem: ' + JSON.stringify(w.alergie));
+  // Nagłówki bez polskich znaków i numerowanie też muszą przejść.
+  const b = Z.parseProfileSuggestion('=== Rozpoznania ===\n1. astma\n=== Alergie ===\n* penicylina');
+  assert(b.choroby[0] === 'astma' && b.alergie[0] === 'penicylina', JSON.stringify(b));
+});
+test('braki w profilu są nazwane, zanim ktoś wydrukuje kartkę', () => {
+  assert(Z.profileGaps(vault).length === 0, 'pełny profil nie ma braków: ' + JSON.stringify(Z.profileGaps(vault)));
+  const pusty = Object.assign({}, vault, { profil: Object.assign({}, vault.profil, { choroby: '', alergie: '', ice: [] }) });
+  const b = Z.profileGaps(pusty);
+  ['choroby przewlekłe', 'uczulenia', 'powiadomić'].forEach(x =>
+    assert(b.some(y => y.includes(x)), 'brak „' + x + '” w: ' + JSON.stringify(b)));
+});
+test('puste pole na kartce znaczy „nie uzupełniono”, nigdy „nie mam”', () => {
+  // Samo „—” pod nagłówkiem „Choroby przewlekłe” lekarz czyta jako brak chorób.
+  assert(/NIEUZUPELNIONE = 'Nie uzupełniono w kartotece/.test(page), 'brak jawnego komunikatu o braku');
+  assert(!/Nie przyjmuję leków na stałe/.test(page), 'kartka nadal twierdzi, że pacjent nie bierze leków');
+  assert(!/nie zgłaszam znanych uczuleń/.test(page), 'karta ICE nadal twierdzi, że nie ma uczuleń');
+  assert(/NIE UZUPEŁNIONO — zapytaj/.test(page), 'karta ICE nie mówi ratownikowi, że pola są puste');
+  assert(/akapity\(k\.choroby, NIEUZUPELNIONE\)/.test(page), 'choroby na kartce bez komunikatu o braku');
+});
+test('strona prowadzi przez przeniesienie kartoteki na telefon', () => {
+  assert(/Przeniesienie na telefon/.test(page), 'brak instrukcji przeniesienia');
+  assert(/nie synchronizuje się nigdzie sama/.test(page), 'trzeba powiedzieć wprost, że nie ma synchronizacji');
+  assert(/Otwórz z kopii zapasowej/.test(page), 'brak drogi wczytania kopii na czystym urządzeniu');
+  assert(/PodpowiedzZDokumentow/.test(page), 'brak przycisku wypisującego rozpoznania z dokumentów');
+});
+
 test('karta ICE niesie to, czego ratownik potrzebuje od razu', () => {
   const ice = Z.iceCard(vault, NOW);
   // Leki z dawkowaniem, nie same nazwy – bez dawki antykoagulantu kartka jest bezużyteczna.

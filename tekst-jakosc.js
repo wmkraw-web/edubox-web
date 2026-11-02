@@ -56,6 +56,26 @@
     return Object.assign({ ok: true, powod: '' }, stat);
   }
 
+  // Ile sensownego tekstu udało się odczytać – do PORÓWNANIA tego samego skanu w różnych orientacjach.
+  // Wydruki z programatora kardiowertera (Merlin PCS) mają zrzut ekranu obrócony o 90° na kartce:
+  // rozpoznawanie czyta wtedy poziomy nagłówek i stopkę, a wszystkie parametry zostają na boku jako śmieci.
+  // Wyższa liczba = więcej prawdziwych słów. Wartość jest bez znaczenia sama w sobie, liczy się porównanie.
+  function orientationScore(text) {
+    const t = String(text || '');
+    if (!t.trim()) return 0;
+    const litery = (t.match(/[\p{L}]/gu) || []).length;
+    if (!litery) return 0;
+    const slowa = t.split(/[^\p{L}\p{N}]+/u).filter(w => w.length >= 3 && /[\p{L}]/u.test(w)).length;
+    const samogloski = (t.match(/[aeiouyąęó]/giu) || []).length;
+    const udzial = samogloski / litery;
+    let podejrzane = 0;
+    [...t].forEach(ch => { if (PODEJRZANY_ZNAK(ch.codePointAt(0))) podejrzane++; });
+    // Obrócony tekst daje litery bez układu samogłosek i dużo znaków-śmieci – obie rzeczy obniżają wynik.
+    const ukladLiter = (udzial >= 0.2 && udzial <= 0.65) ? 1 : 0.3;
+    const kara = 1 - Math.min(0.9, (podejrzane / t.length) * 5);
+    return Math.round(slowa * ukladLiter * kara * 100) / 100;
+  }
+
   const POWOD_OPIS = {
     'pusty': 'w pliku nie ma tekstu',
     'znaki-zastepcze': 'plik zwraca znaki zastępcze zamiast liter (czcionka bez mapy znaków)',
@@ -64,7 +84,7 @@
     'brak-typowych-slow': 'odczytany tekst nie zawiera ani jednego typowego słowa z dokumentu medycznego'
   };
   const qualityMessage = (q) => POWOD_OPIS[(q && q.powod) || ''] || '';
-  const api = { textQuality, qualityMessage, PODEJRZANY_ZNAK, SLOWA_KONTROLNE, POWOD_OPIS };
+  const api = { textQuality, qualityMessage, orientationScore, PODEJRZANY_ZNAK, SLOWA_KONTROLNE, POWOD_OPIS };
   if (typeof window !== 'undefined') window.EduTekstJakosc = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })();
