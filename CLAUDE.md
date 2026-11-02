@@ -486,6 +486,21 @@ po imieniu nad listą parametrów: gdy co najmniej dwa wiersze mają wynik i nor
 gdy żaden wiersz nie ma jednostki albo żaden nie ma normy – aplikacja pisze, że odczyt jest niepełny i że
 trzeba go porównać z oryginałem, zanim uzna się strzałki za ocenę wyników.
 
+**Skan położony bokiem (2.11.2026, zgłoszenie z wydrukiem kontroli ICD):** wydruk z programatora
+Abbott/Merlin PCS ma POZIOMY nagłówek i stopkę, a cały zrzut ekranu z parametrami **obrócony o 90°** na
+pionowej kartce. Rozpoznawanie czytało więc tylko „Abbott", „Screen Image" i stopkę, a wszystkie parametry
+(Mode, Base Rate, Longevity, Lead impedance, Capture, Sense) wychodziły jako śmieci – dokumentu nie dało się
+wprowadzić. Teraz `wykryjObrot` rozpoznaje **pomniejszoną do 1100 px kopię pierwszej strony w czterech
+ułożeniach** (0/90/180/270°) i wybiera to, które daje najwięcej prawdziwych słów według
+`EduTekstJakosc.orientationScore` (liczba słów ≥ 3 liter, skorygowana udziałem samogłosek i karą za znaki-
+-śmieci). Ustalony kąt stosuje się do WSZYSTKICH stron pliku – orientacja w jednym wydruku się nie zmienia,
+a czterokrotne sprawdzanie każdej strony byłoby stratą czasu. **Próg 1,3× nad ułożeniem 0°** chroni dobrze
+ustawiony skan przed przekręceniem przez szum; przy obrocie zerowym plik idzie do rozpoznania bez
+przerysowywania (test to sprawdza). `obrocNaCanvas` obraca i skaluje przez canvas – przyjmuje canvas (strona
+PDF) albo plik zdjęcia (przez `createImageBitmap`). **Ta sama poprawka jest w `podopieczni.html`.**
+Uwaga przy testach w przeglądarce: atrapa tesseracta w `build-preview.js` musi mieć `setParameters`, bo
+`ocrImages` ustawia `preserve_interword_spaces` — bez tej metody cały odczyt cicho padał.
+
 **Wspólna ocena jakości tekstu (`tekst-jakosc.js`, od 28.10.2026):** `window.EduTekstJakosc` – jeden plik dla
 „Mojego Zdrowia” i „Teczki podopiecznych”, bo ten sam `readDocument` jest skopiowany w obu stronach i oba miały
 ten sam błąd (orzeczenia z poradni bywają w takich PDF-ach dokładnie jak wyniki z laboratorium). Dołączaj go
