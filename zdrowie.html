@@ -1654,7 +1654,7 @@
                     <div className="grid sm:grid-cols-2 gap-4 mt-5">
                         <Field label="Data kontroli"><input type="date" className="field" value={k.data} onChange={e => set('data', e.target.value)} /></Field>
                         <Field label="Gdzie"><input className="field" value={k.miejsce} onChange={e => set('miejsce', e.target.value)} placeholder="poradnia kontroli urządzeń" /></Field>
-                        <Field label="Stan baterii" hint="np. 6,5 roku, 2,78 V, ERI/ERT"><input className="field" value={k.bateria} onChange={e => set('bateria', e.target.value)} /></Field>
+                        <Field label="Bateria / przewidywany okres działania" hint="na wydruku „Longevity”, np. 5,9–6,3 roku, 2,78 V, ERI/ERT"><input className="field" value={k.bateria} onChange={e => set('bateria', e.target.value)} /></Field>
                         <Field label="Następna kontrola"><input type="date" className="field" value={k.nastepna} onChange={e => set('nastepna', e.target.value)} /></Field>
                     </div>
                     <div className="mt-4 space-y-4">
@@ -1686,24 +1686,43 @@
             const [u, setU] = useState(() => Object.assign(Z.newDevice(), dev || {}));
             const [kontrola, setKontrola] = useState(null);
             const set = (k, v) => setU(prev => Object.assign({}, prev, { [k]: v }));
+            // Reszta pól urządzenia nadal zapisuje się dopiero przyciskiem – ale nie dajmy ich zgubić po cichu.
+            const zapisany = useRef(JSON.stringify(Object.assign(Z.newDevice(), dev || {})));
+            const zamknij = () => {
+                if (JSON.stringify(u) !== zapisany.current
+                    && !confirm('Masz niezapisane zmiany w danych urządzenia. Zamknąć bez zapisania?')) return;
+                onClose();
+            };
             const typ = Z.deviceType(u);
             const nastepna = Z.nextCheck(u);
+
+            // Kontrola ma własny przycisk „Zapisz”, więc musi od razu trafiać do kartoteki. Wcześniej
+            // siedziała tylko w stanie tego okna i ginęła, gdy ktoś zamknął urządzenie przyciskiem Anuluj
+            // albo × – a po zapisaniu kontroli nikt się nie spodziewa, że trzeba zapisywać drugi raz
+            // (zgłoszenie właściciela 2.11.2026: „nie zapamiętuje wprowadzonej i zapisanej kontroli”).
+            const zeZmianami = (zmiana) => {
+                const nowy = Object.assign({}, u, zmiana);
+                setU(nowy);
+                zapisany.current = JSON.stringify(nowy);
+                onSave(nowy, true);   // true = zapisz, ale zostaw okno urządzenia otwarte
+                return nowy;
+            };
 
             const zapiszKontrole = (k) => {
                 const sa = u.kontrole || [];
                 const next = sa.some(x => x.id === k.id) ? sa.map(x => x.id === k.id ? k : x) : [...sa, k];
                 const najnowsza = next.slice().sort((a, b) => String(a.data).localeCompare(String(b.data))).pop();
-                setU(prev => Object.assign({}, prev, {
+                zeZmianami({
                     kontrole: next,
-                    ostatniaKontrola: (najnowsza && najnowsza.data) || prev.ostatniaKontrola,
-                    nastepnaKontrola: (najnowsza && najnowsza.nastepna) || prev.nastepnaKontrola,
-                    bateria: (najnowsza && najnowsza.bateria) || prev.bateria
-                }));
+                    ostatniaKontrola: (najnowsza && najnowsza.data) || u.ostatniaKontrola,
+                    nastepnaKontrola: (najnowsza && najnowsza.nastepna) || u.nastepnaKontrola,
+                    bateria: (najnowsza && najnowsza.bateria) || u.bateria
+                });
                 setKontrola(null);
             };
 
             return (
-                <Modal title={isNew ? 'Nowe urządzenie' : Z.deviceLabel(u)} onClose={onClose} wide>
+                <Modal title={isNew ? 'Nowe urządzenie' : Z.deviceLabel(u)} onClose={zamknij} wide>
                     <div className="grid sm:grid-cols-2 gap-4">
                         <Field label="Rodzaj">
                             <select className="field" value={u.typ} onChange={e => {
@@ -1767,13 +1786,13 @@
 
                     <div className="flex flex-wrap gap-2 mt-6">
                         <button className="btn btn-main" onClick={() => onSave(u)}><Icon name="check" /> Zapisz</button>
-                        <button className="btn btn-soft" onClick={onClose}>Anuluj</button>
+                        <button className="btn btn-soft" onClick={zamknij}>Anuluj</button>
                         {onDelete ? <button className="btn btn-danger sm:ml-auto" onClick={() => { if (confirm('Usunąć to urządzenie z kartoteki?')) onDelete(u.id); }}>Usuń</button> : null}
                     </div>
 
                     {kontrola ? <DeviceCheckForm dev={u} check={(u.kontrole || []).some(x => x.id === kontrola.id) ? kontrola : null} vault={vault}
                         onSave={zapiszKontrole} onClose={() => setKontrola(null)}
-                        onDelete={(id) => { setU(prev => Object.assign({}, prev, { kontrole: (prev.kontrole || []).filter(x => x.id !== id) })); setKontrola(null); }} /> : null}
+                        onDelete={(id) => { zeZmianami({ kontrole: (u.kontrole || []).filter(x => x.id !== id) }); setKontrola(null); }} /> : null}
                 </Modal>
             );
         }
@@ -1783,10 +1802,10 @@
             const lista = vault.urzadzenia.filter(u => u.aktywne !== false);
             const dawne = vault.urzadzenia.filter(u => u.aktywne === false);
 
-            const zapisz = (u) => {
+            const zapisz = (u, zostawOtwarte) => {
                 const exists = vault.urzadzenia.some(x => x.id === u.id);
                 save(Object.assign({}, vault, { urzadzenia: exists ? vault.urzadzenia.map(x => x.id === u.id ? u : x) : [...vault.urzadzenia, u] }));
-                setEdit(null);
+                if (!zostawOtwarte) setEdit(null);
             };
             const usun = (id) => { save(Object.assign({}, vault, { urzadzenia: vault.urzadzenia.filter(x => x.id !== id) })); setEdit(null); };
             const doKalendarza = () => {

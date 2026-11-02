@@ -322,6 +322,24 @@ się jak dokument (OCR lokalnie) i AI objaśnia go słowami; instrukcja ZABRANIA
 prawidłowo. **Numer seryjny, szpital i lekarz nie wychodzą do AI** (`serialPhrases` w `scrub` i `leaks`), producent
 i model wychodzą – mają znaczenie medyczne.
 
+**Zapisana kontrola ginęła, a wypełnione pole wychodziło jako brak (2.11.2026, zgłoszenie „nie zapamiętuje
+wprowadzonej i zapisanej kontroli… domaga się poprawienia w dokumencie"):** dwa błędy, jeden skutek.
+1. **Okno kontroli zapisywało tylko do stanu okna urządzenia** (`setU`), a do kartoteki szło dopiero
+   przyciskiem „Zapisz” w oknie URZĄDZENIA. Kontrola ma własny przycisk „Zapisz”, więc nikt nie zapisuje
+   drugi raz – zamknięcie urządzenia przez „Anuluj” albo × kasowało całą kontrolę razem z wczytanym
+   protokołem. Teraz `zeZmianami` woła `onSave(nowy, true)` (zapisz, zostaw okno otwarte), a `zapisz(u,
+   zostawOtwarte)` w `Urzadzenia` zamyka okno tylko bez tej flagi. To samo przy usuwaniu kontroli.
+   Dodatkowo okno urządzenia pyta przed zamknięciem, gdy pozostałe pola mają niezapisane zmiany.
+   **Test w przeglądarce sprawdzony w obie strony:** na wersji sprzed poprawki pada, po poprawce przechodzi.
+2. **`deviceLine` nie wypisywał `bateria`** (na wydruku „Longevity”, czyli przewidywany okres działania)
+   ani terminów kontroli – do AI szły tylko typ, producent, model, rok i MRI. Model pisał więc
+   „[uzupełnij: przewidywany okres działania]”, choć pole było wypełnione. Teraz linia urządzenia niesie
+   baterię, ostatnią i policzoną następną kontrolę, wskazanie i uwagi; **numer seryjny i szpital nadal NIE
+   wychodzą** (test tego pilnuje). Pole w formularzu nazywa się „Bateria / przewidywany okres działania”,
+   żeby było jasne, co przepisać z wydruku.
+Wniosek na przyszłość: **okno w oknie z dwoma przyciskami „Zapisz” to pułapka** – ten wewnętrzny musi
+zapisywać naprawdę, inaczej użytkownik traci dane i nie ma jak się domyślić dlaczego.
+
 **Zmiany skórne (`skora`, od 27.10.2026):** dziennik obserwacji, nie rozpoznawanie. Zmiana ma oś czasu wpisów
 (data, rozmiar w mm, dolegliwości, zdjęcie), checklistę ABCDE i epizody leczenia z podziałem `kto: 'ja' | 'lekarz'`,
 czasem trwania i oceną efektu 0–5 – `treatmentSummary` zestawia jedno z drugim. `skinWarnings` liczy **lokalnie,
