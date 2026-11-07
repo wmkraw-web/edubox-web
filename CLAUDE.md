@@ -368,7 +368,14 @@ Kopiuj / Word / Drukuj / Zapisz stały wyłącznie NAD kartką. Zmierzone w prze
 kartka od 1188 do 3258 px przy oknie 900 px – czytając koniec dokumentu miało się wydruk **2400 px poza
 ekranem**, więc wyglądało to na brak takiej możliwości (i gnało do zakładki Kartki, gdzie są zupełnie inne,
 nie-AI kartki). Teraz `przyciskiEksportu(gdzie)` buduje pasek RAZ i `AiKartka` pokazuje go **nad i pod
-kartką** (na dole „Drukuj / PDF” jako przycisk główny). Jedno źródło, więc nie da się poprawić jednego
+kartką**, w obu miejscach z „Drukuj / PDF” jako przyciskiem głównym; po wygenerowaniu „Napisz jeszcze raz”
+schodzi na `btn-soft`, bo gotowy dokument najczęściej się drukuje, a nie pisze od nowa.
+**Górny pasek wchodzi do rodzica jako FRAGMENT, nie w `<div>`** – pierwsza wersja opakowała go w div,
+który w rodzicu `flex` stał się jednym elementem i zrzucił cztery przyciski do osobnego wiersza pod
+przyciskiem głównym; wyglądały przez to na wyłączone (drugie zgłoszenie tego samego dnia: „4 kafle
+z przyciskami są u góry i nie są aktywne”). Przejście w przeglądarce porównuje współrzędne Y: pięć
+przycisków górnego paska musi mieć tę samą. Podpis pod kartką to zwykły, czytelny tekst („Dokument
+gotowy — wydrukuj albo zapisz”), nie `lbl` – drobny szary uppercase dawało się przeoczyć. Jedno źródło, więc nie da się poprawić jednego
 paska i zapomnieć o drugim – test liczy, że `downloadDocx` i `printDoc` występują w kodzie po razie,
 a `przyciskiEksportu` jest użyte dwa razy. Zakładka Kartki zaczyna się teraz zdaniem, że tamte trzy kartki
 powstają bez AI, a dokument od AI jest w „Dla lekarza” i tam się go drukuje. Przejście w przeglądarce mierzy

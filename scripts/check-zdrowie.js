@@ -862,7 +862,12 @@ test('nazwa rozsypana przez OCR nie staje się parametrem', () => {
 test('wydruk i zapis są też POD kartką, nie tylko nad nią', () => {
   // Gotowy dokument bywa dłuższy niż 2000 px – pasek stojący wyłącznie nad kartką był przy czytaniu
   // końca dokumentu dawno poza ekranem i wyglądało to na brak wydruku (zgłoszenie właściciela 7.11.2026).
-  assert(/const przyciskiEksportu = \(gdzie\) =>/.test(page), 'pasek eksportu nie jest wspólny');
+  assert(/const przyciskiEksportu = \(gdzie\) => \{/.test(page), 'pasek eksportu nie jest wspólny');
+  // Górny pasek MUSI być fragmentem: <div> wewnątrz rodzica-flexa zrzucał przyciski do nowego wiersza
+  // i wyglądały na wyłączone (zgłoszenie właściciela 7.11.2026).
+  assert(/gdzie === 'dol' \? <div className="flex flex-wrap gap-2 mt-1">\{guziki\(\)\} : guziki\(\)/.test(page.replace(/<\/div>/g, '')),
+    'górny pasek nie jest wstawiany jako fragment');
+  assert(/Dokument gotowy — wydrukuj albo zapisz/.test(page), 'brak czytelnego podpisu pod kartką');
   assert((page.match(/przyciskiEksportu\('(gora|dol)'\)/g) || []).length === 2,
     'pasek nie jest pokazany w dwóch miejscach');
   assert(/przyciskiEksportu\('dol'\)/.test(page), 'brak paska pod kartką');
