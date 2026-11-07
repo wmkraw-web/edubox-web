@@ -859,6 +859,21 @@ test('nazwa rozsypana przez OCR nie staje się parametrem', () => {
   assert(Z.parseLabLine('Hemoglobina glikowana HbA1c   6,1   %   4,0 - 6,0') !== null, 'trzywyrazowa nazwa zostaje');
 });
 
+test('wydruk i zapis są też POD kartką, nie tylko nad nią', () => {
+  // Gotowy dokument bywa dłuższy niż 2000 px – pasek stojący wyłącznie nad kartką był przy czytaniu
+  // końca dokumentu dawno poza ekranem i wyglądało to na brak wydruku (zgłoszenie właściciela 7.11.2026).
+  assert(/const przyciskiEksportu = \(gdzie\) =>/.test(page), 'pasek eksportu nie jest wspólny');
+  assert((page.match(/przyciskiEksportu\('(gora|dol)'\)/g) || []).length === 2,
+    'pasek nie jest pokazany w dwóch miejscach');
+  assert(/przyciskiEksportu\('dol'\)/.test(page), 'brak paska pod kartką');
+  // Jeden pasek, więc nie da się poprawić górnego i zapomnieć o dolnym.
+  assert((page.match(/downloadDocx\(biezacy\(\)/g) || []).length === 1, 'eksport Word zduplikowany w kodzie');
+  assert((page.match(/printDoc\(biezacy\(\), tytul\)/g) || []).length === 1, 'wydruk zduplikowany w kodzie');
+  // Zakładka Kartki ma mówić, gdzie jest dokument od AI – tam właściciel go szukał.
+  assert(/Dokument pisany przez AI/.test(page) && /zakładce <strong>Dla lekarza<\/strong>/.test(page),
+    'Kartki nie odsyłają do zakładki z dokumentem AI');
+});
+
 test('nieodczytane miejsca dokumentu da się uzupełnić w rubrykach', () => {
   // Żółte „[uzupełnij: …]” zostawało na kartce i trzeba było go szukać ręcznie
   // (zgłoszenie właściciela 2.11.2026) – teraz zbiera się w listę pól nad kartką.

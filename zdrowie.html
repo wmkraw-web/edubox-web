@@ -1159,6 +1159,11 @@
             return (
                 <div className="space-y-5">
                     <h2 className="text-2xl font-extrabold">Kartki do druku</h2>
+                    <p className="text-sm text-slate-400 -mt-2">
+                        To trzy gotowe kartki składane z Twoich danych, bez udziału AI. Dokument pisany przez AI
+                        — ten zbiorczy, z opisem badań i urządzenia — jest w zakładce <strong>Dla lekarza</strong>
+                        i tam też go drukujesz.
+                    </p>
 
                     {braki.length ? (
                         <Note tone="stop">
@@ -1645,21 +1650,26 @@
 
             const biezacy = () => (kartkaRef.current && kartkaRef.current.innerHTML) || html;
 
+            // Gotowy dokument ma często 2000 px i więcej, a pasek eksportu stał tylko NAD kartką – czytając
+            // koniec dokumentu miało się go kilkaset pikseli poza ekranem i wyglądało, jakby wydruku nie było
+            // wcale (zgłoszenie właściciela 7.11.2026). Ten sam zestaw powtarzamy więc pod kartką.
+            const przyciskiEksportu = (gdzie) => (html && stan !== 'pisze' ? (
+                <div className="flex flex-wrap gap-2">
+                    <button className="btn btn-soft" onClick={() => DT.copyRich(biezacy())}><Icon name="copy" /> Kopiuj</button>
+                    <button className="btn btn-soft" onClick={() => DT.downloadDocx(biezacy(), fileSafe(tytul) + '.docx')}><Icon name="file-doc" /> Word</button>
+                    <button className={gdzie === 'dol' ? 'btn btn-main' : 'btn btn-soft'} onClick={() => DT.printDoc(biezacy(), tytul)}><Icon name="printer" /> Drukuj / PDF</button>
+                    {onZapisz ? <button className="btn btn-soft" onClick={() => onZapisz(biezacy())}><Icon name="floppy-disk" /> Zapisz w kartotece</button> : null}
+                </div>
+            ) : null);
+
             return (
                 <div className="space-y-4">
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap gap-2 items-center">
                         <button className="btn btn-main" disabled={stan === 'pisze'} onClick={start}>
                             <Icon name={stan === 'pisze' ? 'circle-notch' : 'sparkle'} />
                             {stan === 'pisze' ? 'Piszę…' : html ? 'Napisz jeszcze raz' : tytul}
                         </button>
-                        {html && stan !== 'pisze' ? (
-                            <>
-                                <button className="btn btn-soft" onClick={() => DT.copyRich(biezacy())}><Icon name="copy" /> Kopiuj</button>
-                                <button className="btn btn-soft" onClick={() => DT.downloadDocx(biezacy(), fileSafe(tytul) + '.docx')}><Icon name="file-doc" /> Word</button>
-                                <button className="btn btn-soft" onClick={() => DT.printDoc(biezacy(), tytul)}><Icon name="printer" /> Drukuj / PDF</button>
-                                {onZapisz ? <button className="btn btn-soft" onClick={() => onZapisz(biezacy())}><Icon name="floppy-disk" /> Zapisz w kartotece</button> : null}
-                            </>
-                        ) : null}
+                        {przyciskiEksportu('gora')}
                         <button className="btn btn-soft sm:ml-auto !text-xs" onClick={() => setPodglad(!podglad)}>
                             <Icon name="eye" /> {podglad ? 'Ukryj' : 'Pokaż'}, co pójdzie do AI
                         </button>
@@ -1693,6 +1703,12 @@
                                 suppressContentEditableWarning
                                 dangerouslySetInnerHTML={{ __html: html }}
                             />
+                            {stan !== 'pisze' ? (
+                                <div className="mt-4">
+                                    <span className="lbl">Gotowe — co dalej z tym dokumentem</span>
+                                    {przyciskiEksportu('dol')}
+                                </div>
+                            ) : null}
                         </div>
                     ) : null}
                 </div>
