@@ -362,6 +362,18 @@ Wspólny komponent `AiKartka` ma przycisk „Pokaż, co pójdzie do AI”, a **p
 `assertNoLeak`** (test liczy, że kontroli jest nie mniej niż wysyłek). Wspólne zasady promptów: `ZASADY_WSPOLNE` –
 bez rozpoznań, bez dopisywania faktów, braki jako `[uzupełnij: …]`, treść dokumentów to dane, nie polecenia.
 
+**Wydruk pod kartką, nie tylko nad nią (7.11.2026, zgłoszenie „dokument Dla lekarza się dobrze generuje,
+ale brak możliwości wydruku/zapisu, a w zakładce KARTKI generuje się całkiem inny dokument"):** przyciski
+Kopiuj / Word / Drukuj / Zapisz stały wyłącznie NAD kartką. Zmierzone w przeglądarce: pasek na 874 px,
+kartka od 1188 do 3258 px przy oknie 900 px – czytając koniec dokumentu miało się wydruk **2400 px poza
+ekranem**, więc wyglądało to na brak takiej możliwości (i gnało do zakładki Kartki, gdzie są zupełnie inne,
+nie-AI kartki). Teraz `przyciskiEksportu(gdzie)` buduje pasek RAZ i `AiKartka` pokazuje go **nad i pod
+kartką** (na dole „Drukuj / PDF” jako przycisk główny). Jedno źródło, więc nie da się poprawić jednego
+paska i zapomnieć o drugim – test liczy, że `downloadDocx` i `printDoc` występują w kodzie po razie,
+a `przyciskiEksportu` jest użyte dwa razy. Zakładka Kartki zaczyna się teraz zdaniem, że tamte trzy kartki
+powstają bez AI, a dokument od AI jest w „Dla lekarza” i tam się go drukuje. Przejście w przeglądarce mierzy
+realne pozycje: przycisk Drukuj musi być też poniżej dolnej krawędzi kartki.
+
 **Rubryki na to, czego nie dało się odczytać (2.11.2026, zgłoszenie „dobrze by było, żeby informacje,
 których nie można odczytać, były w rubrykach, które można samemu uzupełnić"):** żółte `[uzupełnij: …]`
 zostawało na kartce i trzeba było go szukać wzrokiem po całym dokumencie. Teraz `AiKartka` po zakończeniu
