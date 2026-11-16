@@ -455,19 +455,25 @@ export const EduBoxCore = {
     subscribeNewsletter: async (email) => {
         const trimmed = String(email || '').trim().toLowerCase();
         if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) throw new Error('Podaj poprawny adres e-mail.');
-        if (!db) throw new Error('Brak połączenia z chmurą. Odśwież stronę i spróbuj ponownie.');
-
+        // Od 16.11.2026 adres idzie przez serwer do kolekcji niedostępnej z przeglądarki
+        // (api/_lib/newsletter.js). Wcześniej zapis szedł do gałęzi public/data, czytelnej dla każdego.
         const params = typeof location !== 'undefined' ? new URLSearchParams(location.search) : new URLSearchParams();
-        const safeId = trimmed.replace(/[.#$/\[\]]/g, '_');
-        const ref = doc(db, 'artifacts', APP_ID, 'public', 'data', 'newsletter_signups', safeId);
-        await setDoc(ref, {
-            email: trimmed,
-            page: typeof location !== 'undefined' ? location.pathname : '',
-            utmSource: params.get('utm_source') || null,
-            utmMedium: params.get('utm_medium') || null,
-            utmCampaign: params.get('utm_campaign') || null,
-            createdAt: serverTimestamp()
-        }, { merge: true });
+        const res = await fetch('/api/verify-code', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'newsletter-zapisz',
+                email: trimmed,
+                page: typeof location !== 'undefined' ? location.pathname : '',
+                utmSource: params.get('utm_source') || null,
+                utmMedium: params.get('utm_medium') || null,
+                utmCampaign: params.get('utm_campaign') || null
+            })
+        });
+        if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            throw new Error(data.error || 'Nie udało się zapisać. Spróbuj ponownie za chwilę.');
+        }
     },
 
     // Giełda Wzorów - ZAPIS

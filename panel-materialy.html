@@ -724,6 +724,66 @@
             );
         }
 
+        // Lista mailingowa: adresy leżą w kolekcji niedostępnej z przeglądarki (api/_lib/newsletter.js),
+        // więc czyta je serwer po zalogowaniu. Ten sam przycisk przenosi stare wpisy z dawnego, publicznego miejsca.
+        function ListaMailingowa({ authHeader, onAuthError }) {
+            const [stan, setStan] = useState({ status: 'idle', lista: [], przeniesiono: 0, blad: '' });
+            const wczytaj = async () => {
+                setStan(s => ({ ...s, status: 'loading', blad: '' }));
+                try {
+                    const d = await apiCall(authHeader, 'newsletter-lista', {});
+                    setStan({ status: 'done', lista: d.lista || [], przeniesiono: d.przeniesiono || 0, blad: '' });
+                } catch (e) {
+                    if (e.status === 401) { onAuthError(); return; }
+                    setStan(s => ({ ...s, status: 'error', blad: e.message }));
+                }
+            };
+            const csv = () => {
+                const wiersze = [['email', 'data', 'strona', 'zrodlo']].concat(stan.lista.map(x => [x.email, x.createdAt, x.page, x.zrodlo || x.utmSource]));
+                const tekst = wiersze.map(w => w.map(v => `"${String(v || '').replace(/"/g, '""')}"`).join(';')).join('\r\n');
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(new Blob(['﻿' + tekst], { type: 'text/csv;charset=utf-8' }));
+                a.download = 'lista-mailingowa-edubox.csv';
+                a.click();
+                URL.revokeObjectURL(a.href);
+            };
+            return (
+                <div className="bg-slate-900/60 border border-slate-700 rounded-2xl p-5 mb-6">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                            <h2 className="text-lg font-black text-white">📬 Lista mailingowa</h2>
+                            <p className="text-sm text-slate-400">Osoby, które zostawiły e-mail (strona główna i strony z przykładami).</p>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                            <button onClick={wczytaj} disabled={stan.status === 'loading'} className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-60 text-white font-bold px-4 py-2 rounded-xl text-sm">{stan.status === 'loading' ? 'Wczytuję…' : 'Pokaż listę'}</button>
+                            {stan.status === 'done' && stan.lista.length > 0 && <button onClick={csv} className="bg-slate-700 hover:bg-slate-600 text-white font-bold px-4 py-2 rounded-xl text-sm">Pobierz CSV</button>}
+                        </div>
+                    </div>
+                    {stan.status === 'error' && <p className="text-sm font-bold text-rose-400 mt-3">{stan.blad}</p>}
+                    {stan.status === 'done' && (
+                        <div className="mt-4">
+                            <p className="text-sm text-slate-300 mb-2">Zapisanych: <b>{stan.lista.length}</b>{stan.przeniesiono > 0 ? ` · przeniesiono ze starego miejsca: ${stan.przeniesiono}` : ''}</p>
+                            {stan.lista.length > 0 && (
+                                <div className="max-h-64 overflow-auto border border-slate-700 rounded-xl">
+                                    <table className="w-full text-sm text-left">
+                                        <tbody>
+                                            {stan.lista.map(x => (
+                                                <tr key={x.email} className="border-b border-slate-800 last:border-0">
+                                                    <td className="px-3 py-2 text-slate-100 break-all">{x.email}</td>
+                                                    <td className="px-3 py-2 text-slate-400 whitespace-nowrap">{String(x.createdAt || '').slice(0, 10)}</td>
+                                                    <td className="px-3 py-2 text-slate-500 break-all">{x.page}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
         function App() {
             const [authHeader, setAuthHeader] = useState(null);
 
@@ -743,6 +803,7 @@
                                     Pliki wgrywasz i usuwasz przez chroniony serwer (dane logowania nie są nigdzie zapisywane, znikają po zamknięciu karty). Wszystko co tu zapiszesz od razu pojawia się w publicznym katalogu.
                                 </p>
                             </div>
+                            <ListaMailingowa authHeader={authHeader} onAuthError={() => setAuthHeader(null)} />
                             <PanelMaterialy authHeader={authHeader} onWyloguj={() => setAuthHeader(null)} />
                         </>
                     ) : (

@@ -258,6 +258,21 @@ Po ręcznym zapisie z Redaktora Bloga (commit `blog-posts.js` prosto do main) st
 `.github/workflows/static-refresh.yml` (też po zmianie `apps.js`, `blog.html`, `seo.config.js`); automat z maila
 robi to sam w `add-blog-post.yml`. Rewrite z middleware nie działa lokalnie – sprawdza się go na podglądzie Vercel.
 
+**Lista mailingowa i „Bank zwrotów” (od 16.11.2026):** zapis adresu idzie przez serwer – `/api/verify-code`,
+akcja `newsletter-zapisz` (publiczna, limit 6/h na IP, bez logowania adresu) → kolekcja Firestore
+`newsletter_signups` na najwyższym poziomie, **niedostępna z przeglądarki** (identyfikator dokumentu = skrót
+adresu). Wcześniej `subscribeNewsletter` pisał z przeglądarki do `artifacts/eduboxpro/public/data/newsletter_signups`,
+a cała gałąź `public/data` jest czytelna bez logowania (tak działa Giełda) – **adresy dało się odczytać każdemu**.
+Zasada: nic z danymi osobowymi nie trafia do `public/data`. Listę pokazuje `panel-materialy.html` (karta „Lista
+mailingowa”, akcja `newsletter-lista` za Basic Auth, eksport CSV); to samo kliknięcie przenosi stare wpisy
+z miejsca publicznego i je tam usuwa. Logika i testy: `api/_lib/newsletter.js`, `newsletter.test.js` (w `api:check`;
+test pilnuje też, że `global-core.js` nie pisze adresów do Firestore). Zachętą do zapisu jest PDF
+`pobierz/bank-zwrotow-nauczyciela.pdf` (ponad 250 zwrotów) – buduje go `python3 scripts/generate-bank-zwrotow.py`
+(reportlab, ręcznie, poza `npm test`) ze zwrotów w `PAGES` z `generate-wzory.js`; po zmianie zwrotów uruchom go
+ponownie. Formularz jest na stronie głównej (`#lista`) i na każdej stronie `*-przyklady.html` (zwykły `fetch`, bez
+Firebase); po zapisie pokazuje się przycisk pobrania, zdarzenie GA `newsletter_signup` (`signup_place`).
+**Wysyłki do listy jeszcze nie ma** – adresy tylko się zbierają.
+
 **Nawigacja oparta na potrzebach:** `apps.js` przechowuje również `JOURNEYS`
 (gotowe ścieżki NOVY z 2–3 klikalnymi kafelkami), `CENTERS` (cztery publiczne
 centra tematyczne) i `QUALITY` (data kontroli katalogu oraz etykieta roku
