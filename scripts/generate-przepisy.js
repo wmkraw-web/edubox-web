@@ -24,7 +24,9 @@ const TOOL_NAMES = {
   'standardy-ochrony-maloletnich.html': 'Standardy ochrony małoletnich',
   'ocena-opisowa-przyklady.html': 'Ocena opisowa – przykłady', 'ocena-zachowania-przyklady.html': 'Ocena zachowania – przykłady',
   'opinia-o-uczniu-do-poradni-przyklady.html': 'Opinia do poradni – przykłady',
-  'opinia-o-dziecku-przedszkolnym-do-poradni-przyklady.html': 'Opinia o dziecku w przedszkolu – przykłady'
+  'opinia-o-dziecku-przedszkolnym-do-poradni-przyklady.html': 'Opinia o dziecku w przedszkolu – przykłady',
+  'ocena-opisowa-srodroczna-klasa-1-przyklady.html': 'Ocena śródroczna kl. 1 – przykłady', 'ocena-opisowa-srodroczna-klasa-2-przyklady.html': 'Ocena śródroczna kl. 2 – przykłady',
+  'ocena-opisowa-srodroczna-klasa-3-przyklady.html': 'Ocena śródroczna kl. 3 – przykłady', 'wpisy-do-dziennika-przedszkole-przyklady.html': 'Wpisy do dziennika w przedszkolu – przykłady'
 };
 const toolLabel = (f) => f.startsWith('wzory-drukow/') ? null : (TOOL_NAMES[f] || f.replace('.html', ''));
 

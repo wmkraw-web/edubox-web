@@ -1257,6 +1257,423 @@ Prosimy o ocenę możliwości ucznia oraz o wskazanie form pracy z uczniem zdoln
   }
 ];
 
+// ---------------------------------------------------------------------------------------------
+// Partia z 16.11.2026: oceny opisowe śródroczne (osobno klasa 1, 2, 3) i wpisy do dziennika
+// w przedszkolu. Części wspólne trzech stron o ocenach są w OCENA_SR, żeby poprawka w jednym
+// miejscu trafiała do wszystkich.
+// ---------------------------------------------------------------------------------------------
+const NOWE = { updated: '16 listopada 2026', updatedIso: '2026-11-16' };
+
+const OCENA_SR = {
+  kicker: 'Wzory i przykłady · Klasy 1–3 · I półrocze',
+  examplesNote: 'Przykłady są punktem wyjścia – dopasuj je do konkretnego dziecka, a formy (uczeń/uczennica) zmień według potrzeby. Imię wpisz dopiero w dzienniku.',
+  mistakes: [
+    'Ta sama ocena dla kilkorga dzieci z podmienionym imieniem – rodzice porównują i szybko to widzą.',
+    'Ocena roczna w przebraniu: po I półroczu opisz, gdzie dziecko jest teraz i nad czym pracować do czerwca.',
+    'Etykiety („słaby”, „leniwy”, „niegrzeczny”) zamiast opisu tego, co dziecko robi.',
+    'Same braki albo same pochwały – rodzic potrzebuje jednego i drugiego.',
+    'Wskazówki nie do wykonania w domu („więcej pracować”) zamiast konkretu („10 minut głośnego czytania dziennie”).',
+    'Żargon, którego rodzic nie zrozumie („analiza i synteza słuchowa”) bez wyjaśnienia.'
+  ],
+  faqWspolne: [
+    ['Ile zdań powinna mieć ocena śródroczna?', 'Zwykle wystarcza kilka zdań na każdą edukację i dwie, trzy konkretne wskazówki na koniec. Jeśli dziennik elektroniczny ma limit znaków, sprawdź go przed pisaniem.'],
+    ['Czy ocena śródroczna musi obejmować wszystkie edukacje?', 'O tym, co i w jakiej formie zawiera ocena, decydują zasady oceniania zapisane w statucie szkoły. Sprawdź je, zanim przyjmiesz układ dla całej klasy.'],
+    ['Czy mogę użyć AI do pisania ocen opisowych?', 'Tak, jako pomocy w redagowaniu – zawsze na podstawie własnych obserwacji i bez wpisywania danych dziecka do narzędzia. W EduOcena imię wpisane w polu nie trafia do AI. Ocenę ustala nauczyciel.']
+  ],
+  legal: [
+    ['Art. 44i ustawy o systemie oświaty (tekst jedn. Dz.U. 2025 poz. 881 ze zm.)', 'https://isap.sejm.gov.pl/isap.nsf/DocDetails.xsp?id=WDU20250000881'],
+    ['Rozporządzenie w sprawie oceniania, klasyfikowania i promowania uczniów i słuchaczy w szkołach publicznych (tekst jedn. Dz.U. 2023 poz. 2572 ze zm.)', 'https://isap.sejm.gov.pl/isap.nsf/DocDetails.xsp?id=WDU20230002572']
+  ],
+  extraLink: { url: 'ocena-opisowa-przyklady.html', text: 'Zobacz też: ocena opisowa roczna i ogólne zasady dla klas 1–3 →' },
+  tool: (campaign) => ({
+    name: 'EduOcena AI',
+    url: 'eduocena.html',
+    campaign,
+    text: 'Wybierz klasę i ocenę śródroczną, zaznacz z list poziom ucznia w kolejnych edukacjach i dopisz własne obserwacje. AI złoży z tego spójny, życzliwy tekst, który poprawisz na kartce i skopiujesz do dziennika. Za darmo, bez rejestracji; imię zostaje w Twojej przeglądarce.'
+  })
+};
+
+PAGES.push(
+  {
+    slug: 'ocena-opisowa-srodroczna-klasa-1-przyklady.html',
+    ...NOWE,
+    title: 'Ocena opisowa śródroczna klasa 1 – gotowe przykłady | EduBox AI',
+    description: 'Ocena opisowa śródroczna w klasie 1: trzy pełne przykłady (bardzo dobre wyniki, przeciętne, trudności), zwroty do skopiowania i wskazówki dla rodziców po I półroczu.',
+    kicker: OCENA_SR.kicker,
+    h1: 'Ocena opisowa śródroczna w klasie 1 – przykłady po I półroczu',
+    short: 'Pierwsza ocena opisowa w życiu dziecka ma przede wszystkim uspokoić i ukierunkować: pokazać rodzicom, co dziecko już umie po kilku miesiącach szkoły, jak się w niej odnajduje i co ćwiczyć do czerwca. W klasie 1 ważne są nie tylko litery i liczenie, ale też to, jak dziecko pracuje: czy słucha poleceń, kończy zadania, współpracuje. W roku szkolnym 2026/2027 klasa 1 uczy się według nowej podstawy programowej, dlatego w przykładach używamy nazw: edukacja językowa, matematyczna, przyrodnicza, społeczna, artystyczna, techniczna i informatyczna oraz wychowanie fizyczne.',
+    rulesTitle: 'Co opisać w ocenie śródrocznej w klasie 1',
+    rules: [
+      'Adaptacja do szkoły: jak dziecko odnajduje się w klasie, czy zna i stosuje zasady.',
+      'Edukacja językowa: poznane litery, czytanie sylab i wyrazów, pisanie po śladzie i samodzielne, wypowiedzi ustne, słuchanie.',
+      'Edukacja matematyczna: liczenie, dodawanie i odejmowanie w poznanym zakresie, porównywanie, proste zadania z treścią.',
+      'Pozostałe edukacje – krótko, przez to, co dziecko lubi i co mu wychodzi.',
+      'Sposób pracy: koncentracja, tempo, samodzielność, kończenie zadań.',
+      'Dwie, trzy konkretne wskazówki do pracy w domu na II półrocze.'
+    ],
+    examplesNote: OCENA_SR.examplesNote,
+    examples: [
+      {
+        label: 'Przykład 1: uczennica z bardzo dobrymi osiągnięciami',
+        meta: 'Klasa 1 · ocena śródroczna',
+        text: `Uczennica bardzo dobrze odnalazła się w szkole. Zna zasady obowiązujące w klasie i ich przestrzega, chętnie podejmuje nowe zadania.
+Edukacja językowa: Zna wszystkie wprowadzone litery, czyta wyrazy i krótkie zdania płynnie i ze zrozumieniem. Uważnie słucha czytanych tekstów i trafnie odpowiada na pytania. Wypowiada się pełnymi zdaniami, ma bogate słownictwo. Pisze starannie, mieści się w liniaturze, poprawnie łączy litery.
+Edukacja matematyczna: Sprawnie liczy, dodaje i odejmuje w zakresie 10, także w pamięci. Porównuje liczby i poprawnie stosuje znaki >, <, =. Samodzielnie rozwiązuje proste zadania z treścią i potrafi wyjaśnić swój sposób liczenia.
+Edukacja przyrodnicza i społeczna: Z ciekawością obserwuje przyrodę, zna zmiany zachodzące jesienią i zimą. Zgodnie pracuje w parze i w grupie, pomaga innym.
+Edukacja artystyczna, techniczna i informatyczna: Prace plastyczne wykonuje starannie i pomysłowo, chętnie śpiewa. Sprawnie posługuje się nożyczkami i klejem, bezpiecznie korzysta z urządzeń na zajęciach.
+Wychowanie fizyczne: Jest sprawna ruchowo, chętnie uczestniczy w zabawach i przestrzega ich zasad.
+Wskazówki na II półrocze: Warto podsuwać uczennicy książki do samodzielnego czytania i zachęcać, by opowiadała, co przeczytała. Można też proponować jej zagadki i gry logiczne.`
+      },
+      {
+        label: 'Przykład 2: uczeń z przeciętnymi wynikami',
+        meta: 'Klasa 1 · ocena śródroczna',
+        text: `Uczeń dobrze czuje się w klasie i ma kolegów. Zna zasady, czasem trzeba mu o nich przypomnieć.
+Edukacja językowa: Rozpoznaje większość poznanych liter, czasem myli te o podobnym kształcie. Czyta sylabami krótkie wyrazy; dłuższe wyrazy i zdania czyta z pomocą. Chętnie opowiada o swoich przeżyciach, zwykle krótkimi zdaniami. Pisze po śladzie poprawnie, w samodzielnym pisaniu nie zawsze mieści się w liniaturze.
+Edukacja matematyczna: Liczy do 10 i dodaje na konkretach (palce, liczmany). Odejmowanie sprawia mu jeszcze trudność. Proste zadania z treścią rozwiązuje z pomocą nauczyciela.
+Edukacja przyrodnicza i społeczna: Interesuje się zwierzętami i chętnie o nich mówi. W zabawie jest zgodny, uczy się czekać na swoją kolej.
+Edukacja artystyczna, techniczna i informatyczna: Lubi zajęcia plastyczne i muzyczne, prace wykonuje szybko, nie zawsze je kończy. Chętnie pracuje przy komputerze.
+Wychowanie fizyczne: Jest aktywny i sprawny, szczególnie lubi gry z piłką.
+Wskazówki na II półrocze: Warto codziennie przez 10 minut czytać z uczniem sylabami i wyrazami, utrwalać litery w zabawie (układanki, plastelina) oraz ćwiczyć odejmowanie na przedmiotach codziennego użytku.`
+      },
+      {
+        label: 'Przykład 3: uczeń z trudnościami',
+        meta: 'Klasa 1 · ocena śródroczna',
+        text: `Uczeń stopniowo przyzwyczaja się do szkolnego rytmu. Jest pogodny i lubiany. Najlepiej pracuje, gdy polecenie jest krótkie i pokazane na przykładzie.
+Edukacja językowa: Rozpoznaje część poznanych liter i wciąż je utrwala. Z pomocą nauczyciela łączy litery w proste sylaby. Uważnie słucha czytanych bajek i potrafi powiedzieć, o kim była historia. Mówi chętnie, zwłaszcza o tym, co go interesuje. Pisanie po śladzie wymaga jeszcze ćwiczeń – szybko męczy mu się ręka.
+Edukacja matematyczna: Liczy przedmioty do 10. Dodaje w zakresie 5 z użyciem liczmanów. Rozpoznaje podstawowe figury geometryczne.
+Edukacja przyrodnicza i społeczna: Lubi zajęcia w terenie i obserwacje przyrody. Uczy się pracy w grupie i przestrzegania ustalonych zasad.
+Edukacja artystyczna, techniczna i informatyczna: Chętnie śpiewa i uczestniczy w zabawach przy muzyce. Prace plastyczne wykonuje po swojemu, z zaangażowaniem.
+Wychowanie fizyczne: Jest sprawny ruchowo i bardzo lubi zajęcia na sali.
+Wskazówki na II półrocze: Warto codziennie, krótko i w formie zabawy, utrwalać litery (np. szukanie liter na szyldach i w książeczkach), ćwiczyć dłoń przez lepienie, wycinanie i rysowanie oraz liczyć z dzieckiem przy codziennych czynnościach. Chwalenie za wysiłek pomoże mu uwierzyć we własne możliwości. Szkoła będzie nadal wspierać ucznia na zajęciach.`
+      }
+    ],
+    phrases: [
+      ['Adaptacja i sposób pracy', [
+        'Bardzo dobrze odnalazł się w szkole i zna zasady obowiązujące w klasie.',
+        'Stopniowo przyzwyczaja się do szkolnego rytmu dnia.',
+        'Pracuje w skupieniu i kończy rozpoczęte zadania.',
+        'Najlepiej pracuje, gdy polecenie jest krótkie i pokazane na przykładzie.'
+      ]],
+      ['Edukacja językowa', [
+        'Zna wszystkie wprowadzone litery i czyta krótkie zdania.',
+        'Czyta sylabami krótkie wyrazy.',
+        'Rozpoznaje część poznanych liter i wciąż je utrwala.',
+        'Pisze starannie i mieści się w liniaturze.',
+        'Uważnie słucha czytanych tekstów i odpowiada na pytania.'
+      ]],
+      ['Edukacja matematyczna', [
+        'Sprawnie dodaje i odejmuje w zakresie 10.',
+        'Dodaje na konkretach, odejmowanie jeszcze utrwala.',
+        'Poprawnie porównuje liczby i stosuje znaki >, <, =.',
+        'Proste zadania z treścią rozwiązuje z pomocą nauczyciela.'
+      ]],
+      ['Wskazówki na II półrocze', [
+        'Warto codziennie przez 10 minut czytać z dzieckiem na głos.',
+        'Pomocne będzie utrwalanie liter w zabawie.',
+        'Warto ćwiczyć dłoń przez lepienie, wycinanie i rysowanie.',
+        'Zachęcam do liczenia przy codziennych czynnościach.'
+      ]]
+    ],
+    mistakes: OCENA_SR.mistakes,
+    faq: [
+      ['Jakich nazw edukacji użyć w klasie 1 w roku szkolnym 2026/2027?', 'Nowa podstawa programowa obowiązuje w roku szkolnym 2026/2027 w klasach I i IV. W klasie 1 stosuje się nazwy: edukacja językowa, matematyczna, przyrodnicza, społeczna, artystyczna, techniczna i informatyczna oraz wychowanie fizyczne. Sprawdź też, jak edukacje nazywa Twój dziennik elektroniczny.'],
+      ...OCENA_SR.faqWspolne
+    ],
+    legal: OCENA_SR.legal,
+    extraLink: OCENA_SR.extraLink,
+    tool: OCENA_SR.tool('ocena-srodroczna-klasa-1')
+  },
+  {
+    slug: 'ocena-opisowa-srodroczna-klasa-2-przyklady.html',
+    ...NOWE,
+    title: 'Ocena opisowa śródroczna klasa 2 – gotowe przykłady | EduBox AI',
+    description: 'Ocena opisowa śródroczna w klasie 2: trzy pełne przykłady (bardzo dobre wyniki, przeciętne, trudności), zwroty do skopiowania i wskazówki dla rodziców po I półroczu.',
+    kicker: OCENA_SR.kicker,
+    h1: 'Ocena opisowa śródroczna w klasie 2 – przykłady po I półroczu',
+    short: 'W klasie 2 ocena śródroczna pokazuje, jak dziecko rozwinęło umiejętności z pierwszej klasy: czy czyta płynniej i ze zrozumieniem, jak radzi sobie z pisaniem z pamięci, liczeniem w zakresie 100 i początkami mnożenia. To także moment, w którym warto nazwać pierwsze utrwalone trudności i podać rodzicom proste sposoby pracy w domu. W roku szkolnym 2026/2027 klasa 2 uczy się jeszcze według dotychczasowej podstawy programowej, stąd nazwy edukacji: polonistyczna, matematyczna, przyrodnicza, społeczna, plastyczna, techniczna, muzyczna, informatyczna i wychowanie fizyczne.',
+    rulesTitle: 'Co opisać w ocenie śródrocznej w klasie 2',
+    rules: [
+      'Czytanie: tempo, płynność i rozumienie krótkich tekstów.',
+      'Pisanie: przepisywanie, pisanie z pamięci i ze słuchu, pierwsze zasady ortograficzne, staranność.',
+      'Wypowiedzi ustne i pisemne: budowanie zdań, opowiadanie.',
+      'Matematyka: dodawanie i odejmowanie w zakresie 100, początki mnożenia, zadania z treścią, zegar, kalendarz, pieniądze.',
+      'Pozostałe edukacje – krótko, przez mocne strony dziecka.',
+      'Postęp od września i konkretne wskazówki do pracy w domu.'
+    ],
+    examplesNote: OCENA_SR.examplesNote,
+    examples: [
+      {
+        label: 'Przykład 1: uczeń z bardzo dobrymi osiągnięciami',
+        meta: 'Klasa 2 · ocena śródroczna',
+        text: `Edukacja polonistyczna: Uczeń czyta płynnie, z właściwą intonacją, i rozumie przeczytany tekst. Samodzielnie wyszukuje w nim potrzebne informacje. Wypowiada się rozwiniętymi zdaniami, logicznie i na temat. Pisze starannie; w pisaniu z pamięci i ze słuchu stosuje poznane zasady ortograficzne. Samodzielnie układa i zapisuje kilkuzdaniową wypowiedź.
+Edukacja matematyczna: Sprawnie dodaje i odejmuje w zakresie 100, także z przekroczeniem progu dziesiątkowego. Rozumie mnożenie jako dodawanie jednakowych składników i mnoży w poznanym zakresie. Samodzielnie rozwiązuje zadania z treścią. Odczytuje godziny na zegarze i posługuje się kalendarzem.
+Edukacja przyrodnicza i społeczna: Ma dużą wiedzę o roślinach i zwierzętach, chętnie dzieli się nią z klasą. Jest koleżeński, potrafi współpracować i słuchać innych.
+Edukacja plastyczna, techniczna i muzyczna: Prace wykonuje starannie, z dbałością o szczegóły. Chętnie śpiewa i gra na instrumentach perkusyjnych.
+Edukacja informatyczna: Sprawnie posługuje się komputerem i zna zasady bezpiecznej pracy.
+Wychowanie fizyczne: Jest sprawny i zaangażowany, przestrzega zasad gier.
+Wskazówki na II półrocze: Warto zachęcać ucznia do czytania dłuższych książek i do zapisywania własnych opowiadań. Dobrym wyzwaniem będą zadania matematyczne wymagające kilku kroków.`
+      },
+      {
+        label: 'Przykład 2: uczennica z przeciętnymi wynikami',
+        meta: 'Klasa 2 · ocena śródroczna',
+        text: `Edukacja polonistyczna: Uczennica czyta poprawnie, w wolnym tempie; krótkie teksty rozumie i odpowiada na pytania do nich. Wypowiada się chętnie, najczęściej krótkimi zdaniami. Przepisuje bezbłędnie, w pisaniu z pamięci i ze słuchu popełnia błędy – pracuje nad zasadami pisowni „ó”, „rz” i wielkiej litery. Pismo jest czytelne.
+Edukacja matematyczna: Dodaje i odejmuje w zakresie 100 bez przekroczenia progu; przy przekraczaniu progu dziesiątkowego korzysta z pomocy. Poznaje mnożenie i wykonuje je na konkretach. Proste zadania z treścią rozwiązuje samodzielnie, trudniejsze z pomocą. Odczytuje pełne godziny na zegarze.
+Edukacja przyrodnicza i społeczna: Z zainteresowaniem uczestniczy w zajęciach o przyrodzie. Jest życzliwa wobec koleżanek i kolegów, chętnie pracuje w parze.
+Edukacja plastyczna, techniczna i muzyczna: Lubi zajęcia plastyczne, prace wykonuje pomysłowo. Chętnie śpiewa w grupie.
+Edukacja informatyczna: Posługuje się komputerem w podstawowym zakresie.
+Wychowanie fizyczne: Chętnie uczestniczy w zajęciach ruchowych.
+Wskazówki na II półrocze: Warto codziennie czytać na głos przez 10–15 minut, ćwiczyć ortografię w krótkich dyktandach i grach słownych oraz utrwalać liczenie z przekroczeniem progu dziesiątkowego, np. przy grach planszowych i zakupach.`
+      },
+      {
+        label: 'Przykład 3: uczeń z trudnościami',
+        meta: 'Klasa 2 · ocena śródroczna',
+        text: `Edukacja polonistyczna: Uczeń czyta sylabami, wolno; od września robi postępy – rzadziej myli litery i chętniej podejmuje próby czytania. Tekst czytany przez nauczyciela rozumie dobrze i potrafi go opowiedzieć z pomocą pytań. Przepisuje poprawnie krótkie zdania; pisanie z pamięci sprawia mu trudność – opuszcza litery i końcówki wyrazów. Potrzebuje więcej czasu na pracę pisemną.
+Edukacja matematyczna: Dodaje i odejmuje w zakresie 20, w zakresie 100 liczy z użyciem pomocy (liczydło, oś liczbowa). Mnożenie poznaje na konkretach. Zadania z treścią rozwiązuje, gdy zostaną odczytane na głos i rozrysowane. Dobrze radzi sobie z mierzeniem i zadaniami praktycznymi.
+Edukacja przyrodnicza i społeczna: Lubi zajęcia przyrodnicze i doświadczenia. Jest uczynny i lubiany w klasie.
+Edukacja plastyczna, techniczna i muzyczna: Ma zdolności manualne, prace techniczne wykonuje starannie.
+Edukacja informatyczna: Chętnie i sprawnie pracuje przy komputerze.
+Wychowanie fizyczne: Jest bardzo sprawny ruchowo, odnosi sukcesy w grach zespołowych.
+Wskazówki na II półrocze: Warto codziennie czytać z uczniem na zmianę (zdanie dziecko, zdanie dorosły), układać wyrazy z rozsypanek literowych i liczyć na konkretach. Pomocne będzie chwalenie za każdy postęp. Uczeń nadal będzie korzystał ze wsparcia w szkole.`
+      }
+    ],
+    phrases: [
+      ['Czytanie i wypowiedzi', [
+        'Czyta płynnie, z właściwą intonacją, i rozumie czytany tekst.',
+        'Czyta poprawnie, w wolnym tempie.',
+        'Czyta sylabami; od września robi wyraźne postępy.',
+        'Wypowiada się rozwiniętymi zdaniami, logicznie i na temat.'
+      ]],
+      ['Pisanie', [
+        'W pisaniu z pamięci i ze słuchu stosuje poznane zasady ortograficzne.',
+        'Przepisuje bezbłędnie; w pisaniu ze słuchu popełnia błędy.',
+        'Pracuje nad pisownią „ó”, „rz” i wielkiej litery.',
+        'Potrzebuje więcej czasu na pracę pisemną.'
+      ]],
+      ['Edukacja matematyczna', [
+        'Sprawnie dodaje i odejmuje w zakresie 100, także z przekroczeniem progu.',
+        'Przy przekraczaniu progu dziesiątkowego korzysta z pomocy.',
+        'Rozumie mnożenie i wykonuje je w poznanym zakresie.',
+        'Zadania z treścią rozwiązuje po odczytaniu ich na głos.'
+      ]],
+      ['Wskazówki na II półrocze', [
+        'Warto codziennie czytać na głos przez 10–15 minut.',
+        'Pomocne będą krótkie dyktanda i gry słowne.',
+        'Warto utrwalać liczenie przy grach planszowych i zakupach.',
+        'Zachęcam do zapisywania własnych krótkich opowiadań.'
+      ]]
+    ],
+    mistakes: OCENA_SR.mistakes,
+    faq: [
+      ['Jakich nazw edukacji użyć w klasie 2 w roku szkolnym 2026/2027?', 'Nowa podstawa programowa obowiązuje w roku szkolnym 2026/2027 w klasach I i IV, więc klasa 2 pracuje jeszcze według dotychczasowej: edukacja polonistyczna, matematyczna, przyrodnicza, społeczna, plastyczna, techniczna, muzyczna, informatyczna i wychowanie fizyczne.'],
+      ...OCENA_SR.faqWspolne
+    ],
+    legal: OCENA_SR.legal,
+    extraLink: OCENA_SR.extraLink,
+    tool: OCENA_SR.tool('ocena-srodroczna-klasa-2')
+  },
+  {
+    slug: 'ocena-opisowa-srodroczna-klasa-3-przyklady.html',
+    ...NOWE,
+    title: 'Ocena opisowa śródroczna klasa 3 – gotowe przykłady | EduBox AI',
+    description: 'Ocena opisowa śródroczna w klasie 3: trzy pełne przykłady (bardzo dobre wyniki, przeciętne, trudności), zwroty do skopiowania i wskazówki przed przejściem do klasy 4.',
+    kicker: OCENA_SR.kicker,
+    h1: 'Ocena opisowa śródroczna w klasie 3 – przykłady po I półroczu',
+    short: 'Ocena śródroczna w klasie 3 to ostatni moment, żeby spokojnie powiedzieć rodzicom, co warto dopracować przed klasą 4: czytanie ze zrozumieniem dłuższych tekstów, samodzielne pisanie, tabliczkę mnożenia, zadania złożone i organizację własnej pracy. Dobra ocena pokazuje postęp, nazywa trudności bez straszenia i daje konkretny plan na II półrocze. W roku szkolnym 2026/2027 klasa 3 uczy się według dotychczasowej podstawy programowej, stąd nazwy edukacji: polonistyczna, matematyczna, przyrodnicza, społeczna, plastyczna, techniczna, muzyczna, informatyczna i wychowanie fizyczne.',
+    rulesTitle: 'Co opisać w ocenie śródrocznej w klasie 3',
+    rules: [
+      'Czytanie ze zrozumieniem dłuższych tekstów i wyszukiwanie informacji.',
+      'Pisanie: samodzielne wypowiedzi (opis, opowiadanie, list), ortografia, interpunkcja, staranność.',
+      'Matematyka: tabliczka mnożenia, dzielenie, działania w zakresie 100 i większym, zadania złożone, obliczenia praktyczne.',
+      'Samodzielność i organizacja pracy: przygotowanie do lekcji, tempo, kończenie zadań.',
+      'Pozostałe edukacje – przez mocne strony i zainteresowania.',
+      'Plan na II półrocze: co dopracować przed klasą 4.'
+    ],
+    examplesNote: OCENA_SR.examplesNote,
+    examples: [
+      {
+        label: 'Przykład 1: uczennica z bardzo dobrymi osiągnięciami',
+        meta: 'Klasa 3 · ocena śródroczna',
+        text: `Edukacja polonistyczna: Uczennica czyta płynnie i wyraziście, rozumie dłuższe teksty i samodzielnie wyszukuje w nich informacje. Chętnie czyta lektury i książki spoza listy. Jej wypowiedzi ustne są rozbudowane i uporządkowane. Samodzielnie pisze opowiadania, opisy i listy, dbając o poprawność ortograficzną i interpunkcyjną. Zna poznane części mowy.
+Edukacja matematyczna: Biegle zna tabliczkę mnożenia i sprawnie dzieli. Wykonuje obliczenia w pamięci i pisemnie w poznanym zakresie. Samodzielnie rozwiązuje zadania złożone i potrafi ułożyć własne. Sprawnie wykonuje obliczenia zegarowe, kalendarzowe i pieniężne.
+Edukacja przyrodnicza i społeczna: Ma szeroką wiedzę o przyrodzie, korzysta z atlasów i encyklopedii. Jest odpowiedzialna, chętnie podejmuje dodatkowe zadania i pomaga innym.
+Edukacja plastyczna, techniczna i muzyczna: Prace wykonuje starannie i twórczo. Chętnie śpiewa i gra na instrumentach.
+Edukacja informatyczna: Sprawnie korzysta z poznanych programów i zna zasady bezpieczeństwa w internecie.
+Wychowanie fizyczne: Jest sprawna, zaangażowana i przestrzega zasad fair play.
+Wskazówki na II półrocze: Warto rozwijać zainteresowania uczennicy przez udział w konkursach i samodzielne projekty. Dobrym przygotowaniem do klasy 4 będzie sporządzanie krótkich notatek z przeczytanych tekstów.`
+      },
+      {
+        label: 'Przykład 2: uczeń z przeciętnymi wynikami',
+        meta: 'Klasa 3 · ocena śródroczna',
+        text: `Edukacja polonistyczna: Uczeń czyta poprawnie i w dobrym tempie; krótsze teksty rozumie, w dłuższych potrzebuje pytań pomocniczych, by wskazać najważniejsze informacje. Wypowiada się chętnie. Samodzielne prace pisemne są krótkie; zna zasady ortograficzne, ale nie zawsze stosuje je w praktyce. Pismo jest czytelne.
+Edukacja matematyczna: Zna większą część tabliczki mnożenia, trudniejsze przypadki jeszcze utrwala. Dodaje i odejmuje w zakresie 100 sprawnie, obliczenia pisemne wykonuje z drobnymi błędami. Zadania proste rozwiązuje samodzielnie, w złożonych potrzebuje naprowadzenia. Radzi sobie z obliczeniami pieniężnymi i zegarowymi.
+Edukacja przyrodnicza i społeczna: Interesuje się przyrodą, aktywnie uczestniczy w doświadczeniach. Jest koleżeński i zgodnie pracuje w grupie.
+Edukacja plastyczna, techniczna i muzyczna: Chętnie wykonuje prace techniczne, lubi zajęcia muzyczne.
+Edukacja informatyczna: Dobrze radzi sobie z pracą przy komputerze.
+Wychowanie fizyczne: Jest aktywny, lubi gry zespołowe.
+Wskazówki na II półrocze: Warto utrwalić całą tabliczkę mnożenia (krótko, ale codziennie), czytać dłuższe teksty i po każdym rozdziale opowiadać, o czym był, oraz sprawdzać własne prace pisemne przed oddaniem. Przed klasą 4 pomocne będzie samodzielne pakowanie plecaka i pilnowanie terminów.`
+      },
+      {
+        label: 'Przykład 3: uczennica z trudnościami',
+        meta: 'Klasa 3 · ocena śródroczna',
+        text: `Edukacja polonistyczna: Uczennica czyta wolno, wyrazami; przy dłuższych tekstach szybko się męczy. Tekst wysłuchany rozumie dobrze i trafnie odpowiada na pytania. W pisaniu z pamięci i ze słuchu popełnia liczne błędy, mimo że zna zasady pisowni. Samodzielnie układa dwa, trzy zdania na podany temat. Od września widać postęp w staranności pisma.
+Edukacja matematyczna: Tabliczkę mnożenia opanowała częściowo, liczy z pomocą tabliczki i liczmanów. Dodaje i odejmuje w zakresie 100 z użyciem pomocy. Zadania z treścią rozwiązuje po wspólnym omówieniu i narysowaniu. Dobrze radzi sobie z mierzeniem i ważeniem.
+Edukacja przyrodnicza i społeczna: Chętnie uczestniczy w zajęciach przyrodniczych, ma dużą wiedzę o zwierzętach. Jest życzliwa i opiekuńcza wobec innych.
+Edukacja plastyczna, techniczna i muzyczna: Ma zdolności plastyczne – jej prace są barwne i pełne szczegółów. Pięknie śpiewa.
+Edukacja informatyczna: Chętnie pracuje przy komputerze i korzysta z programów edukacyjnych.
+Wychowanie fizyczne: Chętnie ćwiczy i przestrzega zasad.
+Wskazówki na II półrocze: Warto codziennie czytać z uczennicą przez 15 minut (na zmianę z dorosłym), utrwalać tabliczkę mnożenia w grach i piosenkach oraz ćwiczyć pisanie krótkich, kilkuzdaniowych tekstów. Uczennica nadal będzie korzystać ze wsparcia w szkole; warto wspólnie zaplanować, jak przygotować ją do wymagań klasy 4.`
+      }
+    ],
+    phrases: [
+      ['Czytanie i wypowiedzi', [
+        'Rozumie dłuższe teksty i samodzielnie wyszukuje w nich informacje.',
+        'W dłuższych tekstach potrzebuje pytań pomocniczych.',
+        'Tekst wysłuchany rozumie dobrze i trafnie odpowiada na pytania.',
+        'Jej wypowiedzi ustne są rozbudowane i uporządkowane.'
+      ]],
+      ['Pisanie', [
+        'Samodzielnie pisze opowiadania, opisy i listy.',
+        'Zna zasady ortograficzne, ale nie zawsze stosuje je w praktyce.',
+        'Samodzielne prace pisemne są krótkie.',
+        'Od września widać postęp w staranności pisma.'
+      ]],
+      ['Edukacja matematyczna', [
+        'Biegle zna tabliczkę mnożenia i sprawnie dzieli.',
+        'Zna większą część tabliczki mnożenia, trudniejsze przypadki utrwala.',
+        'Samodzielnie rozwiązuje zadania złożone.',
+        'W zadaniach złożonych potrzebuje naprowadzenia.'
+      ]],
+      ['Przed klasą 4', [
+        'Warto ćwiczyć sporządzanie krótkich notatek z przeczytanych tekstów.',
+        'Pomocne będzie samodzielne pakowanie plecaka i pilnowanie terminów.',
+        'Warto sprawdzać własne prace pisemne przed oddaniem.',
+        'Zachęcam do codziennego, krótkiego utrwalania tabliczki mnożenia.'
+      ]]
+    ],
+    mistakes: OCENA_SR.mistakes,
+    faq: [
+      ['Jakich nazw edukacji użyć w klasie 3 w roku szkolnym 2026/2027?', 'Nowa podstawa programowa obowiązuje w roku szkolnym 2026/2027 w klasach I i IV, więc klasa 3 pracuje jeszcze według dotychczasowej: edukacja polonistyczna, matematyczna, przyrodnicza, społeczna, plastyczna, techniczna, muzyczna, informatyczna i wychowanie fizyczne.'],
+      ...OCENA_SR.faqWspolne
+    ],
+    legal: OCENA_SR.legal,
+    extraLink: OCENA_SR.extraLink,
+    tool: OCENA_SR.tool('ocena-srodroczna-klasa-3')
+  },
+  {
+    slug: 'wpisy-do-dziennika-przedszkole-przyklady.html',
+    ...NOWE,
+    title: 'Wpisy do dziennika w przedszkolu – przykłady | EduBox AI',
+    description: 'Przykładowe wpisy do dziennika zajęć przedszkola dla 3-, 4-, 5- i 6-latków: tematy zimowe i świąteczne, zajęcia ruchowe, spacer, indywidualizacja. Zwroty do skopiowania.',
+    kicker: 'Wzory i przykłady · Przedszkole',
+    h1: 'Wpisy do dziennika w przedszkolu – przykłady dla 3-, 4-, 5- i 6-latków',
+    short: 'Wpis do dziennika zajęć przedszkola ma w kilku zdaniach oddać to, co naprawdę działo się w grupie: temat dnia, najważniejsze zabawy i zajęcia oraz to, co dzieci dzięki nim ćwiczyły. Nie musi być długi ani uczony. Łatwiej go napisać, gdy myślisz obszarami rozwoju dziecka z podstawy programowej wychowania przedszkolnego: społecznym, osobistym, językowym, matematycznym, przyrodniczym, technicznym, cyfrowym, artystycznym i ruchowym. Poniżej są przykłady dla różnych grup wiekowych i bank zwrotów ułożony według tych obszarów.',
+    rulesTitle: 'Jak pisać wpisy w dzienniku przedszkola',
+    rules: [
+      'Zacznij od tematu dnia, potem wymień 3–4 najważniejsze aktywności.',
+      'Przy aktywności dopisz, co dzieci ćwiczyły, np. „– rozwijanie sprawności dłoni”.',
+      'Pisz to, co się odbyło, a nie to, co było w planie.',
+      'Dopasuj język do wieku grupy: u 3-latków więcej samoobsługi i zabawy, u 6-latków przygotowanie do czytania i liczenia.',
+      'Bez imion dzieci i bez informacji o diagnozach – dziennik widzą też inne osoby.',
+      'Formę (np. czy podawać obszary podstawy programowej) ustala Twoja placówka – sprawdź, co jest u Was przyjęte.'
+    ],
+    examplesNote: 'Przykłady możesz kopiować i dopasowywać do swoich zajęć. Nie wpisuj do narzędzi AI imion ani danych dzieci.',
+    examples: [
+      {
+        label: 'Przykład 1: 3-latki – adaptacja i samoobsługa',
+        meta: 'Temat: Moja sala, moje przedszkole',
+        text: 'Moja sala, moje przedszkole. Zabawa powitalna w kole z piosenką – oswajanie z grupą i nauczycielem. Zwiedzanie sali i łazienki, poznanie swojego znaczka w szatni. Ćwiczenie samodzielnego mycia rąk i korzystania z ręcznika. Zabawy dowolne w kącikach zainteresowań – nauka odkładania zabawek na miejsce. Zabawa ruchowa „Pociąg” – reagowanie na sygnał.'
+      },
+      {
+        label: 'Przykład 2: 3-latki – zima',
+        meta: 'Temat: Pada śnieg',
+        text: 'Pada śnieg. Słuchanie krótkiego wiersza o zimie, rozmowa przy ilustracjach – nazywanie zimowych ubrań. Zabawa badawcza ze śniegiem przyniesionym do sali: dotykanie, obserwowanie topnienia. Praca plastyczna „Śnieżynki” – stemplowanie palcem białą farbą na niebieskiej kartce. Zabawa ruchowa „Płatki śniegu” przy muzyce. Ćwiczenie samodzielnego zakładania czapki i szalika.'
+      },
+      {
+        label: 'Przykład 3: 4-latki – Mikołajki',
+        meta: 'Temat: Czekamy na Mikołaja',
+        text: 'Czekamy na Mikołaja. Rozmowa o zwyczaju obdarowywania się prezentami na podstawie opowiadania czytanego przez nauczyciela. Zabawa dydaktyczna „Worek Mikołaja” – rozpoznawanie przedmiotów dotykiem i przeliczanie ich w zakresie 5. Praca plastyczna „Czapka Mikołaja” – wyklejanie watą, ćwiczenie sprawności dłoni. Nauka piosenki z pokazywaniem. Zabawy ruchowe z elementem biegu i podskoku.'
+      },
+      {
+        label: 'Przykład 4: 4-latki – zajęcia ruchowe i spacer',
+        meta: 'Temat: Zimowe zabawy na powietrzu',
+        text: 'Zimowe zabawy na powietrzu. Zestaw ćwiczeń gimnastycznych z woreczkami – ćwiczenia równowagi i celności. Rozmowa o bezpiecznej zabawie zimą. Spacer w okolicy przedszkola – obserwowanie śladów na śniegu, dokarmianie ptaków w karmniku. Po powrocie: porządkowanie ubrań w szatni – rozwijanie samodzielności. Rysowanie kredkami „Co widziałem na spacerze?”.'
+      },
+      {
+        label: 'Przykład 5: 5-latki – Dzień Babci i Dziadka',
+        meta: 'Temat: Niespodzianka dla babci i dziadka',
+        text: 'Niespodzianka dla babci i dziadka. Rozmowa kierowana „Za co lubię moją babcię i mojego dziadka” – wypowiadanie się pełnymi zdaniami. Słuchanie wiersza i nauka fragmentu na pamięć. Wykonanie laurki: cięcie po linii, składanie, ozdabianie – doskonalenie sprawności manualnej. Próba piosenki i tańca na uroczystość. Zabawa matematyczna „Bukiet” – przeliczanie i porównywanie liczby elementów w zakresie 8.'
+      },
+      {
+        label: 'Przykład 6: 6-latki – przygotowanie do czytania i liczenia',
+        meta: 'Temat: Karnawał',
+        text: 'Karnawał. Rozmowa o zwyczajach karnawałowych przy ilustracjach. Zabawy słuchowe: dzielenie wyrazów na sylaby i wyodrębnianie pierwszej głoski (maska, balon, korona). Wprowadzenie litery „k” – wyszukiwanie jej w wyrazach, ćwiczenia grafomotoryczne po śladzie. Zabawa matematyczna „Balony” – dodawanie na konkretach w zakresie 10. Wykonanie maski karnawałowej według własnego pomysłu. Tańce przy muzyce – reagowanie na zmianę tempa.'
+      },
+      {
+        label: 'Przykład 7: grupa mieszana – zajęcia przyrodnicze i techniczne',
+        meta: 'Temat: Pomagamy ptakom zimą',
+        text: 'Pomagamy ptakom zimą. Oglądanie zdjęć ptaków zimujących w Polsce, nazywanie ich i porównywanie wyglądu. Rozmowa o tym, czym wolno dokarmiać ptaki. Wspólne przygotowanie karmy i napełnienie karmnika – praca w małych zespołach. Młodsze dzieci: kolorowanie sylwety ptaka; starsze: wycinanie i składanie papierowego ptaka według wzoru. Zabawa ruchowa „Wróbelki i kot”.'
+      },
+      {
+        label: 'Przykład 8: dopisek o indywidualizacji',
+        meta: 'Do dowolnego wpisu',
+        text: 'W trakcie zajęć indywidualizowano pracę z dziećmi, dostosowując stopień trudności zadań i czas ich wykonania do możliwości dzieci, m.in. przez podział poleceń na etapy, pokaz i wsparcie obrazkiem.'
+      }
+    ],
+    phrases: [
+      ['Obszar społeczny i osobisty', [
+        'Wdrażanie do przestrzegania zasad ustalonych w grupie.',
+        'Rozwijanie umiejętności zgodnej zabawy i czekania na swoją kolej.',
+        'Nazywanie i rozpoznawanie emocji własnych i innych osób.',
+        'Doskonalenie czynności samoobsługowych: mycie rąk, ubieranie się.'
+      ]],
+      ['Obszar językowy', [
+        'Wzbogacanie słownictwa związanego z tematem.',
+        'Wypowiadanie się na temat ilustracji i wysłuchanego tekstu.',
+        'Zabawy słuchowe: dzielenie wyrazów na sylaby, wyodrębnianie głosek.',
+        'Ćwiczenia grafomotoryczne przygotowujące do pisania.'
+      ]],
+      ['Obszar matematyczny', [
+        'Przeliczanie elementów w dostępnym zakresie.',
+        'Klasyfikowanie przedmiotów według koloru, kształtu i wielkości.',
+        'Porównywanie liczebności zbiorów: więcej, mniej, tyle samo.',
+        'Określanie położenia przedmiotów w przestrzeni.'
+      ]],
+      ['Obszar przyrodniczy, techniczny i cyfrowy', [
+        'Obserwowanie zmian zachodzących w przyrodzie.',
+        'Zabawy badawcze – wyciąganie prostych wniosków.',
+        'Konstruowanie z klocków i materiałów różnego rodzaju.',
+        'Poznawanie zasad bezpiecznego korzystania z urządzeń.'
+      ]],
+      ['Obszar artystyczny i ruchowy', [
+        'Wykonanie pracy plastycznej techniką [nazwa] – doskonalenie sprawności dłoni.',
+        'Nauka piosenki, zabawy rytmiczne przy muzyce.',
+        'Zestaw ćwiczeń gimnastycznych z przyborem.',
+        'Zabawy ruchowe na powietrzu, spacer w okolicy przedszkola.'
+      ]]
+    ],
+    mistakes: [
+      'Sam temat bez aktywności („Zima”) albo same ogólniki („zajęcia dydaktyczne”).',
+      'Przepisywanie planu zamiast tego, co faktycznie się odbyło.',
+      'Ten sam wpis kopiowany przez kilka dni.',
+      'Imiona dzieci i informacje o ich trudnościach lub diagnozach.',
+      'Bardzo długie opisy metodyczne – szczegóły są w scenariuszu, nie w dzienniku.'
+    ],
+    faq: [
+      ['Jak długi powinien być wpis w dzienniku przedszkola?', 'Zwykle wystarczy temat i trzy, cztery zdania o najważniejszych aktywnościach. Szczegółowe wymagania co do formy ustala placówka.'],
+      ['Czy we wpisie trzeba podawać obszary podstawy programowej?', 'To zależy od ustaleń w Twoim przedszkolu. W wielu placówkach dopisuje się obszary lub numery z podstawy, w innych wystarcza opis aktywności. Zapytaj dyrektora, jaka forma jest przyjęta.'],
+      ['Jak zapisać zajęcia w grupie mieszanej wiekowo?', 'Jednym wpisem ze wspólnym tematem, z krótkim zaznaczeniem, co robiły dzieci młodsze, a co starsze – jak w przykładzie 7.'],
+      ['Czy mogę użyć AI do pisania wpisów?', 'Tak – podaj temat i to, co faktycznie robiliście, bez imion i danych dzieci. Gotowy wpis przeczytaj i popraw tak, żeby zgadzał się z przebiegiem dnia.']
+    ],
+    extraLink: { url: 'wpisy-do-dziennika-przyklady.html', text: 'Zobacz też: wpisy do dziennika dla świetlicy i klas 1–3 →' },
+    tool: {
+      name: 'EduWpisy',
+      url: 'eduwpisy.html',
+      campaign: 'wpisy-przedszkole',
+      text: 'Podaj temat i aktywności, wybierz grupę przedszkolną – dostaniesz 5 wariantów wpisu do wyboru, z nazwami obszarów rozwoju z podstawy programowej. Za darmo, bez rejestracji.'
+    }
+  }
+);
+
 const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const bySlug = slug => PAGES.find(p => p.slug === slug);
 // Zakresy typu „1–3” w nagłówkach nie łamią się między liniami (span nie zmienia kopiowanego tekstu).
