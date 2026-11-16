@@ -248,6 +248,15 @@ strony, wpisów bloga albo listy `publicPages`: `npm run static:generate`, potem
 `npm test` pilnuje aktualności (`static:check`). Automat bloga (`add-blog-post.yml`) sam odświeża `index.html`
 i `blog.html`. W bloku nie używaj `<div>` (wyrażenie szukające `#root` kończy się na pierwszym `</div>`).
 Strony prywatne i wykluczone (`excludedPages`) nie są ruszane.
+**Strony wpisów bloga (`blog-wpisy/<slug>.html`, od 16.11.2026):** wpis ma adres `blog.html?post=<slug>` (jeden
+plik), więc robot bez JavaScriptu dostawał listę wpisów. Ten sam generator robi dla każdego wpisu kopię `blog.html`
+z tytułem, opisem, adresem kanonicznym i `og:*` tego wpisu oraz z całą treścią w `#root`, a `middleware.js`
+podaje ją **pod starym adresem** (nagłówek `x-middleware-rewrite`; lista dozwolonych slugów w generowanym
+`blog-wpisy/lista.mjs`). Adresy, mapa strony i Redaktor Bloga zostają bez zmian. Wpis spoza listy (np. slug z polską
+literą albo świeżo dodany, zanim przejdzie automat) działa po staremu. SEO Manager pomija katalog `blog-wpisy/`.
+Po ręcznym zapisie z Redaktora Bloga (commit `blog-posts.js` prosto do main) strony odświeża
+`.github/workflows/static-refresh.yml` (też po zmianie `apps.js`, `blog.html`, `seo.config.js`); automat z maila
+robi to sam w `add-blog-post.yml`. Rewrite z middleware nie działa lokalnie – sprawdza się go na podglądzie Vercel.
 
 **Nawigacja oparta na potrzebach:** `apps.js` przechowuje również `JOURNEYS`
 (gotowe ścieżki NOVY z 2–3 klikalnymi kafelkami), `CENTERS` (cztery publiczne

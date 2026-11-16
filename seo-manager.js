@@ -124,7 +124,8 @@ function loadBlogPosts() {
 function listHtmlFiles(directory = ROOT) {
   const result = [];
   for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
-    if (entry.name === 'node_modules' || entry.name === '.git') continue;
+    // blog-wpisy/ to generowane kopie blog.html podawane pod adresem blog.html?post=… (scripts/generate-static.js)
+    if (entry.name === 'node_modules' || entry.name === '.git' || entry.name === 'blog-wpisy') continue;
     const full = path.join(directory, entry.name);
     if (entry.isDirectory()) result.push(...listHtmlFiles(full));
     else if (entry.name.toLowerCase().endsWith('.html')) result.push(normalisePath(path.relative(ROOT, full)));

@@ -177,6 +177,7 @@ const ROOT_RE = /(<div id="root"[^>]*>)(\s*|\s*<!-- EDUBOX-STATIC:START[\s\S]*?<
 let changed = 0;
 let done = 0;
 const outdated = [];
+let blogHtml = null; // blog.html już z aktualnym blokiem – szablon stron wpisów
 for (const page of config.publicPages) {
   const file = page.path;
   if (!exists(file)) continue;
@@ -190,11 +191,90 @@ for (const page of config.publicPages) {
     .replace(/\n/g, eol);
   const next = html.slice(0, m.index) + block + html.slice(m.index + m[0].length);
   done += 1;
+  if (file === 'blog.html') blogHtml = next;
   if (next !== html) {
     changed += 1;
     outdated.push(file);
     if (!CHECK) fs.writeFileSync(path.join(ROOT, file), next);
   }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Strony wpisów bloga: blog-wpisy/<slug>.html
+//
+// Wpis ma adres blog.html?post=<slug> – to jeden plik, więc robot bez JavaScriptu dostawał listę
+// wpisów zamiast treści. Dla każdego wpisu powstaje kopia blog.html z tytułem, opisem i adresem
+// kanonicznym TEGO wpisu w <head> oraz z całą treścią wpisu w #root. middleware.js podaje ją pod
+// starym adresem (blog.html?post=<slug>), więc linki, mapa strony i Redaktor Bloga zostają bez zmian.
+// Wpis, którego nie ma na liście blog-wpisy/lista.mjs, działa po staremu (sam blog.html).
+// ---------------------------------------------------------------------------------------------
+const POSTS_DIR = 'blog-wpisy';
+const SAFE_SLUG = /^[a-z0-9-]{1,150}$/;
+const MONTHS = ['stycznia', 'lutego', 'marca', 'kwietnia', 'maja', 'czerwca', 'lipca', 'sierpnia', 'września', 'października', 'listopada', 'grudnia'];
+const plDate = (iso) => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || '');
+  return m ? `${Number(m[3])} ${MONTHS[Number(m[2]) - 1]} ${m[1]}` : '';
+};
+
+function setTag(html, re, replacement, what) {
+  if (!re.test(html)) throw new Error(`[Static] blog.html: nie znaleziono znacznika ${what}`);
+  return html.replace(re, () => replacement);
+}
+
+function postPage(template, post, others) {
+  const url = `${config.baseUrl}/blog.html?post=${encodeURIComponent(post.slug)}`;
+  const title = `${post.title} - Blog EduBox AI`;
+  const image = post.image ? new URL(post.image, `${config.baseUrl}/`).href : `${config.baseUrl}${config.defaultImage}`;
+  let html = template;
+  html = setTag(html, /<title>[\s\S]*?<\/title>/, `<title>${esc(title)}</title>`, '<title>');
+  html = setTag(html, /<meta name="description" content="[^"]*">/, `<meta name="description" content="${esc(post.excerpt)}">`, 'description');
+  html = setTag(html, /<link rel="canonical" href="[^"]*">/, `<link rel="canonical" href="${esc(url)}">`, 'canonical');
+  for (const [attr, key, value] of [
+    ['property', 'og:title', title], ['property', 'og:description', post.excerpt], ['property', 'og:type', 'article'],
+    ['property', 'og:url', url], ['property', 'og:image', image],
+    ['name', 'twitter:title', title], ['name', 'twitter:description', post.excerpt], ['name', 'twitter:image', image]
+  ]) {
+    html = setTag(html, new RegExp(`<meta ${attr}="${key}" content="[^"]*">`), `<meta ${attr}="${key}" content="${esc(value)}">`, key);
+  }
+  const meta = [plDate(post.date), post.category, post.readTime ? `${post.readTime} czytania` : ''].filter(Boolean).join(' · ');
+  const body = [h1(post.title), meta ? p(esc(meta)) : '', NOSCRIPT.replace('To narzędzie działa w przeglądarce i wymaga', 'Pełny wygląd bloga wymaga'),
+    `<article>\n${post.content}\n</article>`];
+  if (others.length) {
+    body.push(h2('Inne wpisy'));
+    body.push(list(others.map((o) => link(`blog.html?post=${encodeURIComponent(o.slug)}`, o.title))));
+  }
+  body.push(p(`${link('blog.html', 'Wszystkie wpisy na blogu')} · ${link('/', 'Wszystkie narzędzia EduBox AI')}`));
+  const eol = html.includes('\r\n') ? '\r\n' : '\n';
+  const block = `${START}\n<main style="${WRAP}">\n${body.filter(Boolean).join('\n')}\n</main>\n${END}`.replace(/\r?\n/g, eol);
+  const from = html.indexOf('<!-- EDUBOX-STATIC:START');
+  const to = html.indexOf(END);
+  if (from < 0 || to < 0) throw new Error('[Static] blog.html nie ma bloku statycznego – nie da się zbudować stron wpisów');
+  return html.slice(0, from) + block + html.slice(to + END.length);
+}
+
+if (blogHtml) {
+  const wanted = new Map();
+  const slugs = [];
+  POSTS.forEach((post, i) => {
+    if (!SAFE_SLUG.test(post.slug || '') || !post.title || !post.content) return; // np. slug z polską literą – zostaje po staremu
+    const others = POSTS.filter((o, j) => j !== i).slice(0, 5);
+    wanted.set(`${POSTS_DIR}/${post.slug}.html`, postPage(blogHtml, post, others));
+    slugs.push(post.slug);
+  });
+  wanted.set(`${POSTS_DIR}/lista.mjs`,
+    `// Generowane przez scripts/generate-static.js – nie edytuj ręcznie. Czyta to middleware.js.\nexport default ${JSON.stringify(slugs, null, 2)};\n`);
+  const present = exists(POSTS_DIR) ? fs.readdirSync(path.join(ROOT, POSTS_DIR)).map((f) => `${POSTS_DIR}/${f}`) : [];
+  for (const f of present) {
+    if (wanted.has(f)) continue;
+    changed += 1; outdated.push(`${f} (do usunięcia)`);
+    if (!CHECK) fs.unlinkSync(path.join(ROOT, f));
+  }
+  for (const [f, content] of wanted) {
+    if (exists(f) && read(f) === content) continue;
+    changed += 1; outdated.push(f);
+    if (!CHECK) { fs.mkdirSync(path.join(ROOT, POSTS_DIR), { recursive: true }); fs.writeFileSync(path.join(ROOT, f), content); }
+  }
+  done += slugs.length;
 }
 
 if (CHECK) {

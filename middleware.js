@@ -4,14 +4,32 @@
 // Działa TYLKO dla ścieżek
 // wymienionych w matcher poniżej - reszta strony (wszystkie narzędzia, blog, strona
 // główna) działa bez żadnych zmian.
+//
+// Drugie zadanie (od 16.11.2026): wpis bloga. Adres blog.html?post=<slug> to jeden plik, więc roboty bez
+// JavaScriptu widziały listę wpisów zamiast treści. Dla wpisów z listy blog-wpisy/lista.mjs podajemy pod tym
+// samym adresem gotową stronę blog-wpisy/<slug>.html (generuje ją scripts/generate-static.js). Wpis spoza
+// listy i sam blog.html przechodzą bez zmian.
+
+import BLOG_SLUGS from './blog-wpisy/lista.mjs';
+
+const BLOG_SET = new Set(BLOG_SLUGS);
 
 export const config = {
-  matcher: ['/ewamarketing.html', '/ewa-marketing.html', '/aniawideo.html', '/zdrowie.html', '/api/ewa-generate', '/api/weekly-report', '/api/social-stats'],
+  matcher: ['/blog.html', '/ewamarketing.html', '/ewa-marketing.html', '/aniawideo.html', '/zdrowie.html', '/api/ewa-generate', '/api/weekly-report', '/api/social-stats'],
 };
 
 export default function middleware(request) {
   const authHeader = request.headers.get('authorization');
   const pathname = new URL(request.url).pathname;
+
+  if (pathname === '/blog.html') {
+    const slug = new URL(request.url).searchParams.get('post');
+    if (slug && BLOG_SET.has(slug)) {
+      const target = new URL(`/blog-wpisy/${slug}.html`, request.url);
+      return new Response(null, { headers: { 'x-middleware-rewrite': target.toString() } });
+    }
+    return; // lista wpisów albo wpis bez gotowej strony – zwykły blog.html
+  }
 
   // GitHub Actions korzysta z tego endpointu do raportu tygodniowego i wysyła
   // własny sekret Bearer. Jego pełną poprawność nadal sprawdza funkcja API.

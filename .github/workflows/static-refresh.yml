@@ -1,0 +1,56 @@
+name: Static Refresh
+
+# Po ręcznej zmianie danych (Redaktor Bloga zapisuje blog-posts.js prosto do main, katalog w apps.js)
+# odświeża treść statyczną: bloki w #root, strony wpisów w blog-wpisy/ i mapę strony.
+# Bez tego nowy wpis z Redaktora nie miałby swojej strony dla robotów, a `npm test` w kolejnym PR
+# zgłaszałby nieaktualne pliki. Commity tego automatu (GITHUB_TOKEN) nie uruchamiają kolejnych przebiegów.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'blog-posts.js'
+      - 'apps.js'
+      - 'blog.html'
+      - 'seo.config.js'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publikacje
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci --no-audit --no-fund
+
+      - name: Odśwież treść statyczną i mapę strony
+        run: |
+          node scripts/generate-static.js
+          if git diff --quiet && [ -z "$(git status --porcelain)" ]; then
+            echo "Nic do odświeżenia."
+            exit 0
+          fi
+          npm run seo:sitemap
+          npm run seo:check
+
+      - name: Commit i push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A index.html blog.html blog-wpisy sitemap.xml '*.html'
+          git commit -m "Treść statyczna: odświeżenie po zmianie danych (automat)" || exit 0
+          for i in 1 2 3; do git pull --rebase -q && git push -q && break; sleep 5; done
