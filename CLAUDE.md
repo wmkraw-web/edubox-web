@@ -236,6 +236,19 @@ nie nadpisuje ich ręcznych tytułów ani opisów. GitHub Action uruchamia tylko
 `npm run seo:check`; nigdy automatycznego `seo:fix`. Szczegóły:
 `docs/SEO-MANAGER.md`.
 
+**Treść statyczna w `#root` (od 16.11.2026, `scripts/generate-static.js`):** strony narzędzi, strona główna
+i blog budują się dopiero w przeglądarce (React + Babel), więc Bing, podglądy linków i roboty czatów AI
+(nie wykonują JavaScriptu) widziały pustą stronę. Generator wstawia do `<div id="root">` 64 publicznych stron
+zwykły HTML między znacznikami `EDUBOX-STATIC:START/END`: nagłówek, opis, linki do podobnych narzędzi, do stron
+z przykładami (`WZORY_FOR`) i do centrum kategorii; strona główna dostaje cały katalog, blog – listę wpisów.
+React (`createRoot`) przy starcie podmienia zawartość `#root`, więc użytkownik widzi to tylko przez chwilę
+ładowania zamiast białej strony (sprawdzone w Chrome headless). Dane wyłącznie z `apps.js`, `blog-posts.js`,
+`seo.config.js` i `<title>`/opisu strony – **nie edytuj bloku ręcznie**. Po zmianie `apps.js`, tytułu/opisu
+strony, wpisów bloga albo listy `publicPages`: `npm run static:generate`, potem `npm run seo:sitemap`;
+`npm test` pilnuje aktualności (`static:check`). Automat bloga (`add-blog-post.yml`) sam odświeża `index.html`
+i `blog.html`. W bloku nie używaj `<div>` (wyrażenie szukające `#root` kończy się na pierwszym `</div>`).
+Strony prywatne i wykluczone (`excludedPages`) nie są ruszane.
+
 **Nawigacja oparta na potrzebach:** `apps.js` przechowuje również `JOURNEYS`
 (gotowe ścieżki NOVY z 2–3 klikalnymi kafelkami), `CENTERS` (cztery publiczne
 centra tematyczne) i `QUALITY` (data kontroli katalogu oraz etykieta roku
