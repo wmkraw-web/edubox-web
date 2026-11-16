@@ -1,6 +1,7 @@
 import { getServiceAccountAccessToken } from './_lib/googleServiceAccountAuth.js';
 import { isRateLimited } from './_lib/rateLimit.js';
 import { YEAR_CODE_PATTERN, yearCodeUntil, BONUS_CODE_PATTERN, BONUS_SHEETS, bonusUntilFromRows } from './_lib/coffeePlan.js';
+import { KOLEKCJA as NEWSLETTER_KOLEKCJA, STARA_KOLEKCJA as NEWSLETTER_STARA, docId as newsletterDocId, signupData, fromDocument as newsletterFromDocument } from './_lib/newsletter.js';
 import { signedGetUrl, allowedOrigin, isPreviewPath, isUploadPath, sanitizePakiet, toFields, FIRESTORE_DOCS, KATALOG_PATH, DOC_ID } from './_lib/materialy.js';
 
 // UWAGA: ten plik obsługuje TERAZ dwie sprawy pod jednym endpointem, celowo -
@@ -402,6 +403,86 @@ async function handleMaterialyPreview(req, res) {
   return res.status(200).send(buffer);
 }
 
+// ---- Lista mailingowa (od 16.11.2026) – opis w api/_lib/newsletter.js ----
+async function firestoreToken() {
+  if (!process.env.FIREBASE_SERVICE_ACCOUNT_KEY) throw new Error('Brak FIREBASE_SERVICE_ACCOUNT_KEY.');
+  return getServiceAccountAccessToken(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY), 'https://www.googleapis.com/auth/datastore');
+}
+
+async function zapiszZapis(token, dane) {
+  return fetch(`${FIRESTORE_DOCS}/${NEWSLETTER_KOLEKCJA}/${newsletterDocId(dane.email)}`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fields: toFields(dane) }),
+  });
+}
+
+// Publiczny zapis adresu. Adresu nie logujemy; odpowiedź jest taka sama dla nowego i ponownego zapisu.
+async function handleNewsletterZapisz(req, res) {
+  if (isRateLimited(req, { name: 'newsletter', windowMs: 60 * 60 * 1000, max: 6 })) {
+    return res.status(429).json({ error: 'Zbyt wiele zapisów z tego adresu sieci. Spróbuj ponownie później.' });
+  }
+  const dane = signupData(req.body, new Date());
+  if (!dane) return res.status(400).json({ error: 'Podaj poprawny adres e-mail.' });
+  try {
+    const fsRes = await zapiszZapis(await firestoreToken(), dane);
+    if (!fsRes.ok) {
+      console.error('newsletter-zapisz firestore error', fsRes.status);
+      return res.status(502).json({ error: 'Nie udało się zapisać. Spróbuj ponownie za chwilę.' });
+    }
+  } catch (e) {
+    console.error('newsletter-zapisz error', e && e.message);
+    return res.status(500).json({ error: 'Nie udało się zapisać. Spróbuj ponownie za chwilę.' });
+  }
+  return res.status(200).json({ ok: true });
+}
+
+// Panel (Basic Auth): lista zapisanych + jednorazowe przeniesienie starych wpisów z miejsca publicznego.
+async function handleNewsletterLista(req, res) {
+  if (!checkAdminBasicAuth(req)) {
+    res.setHeader('WWW-Authenticate', 'Basic realm="Prywatna aplikacja EduBox"');
+    return res.status(401).json({ error: 'Niepoprawny login lub hasło.' });
+  }
+  try {
+    const token = await firestoreToken();
+    const naglowki = { Authorization: `Bearer ${token}` };
+    const wszystkie = async (kolekcja) => {
+      const out = [];
+      let pageToken = '';
+      for (let i = 0; i < 20; i += 1) {
+        const r = await fetch(`${FIRESTORE_DOCS}/${kolekcja}?pageSize=300${pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : ''}`, { headers: naglowki });
+        if (!r.ok) throw new Error(`Odczyt ${kolekcja}: HTTP ${r.status}`);
+        const d = await r.json();
+        out.push(...(d.documents || []));
+        pageToken = d.nextPageToken || '';
+        if (!pageToken) break;
+      }
+      return out;
+    };
+
+    let przeniesiono = 0;
+    for (const doc of await wszystkie(NEWSLETTER_STARA)) {
+      const stary = newsletterFromDocument(doc);
+      const dane = signupData({ email: stary.email, page: stary.page, utmSource: stary.utmSource, zrodlo: 'przeniesione' }, stary.createdAt ? new Date(stary.createdAt) : new Date());
+      if (dane) {
+        const zapis = await zapiszZapis(token, dane);
+        if (!zapis.ok) throw new Error(`Przeniesienie wpisu: HTTP ${zapis.status}`);
+      }
+      // Usuwamy z miejsca publicznego dopiero po udanym zapisie w prywatnym (albo gdy wpis nie ma poprawnego adresu).
+      const usun = await fetch(`https://firestore.googleapis.com/v1/${doc.name}`, { method: 'DELETE', headers: naglowki });
+      if (!usun.ok) throw new Error(`Usunięcie starego wpisu: HTTP ${usun.status}`);
+      przeniesiono += 1;
+    }
+
+    const lista = (await wszystkie(NEWSLETTER_KOLEKCJA)).map(newsletterFromDocument).filter((x) => x.email)
+      .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+    return res.status(200).json({ ok: true, liczba: lista.length, przeniesiono, lista });
+  } catch (e) {
+    console.error('newsletter-lista error', e && e.message);
+    return res.status(502).json({ error: `Nie udało się odczytać listy: ${e.message}` });
+  }
+}
+
 export default async function handler(req, res) {
   if (req.method === 'GET' && req.query && req.query.podglad) {
     return handleMaterialyPreview(req, res);
@@ -427,6 +508,8 @@ export default async function handler(req, res) {
   if (action === 'materialy-delete') return handleMaterialyDelete(req, res);
   if (action === 'materialy-zapisz') return handleMaterialyZapisz(req, res);
   if (action === 'materialy-upload-start') return handleMaterialyUploadStart(req, res);
+  if (action === 'newsletter-zapisz') return handleNewsletterZapisz(req, res);
+  if (action === 'newsletter-lista') return handleNewsletterLista(req, res);
 
   // --- Zachowanie domyślne, dokładnie jak dotychczas (menu.html, activatePro) ---
   const { code } = req.body;

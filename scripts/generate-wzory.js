@@ -1674,6 +1674,8 @@ Wskazówki na II półrocze: Warto codziennie czytać z uczennicą przez 15 minu
   }
 );
 
+const BANK_PDF = 'pobierz/bank-zwrotow-nauczyciela.pdf'; // generuje scripts/generate-bank-zwrotow.py
+
 const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const bySlug = slug => PAGES.find(p => p.slug === slug);
 // Zakresy typu „1–3” w nagłówkach nie łamią się między liniami (span nie zmienia kopiowanego tekstu).
@@ -1783,6 +1785,20 @@ ${items.map(it => `            <li><button type="button" class="phrase text-left
       </div>
     </section>
 
+    <section class="mb-10 bg-gradient-to-br from-indigo-600 to-purple-600 text-white rounded-2xl p-6" id="bank-zwrotow">
+      <p class="text-xs font-extrabold uppercase tracking-widest text-indigo-100 mb-2">Prezent na start · PDF</p>
+      <h2 class="text-xl font-extrabold mb-2">Bank zwrotów nauczyciela – ponad 250 sformułowań w jednym pliku</h2>
+      <p class="text-sm text-indigo-100 mb-4">Opinie, oceny opisowe, wiadomości do rodziców, sprawozdania i wpisy do dziennika. Zostaw e-mail, a plik pobierzesz od razu. Potem dostaniesz tylko krótką wiadomość, gdy pojawi się nowe narzędzie albo nowy zestaw przykładów.</p>
+      <form id="nl-form" class="flex flex-col sm:flex-row gap-2">
+        <label class="sr-only" for="nl-email">Adres e-mail</label>
+        <input id="nl-email" type="email" required autocomplete="email" placeholder="twoj@email.pl" class="flex-1 rounded-xl px-4 py-3 text-sm text-slate-900 placeholder-slate-400 outline-none">
+        <button type="submit" id="nl-btn" class="bg-slate-900 hover:bg-slate-800 text-white font-bold px-5 py-3 rounded-xl text-sm transition">Zapisz mnie i pobierz PDF</button>
+      </form>
+      <p id="nl-msg" class="text-sm font-bold mt-3 hidden" role="status"></p>
+      <a id="nl-pdf" href="/${BANK_PDF}" download class="hidden mt-3 inline-block bg-white text-indigo-700 font-extrabold px-5 py-3 rounded-xl text-sm hover:bg-indigo-50 transition">Pobierz Bank zwrotów (PDF) ↓</a>
+      <p class="text-xs text-indigo-100 mt-3">Zapis jest dobrowolny, bez zakładania konta. Wypiszesz się, odpowiadając na dowolną wiadomość. <a href="polityka-prywatnosci.html" class="underline">Polityka prywatności</a></p>
+    </section>
+
     <section class="mb-8">
       <h2 class="text-xl font-extrabold text-slate-900 mb-3">Najczęstsze błędy</h2>
       <ul class="space-y-2">
@@ -1833,6 +1849,30 @@ ${PAGES.filter(o => o.slug !== p.slug).map(o => `        <li><a href="${o.slug}"
       document.querySelectorAll('.phrase').forEach(function (btn) {
         btn.addEventListener('click', function () { copy(btn.innerText, 'zwrot'); });
       });
+
+      // Zapis na listę: adres idzie do naszego serwera (api/verify-code, akcja newsletter-zapisz), plik jest od razu.
+      var form = document.getElementById('nl-form');
+      if (form) form.addEventListener('submit', function (event) {
+        event.preventDefault();
+        var msg = document.getElementById('nl-msg');
+        var btn = document.getElementById('nl-btn');
+        var params = new URLSearchParams(location.search);
+        btn.disabled = true; btn.textContent = 'Zapisuję…';
+        fetch('/api/verify-code', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'newsletter-zapisz', email: document.getElementById('nl-email').value, page: location.pathname, zrodlo: 'wzory',
+            utmSource: params.get('utm_source'), utmMedium: params.get('utm_medium'), utmCampaign: params.get('utm_campaign') })
+        }).then(function (res) { return res.json().catch(function () { return {}; }).then(function (data) { return { ok: res.ok, data: data }; }); })
+          .then(function (r) {
+            msg.classList.remove('hidden');
+            if (!r.ok) { msg.textContent = r.data.error || 'Nie udało się zapisać. Spróbuj ponownie za chwilę.'; btn.disabled = false; btn.textContent = 'Zapisz mnie i pobierz PDF'; return; }
+            msg.textContent = 'Zapisano! Plik jest gotowy:';
+            form.classList.add('hidden');
+            document.getElementById('nl-pdf').classList.remove('hidden');
+            try { if (window.gtag) gtag('event', 'newsletter_signup', { signup_place: 'wzory' }); } catch (e) {}
+          })
+          .catch(function () { msg.classList.remove('hidden'); msg.textContent = 'Brak połączenia. Spróbuj ponownie za chwilę.'; btn.disabled = false; btn.textContent = 'Zapisz mnie i pobierz PDF'; });
+      });
     })();
   </script>
 </body>
@@ -1846,5 +1886,7 @@ for (const p of PAGES) {
   fs.writeFileSync(path.join(ROOT, p.slug), render(p));
 }
 console.log(`[Wzory] Wygenerowano stron: ${PAGES.length} (${PAGES.map(p => p.slug).join(', ')})`);
+
+module.exports = { PAGES };
 
 module.exports = { PAGES };
