@@ -470,10 +470,10 @@ Odbyły się [2] zebrania z rodzicami oraz konsultacje indywidualne. Rodzice wsp
   },
   {
     slug: 'wiadomosc-do-rodzica-przyklady.html',
-    title: 'Wiadomość do rodzica – przykłady trudnych sytuacji | EduBox AI',
-    description: 'Przykłady wiadomości do rodzica przez e-dziennik: zachowanie, oceny, konflikt, nieobecności i pochwała. Spokojne, życzliwe zwroty do skopiowania i darmowy kreator.',
+    title: 'Wiadomość do rodziców – 6 gotowych przykładów do skopiowania',
+    description: 'Gotowe wiadomości do rodziców ucznia: zachowanie, słabsze oceny, konflikt, nieobecności, pochwała i zaproszenie na rozmowę. Skopiuj, uzupełnij i wyślij przez e-dziennik.',
     kicker: 'Wzory i przykłady · Kontakt z rodzicami',
-    h1: 'Wiadomość do rodzica przez e-dziennik – przykłady na trudne sytuacje',
+    h1: 'Wiadomość do rodziców przez e-dziennik – gotowe przykłady na trudne sytuacje',
     short: 'Trudną wiadomość do rodzica najłatwiej napisać według prostego schematu: zacznij od czegoś dobrego o dziecku, opisz konkretną sytuację (fakty, bez ocen), pokaż troskę i zaproponuj wspólny krok – rozmowę, spotkanie albo prostą umowę. Krótko i spokojnie. Poniżej znajdziesz przykłady na najczęstsze sytuacje oraz zwroty do skopiowania.',
     rulesTitle: 'Jak napisać trudną wiadomość do rodzica',
     rules: [
@@ -724,6 +724,536 @@ Prosimy o diagnozę przyczyn trudności w czytaniu i pisaniu oraz wskazanie form
       campaign: 'opinia-do-poradni',
       text: 'Otwiera się od razu w trybie „Opinia (PPP / IPET)”: wpisz potoczne, anonimowe notatki (bez imienia i nazwiska), a AI zamieni je w uporządkowany, profesjonalny fragment opinii – z mocnymi stronami ucznia i obszarami ICF. Za darmo, bez rejestracji.'
     }
+  },
+  {
+    slug: 'opinia-wychowawcy-o-uczniu-przyklady.html',
+    updated: '16 listopada 2026',
+    updatedIso: '2026-11-16',
+    title: 'Opinia wychowawcy o uczniu – przykłady i zwroty | EduBox AI',
+    description: 'Opinia wychowawcy o uczniu: trzy gotowe przykłady (klasa 1, klasa 5, klasa 7), układ krok po kroku, zwroty do skopiowania i błędy, których warto unikać.',
+    kicker: 'Wzory i przykłady · Opinie o uczniu',
+    h1: 'Opinia wychowawcy o uczniu – przykłady dla klas 1–3 i 4–8',
+    short: 'Opinia wychowawcy to krótki, rzeczowy opis tego, jak uczeń funkcjonuje w klasie: w nauce, w relacjach i w codziennych obowiązkach. Pisze się ją najczęściej dla poradni, na prośbę rodziców albo innej instytucji. Dobra opinia opiera się na konkretnych obserwacjach z podanym okresem, zaczyna od mocnych stron, opisuje trudności bez etykiet i mówi, jaka pomoc była już stosowana i z jakim skutkiem. Wychowawca opisuje, nie diagnozuje.',
+    rulesTitle: 'Jak ułożyć opinię wychowawcy – krok po kroku',
+    rules: [
+      'Nagłówek: dla kogo i w jakim celu powstaje opinia, okres obserwacji, od kiedy znasz ucznia.',
+      'Mocne strony i zainteresowania – co uczniowi wychodzi i w jakich warunkach pracuje najlepiej.',
+      'Nauka: tempo pracy, koncentracja, samodzielność, czytanie, pisanie, liczenie – z przykładami sytuacji.',
+      'Relacje i emocje: kontakty z rówieśnikami i dorosłymi, reakcje na trudność, porażkę i zmianę.',
+      'Dotychczasowa pomoc: zajęcia, dostosowania, rozmowy – od kiedy i z jakim efektem.',
+      'Współpraca z rodzicami – krótko i neutralnie, bez ocen rodziny.',
+      'Wnioski albo pytania do adresata. Data i podpis; opinię szkoły podpisuje dyrektor, jeśli tak stanowią zasady placówki.'
+    ],
+    examplesNote: 'Dane w nawiasach kwadratowych uzupełnij dopiero w dokumencie szkoły. Do narzędzi AI wpisuj wyłącznie anonimowe obserwacje – bez imienia, nazwiska i diagnoz.',
+    examples: [
+      {
+        label: 'Przykład 1: uczeń klasy 1 – trudności z koncentracją i adaptacją',
+        meta: 'Edukacja wczesnoszkolna · dla poradni, na prośbę rodziców',
+        text: `Opinia wychowawcy o uczniu [imię i nazwisko], klasa [1b], [nazwa szkoły]
+Okres obserwacji: [wrzesień–listopad 2026]. Opinia przygotowana na prośbę rodziców w związku z wizytą w poradni.
+
+Mocne strony
+Uczeń jest ciekawy świata, zadaje dużo pytań i chętnie opowiada o swoich zainteresowaniach (zwierzęta, klocki konstrukcyjne). Dobrze liczy w zakresie 10 i szybko zapamiętuje wierszyki oraz piosenki.
+
+Funkcjonowanie w nauce
+Pracuje krótko: po kilku minutach odkłada przybory, wstaje z miejsca albo zagaduje kolegów. Zadanie kończy, gdy nauczyciel siedzi obok i dzieli polecenie na etapy. Rozpoznaje większość poznanych liter, ale myli te o podobnym kształcie. Pisze z dużym naciskiem, szybko się męczy i niechętnie podejmuje ćwiczenia grafomotoryczne.
+
+Funkcjonowanie społeczne i emocjonalne
+Chętnie bawi się z rówieśnikami, ma w klasie dwóch stałych kolegów. Trudno mu czekać na swoją kolej; gdy przegrywa w grze, reaguje płaczem lub odejściem od grupy. Uspokaja się po kilku minutach w spokojnym kącie sali.
+
+Dotychczasowa pomoc
+Miejsce w pierwszej ławce, krótkie przerwy ruchowe co kilkanaście minut, polecenia podawane pojedynczo, plan dnia w obrazkach. Po wprowadzeniu przerw ruchowych uczeń częściej kończy rozpoczętą pracę.
+
+Współpraca z rodzicami
+Rodzice są w stałym kontakcie z wychowawcą i stosują w domu te same zasady pracy.
+
+Pytania do poradni
+Prosimy o ocenę przyczyn trudności z koncentracją i grafomotoryką oraz o wskazanie form pomocy.
+
+[data] [podpis wychowawcy]`
+      },
+      {
+        label: 'Przykład 2: uczennica klasy 5 – trudności w relacjach z rówieśnikami',
+        meta: 'Klasy 4–8 · dla poradni',
+        text: `Opinia wychowawcy o uczennicy [imię i nazwisko], klasa [5a], [nazwa szkoły]
+Okres obserwacji: [wrzesień 2025 – listopad 2026]. Wychowawcą klasy jestem od [września 2025 r.].
+
+Mocne strony
+Uczennica jest sumienna, starannie prowadzi zeszyty i terminowo oddaje prace. Ma zdolności plastyczne, chętnie przygotowuje dekoracje klasowe. Uzyskuje dobre i bardzo dobre oceny z większości przedmiotów.
+
+Funkcjonowanie w nauce
+Pracuje samodzielnie i w równym tempie. Rzadko zgłasza się do odpowiedzi; zapytana odpowiada poprawnie, ale cicho i krótko. Przed sprawdzianami zgłasza ból brzucha.
+
+Funkcjonowanie społeczne i emocjonalne
+Od początku roku szkolnego większość przerw spędza sama, najczęściej w bibliotece. W pracy w grupie wykonuje przydzielone zadanie, lecz nie proponuje własnych pomysłów. Dwukrotnie w tym semestrze zgłosiła wychowawcy, że koleżanki nie chcą z nią siedzieć. Na uwagi rówieśników reaguje wycofaniem, nie odpowiada na zaczepki.
+
+Dotychczasowa pomoc
+Rozmowy z wychowawcą i pedagogiem szkolnym, zajęcia integracyjne w klasie, praca w stałych małych zespołach dobieranych przez nauczyciela. Uczennica chętniej współpracuje w zespole, w którym jest koleżanka z koła plastycznego.
+
+Współpraca z rodzicami
+Rodzice uczestniczą w zebraniach i zgłaszają, że córka niechętnie mówi w domu o szkole.
+
+Wnioski
+Wskazane jest dalsze wsparcie w budowaniu relacji z rówieśnikami oraz konsultacja w zakresie radzenia sobie z napięciem przed sprawdzianami.
+
+[data] [podpis wychowawcy]`
+      },
+      {
+        label: 'Przykład 3: uczeń klasy 7 – spadek wyników i nieobecności',
+        meta: 'Klasy 4–8 · na prośbę rodziców',
+        text: `Opinia wychowawcy o uczniu [imię i nazwisko], klasa [7c], [nazwa szkoły]
+Okres obserwacji: [wrzesień–listopad 2026], z odniesieniem do poprzedniego roku szkolnego.
+
+Mocne strony
+Uczeń ma dużą wiedzę z historii i informatyki, dobrze wypowiada się ustnie. W klasie jest lubiany, potrafi rozładować napięcie żartem.
+
+Funkcjonowanie w nauce
+W poprzednim roku szkolnym uzyskiwał oceny dobre. Od września oceny z matematyki, fizyki i języka polskiego obniżyły się do dopuszczających. Często nie ma zeszytu ani odrobionych zadań. Na lekcjach bywa senny. W tym semestrze ma [18] godzin nieobecności, w większości na pierwszych lekcjach.
+
+Funkcjonowanie społeczne i emocjonalne
+W kontaktach z dorosłymi jest uprzejmy. Zapytany o przyczyny trudności odpowiada krótko, że „nie ma siły”. Zrezygnował z zajęć koła informatycznego, w których wcześniej chętnie uczestniczył.
+
+Dotychczasowa pomoc
+Rozmowy z wychowawcą i pedagogiem, ustalenie terminów zaliczeń, zajęcia wyrównawcze z matematyki (uczeń był na dwóch z sześciu spotkań).
+
+Współpraca z rodzicami
+Rodzice zostali poinformowani o nieobecnościach i ocenach; potwierdzają, że syn późno zasypia i trudno go obudzić.
+
+Wnioski
+Zmiana w funkcjonowaniu ucznia jest wyraźna i utrzymuje się od około trzech miesięcy. Prosimy o konsultację i wskazanie, jak szkoła może go wspierać.
+
+[data] [podpis wychowawcy]`
+      }
+    ],
+    phrases: [
+      ['Mocne strony', [
+        'Jest sumienny i terminowo wykonuje powierzone zadania.',
+        'Chętnie dzieli się wiedzą na tematy, które go interesują.',
+        'Najlepiej pracuje, gdy zna plan zajęć i kolejne kroki.',
+        'Jest lubiany przez rówieśników i chętnie pomaga innym.'
+      ]],
+      ['Nauka i praca na lekcji', [
+        'Pracuje w wolnym tempie i potrzebuje dodatkowego czasu.',
+        'Kończy zadanie, gdy polecenie jest podzielone na etapy.',
+        'Rzadko zgłasza się do odpowiedzi; zapytany odpowiada poprawnie.',
+        'Od początku semestru jego oceny z [przedmiotu] wyraźnie się obniżyły.'
+      ]],
+      ['Relacje i emocje', [
+        'Większość przerw spędza w towarzystwie jednego kolegi.',
+        'W sytuacji niepowodzenia wycofuje się i potrzebuje czasu na uspokojenie.',
+        'Trudno mu czekać na swoją kolej w zabawie i rozmowie.',
+        'W kontaktach z dorosłymi jest uprzejmy i otwarty.'
+      ]],
+      ['Pomoc i wnioski', [
+        'Od [miesiąca] uczestniczy w zajęciach [nazwa] w wymiarze 1 godziny tygodniowo.',
+        'Zastosowane dostosowania przynoszą częściowe efekty.',
+        'Rodzice są w stałym kontakcie z wychowawcą.',
+        'Prosimy o wskazanie form pomocy możliwych do realizacji w szkole.'
+      ]]
+    ],
+    mistakes: [
+      'Etykiety zamiast opisu („leniwy”, „agresywny”, „nadpobudliwy”) – napisz, co uczeń robi, kiedy i jak często.',
+      'Stawianie diagnozy. Wychowawca opisuje obserwacje, rozpoznanie należy do specjalistów.',
+      'Same trudności, bez mocnych stron i bez sytuacji, w których uczeń radzi sobie dobrze.',
+      'Brak okresu obserwacji i informacji o tym, co szkoła już zrobiła.',
+      'Oceny rodziny i informacje o sytuacji domowej, które nie pochodzą z własnej obserwacji.',
+      'Opisywanie innych uczniów z imienia i nazwiska.'
+    ],
+    faq: [
+      ['Kto podpisuje opinię o uczniu?', 'To zależy od adresata i zasad obowiązujących w szkole. Opinię szkoły przekazywaną na zewnątrz zwykle podpisuje dyrektor, a przygotowuje wychowawca, często razem z nauczycielami i specjalistami. Sprawdź, jak reguluje to Twoja placówka.'],
+      ['Jak długa powinna być opinia wychowawcy?', 'Zwykle wystarcza jedna strona. Ważniejsze od długości są konkretne przykłady sytuacji, okres obserwacji i informacja o dotychczasowej pomocy.'],
+      ['Czy rodzic może zobaczyć opinię?', 'Opinia dotyczy dziecka, więc rodzice powinni znać jej treść. Dlatego warto pisać ją tak, żeby rodzic po lekturze widział w szkole sojusznika.'],
+      ['Czy mogę użyć AI do napisania opinii wychowawcy?', 'Tak, do uporządkowania i zredagowania anonimowych notatek – bez imienia, nazwiska i diagnoz. Dane ucznia uzupełnij dopiero w dokumencie szkoły, a całość uważnie sprawdź.']
+    ],
+    extraLink: { url: 'opinia-o-uczniu-do-poradni-przyklady.html', text: 'Opinia dla zespołu orzekającego ma treść określoną w przepisach – zobacz wzór z obszarami ICF →' },
+    tool: {
+      name: 'EduDialog',
+      url: 'edudialog.html?mode=ppp',
+      campaign: 'opinia-wychowawcy',
+      text: 'Wpisz potoczne, anonimowe notatki o uczniu (bez imienia i nazwiska), a EduDialog zamieni je w uporządkowany, rzeczowy tekst opinii – z mocnymi stronami i opisem trudności bez etykiet. Za darmo, bez rejestracji.'
+    }
+  },
+  {
+    slug: 'opinia-nauczyciela-przedmiotu-o-uczniu-przyklady.html',
+    updated: '16 listopada 2026',
+    updatedIso: '2026-11-16',
+    title: 'Opinia nauczyciela przedmiotu o uczniu – przykłady | EduBox AI',
+    description: 'Opinia nauczyciela przedmiotu o uczniu do poradni: przykłady od polonisty, matematyka i nauczyciela języka obcego, zwroty do skopiowania i typowe błędy.',
+    kicker: 'Wzory i przykłady · Opinie o uczniu',
+    h1: 'Opinia nauczyciela przedmiotu o uczniu – przykłady (język polski, matematyka, język obcy)',
+    short: 'Poradnia albo wychowawca często proszą nauczyciela przedmiotu o krótką opinię: jak uczeń radzi sobie właśnie na tych lekcjach. Taka opinia ma być konkretna i przedmiotowa. Opisuje, co uczeń umie, z czym ma trudność, jakie błędy popełnia najczęściej, w jakich warunkach pracuje lepiej i jakie dostosowania nauczyciel już stosuje. Wystarczy pół strony, jeśli zawiera przykłady z zeszytu, sprawdzianów i pracy na lekcji.',
+    rulesTitle: 'Co napisać w opinii nauczyciela przedmiotu',
+    rules: [
+      'Przedmiot, klasa, okres obserwacji i liczba godzin tygodniowo – adresat wie wtedy, na czym opierasz opinię.',
+      'Co uczeń opanował i co jest jego mocną stroną na Twoich lekcjach.',
+      'Rodzaj trudności z przykładami: typowe błędy w pracach pisemnych, w odpowiedziach ustnych, w zadaniach.',
+      'Sposób pracy: tempo, koncentracja, samodzielność, reakcja na pomoc i na ocenę.',
+      'Stosowane dostosowania i ich skutek – co pomaga, a co nie przyniosło efektu.',
+      'Bez diagnoz i bez porównywania z innymi uczniami z nazwiska.'
+    ],
+    examplesNote: 'Dane w nawiasach kwadratowych uzupełnij dopiero w dokumencie szkoły. Do narzędzi AI wpisuj wyłącznie anonimowe obserwacje – bez imienia, nazwiska i diagnoz.',
+    examples: [
+      {
+        label: 'Przykład 1: opinia nauczyciela języka polskiego – klasa 5',
+        meta: 'Język polski · dla poradni',
+        text: `Opinia nauczyciela języka polskiego o uczniu [imię i nazwisko], klasa [5b], [nazwa szkoły]
+Okres obserwacji: [wrzesień 2025 – listopad 2026], 5 godzin tygodniowo.
+
+Mocne strony
+Uczeń chętnie uczestniczy w rozmowach o lekturach, trafnie opisuje bohaterów i ich motywy. Ma bogate słownictwo w wypowiedziach ustnych i dobrą pamięć słuchową – szybko uczy się tekstów na pamięć.
+
+Czytanie
+Czyta wolno, sylabizując dłuższe wyrazy, przekręca końcówki i gubi się w tekście. Tekst przeczytany przez nauczyciela rozumie dobrze; po samodzielnym cichym czytaniu odpowiada na pytania wybiórczo.
+
+Pisanie
+W pracach pisemnych popełnia liczne błędy: opuszcza litery i końcówki, myli „b” i „d”, nie stosuje poznanych zasad pisowni „rz/ż” i „ó/u”, choć potrafi je ustnie przytoczyć. Pismo jest mało czytelne, tempo pisania wolne – często nie kończy notatki z tablicy. Treść wypracowań jest ciekawa i logiczna, znacznie lepsza niż ich zapis.
+
+Praca na lekcji
+Pracuje chętnie, gdy może odpowiadać ustnie. Przy dłuższym pisaniu zniechęca się i przerywa pracę.
+
+Stosowane dostosowania
+Wydłużony czas na prace pisemne, czytanie poleceń przez nauczyciela, ocenianie treści oddzielnie od poprawności zapisu, możliwość odpowiedzi ustnej zamiast części kartkówek. Po wprowadzeniu dostosowań uczeń częściej oddaje ukończone prace.
+
+[data] [podpis nauczyciela]`
+      },
+      {
+        label: 'Przykład 2: opinia nauczyciela matematyki – klasa 6',
+        meta: 'Matematyka · dla poradni',
+        text: `Opinia nauczyciela matematyki o uczennicy [imię i nazwisko], klasa [6a], [nazwa szkoły]
+Okres obserwacji: [wrzesień–listopad 2026], 4 godziny tygodniowo.
+
+Mocne strony
+Uczennica jest pracowita, prowadzi staranny zeszyt i regularnie odrabia zadania. Dobrze radzi sobie z geometrią: rysuje dokładnie, rozpoznaje figury i ich własności.
+
+Rodzaj trudności
+Nie ma utrwalonej tabliczki mnożenia – wyniki oblicza przez wielokrotne dodawanie albo liczy na palcach. Myli kolejność cyfr przy zapisie liczb wielocyfrowych, w działaniach pisemnych przestawia kolumny. Zadania tekstowe rozwiązuje poprawnie, gdy treść zostanie odczytana na głos i rozrysowana; samodzielnie często nie wie, od czego zacząć. Ułamki rozumie na konkretach (koła, paski), ma trudność z zapisem symbolicznym.
+
+Praca na lekcji i reakcja na ocenę
+Pracuje wolno i bardzo się stara. Na sprawdzianach zwykle nie kończy wszystkich zadań. Po słabej ocenie płacze i mówi, że „nigdy tego nie zrozumie”.
+
+Stosowane dostosowania
+Wydłużony czas na sprawdzianach, możliwość korzystania z tabliczki mnożenia, zadania tekstowe dzielone na kroki, ocenianie toku rozumowania, a nie tylko wyniku. Efekt: lepsze wyniki w zadaniach wieloetapowych, trudności rachunkowe utrzymują się.
+
+[data] [podpis nauczyciela]`
+      },
+      {
+        label: 'Przykład 3: opinia nauczyciela języka angielskiego – klasa 4',
+        meta: 'Język obcy · na prośbę wychowawcy',
+        text: `Opinia nauczyciela języka angielskiego o uczniu [imię i nazwisko], klasa [4c], [nazwa szkoły]
+Okres obserwacji: [wrzesień–listopad 2026], 3 godziny tygodniowo.
+
+Mocne strony
+Uczeń dobrze rozumie polecenia i krótkie nagrania, chętnie powtarza i śpiewa. Ma dobrą wymowę. Aktywnie uczestniczy w zabawach językowych.
+
+Rodzaj trudności
+Słówka zapamiętuje ze słuchu, ale ma dużą trudność z ich zapisem – pisze je tak, jak słyszy. Na kartkówkach ze słownictwa uzyskuje oceny niedostateczne, a te same słowa poprawnie wypowiada ustnie. Przepisując z tablicy, opuszcza litery. Czytając na głos, zgaduje wyrazy po pierwszych literach.
+
+Stosowane dostosowania
+Sprawdzanie słownictwa ustnie lub przez dopasowanie obrazka do wyrazu, krótsze partie materiału, karty ze słówkami z ilustracjami. Przy sprawdzaniu ustnym uczeń uzyskuje oceny dobre.
+
+[data] [podpis nauczyciela]`
+      }
+    ],
+    phrases: [
+      ['Język polski', [
+        'Czyta wolno, przekręca końcówki wyrazów i gubi się w tekście.',
+        'Zna zasady pisowni, ale nie stosuje ich w pracach pisemnych.',
+        'Treść wypracowań jest logiczna, znacznie lepsza niż ich zapis.',
+        'Chętnie wypowiada się ustnie i trafnie argumentuje.'
+      ]],
+      ['Matematyka', [
+        'Nie ma utrwalonej tabliczki mnożenia, liczy na konkretach.',
+        'W działaniach pisemnych przestawia cyfry i kolumny.',
+        'Zadanie tekstowe rozwiązuje po odczytaniu treści na głos i rozrysowaniu.',
+        'Rozumuje poprawnie, popełnia błędy rachunkowe.'
+      ]],
+      ['Języki obce i inne przedmioty', [
+        'Słownictwo zapamiętuje ze słuchu, ma trudność z jego zapisem.',
+        'Lepiej wypada w odpowiedziach ustnych niż w pracach pisemnych.',
+        'Sprawnie wykonuje zadania praktyczne i doświadczenia.',
+        'Notatkę z tablicy przepisuje wolno i z błędami.'
+      ]],
+      ['Dostosowania i ich efekty', [
+        'Wydłużony czas pracy pisemnej przynosi wyraźną poprawę.',
+        'Polecenia czytane przez nauczyciela uczeń wykonuje poprawnie.',
+        'Oceniana jest treść wypowiedzi, a poprawność zapisu osobno.',
+        'Mimo dostosowań trudności w [zakres] się utrzymują.'
+      ]]
+    ],
+    mistakes: [
+      'Ogólniki („słabo czyta”, „nie radzi sobie z matematyką”) bez przykładów błędów.',
+      'Podawanie samych ocen – ocena nie mówi, na czym polega trudność.',
+      'Rozpoznania w rodzaju „dysleksja” czy „dyskalkulia”. Nauczyciel opisuje objawy, diagnozę stawia poradnia.',
+      'Pominięcie tego, co uczeń umie i w jakich warunkach pracuje lepiej.',
+      'Brak informacji o dostosowaniach, które już stosujesz.',
+      'Wpisywanie imienia, nazwiska lub diagnoz ucznia do narzędzi AI.'
+    ],
+    faq: [
+      ['Czy opinia nauczyciela przedmiotu jest obowiązkowa?', 'Zwykle jest częścią informacji, którą szkoła przekazuje poradni, albo załącznikiem, o który prosi wychowawca lub rodzice. O tym, kto i w jakiej formie ją przygotowuje, decydują zasady przyjęte w szkole.'],
+      ['Co jest najważniejsze dla poradni w opinii polonisty?', 'Konkretne przykłady: jak uczeń czyta, jakie błędy popełnia w pisaniu, czym różni się jego wypowiedź ustna od pisemnej oraz jakie dostosowania już działają. Warto dołączyć kopie kilku prac, jeśli szkoła i rodzice się na to zgadzają.'],
+      ['Jak długa powinna być taka opinia?', 'Pół strony do jednej strony. Lepiej krótko i z przykładami niż długo i ogólnie.'],
+      ['Czy mogę użyć AI do zredagowania opinii?', 'Tak – wpisz anonimowe obserwacje, bez imienia, nazwiska i diagnoz. Gotowy tekst sprawdź i uzupełnij dane dopiero w dokumencie szkoły.']
+    ],
+    extraLink: { url: 'opinia-wychowawcy-o-uczniu-przyklady.html', text: 'Zobacz też: opinia wychowawcy o uczniu – przykłady dla klas 1–3 i 4–8 →' },
+    tool: {
+      name: 'EduDialog',
+      url: 'edudialog.html?mode=ppp',
+      campaign: 'opinia-nauczyciela-przedmiotu',
+      text: 'Wpisz w punktach, co widzisz na swoich lekcjach (anonimowo, bez imienia i nazwiska), a EduDialog ułoży z tego rzeczowy fragment opinii: mocne strony, rodzaj trudności i stosowane dostosowania. Za darmo, bez rejestracji.'
+    }
+  },
+  {
+    slug: 'opinia-o-dziecku-przedszkolnym-do-poradni-przyklady.html',
+    updated: '16 listopada 2026',
+    updatedIso: '2026-11-16',
+    title: 'Opinia o dziecku w przedszkolu do poradni – wzór | EduBox AI',
+    description: 'Opinia przedszkola o dziecku do poradni: układ w 5 obszarach ICF dla zespołu orzekającego, dwa przykłady (4-latek i 6-latek), zwroty do skopiowania i najczęstsze błędy.',
+    kicker: 'Wzory i przykłady · Przedszkole',
+    h1: 'Opinia o dziecku przedszkolnym do poradni – wzór i przykłady',
+    short: 'Opinia nauczyciela przedszkola pokazuje poradni to, czego nie widać w gabinecie: jak dziecko bawi się, mówi, radzi sobie z emocjami i samoobsługą w grupie. Gdy sprawa trafia do zespołu orzekającego, od 1 września 2026 r. opinia opisuje funkcjonowanie dziecka w pięciu obszarach aktywności i uczestniczenia według ICF. W pozostałych sprawach przepisy nie narzucają układu, ale te same obszary dobrze porządkują obserwacje. Opisuj konkretne sytuacje i mocne strony dziecka, nie stawiaj diagnoz.',
+    rulesTitle: 'Pięć obszarów, w których opisuje się dziecko w wieku przedszkolnym (opinia dla zespołu orzekającego)',
+    rules: [
+      'Uczenie się i stosowanie wiedzy – zabawa, zainteresowania, rozumienie poleceń, uwaga, pamięć.',
+      'Zachowania społeczne we wzajemnych kontaktach – przystosowanie społeczne i emocjonalne: relacje z dziećmi i dorosłymi, emocje, reakcje na zmianę i odmowę.',
+      'Porozumiewanie się – mowa, rozumienie, inne sposoby komunikowania potrzeb.',
+      'Aktywność ruchowa – poruszanie się: sprawność na sali i w ogrodzie, sprawność rąk.',
+      'Dbanie o siebie – jedzenie, ubieranie, toaleta, zgłaszanie potrzeb.',
+      'Do tego: mocne strony dziecka, udzielana pomoc z okresem i efektami oraz wnioski do dalszej pracy.',
+      'Pełną listę wymaganych elementów i terminów znajdziesz we wzorze opinii dla zespołu orzekającego.'
+    ],
+    examplesNote: 'Dane w nawiasach kwadratowych uzupełnij dopiero w dokumencie przedszkola. Do narzędzi AI wpisuj wyłącznie anonimowe obserwacje – bez imienia, nazwiska i diagnoz.',
+    examples: [
+      {
+        label: 'Przykład 1: opinia dla zespołu orzekającego – dziecko 4-letnie',
+        meta: 'Układ w 5 obszarach ICF · od 1 września 2026 r.',
+        text: `Opinia o funkcjonowaniu dziecka w przedszkolu – dla zespołu orzekającego [nazwa poradni]
+Data wydania opinii: [data]
+Imię i nazwisko dziecka: [imię i nazwisko], grupa [4-latków], [nazwa przedszkola]
+Dziecko uczęszcza do przedszkola od [września 2025 r.].
+
+1. Mocne strony i uzdolnienia
+Dziecko jest pogodne, lubi muzykę i zabawy ruchowe. Długo i z uwagą układa układanki oraz buduje z klocków. Dobrze zapamiętuje stały rytm dnia.
+
+2. Funkcjonowanie w obszarach aktywności i uczestniczenia (ICF)
+Uczenie się i stosowanie wiedzy: wybiera stale te same zabawy (klocki, układanki, samochody ustawiane w szeregu). W zajęciach przy stoliku uczestniczy kilka minut, przy wsparciu nauczyciela. Rozumie proste, pojedyncze polecenia poparte gestem lub obrazkiem.
+Zachowania społeczne we wzajemnych kontaktach – przystosowanie społeczne i emocjonalne: bawi się obok dzieci, rzadko włącza się do wspólnej zabawy. Na zmianę aktywności lub hałas reaguje płaczem, zasłania uszy; uspokaja się w cichym kąciku sali po kilku minutach. Dobrze reaguje na zapowiedź zmiany pokazaną na planie dnia.
+Porozumiewanie się: mówi pojedyncze słowa, potrzeby sygnalizuje gestem lub prowadząc dorosłego za rękę. Reaguje na swoje imię nie za każdym razem. Korzysta z kilku obrazków do wyboru zabawy.
+Aktywność ruchowa – poruszanie się: biega i wspina się sprawnie. Niechętnie rysuje, kredkę trzyma całą dłonią.
+Dbanie o siebie: je samodzielnie wybrane potrawy, z ograniczoną liczbą produktów. Przy ubieraniu potrzebuje pomocy. Korzysta z toalety z przypomnieniem dorosłego.
+
+3. Działania, formy pomocy, okres i efekty
+Od [października 2025 r.]: plan dnia w obrazkach, cichy kącik, zapowiadanie zmian, zajęcia z logopedą (2 razy w tygodniu) i z psychologiem (1 raz w tygodniu). Efekty: dziecko krócej płacze przy zmianie aktywności i zaczęło wskazywać obrazki, by poprosić o zabawę.
+
+4. Wnioski dotyczące dalszej pracy
+Kontynuować pracę z planem obrazkowym i komunikacją wspomagającą, stopniowo wydłużać udział w zajęciach grupowych, utrzymać stałą współpracę z rodzicami.
+
+[podpis dyrektora] – opinię przygotowali: [wychowawca grupy, logopeda, psycholog]`
+      },
+      {
+        label: 'Przykład 2: informacja dla poradni – dziecko 6-letnie przed pójściem do szkoły',
+        meta: 'Treści nie określa przepis – uniwersalny układ',
+        text: `Informacja o funkcjonowaniu dziecka [imię i nazwisko], grupa [6-latków], [nazwa przedszkola]
+Okres obserwacji: [wrzesień–listopad 2026]. Informacja przygotowana na prośbę rodziców.
+
+Mocne strony
+Dziecko jest towarzyskie, chętnie opowiada, ma bogate słownictwo i dużą wiedzę o świecie. Lubi zabawy tematyczne i konstrukcyjne, często jest ich pomysłodawcą.
+
+Zabawa i uczenie się
+W zabawie dowolnej skupia się długo. W zajęciach przy stoliku szybko się zniechęca, zwłaszcza gdy trzeba rysować lub pisać po śladzie. Rozpoznaje kilka liter, liczy do dziesięciu, ma trudność z dzieleniem wyrazów na głoski.
+
+Sprawność rąk
+Nieprawidłowo trzyma kredkę, rysuje słabą linią, unika wycinania. Rysunki są ubogie w szczegóły w porównaniu z tym, jak dużo potrafi o nich opowiedzieć.
+
+Emocje i relacje
+Jest lubiane przez dzieci. Gdy coś nie wychodzi, mówi „nie umiem” i odkłada pracę; przy zachęcie i podzieleniu zadania na części kończy je.
+
+Samodzielność
+W pełni samodzielne w jedzeniu, ubieraniu i toalecie.
+
+Dotychczasowa pomoc
+Ćwiczenia usprawniające dłoń w formie zabawy (plastelina, nawlekanie, spinacze) 3 razy w tygodniu, krótsze zadania graficzne. Widoczna niewielka poprawa chwytu.
+
+Pytania do poradni
+Prosimy o ocenę sprawności grafomotorycznej i słuchu fonematycznego oraz wskazówki do pracy przed rozpoczęciem nauki w szkole.
+
+[data] [podpis nauczyciela]`
+      }
+    ],
+    phrases: [
+      ['Zabawa i uczenie się', [
+        'Najchętniej wybiera zabawy konstrukcyjne i układanki.',
+        'W zajęciach przy stoliku uczestniczy kilka minut, przy wsparciu nauczyciela.',
+        'Rozumie proste polecenia poparte gestem lub obrazkiem.',
+        'Długo skupia się na zabawie, którą samo wybrało.'
+      ]],
+      ['Relacje i emocje', [
+        'Bawi się obok dzieci, rzadko włącza się do wspólnej zabawy.',
+        'Na zmianę aktywności reaguje płaczem; uspokaja się w cichym kąciku.',
+        'Chętnie nawiązuje kontakt z dorosłymi.',
+        'Gdy coś się nie udaje, odkłada pracę i potrzebuje zachęty.'
+      ]],
+      ['Mowa i porozumiewanie się', [
+        'Mówi pojedyncze słowa, potrzeby sygnalizuje gestem.',
+        'Wypowiada się zdaniami, mowa jest zrozumiała dla otoczenia.',
+        'Zniekształca głoski [sz, ż, cz, dż], co utrudnia zrozumienie wypowiedzi.',
+        'Korzysta z obrazków, by wybrać zabawę lub poprosić o pomoc.'
+      ]],
+      ['Ruch, samoobsługa i pomoc', [
+        'Sprawnie biega i wspina się; niechętnie rysuje i wycina.',
+        'Je samodzielnie, przy ubieraniu potrzebuje pomocy.',
+        'Korzysta z toalety z przypomnieniem dorosłego.',
+        'Plan dnia w obrazkach wyraźnie ułatwia dziecku zmianę aktywności.'
+      ]]
+    ],
+    mistakes: [
+      'Nazwy rozpoznań („autyzm”, „ADHD”, „opóźnienie”) zamiast opisu zachowania – diagnozę stawiają specjaliści.',
+      'Porównania do „normy” i do innych dzieci zamiast opisu tego, co dziecko robi samodzielnie, a co z pomocą.',
+      'Pominięcie mocnych stron i ulubionych zabaw – to od nich zaczyna się dalsza praca.',
+      'Brak informacji, co przedszkole już wprowadziło i z jakim skutkiem.',
+      'W opinii dla zespołu orzekającego: pominięcie któregoś z pięciu obszarów.',
+      'Wpisywanie imienia, nazwiska lub diagnoz dziecka do narzędzi AI.'
+    ],
+    faq: [
+      ['Kto przygotowuje opinię o dziecku w przedszkolu?', 'Zwykle nauczyciele grupy razem ze specjalistami pracującymi z dzieckiem. Opinię dla zespołu orzekającego przekazuje dyrektor, na prośbę przewodniczącego zespołu albo rodzica.'],
+      ['Czym różni się opinia o przedszkolaku od opinii o uczniu?', 'W opinii dla zespołu orzekającego dziecko w wieku przedszkolnym opisuje się w pięciu obszarach, a ucznia w siedmiu. U przedszkolaka więcej miejsca zajmują zabawa, mowa, emocje i samoobsługa.'],
+      ['Czy mogę opisać, co mówią rodzice o zachowaniu dziecka w domu?', 'Tak, ale wyraźnie zaznacz, że to informacja od rodziców, a nie Twoja obserwacja.'],
+      ['Czy mogę użyć AI do napisania opinii?', 'Tak, do uporządkowania anonimowych notatek – bez imienia, nazwiska i diagnoz. Dane dziecka uzupełnij dopiero w dokumencie przedszkola, a treść sprawdź: za opinię odpowiada placówka.']
+    ],
+    legal: [
+      ['§ 7 rozporządzenia Ministra Edukacji z 2 marca 2026 r. w sprawie orzeczeń i opinii wydawanych przez zespoły orzekające (Dz.U. 2026 poz. 428) – obowiązuje od 14.04.2026, § 7 ust. 6–7 od 1.09.2026', 'https://isap.sejm.gov.pl/isap.nsf/DocDetails.xsp?id=WDU20260000428'],
+      ['Pełny wzór opinii dla zespołu orzekającego z listą wymaganych elementów i terminami', 'opinia-o-uczniu-do-poradni-przyklady.html']
+    ],
+    tool: {
+      name: 'Asystenta Pedagoga',
+      url: 'asystent-pedagoga.html?doc=opinia',
+      campaign: 'opinia-przedszkole',
+      text: 'Wpisz anonimowe obserwacje z grupy (bez imienia i nazwiska), a Asystent Pedagoga ułoży z nich opinię w obszarach właściwych dla wieku dziecka – z mocnymi stronami, udzielaną pomocą i wnioskami. Za darmo, bez rejestracji.'
+    }
+  },
+  {
+    slug: 'opinia-o-uczniu-zdolnym-przyklady.html',
+    updated: '16 listopada 2026',
+    updatedIso: '2026-11-16',
+    title: 'Opinia o uczniu zdolnym – przykłady i zwroty | EduBox AI',
+    description: 'Opinia wychowawcy lub nauczyciela o uczniu zdolnym: przykłady do stypendium, konkursu i poradni, zwroty do skopiowania oraz błędy, przez które opinia brzmi pusto.',
+    kicker: 'Wzory i przykłady · Opinie o uczniu',
+    h1: 'Opinia o uczniu zdolnym – przykłady do stypendium, konkursu i poradni',
+    short: 'Opinię o uczniu zdolnym pisze się najczęściej do wniosku o stypendium, do zgłoszenia na konkurs lub program dla uzdolnionych albo dla poradni, gdy rodzice i szkoła szukają dla ucznia odpowiedniej ścieżki. Przekonuje nie liczba przymiotników, tylko konkret: osiągnięcia z datą i szczeblem, przykłady samodzielnej pracy wykraczającej poza program i opis tego, jak uczeń się uczy. Wymagania co do treści i formy zawsze sprawdź w regulaminie, do którego opinia jest załącznikiem.',
+    rulesTitle: 'Co powinna zawierać opinia o uczniu zdolnym',
+    rules: [
+      'Cel opinii i adresat, okres, w którym uczysz ucznia lub jesteś wychowawcą.',
+      'Osiągnięcia: konkursy i olimpiady z nazwą, rokiem i szczeblem, średnia ocen, projekty – tylko potwierdzone fakty.',
+      'Sposób uczenia się: samodzielność, dociekliwość, tempo, praca z materiałem spoza programu.',
+      'Przykład jednej, dwóch sytuacji, które dobrze pokazują uzdolnienie.',
+      'Funkcjonowanie w klasie: współpraca, pomoc innym, zaangażowanie w życie szkoły.',
+      'Rzetelnie także o tym, co wymaga wsparcia (np. organizacja pracy, relacje) – szczególnie w opinii dla poradni.',
+      'Jednoznaczna rekomendacja na końcu.'
+    ],
+    examplesNote: 'Dane w nawiasach kwadratowych uzupełnij dopiero w dokumencie szkoły. Do narzędzi AI wpisuj wyłącznie anonimowe opisy – bez imienia i nazwiska ucznia.',
+    examples: [
+      {
+        label: 'Przykład 1: opinia wychowawcy do wniosku o stypendium – klasa 8',
+        meta: 'Stypendium za wyniki i osiągnięcia',
+        text: `Opinia wychowawcy o uczennicy [imię i nazwisko], klasa [8a], [nazwa szkoły]
+Opinia do wniosku o [nazwa stypendium]. Wychowawcą klasy jestem od [września 2024 r.].
+
+Uczennica od trzech lat uzyskuje bardzo wysokie wyniki w nauce; w roku szkolnym [2025/2026] jej średnia ocen wyniosła [5,4], a zachowanie oceniono jako wzorowe. Szczególne uzdolnienia przejawia w przedmiotach przyrodniczych. Jest [finalistką Wojewódzkiego Konkursu Biologicznego w roku szkolnym 2025/2026] oraz [laureatką szkolnego konkursu chemicznego].
+
+Uczy się samodzielnie i systematycznie. Sięga po materiały wykraczające poza program – w tym roku przygotowała i przedstawiła klasie własną obserwację [rozwoju roślin w różnych warunkach oświetlenia], prowadzoną przez sześć tygodni z pełną dokumentacją. Potrafi stawiać pytania badawcze i krytycznie oceniać własne wyniki.
+
+W klasie jest życzliwa i chętnie tłumaczy materiał kolegom; z własnej inicjatywy prowadzi cotygodniowe powtórki z biologii przed sprawdzianami. Działa w samorządzie uczniowskim.
+
+Z pełnym przekonaniem popieram wniosek o przyznanie stypendium.
+
+[data] [podpis wychowawcy]`
+      },
+      {
+        label: 'Przykład 2: opinia nauczyciela matematyki – zgłoszenie do programu dla uzdolnionych',
+        meta: 'Konkurs, program, zajęcia dla uzdolnionych',
+        text: `Opinia nauczyciela matematyki o uczniu [imię i nazwisko], klasa [6b], [nazwa szkoły]
+Opinia do zgłoszenia na [nazwa programu / zajęć]. Uczę ucznia od [września 2024 r.], 4 godziny tygodniowo.
+
+Uczeń wyraźnie wyprzedza program klasy szóstej. Zadania typowe rozwiązuje w pamięci, a najwięcej satysfakcji dają mu zadania nietypowe, w których sam szuka metody. Często proponuje drugie, krótsze rozwiązanie i potrafi wyjaśnić, dlaczego jest poprawne. Samodzielnie poznał [równania z jedną niewiadomą i podstawy potęgowania].
+
+W roku szkolnym [2025/2026] uzyskał [wyróżnienie w konkursie Kangur Matematyczny] i zajął [II miejsce w powiatowym konkursie matematycznym]. Uczestniczy w szkolnym kole matematycznym, gdzie pracuje z zadaniami dla klas starszych.
+
+Na lekcjach, gdy skończy pracę przed innymi, otrzymuje zadania dodatkowe; chętnie pomaga kolegom, tłumacząc cierpliwie i bez podawania gotowego wyniku. Wymaga jeszcze pracy nad starannością zapisu rozwiązań – tok rozumowania często zostawia „w głowie”.
+
+Udział w zajęciach o podwyższonym poziomie będzie dla niego właściwym wyzwaniem. Rekomenduję przyjęcie ucznia do programu.
+
+[data] [podpis nauczyciela]`
+      },
+      {
+        label: 'Przykład 3: opinia wychowawcy dla poradni – uczeń zdolny, klasa 3',
+        meta: 'Dla poradni · szukanie form wsparcia',
+        text: `Opinia wychowawcy o uczniu [imię i nazwisko], klasa [3a], [nazwa szkoły]
+Okres obserwacji: [wrzesień 2024 – listopad 2026]. Opinia przygotowana na prośbę rodziców.
+
+Mocne strony i uzdolnienia
+Uczeń płynnie czyta ze zrozumieniem teksty przeznaczone dla starszych dzieci, samodzielnie korzysta z encyklopedii i atlasów. Liczy w pamięci w zakresie 1000, rozwiązuje zadania z treścią przewidziane dla klas starszych. Ma bardzo dobrą pamięć i szeroką wiedzę o kosmosie i historii.
+
+Funkcjonowanie na lekcjach
+Zadania wykonuje znacznie szybciej niż klasa. Gdy czeka na innych, zaczyna rozmawiać, rysować lub komentować głośno pracę kolegów. Przy zadaniach powtarzalnych mówi, że są „nudne”, i wykonuje je niestarannie. Przy zadaniach trudnych pracuje długo i w skupieniu.
+
+Funkcjonowanie społeczne i emocjonalne
+Chętniej rozmawia z dorosłymi niż z rówieśnikami. W zabawie chce ustalać zasady; gdy dzieci się nie zgadzają, odchodzi. Źle znosi własne błędy – potrafi podrzeć kartkę z pomyłką.
+
+Dotychczasowe działania
+Zadania dodatkowe o wyższym stopniu trudności, rola „asystenta” przy pracy w parach, udział w szkolnym kole szachowym. Zadania dodatkowe wyraźnie zmniejszyły liczbę sytuacji przeszkadzania na lekcji.
+
+Pytania do poradni
+Prosimy o ocenę możliwości ucznia oraz o wskazanie form pracy z uczniem zdolnym i sposobów wspierania go w relacjach z rówieśnikami.
+
+[data] [podpis wychowawcy]`
+      }
+    ],
+    phrases: [
+      ['Uzdolnienia i sposób uczenia się', [
+        'Wyraźnie wyprzedza program realizowany w klasie.',
+        'Samodzielnie sięga po materiały wykraczające poza podręcznik.',
+        'Stawia dociekliwe pytania i szuka własnych metod rozwiązania.',
+        'Przy zadaniach trudnych pracuje długo i w skupieniu.'
+      ]],
+      ['Osiągnięcia', [
+        'W roku szkolnym [rok] uzyskał tytuł [laureata / finalisty] konkursu [nazwa].',
+        'Średnia ocen w roku szkolnym [rok] wyniosła [wartość].',
+        'Przygotował i przedstawił projekt [temat].',
+        'Reprezentował szkołę w [zawodach / konkursie] na szczeblu [szczebel].'
+      ]],
+      ['Postawa i współpraca', [
+        'Chętnie tłumaczy materiał kolegom, cierpliwie i bez podawania gotowego wyniku.',
+        'Angażuje się w życie klasy i szkoły.',
+        'Jest odpowiedzialny i dotrzymuje terminów.',
+        'Potrafi przyjąć uwagę i poprawić pracę.'
+      ]],
+      ['Rekomendacja', [
+        'Z pełnym przekonaniem popieram wniosek o przyznanie stypendium.',
+        'Rekomenduję przyjęcie ucznia do programu.',
+        'Udział w zajęciach o podwyższonym poziomie będzie dla niego właściwym wyzwaniem.',
+        'Prosimy o wskazanie form pracy z uczniem zdolnym.'
+      ]]
+    ],
+    mistakes: [
+      'Same przymiotniki („wybitny”, „wyjątkowy”, „niezwykle utalentowany”) bez jednego konkretnego przykładu.',
+      'Osiągnięcia bez nazwy konkursu, roku i szczebla – komisja nie ma jak ich ocenić.',
+      'Wpisywanie osiągnięć niepotwierdzonych dokumentem.',
+      'Przemilczenie trudności w opinii dla poradni – uczeń zdolny też może potrzebować wsparcia.',
+      'Pominięcie wymagań z regulaminu stypendium lub konkursu (forma, długość, załączniki).',
+      'Brak jednoznacznej rekomendacji na końcu.'
+    ],
+    faq: [
+      ['Kto pisze opinię o uczniu zdolnym?', 'Najczęściej wychowawca albo nauczyciel przedmiotu, w którym uczeń ma osiągnięcia. Kto ma ją podpisać i czy potrzebny jest podpis dyrektora, określa regulamin stypendium, konkursu lub programu.'],
+      ['Jak długa powinna być opinia do stypendium?', 'Zwykle pół strony do jednej strony. Jeśli regulamin podaje limit albo formularz, trzymaj się go.'],
+      ['Czy w opinii do stypendium pisać o słabszych stronach ucznia?', 'W opinii popierającej wniosek nie ma takiej potrzeby, o ile regulamin tego nie wymaga. W opinii dla poradni – tak, bo jej celem jest dobranie wsparcia.'],
+      ['Czy mogę użyć AI do zredagowania opinii?', 'Tak – opisz anonimowo osiągnięcia i sposób pracy ucznia, bez imienia i nazwiska. AI nie zna faktów, więc każdą nazwę konkursu, datę i wynik wpisz i sprawdź samodzielnie.']
+    ],
+    extraLink: { url: 'opinia-wychowawcy-o-uczniu-przyklady.html', text: 'Zobacz też: opinia wychowawcy o uczniu – przykłady dla klas 1–3 i 4–8 →' },
+    tool: {
+      name: 'EduDialog',
+      url: 'edudialog.html?mode=ppp',
+      campaign: 'opinia-uczen-zdolny',
+      text: 'Wpisz w punktach osiągnięcia i obserwacje (anonimowo, bez imienia i nazwiska), a EduDialog ułoży z nich rzeczową opinię z konkretami zamiast ogólników. Za darmo, bez rejestracji.'
+    }
   }
 ];
 
@@ -736,7 +1266,7 @@ function render(p) {
   const url = `${BASE}/${p.slug}`;
   const toolUrl = `${p.tool.url.replace(/&/g, '&amp;')}${p.tool.url.includes('?') ? '&amp;' : '?'}utm_source=eduboxpro&amp;utm_medium=wzor&amp;utm_campaign=${p.tool.campaign}`;
   const ld = [
-    { '@context': 'https://schema.org', '@type': 'Article', headline: p.h1, description: p.description, inLanguage: 'pl-PL', datePublished: UPDATED_ISO, dateModified: UPDATED_ISO, mainEntityOfPage: url, publisher: { '@type': 'Organization', name: 'EduBox AI', url: `${BASE}/` } },
+    { '@context': 'https://schema.org', '@type': 'Article', headline: p.h1, description: p.description, inLanguage: 'pl-PL', datePublished: p.updatedIso || UPDATED_ISO, dateModified: p.updatedIso || UPDATED_ISO, mainEntityOfPage: url, publisher: { '@type': 'Organization', name: 'EduBox AI', url: `${BASE}/` } },
     { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity: p.faq.map(([q, a]) => ({ '@type': 'Question', name: q, acceptedAnswer: { '@type': 'Answer', text: a } })) }
   ];
   const ctaBox = (variant) => `
@@ -795,7 +1325,7 @@ function render(p) {
   <main class="max-w-3xl mx-auto px-5 py-10">
     <p class="text-xs font-extrabold uppercase tracking-widest text-indigo-600 mb-3">${esc(p.kicker)}</p>
     <h1 class="text-3xl md:text-4xl font-extrabold text-slate-900 leading-tight mb-3">${nowrap(esc(p.h1))}</h1>
-    <p class="text-sm text-slate-500 mb-8">Ostatnia aktualizacja: ${UPDATED}</p>
+    <p class="text-sm text-slate-500 mb-8">Ostatnia aktualizacja: ${p.updated || UPDATED}</p>
 
     <section class="bg-indigo-50 border border-indigo-200 rounded-2xl p-5 mb-8">
       <h2 class="text-lg font-extrabold text-indigo-900 mb-2">Krótko</h2>
