@@ -1153,10 +1153,9 @@ Zwróć WYŁĄCZNIE poprawny obiekt JSON w postaci: {"answer":"pełna odpowiedź
             // dymek "Zapytaj Bota!" nie był podpięty do niczego (martwy element).
             const [botOpen, setBotOpen] = React.useState(false);
             React.useEffect(() => {
-              if (!localStorage.getItem('edubox_quiz_done')) {
-                setShowQuiz(true);
-                localStorage.setItem('edubox_quiz_done', 'true');
-              }
+              // Od 16.11.2026 diagnoza NIE otwiera się sama: nowa osoba widziała okno, zanim zobaczyła
+              // stronę. Otwiera ją link „Nie wiesz, od czego zacząć?” pod skrótami w nagłówku.
+              localStorage.setItem('edubox_quiz_done', 'true');
             }, []);
 
             // Theme state
@@ -1207,6 +1206,8 @@ useEffect(() => {
             return;
         }
         if (!window.OGLOSZENIE.active) return;
+        // Pierwsza wizyta bez okna z ogłoszeniem – najpierw strona, ogłoszenie przy powrocie.
+        if (!localStorage.getItem('eduboxVisited')) { localStorage.setItem('eduboxVisited', '1'); return; }
         const seenId = localStorage.getItem('eduboxSeenAnnouncementId');
         if (seenId === window.OGLOSZENIE.id) return;
         setAnnouncement(window.OGLOSZENIE);
@@ -1466,19 +1467,19 @@ const closeAnnouncement = () => {
 
                     {/* HERO & VIDEO ASSISTANT */}
                     <header className="relative pt-32 pb-20 md:pt-48 md:pb-24 px-6 z-10">
-                        <div className="max-w-7xl mx-auto flex flex-col-reverse md:flex-row items-center gap-12 md:gap-8">
+                        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center gap-12 md:gap-8">
                             
                             {/* Lewa Strona - Tekst i Szukajka */}
                             <div className="flex-1 text-center md:text-left reveal">
                                 <div className="inline-flex items-center gap-2 bg-blue-100 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-500/30 px-4 py-2 rounded-full text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest mb-6 md:mb-8">
-                                    <i className="ph-bold ph-sparkle"></i> Ponad 60 Zintegrowanych Narzędzi AI
+                                    <i className="ph-bold ph-check-circle"></i> Za darmo · bez rejestracji · po polsku
                                 </div>
-                                <h1 className="text-4xl md:text-6xl lg:text-7xl font-black text-slate-900 dark:text-white mb-6 leading-tight tracking-tight">
-                                    Mniej papierów,<br/>
-                                    <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-400 dark:to-purple-400">więcej edukacji.</span>
+                                <h1 className="text-4xl md:text-5xl lg:text-6xl font-black text-slate-900 dark:text-white mb-6 leading-tight tracking-tight">
+                                    Opinia, ocena opisowa, IPET, scenariusz —<br/>
+                                    <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-400 dark:to-purple-400">szkic w kilka minut.</span>
                                 </h1>
-                                <p className="text-lg text-slate-600 dark:text-slate-400 max-w-xl mx-auto md:mx-0 mb-10 leading-relaxed">
-                                    Ponad 60 polskich narzędzi AI dla nauczycieli: twórz oceny, scenariusze, IPET i WOPFU, dyplomy, fiszki oraz pisma. Mniej klikania, więcej czasu dla uczniów.
+                                <p className="text-lg text-slate-600 dark:text-slate-400 max-w-xl mx-auto md:mx-0 mb-8 leading-relaxed">
+                                    Mniej papierów, więcej edukacji. Ponad 60 darmowych narzędzi AI dla nauczycieli – wybierz, czego dziś potrzebujesz, wpisz kilka informacji i popraw gotowy tekst po swojemu.
                                 </p>
                                 
                                 {/* OMNIBAR SEARCH */}
@@ -1496,6 +1497,28 @@ const closeAnnouncement = () => {
                                         </button>
                                     </div>
                                 </div>
+
+                                {/* SKRÓTY DO NAJCZĘŚCIEJ POTRZEBNYCH RZECZY – zwykłe linki, widoczne od razu także na telefonie */}
+                                <nav aria-label="Najczęściej potrzebne" className="mt-7 max-w-2xl">
+                                    <p className="text-xs font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-3">Najczęściej potrzebne</p>
+                                    <div className="flex flex-wrap justify-center md:justify-start gap-2.5">
+                                        {[
+                                            ['edudialog.html?mode=ppp', 'ph-file-text', 'Opinia o uczniu', 'bg-blue-50 text-blue-800 border-blue-200 dark:bg-blue-500/10 dark:text-blue-200 dark:border-blue-500/30'],
+                                            ['eduocena.html', 'ph-pencil-line', 'Ocena opisowa', 'bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-200 dark:border-emerald-500/30'],
+                                            ['edudialog.html?mode=nvc', 'ph-chat-circle-text', 'Wiadomość do rodzica', 'bg-amber-50 text-amber-900 border-amber-200 dark:bg-amber-500/10 dark:text-amber-200 dark:border-amber-500/30'],
+                                            ['asystent-pedagoga.html', 'ph-puzzle-piece', 'IPET / WOPFU', 'bg-rose-50 text-rose-800 border-rose-200 dark:bg-rose-500/10 dark:text-rose-200 dark:border-rose-500/30'],
+                                            ['edulekcja360.html', 'ph-chalkboard-teacher', 'Scenariusz lekcji', 'bg-purple-50 text-purple-800 border-purple-200 dark:bg-purple-500/10 dark:text-purple-200 dark:border-purple-500/30'],
+                                            ['eduwpisy.html', 'ph-notebook', 'Wpis do dziennika', 'bg-teal-50 text-teal-800 border-teal-200 dark:bg-teal-500/10 dark:text-teal-200 dark:border-teal-500/30']
+                                        ].map(([url, icon, label, color]) => (
+                                            <a key={url} href={url} className={`inline-flex items-center gap-2 border rounded-full px-4 py-2.5 text-sm font-bold hover:-translate-y-0.5 hover:shadow-md transition-all ${color}`}>
+                                                <i className={`ph-bold ${icon}`} aria-hidden="true"></i>{label}
+                                            </a>
+                                        ))}
+                                    </div>
+                                    <button type="button" onClick={() => setShowQuiz(true)} className="mt-4 text-sm font-bold text-blue-600 dark:text-blue-400 hover:underline">
+                                        Nie wiesz, od czego zacząć? Odpowiedz na 2 pytania →
+                                    </button>
+                                </nav>
                             </div>
 
                            {/* Prawa Strona - Asystentka Wideo */}
@@ -1506,88 +1529,6 @@ const closeAnnouncement = () => {
 
                         </div>
                     </header>
-{window.PORADA_DNIA && (
-    <section className="max-w-4xl mx-auto px-6 -mt-6 mb-10 relative z-10">
-        <div className="flex items-center gap-4 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 rounded-2xl px-6 py-4 shadow-sm">
-            <div className="w-10 h-10 rounded-xl bg-amber-400 dark:bg-amber-500 flex items-center justify-center shrink-0">
-                <i className="ph-bold ph-lightbulb text-white text-xl"></i>
-            </div>
-            <div>
-                <p className="text-[10px] font-black uppercase tracking-widest text-amber-700 dark:text-amber-400 mb-1">Porada dnia dla nauczyciela</p>
-                <p className="text-sm text-slate-700 dark:text-slate-300">{window.PORADA_DNIA.text}</p>
-            </div>
-        </div>
-    </section>
-)}
-                    {/* ZAPIS NA POWIADOMIENIA - najważniejsze miejsce dla ruchu z social mediów: ktoś
-                        wchodzi raz z pina/filmiku, nie zostawia kawy, ale zapisany e-mail daje szansę
-                        wrócić do niego przy kolejnym narzędziu. Zero konta, jeden e-mail, zapis wprost
-                        do Firestore (patrz global-core.js subscribeNewsletter) - bez nowej funkcji Vercel. */}
-                    <section className="max-w-4xl mx-auto px-6 mb-10 relative z-10">
-                        <div className="bg-gradient-to-br from-blue-600 to-purple-600 rounded-3xl p-6 md:p-8 shadow-xl">
-                            <div className="flex flex-col md:flex-row md:items-center gap-5 md:gap-8">
-                                <div className="flex-1 text-center md:text-left">
-                                    <p className="text-[10px] font-black uppercase tracking-widest text-blue-100 mb-2">📬 Nowości EduBox prosto na skrzynkę</p>
-                                    <h2 className="text-xl md:text-2xl font-black text-white mb-1">Nie chcesz przegapić nowego narzędzia?</h2>
-                                    <p className="text-sm text-blue-100">Zero konta, zero spamu - tylko krótka wiadomość, gdy pojawi się coś nowego.</p>
-                                </div>
-                                <form onSubmit={handleNewsletterSubmit} className="flex flex-col sm:flex-row gap-2 w-full md:w-auto shrink-0">
-                                    <input
-                                        type="email" required value={newsletterEmail}
-                                        onChange={(e) => setNewsletterEmail(e.target.value)}
-                                        placeholder="twoj@email.pl"
-                                        className="bg-white/95 text-slate-900 placeholder-slate-400 rounded-full px-5 py-3 text-sm font-medium outline-none w-full sm:w-64"
-                                    />
-                                    <button
-                                        type="submit" disabled={newsletterStatus === 'sending'}
-                                        className="bg-slate-900 hover:bg-slate-800 disabled:opacity-60 text-white font-bold px-6 py-3 rounded-full text-sm transition-colors shrink-0"
-                                    >
-                                        {newsletterStatus === 'sending' ? 'Zapisuję...' : 'Zapisz mnie'}
-                                    </button>
-                                </form>
-                            </div>
-                            {newsletterMsg && (
-                                <p className={`text-center md:text-left text-xs font-bold mt-3 ${newsletterStatus === 'error' ? 'text-rose-200' : 'text-emerald-200'}`}>{newsletterMsg}</p>
-                            )}
-                        </div>
-                    </section>
-
-                    {/* MATERIAŁY DO POBRANIA — baner promujący nowy katalog pakietów tematycznych
-                        (materialy.html), ten sam wzorzec co sekcja "Standardy ochrony małoletnich"
-                        poniżej: stały, hardkodowany baner na stronie głównej (NIE część siatki z
-                        apps.js, bo to nie jest "narzędzie" tylko katalog treści/wsparcia). */}
-                    <section aria-labelledby="materialy-heading" className="max-w-[90rem] mx-auto px-6 pb-10 relative z-10">
-                        <div className="bg-gradient-to-br from-indigo-50 to-amber-50 dark:from-indigo-950/40 dark:to-slate-900 border border-indigo-200 dark:border-indigo-800/60 rounded-3xl p-6 md:p-8 flex flex-col lg:flex-row gap-6 lg:items-center lg:justify-between">
-                            <div className="flex items-start gap-4 max-w-3xl">
-                                <div className="w-12 h-12 rounded-2xl bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 flex items-center justify-center shrink-0" aria-hidden="true"><i className="ph-bold ph-package text-2xl"></i></div>
-                                <div>
-                                    <p className="text-xs font-bold uppercase tracking-widest text-indigo-800 dark:text-indigo-300 mb-2">📦 Nowość</p>
-                                    <h2 id="materialy-heading" className="text-xl md:text-2xl font-black text-slate-900 dark:text-white mb-3 leading-snug">Materiały do pobrania — gotowe pakiety tematyczne</h2>
-                                    <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">Scenariusze, piosenki, karty i plansze do druku dla przedszkola i szkoły. Podgląd zawsze darmowy — wsparcie kawą odblokowuje pobieranie.</p>
-                                </div>
-                            </div>
-                            <div className="flex flex-col sm:flex-row lg:flex-col gap-3 shrink-0">
-                                <a href="materialy.html" className="inline-flex justify-center items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl text-sm font-bold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-indigo-500">Zobacz materiały <span aria-hidden="true">↗</span></a>
-                            </div>
-                        </div>
-                    </section>
-                    {/* STANDARDY OCHRONY MAŁOLETNICH — poradnik, nie formalne standardy serwisu */}
-                    <section aria-labelledby="standardy-heading" className="max-w-[90rem] mx-auto px-6 pb-10 relative z-10">
-                        <div className="bg-gradient-to-br from-teal-50 to-blue-50 dark:from-teal-950/40 dark:to-slate-900 border border-teal-200 dark:border-teal-800/60 rounded-3xl p-6 md:p-8 flex flex-col lg:flex-row gap-6 lg:items-center lg:justify-between">
-                            <div className="flex items-start gap-4 max-w-3xl">
-                                <div className="w-12 h-12 rounded-2xl bg-teal-100 dark:bg-teal-900/60 text-teal-700 dark:text-teal-300 flex items-center justify-center shrink-0" aria-hidden="true"><i className="ph-bold ph-shield-check text-2xl"></i></div>
-                                <div>
-                                    <p className="text-xs font-bold uppercase tracking-widest text-teal-800 dark:text-teal-300 mb-2">Bezpieczeństwo dzieci · Poradnik dla szkoły</p>
-                                    <h2 id="standardy-heading" className="text-xl md:text-2xl font-black text-slate-900 dark:text-white mb-3 leading-snug">Standardy ochrony małoletnich — sprawdź na rok szkolny 2026/2027</h2>
-                                    <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">Obowiązki placówki, przegląd standardów, bezpieczeństwo w internecie i sprawdzone źródła prawne. Bez logowania, z listą kontrolną do wydruku.</p>
-                                </div>
-                            </div>
-                            <div className="flex flex-col sm:flex-row lg:flex-col gap-3 shrink-0">
-                                <a href="standardy-ochrony-maloletnich.html" className="inline-flex justify-center items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl text-sm font-bold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue-500">Otwórz poradnik <span aria-hidden="true">↗</span></a>
-                                <a href="standardy-ochrony-maloletnich.html#lista-kontrolna" className="inline-flex justify-center items-center px-5 py-3 rounded-xl text-sm font-bold text-teal-800 dark:text-teal-200 border border-teal-300 dark:border-teal-700 hover:bg-teal-100 dark:hover:bg-teal-900/50 transition-colors">Lista kontrolna</a>
-                            </div>
-                        </div>
-                    </section>
                     {/* CZTERY PROSTE WEJŚCIA DLA OSÓB, KTÓRE NIE ZNAJĄ JESZCZE NAZW APLIKACJI */}
                     <section aria-labelledby="centra-heading" className="max-w-[90rem] mx-auto px-6 pb-16 relative z-10">
                         <Reveal>
@@ -1609,6 +1550,54 @@ const closeAnnouncement = () => {
                                 ))}
                             </div>
                         </Reveal>
+                    </section>
+                    {/* GOTOWE PRZYKŁADY – to po nie nauczyciele przychodzą z Google; ciepły kolor przełamuje granat strony */}
+                    <section aria-labelledby="przyklady-heading" className="max-w-[90rem] mx-auto px-6 pb-10 relative z-10">
+                        <div className="rounded-3xl border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 p-6 md:p-8">
+                            <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-2 mb-6">
+                                <div>
+                                    <p className="text-xs font-black uppercase tracking-[0.2em] text-amber-700 dark:text-amber-400 mb-2">Bez AI, od ręki</p>
+                                    <h2 id="przyklady-heading" className="text-2xl md:text-3xl font-black text-slate-900 dark:text-white tracking-tight">Gotowe przykłady do skopiowania</h2>
+                                </div>
+                                <p className="text-sm text-slate-700 dark:text-slate-300 max-w-md">Wzory tekstów z bankiem zwrotów. Kopiujesz, dopasowujesz do swojego ucznia i gotowe.</p>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+                                {[
+                                    ['opinia-o-uczniu-do-poradni-przyklady.html', 'Opinia o uczniu do poradni'],
+                                    ['opinia-wychowawcy-o-uczniu-przyklady.html', 'Opinia wychowawcy o uczniu'],
+                                    ['ocena-opisowa-przyklady.html', 'Ocena opisowa – klasy 1–3'],
+                                    ['ocena-opisowa-srodroczna-klasa-1-przyklady.html', 'Ocena śródroczna – klasa 1'],
+                                    ['wiadomosc-do-rodzica-przyklady.html', 'Wiadomość do rodziców'],
+                                    ['wpisy-do-dziennika-przyklady.html', 'Wpisy do dziennika'],
+                                    ['wpisy-do-dziennika-przedszkole-przyklady.html', 'Wpisy do dziennika – przedszkole'],
+                                    ['sprawozdanie-wychowawcy-przyklady.html', 'Sprawozdanie wychowawcy']
+                                ].map(([url, label]) => (
+                                    <a key={url} href={url} className="group flex items-center justify-between gap-3 rounded-2xl bg-white dark:bg-slate-900 border border-amber-200 dark:border-slate-700 px-4 py-3.5 text-sm font-bold text-slate-900 dark:text-white hover:border-amber-400 hover:shadow-md transition-all min-w-0">
+                                        <span className="min-w-0">{label}</span>
+                                        <i className="ph-bold ph-arrow-right text-amber-600 dark:text-amber-400 group-hover:translate-x-1 transition-transform shrink-0" aria-hidden="true"></i>
+                                    </a>
+                                ))}
+                            </div>
+                        </div>
+                    </section>
+                    {/* MATERIAŁY DO POBRANIA — baner promujący nowy katalog pakietów tematycznych
+                        (materialy.html), ten sam wzorzec co sekcja "Standardy ochrony małoletnich"
+                        poniżej: stały, hardkodowany baner na stronie głównej (NIE część siatki z
+                        apps.js, bo to nie jest "narzędzie" tylko katalog treści/wsparcia). */}
+                    <section aria-labelledby="materialy-heading" className="max-w-[90rem] mx-auto px-6 pb-10 relative z-10">
+                        <div className="bg-gradient-to-br from-indigo-50 to-amber-50 dark:from-indigo-950/40 dark:to-slate-900 border border-indigo-200 dark:border-indigo-800/60 rounded-3xl p-6 md:p-8 flex flex-col lg:flex-row gap-6 lg:items-center lg:justify-between">
+                            <div className="flex items-start gap-4 max-w-3xl">
+                                <div className="w-12 h-12 rounded-2xl bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 flex items-center justify-center shrink-0" aria-hidden="true"><i className="ph-bold ph-package text-2xl"></i></div>
+                                <div>
+                                    <p className="text-xs font-bold uppercase tracking-widest text-indigo-800 dark:text-indigo-300 mb-2">📦 Nowość</p>
+                                    <h2 id="materialy-heading" className="text-xl md:text-2xl font-black text-slate-900 dark:text-white mb-3 leading-snug">Materiały do pobrania — gotowe pakiety tematyczne</h2>
+                                    <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">Scenariusze, piosenki, karty i plansze do druku dla przedszkola i szkoły. Podgląd zawsze darmowy — wsparcie kawą odblokowuje pobieranie.</p>
+                                </div>
+                            </div>
+                            <div className="flex flex-col sm:flex-row lg:flex-col gap-3 shrink-0">
+                                <a href="materialy.html" className="inline-flex justify-center items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl text-sm font-bold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-indigo-500">Zobacz materiały <span aria-hidden="true">↗</span></a>
+                            </div>
+                        </div>
                     </section>
                     {/* KATEGORIE I GRID APLIKACJI */}
                     <section id="narzedzia" className="max-w-[90rem] mx-auto px-6 py-20 z-10 relative border-t border-slate-200 dark:border-slate-800/50">
@@ -1710,6 +1699,69 @@ const closeAnnouncement = () => {
                         )}
                     </section>
 
+                    {/* ZAPIS NA POWIADOMIENIA - najważniejsze miejsce dla ruchu z social mediów: ktoś
+                        wchodzi raz z pina/filmiku, nie zostawia kawy, ale zapisany e-mail daje szansę
+                        wrócić do niego przy kolejnym narzędziu. Zero konta, jeden e-mail, zapis wprost
+                        do Firestore (patrz global-core.js subscribeNewsletter) - bez nowej funkcji Vercel. */}
+                    <section className="max-w-4xl mx-auto px-6 mb-10 relative z-10">
+                        <div className="bg-gradient-to-br from-blue-600 to-purple-600 rounded-3xl p-6 md:p-8 shadow-xl">
+                            <div className="flex flex-col md:flex-row md:items-center gap-5 md:gap-8">
+                                <div className="flex-1 text-center md:text-left">
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-blue-100 mb-2">📬 Nowości EduBox prosto na skrzynkę</p>
+                                    <h2 className="text-xl md:text-2xl font-black text-white mb-1">Nie chcesz przegapić nowego narzędzia?</h2>
+                                    <p className="text-sm text-blue-100">Zero konta, zero spamu - tylko krótka wiadomość, gdy pojawi się coś nowego.</p>
+                                </div>
+                                <form onSubmit={handleNewsletterSubmit} className="flex flex-col sm:flex-row gap-2 w-full md:w-auto shrink-0">
+                                    <input
+                                        type="email" required value={newsletterEmail}
+                                        onChange={(e) => setNewsletterEmail(e.target.value)}
+                                        placeholder="twoj@email.pl"
+                                        className="bg-white/95 text-slate-900 placeholder-slate-400 rounded-full px-5 py-3 text-sm font-medium outline-none w-full sm:w-64"
+                                    />
+                                    <button
+                                        type="submit" disabled={newsletterStatus === 'sending'}
+                                        className="bg-slate-900 hover:bg-slate-800 disabled:opacity-60 text-white font-bold px-6 py-3 rounded-full text-sm transition-colors shrink-0"
+                                    >
+                                        {newsletterStatus === 'sending' ? 'Zapisuję...' : 'Zapisz mnie'}
+                                    </button>
+                                </form>
+                            </div>
+                            {newsletterMsg && (
+                                <p className={`text-center md:text-left text-xs font-bold mt-3 ${newsletterStatus === 'error' ? 'text-rose-200' : 'text-emerald-200'}`}>{newsletterMsg}</p>
+                            )}
+                        </div>
+                    </section>
+
+{window.PORADA_DNIA && (
+    <section className="max-w-4xl mx-auto px-6 mb-10 relative z-10">
+        <div className="flex items-center gap-4 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 rounded-2xl px-6 py-4 shadow-sm">
+            <div className="w-10 h-10 rounded-xl bg-amber-400 dark:bg-amber-500 flex items-center justify-center shrink-0">
+                <i className="ph-bold ph-lightbulb text-white text-xl"></i>
+            </div>
+            <div>
+                <p className="text-[10px] font-black uppercase tracking-widest text-amber-700 dark:text-amber-400 mb-1">Porada dnia dla nauczyciela</p>
+                <p className="text-sm text-slate-700 dark:text-slate-300">{window.PORADA_DNIA.text}</p>
+            </div>
+        </div>
+    </section>
+)}
+                    {/* STANDARDY OCHRONY MAŁOLETNICH — poradnik, nie formalne standardy serwisu */}
+                    <section aria-labelledby="standardy-heading" className="max-w-[90rem] mx-auto px-6 pb-10 relative z-10">
+                        <div className="bg-gradient-to-br from-teal-50 to-blue-50 dark:from-teal-950/40 dark:to-slate-900 border border-teal-200 dark:border-teal-800/60 rounded-3xl p-6 md:p-8 flex flex-col lg:flex-row gap-6 lg:items-center lg:justify-between">
+                            <div className="flex items-start gap-4 max-w-3xl">
+                                <div className="w-12 h-12 rounded-2xl bg-teal-100 dark:bg-teal-900/60 text-teal-700 dark:text-teal-300 flex items-center justify-center shrink-0" aria-hidden="true"><i className="ph-bold ph-shield-check text-2xl"></i></div>
+                                <div>
+                                    <p className="text-xs font-bold uppercase tracking-widest text-teal-800 dark:text-teal-300 mb-2">Bezpieczeństwo dzieci · Poradnik dla szkoły</p>
+                                    <h2 id="standardy-heading" className="text-xl md:text-2xl font-black text-slate-900 dark:text-white mb-3 leading-snug">Standardy ochrony małoletnich — sprawdź na rok szkolny 2026/2027</h2>
+                                    <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">Obowiązki placówki, przegląd standardów, bezpieczeństwo w internecie i sprawdzone źródła prawne. Bez logowania, z listą kontrolną do wydruku.</p>
+                                </div>
+                            </div>
+                            <div className="flex flex-col sm:flex-row lg:flex-col gap-3 shrink-0">
+                                <a href="standardy-ochrony-maloletnich.html" className="inline-flex justify-center items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl text-sm font-bold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue-500">Otwórz poradnik <span aria-hidden="true">↗</span></a>
+                                <a href="standardy-ochrony-maloletnich.html#lista-kontrolna" className="inline-flex justify-center items-center px-5 py-3 rounded-xl text-sm font-bold text-teal-800 dark:text-teal-200 border border-teal-300 dark:border-teal-700 hover:bg-teal-100 dark:hover:bg-teal-900/50 transition-colors">Lista kontrolna</a>
+                            </div>
+                        </div>
+                    </section>
                     {/* BIBLIOTEKA WZORÓW */}
                     <section className="max-w-[90rem] mx-auto px-6 py-20 z-10 relative border-t border-slate-200 dark:border-slate-800/50">
                         <Reveal>
