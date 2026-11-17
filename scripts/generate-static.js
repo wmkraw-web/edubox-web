@@ -66,6 +66,9 @@ const WZORY_FOR = {
     'opinia-o-uczniu-do-poradni-przyklady.html'],
   'edubiurokrata.html': ['opinia-o-uczniu-do-poradni-przyklady.html'],
   'edusprawozdania.html': ['sprawozdanie-wychowawcy-przyklady.html'],
+  'edudyplomy.html': ['podziekowania-dla-rodzicow-przyklady.html'],
+  'edugenerator.html': ['podziekowania-dla-rodzicow-przyklady.html', 'zyczenia-swiateczne-od-nauczyciela-przyklady.html'],
+  'edukalendarz.html': ['wigilia-klasowa-przyklady.html', 'zyczenia-swiateczne-od-nauczyciela-przyklady.html'],
   'zanimklikniesz.html': ['oszustwo-doplata-do-paczki.html', 'oszustwo-telefon-z-banku.html', 'oszustwo-kup-z-olx.html',
     'oszustwo-blik-messenger.html', 'jak-sprawdzic-sklep-internetowy.html', 'falszywe-inwestycje-reklamy.html']
 };
