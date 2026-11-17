@@ -1792,6 +1792,7 @@ witam wszystkich po przerwie świątecznej i życzę udanego Nowego Roku. Przed 
       ['Czy mogę wygenerować życzenia przez AI?', 'Tak – nie wpisuj tylko danych dzieci ani rodziców. Gotowy tekst przeczytaj i dopisz coś od siebie, wtedy nie brzmi jak szablon.']
     ],
     extraLink: { url: 'wigilia-klasowa-przyklady.html', text: 'Zobacz też: wigilia klasowa – przebieg, zabawy i wiadomość do rodziców →' },
+    sklep: 'zyczenia-swiateczne',
     tool: {
       name: 'EduGenerator PRO',
       url: 'edugenerator.html',
@@ -1907,6 +1908,7 @@ dziękuję wszystkim, którzy pomogli przy naszej klasowej wigilii – za poczę
       ['Czy mogę zrobić zdjęcia na wigilii?', 'Tak, ale publikować je (np. na stronie szkoły) można tylko zgodnie ze zgodami rodziców obowiązującymi w Twojej szkole.']
     ],
     extraLink: { url: 'zyczenia-swiateczne-od-nauczyciela-przyklady.html', text: 'Zobacz też: życzenia świąteczne od nauczyciela – gotowe przykłady →' },
+    sklep: 'wigilia-klasowa',
     tool: {
       name: 'EduKalendarz',
       url: 'edukalendarz.html?m=12&swieto=Wigilia%20i%20Bo%C5%BCe%20Narodzenie',
@@ -2016,6 +2018,29 @@ dziękuję wszystkim, którzy pomogli przy [nazwa uroczystości] – za poczęst
   }
 );
 
+// Płatne pakiety grudniowe w sklepie naffy.io/edubox (od 17.11.2026). Strona z przykładami może mieć pole
+// `sklep: 'nazwa-kampanii'` – wtedy pod przykładami pokazuje się spokojna ramka „zobacz pakiet”, nie „kup teraz”.
+const SKLEP = [
+  ['https://naffy.io/edubox/grudzien-w-przedszkolu', 'Przedszkole – 19 zł', 'przedszkole'],
+  ['https://naffy.io/edubox/grudzien-w-klasach-1-3', 'Klasy 1–3 – 19 zł', 'klasy-1-3'],
+  ['https://naffy.io/edubox/zestaw-grudniowy', 'Oba pakiety – 29 zł', 'zestaw'],
+];
+function sklepBox(campaign) {
+  const links = SKLEP.map(([url, label, id]) => `<a href="${url}?utm_source=eduboxpro&amp;utm_medium=wzor&amp;utm_campaign=${campaign}" target="_blank" rel="noopener" onclick="try{gtag('event','sklep_click',{produkt:'${id}',miejsce:'${campaign}'})}catch(e){}" class="inline-block bg-white border border-rose-300 text-rose-800 font-bold px-4 py-2.5 rounded-xl text-sm hover:bg-rose-100 transition">${label} ↗</a>`).join('\n        ');
+  return `
+    <section class="mb-10 bg-rose-50 border border-rose-200 rounded-2xl p-5 flex flex-col sm:flex-row gap-5 sm:items-center">
+      <img src="/sklep-grudzien.webp" alt="Okładki pakietów grudniowych dla przedszkola i klas 1–3" width="720" height="378" loading="lazy" class="w-full sm:w-56 rounded-xl shadow-sm">
+      <div>
+        <p class="text-xs font-extrabold uppercase tracking-widest text-rose-700 mb-1">Pakiet na grudzień</p>
+        <h2 class="text-lg font-extrabold text-slate-900 mb-2">Gotowe przedstawienie świąteczne z piosenkami i teledyskami</h2>
+        <p class="text-sm text-slate-700 mb-3">Scenariusz z rolami dla 15–25 dzieci, 3 piosenki MP3, 2 teledyski z tekstem na ekranie, kalendarz adwentowy, gry i karty pracy. Osobno dla przedszkola i klas 1–3. Pakiety są płatne – dzięki nim reszta EduBoxa zostaje darmowa.</p>
+        <div class="flex flex-wrap gap-2">
+        ${links}
+        </div>
+      </div>
+    </section>`;
+}
+
 const BANK_PDF = 'pobierz/bank-zwrotow-nauczyciela.pdf'; // generuje scripts/generate-bank-zwrotow.py
 
 const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -2113,7 +2138,7 @@ ${p.examples.map((ex, i) => `        <article class="bg-white border border-slat
         </article>`).join('\n')}
       </div>
     </section>
-
+${p.sklep ? sklepBox(p.sklep) : ''}
     <section class="mb-8">
       <h2 class="text-xl font-extrabold text-slate-900 mb-2">Bank zwrotów</h2>
       <p class="text-sm text-slate-500 mb-4">Kliknij zwrot, żeby go skopiować.</p>

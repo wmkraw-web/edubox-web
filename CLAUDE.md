@@ -179,6 +179,14 @@ category, tags`.
   EduDyplomy, Magic Color, EduPlakat, EduStudio, EduGazetka, MagicLetters,
   EduMalarz, EduDetox.
 
+**Sklep z płatnymi pakietami (od 17.11.2026):** naffy.io/edubox (Naffy, płatność BLIK/karta, pliki ZIP do pobrania).
+Produkty: `grudzien-w-przedszkolu` (19 zł), `grudzien-w-klasach-1-3` (19 zł), `zestaw-grudniowy` (29 zł). Linki prowadzą
+z banera na stronie głównej i w `materialy.html` (oba znikają same po 24.12.2026 – warunek z datą w JSX) oraz z ramki
+`sklepBox` na stronach z przykładami z polem `sklep` w `generate-wzory.js` (wigilia klasowa, życzenia świąteczne).
+Zdarzenie GA `sklep_click` (`produkt`, `miejsce`), UTM `utm_source=eduboxpro`. Ton: „zobacz pakiet”, nigdy „kup teraz”;
+zawsze z dopiskiem, że płatne pakiety utrzymują darmową resztę. Pakiety do sprzedaży i generator PDF leżą poza repo
+(folder właściciela). Złoty Nauczyciel – profil dostawcy w weryfikacji.
+
 **Narzędzia prywatne** (poza katalogiem, za Basic Auth przez `middleware.js`,
 `EWA_AUTH_USER`/`EWA_AUTH_PASS`):
 - `ewamarketing.html` — "EduInfluencer Studio", posty + zdjęcia (Ewa: blond,
