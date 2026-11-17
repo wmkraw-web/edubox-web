@@ -1674,6 +1674,348 @@ Wskazówki na II półrocze: Warto codziennie czytać z uczennicą przez 15 minu
   }
 );
 
+// ---------------------------------------------------------------------------------------------
+// Partia z 17.11.2026: strony sezonowe (grudzień) i podziękowania. Bez przepisów – to teksty
+// okolicznościowe. Zasada: życzenia do wszystkich rodzin także w wersji bez odniesień religijnych,
+// tradycje bez narzucania wiary, przy wigilii bezpieczeństwo (ogień tylko u dorosłego) i alergie.
+// ---------------------------------------------------------------------------------------------
+const NOWE17 = { updated: '17 listopada 2026', updatedIso: '2026-11-17' };
+
+PAGES.push(
+  {
+    slug: 'zyczenia-swiateczne-od-nauczyciela-przyklady.html',
+    ...NOWE17,
+    title: 'Życzenia świąteczne od nauczyciela – przykłady | EduBox AI',
+    description: 'Gotowe życzenia świąteczne od wychowawcy: dla rodziców przez e-dziennik, dla uczniów, dla grona pedagogicznego i noworoczne. Także wersje bez odniesień religijnych.',
+    kicker: 'Wzory i przykłady · Grudzień',
+    h1: 'Życzenia świąteczne od nauczyciela – gotowe przykłady do skopiowania',
+    short: 'Przed przerwą świąteczną wychowawca zwykle wysyła krótkie życzenia rodzicom przez e-dziennik, składa je uczniom na ostatniej lekcji i dopisuje kilka słów na kartce dla grona. Dobre życzenia od nauczyciela są krótkie, ciepłe i dotyczą wszystkich – w klasie bywają rodziny różnych wyznań albo niewierzące, dlatego przy wiadomości do całej klasy warto mieć pod ręką wersję bez odniesień religijnych. Poniżej znajdziesz przykłady na każdą z tych sytuacji i bank zwrotów do własnych życzeń.',
+    rulesTitle: 'Jak napisać życzenia od nauczyciela',
+    rules: [
+      'Krótko: 3–5 zdań wystarczy, w e-dzienniku rodzic czyta je na telefonie.',
+      'Jedna wiadomość do wszystkich rodziców, bez imion dzieci i bez wyróżniania kogokolwiek.',
+      'Do całej klasy wybierz życzenia, w których odnajdzie się każda rodzina; wersję religijną zostaw na kartki dla osób, o których wiesz, że ją docenią.',
+      'Dodaj jedno zdanie o tym, co udało się razem w tym półroczu – to odróżnia życzenia od szablonu.',
+      'Nie dopisuj spraw organizacyjnych (zebrania, oceny, wpłaty) – na to jest osobna wiadomość.',
+      'Wyślij przed ostatnim dniem zajęć albo w ostatni dzień po lekcjach, nie w Wigilię wieczorem.'
+    ],
+    examplesNote: 'Przykłady możesz kopiować i dopasowywać – zmień formy (Pani/Pan, wychowawczyni/wychowawca) i dopisz coś od siebie.',
+    examples: [
+      {
+        label: 'Przykład 1: do rodziców przez e-dziennik – ciepło, bez odniesień religijnych',
+        meta: 'Wiadomość do wszystkich rodziców klasy',
+        text: `Szanowni Państwo,
+dziękuję za współpracę w tym półroczu – za wspólne wyjścia, pomoc przy klasowych wydarzeniach i każdą rozmowę o Państwa dzieciach. Na nadchodzące święta i przerwę życzę spokoju, odpoczynku i czasu dla siebie nawzajem, a w Nowym Roku – zdrowia i wielu powodów do radości.
+Z serdecznymi pozdrowieniami
+[imię i nazwisko], wychowawczyni klasy [klasa]`
+      },
+      {
+        label: 'Przykład 2: do rodziców – tradycyjnie',
+        meta: 'Gdy wiesz, że taka forma pasuje do klasy',
+        text: `Szanowni Rodzice,
+z okazji Świąt Bożego Narodzenia życzę Państwu i Państwa bliskim radosnych, spokojnych dni w rodzinnym gronie, a w Nowym Roku – zdrowia, życzliwości i spełnienia planów. Dziękuję za zaufanie i dobrą współpracę w tym półroczu.
+[imię i nazwisko], wychowawca klasy [klasa]`
+      },
+      {
+        label: 'Przykład 3: dla uczniów klas 1–3 – na ostatniej lekcji albo na kartce',
+        meta: 'Proste słowa, które dzieci zrozumieją',
+        text: `Kochani!
+Życzę Wam wesołych świąt, pełnych uśmiechu, ciepłego kakao i wspólnych zabaw z bliskimi. Odpocznijcie, wyśpijcie się i wróćcie do szkoły z nowymi pomysłami – będę na Was czekać!
+Wasza Pani [imię]`
+      },
+      {
+        label: 'Przykład 4: dla uczniów klas 4–8',
+        meta: 'Na koniec ostatniej lekcji przed przerwą',
+        text: `Na koniec tego półrocza chcę Wam podziękować: za dobre pomysły, za pomoc, którą dajecie sobie nawzajem, i za to, że coraz lepiej umiecie pracować razem. Życzę Wam świąt bez pośpiechu i przerwy, w czasie której naprawdę odpoczniecie. Do zobaczenia w Nowym Roku!`
+      },
+      {
+        label: 'Przykład 5: dla grona pedagogicznego i pracowników szkoły',
+        meta: 'Na kartkę w pokoju nauczycielskim albo wiadomość do zespołu',
+        text: `Drogie Koleżanki i Koledzy,
+dziękuję za wspólną pracę w tym półroczu – za pomoc w zastępstwach, dobre rady i każdą kawę wypitą w biegu. Życzę Wam świąt pełnych spokoju i odpoczynku, a w Nowym Roku – sił, zdrowia i uczniów, którzy zaskakują nas pozytywnie.
+[imię]`
+      },
+      {
+        label: 'Przykład 6: dla dyrekcji – oficjalnie',
+        meta: 'Kartka albo krótki list',
+        text: `Szanowna Pani Dyrektor,
+z okazji nadchodzących świąt i Nowego Roku składam serdeczne życzenia zdrowia, pogody ducha oraz satysfakcji z pracy. Dziękuję za wsparcie i dobrą współpracę w mijającym roku.
+Z wyrazami szacunku
+[imię i nazwisko]`
+      },
+      {
+        label: 'Przykład 7: noworoczne – do rodziców po przerwie',
+        meta: 'Pierwsza wiadomość w styczniu',
+        text: `Szanowni Państwo,
+witam wszystkich po przerwie świątecznej i życzę udanego Nowego Roku. Przed nami drugie półrocze – liczę na tak dobrą współpracę jak dotąd. Gdyby mieli Państwo pytania dotyczące najbliższych tygodni, jestem do dyspozycji.
+[imię i nazwisko]`
+      }
+    ],
+    phrases: [
+      ['Początek', [
+        'Z okazji nadchodzących świąt…',
+        'Na nadchodzący czas świąt i przerwy…',
+        'Z okazji Świąt Bożego Narodzenia…',
+        'Na zakończenie tego półrocza…'
+      ]],
+      ['Życzenia', [
+        'życzę spokoju, odpoczynku i czasu dla bliskich',
+        'życzę radosnych dni w rodzinnym gronie',
+        'życzę świąt bez pośpiechu i pełnych ciepła',
+        'życzę zdrowia, życzliwości i wielu powodów do uśmiechu',
+        'niech ten czas przyniesie odpoczynek i dobre chwile'
+      ]],
+      ['Podziękowanie za półrocze', [
+        'Dziękuję za współpracę i zaufanie w tym półroczu.',
+        'Dziękuję za pomoc przy klasowych wydarzeniach.',
+        'Dziękuję za każdą rozmowę o Państwa dzieciach.',
+        'Dziękuję Wam za dobre pomysły i pomoc, którą dajecie sobie nawzajem.'
+      ]],
+      ['Nowy Rok', [
+        'a w Nowym Roku – zdrowia i spełnienia planów',
+        'niech Nowy Rok przyniesie wiele powodów do radości',
+        'do zobaczenia w Nowym Roku!',
+        'liczę na równie dobrą współpracę w drugim półroczu'
+      ]]
+    ],
+    mistakes: [
+      'Imiona dzieci albo wyróżnianie pojedynczych uczniów w wiadomości do wszystkich rodziców.',
+      'Życzenia religijne wysłane do całej klasy, w której są rodziny różnych wyznań lub niewierzące.',
+      'Dopisane sprawy organizacyjne („przypominam o wpłatach”) – psują ciepły ton.',
+      'Bardzo długi tekst albo wiersz na pół ekranu telefonu.',
+      'Wysyłka w Wigilię wieczorem – lepiej dzień lub dwa wcześniej.'
+    ],
+    faq: [
+      ['Czy wychowawca powinien wysyłać życzenia rodzicom?', 'Nie ma takiego obowiązku – to gest uprzejmości. Wielu rodziców dobrze go przyjmuje, zwłaszcza gdy w życzeniach jest jedno zdanie o tym, co udało się w klasie.'],
+      ['Jak złożyć życzenia, gdy w klasie są rodziny różnych wyznań?', 'Do całej klasy najbezpieczniej wysłać życzenia świąteczne i noworoczne bez odniesień religijnych (przykład 1). Wersję tradycyjną możesz wpisać na kartkę dla osób, o których wiesz, że ją docenią.'],
+      ['Czy mogę wysłać życzenia przez e-dziennik?', 'Tak, to najprostsza droga do wszystkich rodziców naraz. Wyślij jedną wiadomość zbiorczą, bez imion dzieci.'],
+      ['Czy mogę wygenerować życzenia przez AI?', 'Tak – nie wpisuj tylko danych dzieci ani rodziców. Gotowy tekst przeczytaj i dopisz coś od siebie, wtedy nie brzmi jak szablon.']
+    ],
+    extraLink: { url: 'wigilia-klasowa-przyklady.html', text: 'Zobacz też: wigilia klasowa – przebieg, zabawy i wiadomość do rodziców →' },
+    tool: {
+      name: 'EduGenerator PRO',
+      url: 'edugenerator.html',
+      campaign: 'zyczenia-swiateczne',
+      text: 'Chcesz dać dzieciom coś na pamiątkę? W EduGeneratorze wybierasz okazję „Mikołajki / Święta”, wklejasz listę imion i drukujesz dyplomy dla całej klasy naraz. Za darmo, bez rejestracji; lista imion zostaje w Twojej przeglądarce.'
+    }
+  },
+  {
+    slug: 'wigilia-klasowa-przyklady.html',
+    ...NOWE17,
+    title: 'Wigilia klasowa – scenariusz, zabawy i list | EduBox AI',
+    description: 'Wigilia klasowa krok po kroku: przebieg dla przedszkola, klas 1–3 i 4–8, zabawy bez przygotowań, wiadomość do rodziców o organizacji i podziękowanie po spotkaniu.',
+    kicker: 'Wzory i przykłady · Grudzień',
+    h1: 'Wigilia klasowa – przebieg, zabawy i wiadomość do rodziców',
+    short: 'Klasowa wigilia to dla dzieci jedno z najważniejszych spotkań roku, a dla wychowawcy – sporo organizacji w najbardziej zabieganym tygodniu. Najlepiej sprawdzają się proste plany: krótki program, wspólny poczęstunek, jedna albo dwie zabawy i czas na rozmowę. Poniżej znajdziesz przykładowy przebieg dla różnych grup wiekowych, gotową wiadomość do rodziców i pomysły na zabawy, które nie wymagają przygotowań. Tradycje pokazujemy tak, żeby każde dziecko czuło się zaproszone – niezależnie od tego, czy i jak jego rodzina obchodzi święta.',
+    rulesTitle: 'Na co zwrócić uwagę przy organizacji',
+    rules: [
+      'Zapytaj rodziców o alergie i diety, zanim ustalicie poczęstunek – i powiedz o nich osobom, które przynoszą jedzenie.',
+      'Świece tylko elektryczne; jeśli prawdziwa świeca, to wyłącznie u dorosłego, z dala od dzieci i dekoracji.',
+      'Prezenty: losowanie z kwotą ustaloną z rodzicami albo wspólny prezent dla klasy – żeby nikt nie czuł się gorzej.',
+      'Udział w zwyczajach religijnych (opłatek, kolędy) zostaw jako możliwość, nie obowiązek – zawsze z alternatywą.',
+      'Plan zmieść w czasie lekcji: dzieci są zmęczone, krótszy program to lepszy program.',
+      'Zapytaj, kto z rodziców chce pomóc – i podziękuj potem konkretnie.'
+    ],
+    examplesNote: 'Przebieg dopasuj do swojej grupy i czasu, który masz. Godziny są orientacyjne.',
+    examples: [
+      {
+        label: 'Przykład 1: przedszkole – ok. 45 minut',
+        meta: 'Grupa 4–6-latków, z rodzicami albo bez',
+        text: `1. Powitanie w kole i krótka rozmowa: „Jak u Was w domu wygląda czas świąt?” (5 min).
+2. Piosenka zimowa albo świąteczna z pokazywaniem (5 min).
+3. Wspólne ubieranie małej choinki albo dekorowanie okna papierowymi gwiazdkami zrobionymi wcześniej przez dzieci (10 min).
+4. Poczęstunek przy wspólnym stole – pierniczki, owoce, sok; przy stole każde dziecko mówi, czego życzy kolegom (15 min).
+5. Rozdanie drobnych upominków albo wspólnego prezentu dla grupy (5 min).
+6. Pożegnanie i zdjęcie grupowe – tylko za zgodą rodziców (5 min).`
+      },
+      {
+        label: 'Przykład 2: klasy 1–3 – 1–2 godziny lekcyjne',
+        meta: 'W klasie, z wychowawcą',
+        text: `1. Uczniowie nakrywają stół: obrus, serwetki, talerzyki – każdy ma zadanie (10 min).
+2. Krótki program przygotowany przez dzieci: wiersz, piosenka albo scenka (10–15 min).
+3. Życzenia – w kręgu każde dziecko mówi jedno życzenie dla osoby siedzącej obok; kto chce, może podzielić się opłatkiem (10 min).
+4. Poczęstunek i rozmowa: „Moja ulubiona świąteczna albo zimowa tradycja” (20 min).
+5. Losowanie prezentów albo otwieranie wspólnego prezentu dla klasy (10 min).
+6. Zabawa na koniec: kalambury świąteczno-zimowe (10 min).
+7. Wspólne sprzątanie – lista zadań na tablicy (5 min).`
+      },
+      {
+        label: 'Przykład 3: klasy 4–8 – 1 godzina lekcyjna',
+        meta: 'Starsi uczniowie współorganizują',
+        text: `1. Samorząd klasowy przygotowuje salę i plan (przed lekcją).
+2. Krótkie słowo wychowawcy: podsumowanie półrocza – jedna rzecz, z której klasa może być dumna (3 min).
+3. Życzenia w parach wylosowanych na tablicy; dla chętnych opłatek (7 min).
+4. Poczęstunek przygotowany przez zespoły (20 min).
+5. Quiz „Zimowe tradycje w różnych krajach” w drużynach (10 min).
+6. „Słoik dobrych słów”: każdy pisze anonimowo jedno miłe zdanie o klasie, wychowawca czyta kilka na głos (5 min).
+7. Sprzątanie według podziału zadań (5 min).`
+      },
+      {
+        label: 'Przykład 4: wiadomość do rodziców o organizacji',
+        meta: 'Przez e-dziennik, ok. 2 tygodnie wcześniej',
+        text: `Szanowni Państwo,
+klasowa wigilia odbędzie się [data] w godzinach [godziny]. Planujemy wspólny poczęstunek, krótki program przygotowany przez dzieci i drobne upominki.
+Prośby:
+– do [data] proszę o informację o alergiach i dietach dziecka (wiadomością prywatną),
+– prezenty losujemy w klasie; proponowana kwota to [kwota] zł – jeśli wolą Państwo inną formę, proszę o sygnał,
+– osoby, które mogą przynieść poczęstunek albo pomóc w dekoracji, proszę o krótką odpowiedź.
+Dziękuję i pozdrawiam,
+[imię i nazwisko]`
+      },
+      {
+        label: 'Przykład 5: podziękowanie dla rodziców po wigilii',
+        meta: 'Krótka wiadomość następnego dnia',
+        text: `Szanowni Państwo,
+dziękuję wszystkim, którzy pomogli przy naszej klasowej wigilii – za poczęstunek, dekoracje i pomoc przy sprzątaniu. Dzieci były bardzo zadowolone, a spotkanie było naprawdę ciepłe. Życzę Państwu spokojnych świąt i odpoczynku.
+[imię i nazwisko]`
+      }
+    ],
+    phrases: [
+      ['Zabawy bez przygotowań', [
+        'Kalambury świąteczno-zimowe – hasła na karteczkach w pudełku.',
+        'Głuchy telefon z życzeniami przekazywanymi szeptem.',
+        'Bingo zimowych słów – uczniowie rysują planszę 3 × 3 sami.',
+        '„Kto to powiedział?” – zgadywanie autorów miłych zdań o klasie.',
+        'Wspólny rysunek „Nasza klasa zimą” na dużym arkuszu.'
+      ]],
+      ['Zadania dla uczniów', [
+        'Nakrycie stołu i obrus.',
+        'Dekoracja sali i okien.',
+        'Prowadzenie programu i zapowiedzi.',
+        'Muzyka w tle (playlista sprawdzona wcześniej przez nauczyciela).',
+        'Sprzątanie według listy na tablicy.'
+      ]],
+      ['Bez wykluczania', [
+        'Opłatek i kolędy dla chętnych – reszta śpiewa piosenkę zimową albo składa życzenia słowami.',
+        'Rozmowa o różnych sposobach świętowania w różnych domach.',
+        'Prezenty losowane z ustaloną kwotą albo jeden wspólny prezent dla klasy.',
+        'Poczęstunek z oznaczeniem, co zawiera orzechy, mleko lub gluten.'
+      ]]
+    ],
+    mistakes: [
+      'Prawdziwe świece na stole wśród dzieci i papierowych dekoracji.',
+      'Brak pytania o alergie przed ustaleniem poczęstunku.',
+      'Prezenty bez ustalonej kwoty – dzieci porównują, ktoś czuje się gorzej.',
+      'Obowiązkowy udział w zwyczajach religijnych bez alternatywy.',
+      'Zbyt długi program – po godzinie uwaga dzieci się kończy.',
+      'Publikowanie zdjęć dzieci bez zgody rodziców.'
+    ],
+    faq: [
+      ['Ile powinna trwać wigilia klasowa?', 'W przedszkolu i klasach 1–3 zwykle 45–90 minut, w klasach 4–8 jedna godzina lekcyjna. Lepiej krócej i spokojnie niż długo i w pośpiechu.'],
+      ['Czy dziecko z rodziny innego wyznania może wziąć udział?', 'Tak – spotkanie klasowe jest dla wszystkich. Zwyczaje religijne zaproponuj jako możliwość, a dla reszty miej alternatywę, np. życzenia słowami albo piosenkę zimową. W razie wątpliwości porozmawiaj z rodzicami.'],
+      ['Jak ustalić prezenty, żeby nikt nie czuł się gorzej?', 'Najprościej przez losowanie z kwotą ustaloną razem z rodzicami albo jeden wspólny prezent dla klasy (gra, książki do biblioteczki klasowej).'],
+      ['Czy mogę zrobić zdjęcia na wigilii?', 'Tak, ale publikować je (np. na stronie szkoły) można tylko zgodnie ze zgodami rodziców obowiązującymi w Twojej szkole.']
+    ],
+    extraLink: { url: 'zyczenia-swiateczne-od-nauczyciela-przyklady.html', text: 'Zobacz też: życzenia świąteczne od nauczyciela – gotowe przykłady →' },
+    tool: {
+      name: 'EduKalendarz',
+      url: 'edukalendarz.html?m=12&swieto=Wigilia%20i%20Bo%C5%BCe%20Narodzenie',
+      campaign: 'wigilia-klasowa',
+      text: 'Potrzebujesz gotowych zajęć przed przerwą świąteczną? EduKalendarz przygotuje plan zajęć na Wigilię i Boże Narodzenie, mikołajki albo zimę – z czasem trwania części, materiałami z sali i uwagą o alergiach. Za darmo, bez rejestracji.'
+    }
+  },
+  {
+    slug: 'podziekowania-dla-rodzicow-przyklady.html',
+    ...NOWE17,
+    title: 'Podziękowania dla rodziców – gotowe przykłady | EduBox AI',
+    description: 'Gotowe podziękowania od wychowawcy: dla rodziców na koniec roku, dla trójki klasowej, za pomoc przy wycieczce i wigilii, dla sponsora. Teksty do dyplomów i kartek.',
+    kicker: 'Wzory i przykłady · Podziękowania',
+    h1: 'Podziękowania dla rodziców – przykłady od wychowawcy i szkoły',
+    short: 'Podziękowanie to drobiazg, który rodzice zapamiętują na długo – zwłaszcza gdy jest konkretne. Zamiast ogólnego „dziękuję za współpracę” lepiej napisać, za co dokładnie: za pomoc przy wycieczce, upieczone ciasta na kiermasz albo prowadzenie klasowej zbiórki. Poniżej znajdziesz gotowe teksty na dyplom, kartkę i wiadomość w e-dzienniku – na koniec roku szkolnego, po klasowej uroczystości i dla osób spoza szkoły.',
+    rulesTitle: 'Jak napisać dobre podziękowanie',
+    rules: [
+      'Napisz, za co konkretnie dziękujesz – jedna rzecz zapamiętana jest lepsza niż ogólnik.',
+      'Dodaj, co to dało dzieciom albo klasie („dzięki temu wycieczka mogła się odbyć”).',
+      'Na dyplom: krótko i uroczyście; w wiadomości: cieplej i bardziej osobiście.',
+      'Podpisz się imieniem i nazwiskiem, a przy podziękowaniu od szkoły – także dyrektor.',
+      'Dziękuj wszystkim, którzy pomogli – pominięcie kogoś boli bardziej niż brak podziękowań.'
+    ],
+    examplesNote: 'Teksty możesz wpisać na dyplom, kartkę albo wiadomość. W miejsca w nawiasach kwadratowych wpisz swoje dane.',
+    examples: [
+      {
+        label: 'Przykład 1: dla rodziców na koniec roku szkolnego – na dyplom',
+        meta: 'Dla rodzica szczególnie zaangażowanego w życie klasy',
+        text: `Serdecznie dziękujemy Pani [imię i nazwisko] za zaangażowanie w życie klasy [klasa] w roku szkolnym [rok], za pomoc w organizacji wycieczek i uroczystości oraz za życzliwość, z jaką zawsze wspierała Pani nasze działania.
+Wychowawczyni [imię i nazwisko]          Dyrektor szkoły [imię i nazwisko]`
+      },
+      {
+        label: 'Przykład 2: dla wszystkich rodziców – wiadomość na koniec roku',
+        meta: 'Przez e-dziennik, ostatni tydzień czerwca',
+        text: `Szanowni Państwo,
+dziękuję za ten rok – za zaufanie, za pomoc przy wycieczkach i uroczystościach, za każdą rozmowę i każde „w czym możemy pomóc?”. To był dobry rok dla naszej klasy, także dzięki Państwu. Życzę udanych wakacji i do zobaczenia we wrześniu.
+[imię i nazwisko], wychowawczyni klasy [klasa]`
+      },
+      {
+        label: 'Przykład 3: dla trójki klasowej (rady oddziałowej)',
+        meta: 'Dyplom albo kartka',
+        text: `Dziękujemy Radzie Oddziałowej klasy [klasa] – [imiona i nazwiska] – za całoroczną pracę na rzecz klasy: prowadzenie zbiórek, organizację klasowych wydarzeń i sprawny kontakt z rodzicami. Państwa pomoc była dla nas nieoceniona.`
+      },
+      {
+        label: 'Przykład 4: za pomoc przy wycieczce',
+        meta: 'Wiadomość po powrocie',
+        text: `Szanowna Pani,
+bardzo dziękuję za pomoc jako opiekunka podczas naszej wycieczki do [miejsce]. Dzięki Pani obecności mogliśmy zorganizować wyjazd dla całej klasy, a dzieci były bezpieczne i zadowolone. To był świetny dzień!
+[imię i nazwisko]`
+      },
+      {
+        label: 'Przykład 5: za pomoc przy klasowej uroczystości (wigilia, Dzień Babci i Dziadka, festyn)',
+        meta: 'Krótka wiadomość do pomagających rodziców',
+        text: `Szanowni Państwo,
+dziękuję wszystkim, którzy pomogli przy [nazwa uroczystości] – za poczęstunek, dekoracje, stroje i pomoc przy sprzątaniu. Dzięki Państwu dzieci miały piękne święto, a goście wyszli zachwyceni.
+[imię i nazwisko]`
+      },
+      {
+        label: 'Przykład 6: dla sponsora lub instytucji – oficjalnie',
+        meta: 'Podziękowanie od dyrekcji i grona',
+        text: `Dyrekcja, nauczyciele i uczniowie [nazwa szkoły] składają serdeczne podziękowania [nazwa firmy lub instytucji] za [czego dotyczyło wsparcie, np. przekazanie książek do biblioteki szkolnej]. Dzięki Państwa życzliwości nasi uczniowie [co to dało]. Wyrażamy nadzieję na dalszą współpracę.
+[miejscowość, data]          Dyrektor szkoły [imię i nazwisko]`
+      }
+    ],
+    phrases: [
+      ['Za co dziękujemy', [
+        'za zaangażowanie w życie klasy',
+        'za pomoc w organizacji wycieczek i uroczystości',
+        'za życzliwość i dobrą współpracę',
+        'za całoroczną pracę na rzecz klasy',
+        'za pomoc jako opiekun podczas wycieczki',
+        'za przygotowanie poczęstunku i dekoracji'
+      ]],
+      ['Co to dało', [
+        'Dzięki Państwa pomocy wycieczka mogła się odbyć.',
+        'Dzięki Państwu dzieci miały piękne święto.',
+        'Państwa wsparcie było dla nas nieocenione.',
+        'To był dobry rok dla naszej klasy, także dzięki Państwu.'
+      ]],
+      ['Zakończenie', [
+        'Życzę udanych wakacji i do zobaczenia we wrześniu.',
+        'Z wyrazami wdzięczności',
+        'Z serdecznymi pozdrowieniami',
+        'Wyrażamy nadzieję na dalszą współpracę.'
+      ]]
+    ],
+    mistakes: [
+      'Ogólnik („dziękujemy za wszystko”) zamiast jednej konkretnej rzeczy.',
+      'Pominięcie części osób, które pomagały.',
+      'Imiona dzieci w wiadomości do wszystkich rodziców.',
+      'Podziękowanie wysłane kilka tygodni po wydarzeniu – najlepiej w ciągu paru dni.',
+      'Błędy w imieniu lub nazwisku na dyplomie – sprawdź pisownię przed drukiem.'
+    ],
+    faq: [
+      ['Komu wręczyć podziękowanie na koniec roku?', 'Najczęściej rodzicom szczególnie zaangażowanym (trójka klasowa, opiekunowie na wycieczkach, pomoc przy uroczystościach). Wszystkim rodzicom warto wysłać krótką wiadomość z podziękowaniem za cały rok.'],
+      ['Czy podziękowanie dla rodzica podpisuje dyrektor?', 'Na dyplomie od szkoły – zwykle wychowawca i dyrektor. Wiadomość w e-dzienniku podpisuje sam wychowawca.'],
+      ['Gdzie zrobić ładny dyplom z podziękowaniem?', 'W EduGeneratorze wybierasz okazję i wygląd, wpisujesz treść i drukujesz – dla jednej osoby albo dla całej listy naraz. Narzędzie jest darmowe.'],
+      ['Czy mogę napisać podziękowanie przez AI?', 'Tak, w EduDyplomach jest tryb oficjalnych podziękowań: podajesz, dla kogo i za co, a AI pisze tekst. Nie wpisuj danych wrażliwych; gotowy tekst przeczytaj i popraw.']
+    ],
+    extraLink: { url: 'edugenerator.html', text: 'Dyplom z podziękowaniem do druku – EduGenerator (za darmo) →' },
+    tool: {
+      name: 'EduDyplomy AI',
+      url: 'edudyplomy.html',
+      campaign: 'podziekowania-rodzice',
+      text: 'Podaj, dla kogo i za co dziękujesz – EduDyplomy napiszą eleganckie podziękowanie dla rodzica, sponsora albo instytucji, a dla uczniów wesołe, rymowane dyplomy z przymrużeniem oka. Za darmo, bez rejestracji.'
+    }
+  }
+);
+
 const BANK_PDF = 'pobierz/bank-zwrotow-nauczyciela.pdf'; // generuje scripts/generate-bank-zwrotow.py
 
 const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
