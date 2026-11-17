@@ -1,5 +1,6 @@
 // Generowane przez scripts/generate-static.js – nie edytuj ręcznie. Czyta to middleware.js.
 export default [
+  "dostosowanie-wymagan-a-warunki-pracy-ucznia-co-naprawde-sie-rozni",
   "nowa-klasa-od-pierwszego-spotkania-jak-szybko-zbudowac-dobre-relacje",
   "wypalenie-nauczyciela-jak-rozpoznac-wczesnie-i-co-robic-na-co-dzien",
   "jak-rozmawiac-z-rodzicami-o-opiece-nad-dzieckiem-bez-konfliktu-krok-po",
