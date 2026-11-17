@@ -186,6 +186,10 @@ z banera na stronie głównej i w `materialy.html` (oba znikają same po 24.12.2
 Zdarzenie GA `sklep_click` (`produkt`, `miejsce`), UTM `utm_source=eduboxpro`. Ton: „zobacz pakiet”, nigdy „kup teraz”;
 zawsze z dopiskiem, że płatne pakiety utrzymują darmową resztę. Pakiety do sprzedaży i generator PDF leżą poza repo
 (folder właściciela). Złoty Nauczyciel – profil dostawcy w weryfikacji.
+**Andrzejki – wieczór czarów** (`andrzejki-wieczor-czarow`, 19 zł, od 17.11.2026): jeden pakiet dla przedszkola i klas 1–3
+(każdy krok w dwóch wersjach), wróżby bez ognia; baner na stronie głównej i w `materialy.html` znika 28.11.2026
+(`sklep-andrzejki.webp`, `sklep_click` z `produkt: 'andrzejki'`). Darmowych Andrzejek z generatora NIE publikujemy –
+konkurowałyby z płatnym pakietem.
 
 **Narzędzia prywatne** (poza katalogiem, za Basic Auth przez `middleware.js`,
 `EWA_AUTH_USER`/`EWA_AUTH_PASS`):
