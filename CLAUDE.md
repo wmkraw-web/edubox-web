@@ -190,6 +190,9 @@ zawsze z dopiskiem, że płatne pakiety utrzymują darmową resztę. Pakiety do 
 (każdy krok w dwóch wersjach), wróżby bez ognia; baner na stronie głównej i w `materialy.html` znika 28.11.2026
 (`sklep-andrzejki.webp`, `sklep_click` z `produkt: 'andrzejki'`). Darmowych Andrzejek z generatora NIE publikujemy –
 konkurowałyby z płatnym pakietem.
+**Mikołajki – wielki pakiet** (`mikolajki`, 19 zł, od 18.11.2026): przedszkole + klasy 1–3, 4 piosenki MP3 i 3 teledyski MP4;
+baner na stronie głównej i w `materialy.html` znika 5.12.2026 (`sklep-mikolajki.webp`, `produkt: 'mikolajki'`). Darmowych
+Mikołajek z generatora też NIE publikujemy.
 
 **Narzędzia prywatne** (poza katalogiem, za Basic Auth przez `middleware.js`,
 `EWA_AUTH_USER`/`EWA_AUTH_PASS`):
