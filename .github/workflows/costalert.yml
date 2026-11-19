@@ -18,35 +18,52 @@ jobs:
       WEEKLY_LIMIT_USD: "15"
       FAL_MIN_BALANCE_USD: "5"
     steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      # Licznik dni z rzędu, w których Costs API odmówiło (429). Cache z unikalnym kluczem
+      # i restore-keys = najnowszy zapisany stan; nowy zapisuje się po udanym przebiegu.
+      - name: Wczytaj stan alertu
+        uses: actions/cache@v4
+        with:
+          path: .cost-alert-state
+          key: cost-alert-state-${{ github.run_id }}
+          restore-keys: cost-alert-state-
+
       - name: Sprawdź koszty i wyślij alert, jeśli trzeba
         run: |
           node <<'EOF'
+          const fs = require('fs');
+          const { fetchOpenAICosts, rateLimitAlert } = require('./scripts/openai-costs.js');
+          const STATE_DIR = '.cost-alert-state';
+          const STATE_FILE = STATE_DIR + '/state.json';
+
           async function main() {
-            const now = new Date();
-            const todayStart = Math.floor(new Date(now.toISOString().slice(0, 10) + 'T00:00:00Z').getTime() / 1000);
-            const weekStart = todayStart - 6 * 24 * 3600;
+            const today = new Date().toISOString().slice(0, 10);
+            let state = {};
+            try { state = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8')); } catch (e) {}
 
-            async function fetchOpenAICost(startTime) {
-              const url = `https://api.openai.com/v1/organization/costs?start_time=${startTime}&bucket_width=1d&limit=31`;
-              const res = await fetch(url, { headers: { Authorization: `Bearer ${process.env.OPENAI_ADMIN_KEY}` } });
-              if (!res.ok) throw new Error('OpenAI Costs API error: ' + res.status + ' ' + await res.text());
-              const data = await res.json();
-              let total = 0;
-              for (const bucket of data.data || []) {
-                for (const r of bucket.results || []) {
-                  total += (r.amount && r.amount.value) || 0;
-                }
-              }
-              return total;
-            }
-
-            let todayCost = 0, weekCost = 0, openaiError = null;
+            let todayCost = 0, weekCost = 0, openaiError = null, openaiRateLimited = false;
             try {
-              todayCost = await fetchOpenAICost(todayStart);
-              weekCost = await fetchOpenAICost(weekStart);
+              ({ today: todayCost, week: weekCost } = await fetchOpenAICosts({
+                adminKey: process.env.OPENAI_ADMIN_KEY,
+                log: m => console.log(m),
+              }));
             } catch (e) {
               openaiError = e.message;
+              openaiRateLimited = !!e.rateLimited;
             }
+
+            // Dni z rzędu z 429 (ręczne uruchomienie tego samego dnia nie nabija licznika).
+            let streak = 0;
+            if (openaiRateLimited) {
+              const prev = state.rateLimitStreak || 0;
+              streak = state.lastRateLimitDay === today ? Math.max(prev, 1) : prev + 1;
+              state.lastRateLimitDay = today;
+            }
+            state.rateLimitStreak = streak;
+            fs.mkdirSync(STATE_DIR, { recursive: true });
+            fs.writeFileSync(STATE_FILE, JSON.stringify(state) + '\n');
 
             let falBalance = null, falError = null;
             try {
@@ -68,6 +85,11 @@ jobs:
             if (!openaiError) {
               if (todayCost >= dailyLimit) alerts.push(`Dzienny koszt OpenAI: $${todayCost.toFixed(2)} (limit: $${dailyLimit.toFixed(2)})`);
               if (weekCost >= weeklyLimit) alerts.push(`Tygodniowy koszt OpenAI (7 dni): $${weekCost.toFixed(2)} (limit: $${weeklyLimit.toFixed(2)})`);
+            } else if (openaiRateLimited) {
+              // Chwilowy limit zapytań to nie problem z kosztami – mail dopiero, gdy trwa kilka dni.
+              const msg = rateLimitAlert(streak, openaiError);
+              if (msg) alerts.push(msg);
+              else console.log(`::warning::Costs API: limit zapytań mimo ponowień (dzień ${streak} z rzędu) – bez maila.`);
             } else {
               alerts.push(`Nie udało się pobrać kosztów OpenAI: ${openaiError}`);
             }
@@ -91,7 +113,7 @@ jobs:
               <ul>${alerts.map(a => `<li>${a}</li>`).join('')}</ul>
               <p>OpenAI dziś: $${todayCost.toFixed(2)} &bull; OpenAI 7 dni: $${weekCost.toFixed(2)} &bull; Fal.ai saldo: ${falBalance !== null ? '$' + falBalance.toFixed(2) : 'b/d'}</p>
               <p><a href="https://platform.openai.com/settings/organization/usage">Panel OpenAI</a> &bull; <a href="https://fal.ai/dashboard/billing">Panel Fal.ai</a></p>
-              <p style="color:#888;font-size:12px">Progi alertów ustawione w .github/workflows/cost-alert.yml (zmienne DAILY_LIMIT_USD / WEEKLY_LIMIT_USD / FAL_MIN_BALANCE_USD).</p>
+              <p style="color:#888;font-size:12px">Progi alertów ustawione w .github/workflows/costalert.yml (zmienne DAILY_LIMIT_USD / WEEKLY_LIMIT_USD / FAL_MIN_BALANCE_USD).</p>
             `;
 
             const emailRes = await fetch('https://api.resend.com/emails', {

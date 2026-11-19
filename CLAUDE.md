@@ -146,6 +146,11 @@ wzorów (np. EduDialog).
   `health-check.yml` (co 6h — sprawdza WSZYSTKIE strony .html i endpointy
   /api, alert mailem przez Resend jeśli coś nie odpowiada),
   `costalert.yml` (codziennie — koszty OpenAI/Fal.ai),
+  koszty OpenAI pobiera `scripts/openai-costs.js` (wspólny z `weekly-report.yml`, testy `costs:check`):
+  JEDNO zapytanie do Costs API (dziś = dzisiejszy kubełek z 7 dni), ponowienie przy 429/5xx (Retry-After albo
+  15/30/60 s). Limit Costs API (30/min) liczy się na całą organizację – 19.11.2026 drugie z dwóch zapytań dostało
+  429 i poszedł fałszywy „alert kosztowy”. Teraz chwilowy limit daje tylko ostrzeżenie w Actions, a mail dopiero
+  po 3 dniach z rzędu (licznik w cache `cost-alert-state-*`). Inne błędy (np. 401) nadal od razu mailem.
   `coffee-check.yml` (co 5 min — wpłaty buycoffee.to → kod PRO),
   `weekly-report.yml` (poniedziałki — raport tygodniowy).
   **Porada dnia** (od 22.10.2026) NIE idzie już przez Make ani AI: `porada-dnia.js` ma stałą pulę

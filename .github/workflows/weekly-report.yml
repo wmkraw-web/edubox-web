@@ -146,19 +146,11 @@ jobs:
             fs.writeFileSync(STATE_FILE, JSON.stringify(state, null, 2) + '\n', 'utf8');
           }
 
+          // Jedno zapytanie z ponowieniem przy 429 – wspólne z alertem kosztowym (scripts/openai-costs.js).
           async function fetchOpenAIWeekCost() {
-            const now = new Date();
-            const todayStart = Math.floor(new Date(now.toISOString().slice(0, 10) + 'T00:00:00Z').getTime() / 1000);
-            const weekStart = todayStart - 6 * 24 * 3600;
-            const url = `https://api.openai.com/v1/organization/costs?start_time=${weekStart}&bucket_width=1d&limit=31`;
-            const res = await fetch(url, { headers: { Authorization: `Bearer ${process.env.OPENAI_ADMIN_KEY}` } });
-            if (!res.ok) throw new Error('OpenAI Costs API error: ' + res.status + ' ' + await res.text());
-            const data = await res.json();
-            let total = 0;
-            for (const bucket of data.data || []) {
-              for (const r of bucket.results || []) total += (r.amount && r.amount.value) || 0;
-            }
-            return total;
+            const { fetchOpenAICosts } = require('./scripts/openai-costs.js');
+            const { week } = await fetchOpenAICosts({ adminKey: process.env.OPENAI_ADMIN_KEY, log: m => console.log(m) });
+            return week;
           }
 
           // Nowe kody "Postaw kawę" / "Poleć i zyskaj PRO" z ostatnich 7 dni - liczone wprost
