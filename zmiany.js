@@ -3,6 +3,22 @@
 // Najnowsze wpisy na początku tablicy.
 window.CO_NOWEGO = [
     {
+        "id": "2026-11-23-edugenerator-pro-linki-do-nowych-gotowych-przykladow",
+        "date": "2026-11-23",
+        "tag": "Ulepszenie",
+        "title": "EduGenerator PRO — linki do nowych gotowych przykładów",
+        "description": "Na stronie narzędzia dodano odnośniki do nowych stron z przykładami.",
+        "link": "edugenerator.html"
+    },
+    {
+        "id": "2026-11-23-edudyplomy-ai-poprawiony-opis-i-linki-do-przykladow",
+        "date": "2026-11-23",
+        "tag": "Poprawka",
+        "title": "EduDyplomy AI — poprawiony opis i linki do przykładów",
+        "description": "Opis nie obiecuje już girland; dodano odnośniki do nowych stron z przykładami.",
+        "link": "edudyplomy.html"
+    },
+    {
         "id": "2026-10-26-edugenerator-nowy-4-krokowy-kreator-dyplomow",
         "date": "2026-10-26",
         "tag": "Ulepszenie",
